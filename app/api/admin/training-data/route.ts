@@ -5,7 +5,7 @@ import { getTrainingStats, backfillFromItems, backfillFromProducts, backfillFrom
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-// GET — training dataset stats (admin only).
+// GET: training dataset stats (admin only).
 export async function GET(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  try {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
  }
 }
 
-// POST — backfill every existing listing (VYA inventory + marketplace products) into
+// POST: backfill every existing listing (VYA inventory + marketplace products) into
 // the training dataset. Idempotent: re-running only adds what's new.
 export async function POST(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

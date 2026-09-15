@@ -15,7 +15,7 @@ import { colors, fonts, spacing } from "../lib/theme";
 export default function AppHeader({ title, wordmark }: { title?: string; wordmark?: boolean }) {
   const { count } = useCart();
   // The tab screens draw their own header, so nothing above them reserves the status bar. Without
-  // this the wordmark sits underneath the clock and the notch — which is exactly what it did.
+  // this the wordmark sits underneath the clock and the notch, which is exactly what it did.
   const insets = useSafeAreaInsets();
 
   return (
@@ -28,7 +28,7 @@ export default function AppHeader({ title, wordmark }: { title?: string; wordmar
       }}
     >
       {wordmark ? (
-        // The real logotype — Georgia was a stand-in and never matched the mark.
+        // The real logotype: Georgia was a stand-in and never matched the mark.
         <Image
           source={require("../assets/wordmark.png")}
           style={{ width: 92, height: 30 }}

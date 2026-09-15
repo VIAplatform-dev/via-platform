@@ -19,7 +19,7 @@ test("a per-day ladder is recognised on the way back in", () => {
 });
 
 test("named lengths are not mistaken for a daily rate", () => {
- // The 4/7/28 ladder a seller types by hand — three rows, not a rate.
+ // The 4/7/28 ladder a seller types by hand. Three rows, not a rate.
  const named = [{ days: 4, cents: 2000 }, { days: 7, cents: 2500 }, { days: 28, cents: 10000 }];
  assert.equal(perDayRate(named, 4, 28), null);
 });

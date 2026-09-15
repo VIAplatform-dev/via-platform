@@ -18,12 +18,12 @@ type Profile = {
 
 const FIELDS: { key: keyof Profile; label: string; hint?: string; half?: boolean }[] = [
  { key: "displayName", label: "Store name", hint: "What buyers see." },
- { key: "legalName", label: "Legal business name", hint: "The name on your bank account and customs paperwork — often not your shop name." },
+ { key: "legalName", label: "Legal business name", hint: "The name on your bank account and customs paperwork. Often not your shop name." },
  { key: "supportEmail", label: "Support email", hint: "Where buyers reach you. Shown on receipts.", half: true },
  { key: "supportPhone", label: "Support phone", hint: "Couriers require one for international parcels.", half: true },
- { key: "companyNumber", label: "Company number", hint: "Companies House, EIN, ABN — whatever your country calls it.", half: true },
+ { key: "companyNumber", label: "Company number", hint: "Companies House, EIN, ABN. Whatever your country calls it.", half: true },
  { key: "vatNumber", label: "VAT / GST number", hint: "For your invoices. Separate from where you collect tax.", half: true },
- { key: "location", label: "Location", hint: "Shown on your storefront — “London, UK”." },
+ { key: "location", label: "Location", hint: "Shown on your storefront. “London, UK”." },
 ];
 
 export default function StoreDetailsPage() {

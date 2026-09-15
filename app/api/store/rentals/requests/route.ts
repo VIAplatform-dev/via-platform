@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // holds the dates while the store thinks about it is the STORE'S setting, and
 // createRequest snapshots that choice onto the row.
 
-// GET — the seller's inbox.
+// GET: the seller's inbox.
 export async function GET(request: NextRequest) {
  const acting = await seller(request);
  if (!acting) return unauthorized();

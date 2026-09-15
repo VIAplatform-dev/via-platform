@@ -16,20 +16,20 @@ import { getSellerBySlug } from "@/app/lib/db/sellers";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// The store's own email tool — Klaviyo or Mailchimp.
+// The store's own email tool. Klaviyo or Mailchimp.
 //
 // The API key is never sent back to the browser. Once saved it exists only server-side; the page
 // gets a masked version so a seller can tell which key is connected without it being readable over
 // her shoulder or sitting in a browser cache.
 
-/** GET — what's connected, if anything. */
+/** GET: what's connected, if anything. */
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const r = await espAuth(slug);
- // What VYA itself can offer — missing app credentials is our problem to fix, not something to show
+ // What VYA itself can offer. Missing app credentials is our problem to fix, not something to show
  // a seller as a broken button.
- // Only what a store can actually connect to — see connectableProviders. Klaviyo used to be listed
+ // Only what a store can actually connect to. See connectableProviders. Klaviyo used to be listed
  // greyed out with "we're finishing the approval with them", which was not true of anything.
  const offer = new Set(connectableProviders());
  const available = PROVIDERS.filter((p) => offer.has(p.key)).map((p) => ({ ...p, available: true }));
@@ -73,8 +73,8 @@ export async function GET(request: NextRequest) {
  });
 }
 
-/** POST { listId } — choose the audience. { autoSync } / { handOverMarketing } — switches.
- *  { sync: true } — send everyone now. Connecting itself is OAuth: see connect/[provider]. */
+/** POST { listId }: choose the audience. { autoSync } / { handOverMarketing }: switches.
+ *  { sync: true }: send everyone now. Connecting itself is OAuth: see connect/[provider]. */
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: "Nothing to do." }, { status: 400 });
 }
 
-/** DELETE — forget the key entirely. */
+/** DELETE: forget the key entirely. */
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

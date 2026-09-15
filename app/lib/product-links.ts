@@ -8,12 +8,12 @@
  *
  *   <a class="tile-link absolute inset-0" href="/products/prada-…" aria-labelledby="…-label"></a>
  *
- * On that theme the old rule found nothing — so parity reported 0 products on the seller's site and
+ * On that theme the old rule found nothing, so parity reported 0 products on the seller's site and
  * 0 on ours, called it a match it could not make, and graded the store "we couldn't compare". The
  * store passed by not being looked at. Six pages across three stores did this in one fleet run.
  *
  * Two changes follow from that. A product's IDENTITY is the handle in its URL, never its displayed
- * text — that survives any markup and makes "same product" unambiguous. Its NAME is whatever the
+ * text: that survives any markup and makes "same product" unambiguous. Its NAME is whatever the
  * page offers, tried in order of how much we should trust it.
  */
 
@@ -43,7 +43,7 @@ const CODE = "USD|GBP|EUR|CAD|AUD|JPY";
 const MONEY = new RegExp(`(?:[$£€¥]\\s?)?[\\d,]+(?:\\.\\d{2})?\\s?(?:${CODE})|(?:[$£€¥]|${CODE})\\s?[\\d,]+(?:\\.\\d{2})?`, "g");
 /**
  * A tag, not a name. Reading a tile's textContent picks up the SOURCE of anything inside a
- * <noscript> — themes put a fallback <img> there for browsers without JavaScript — so bag-crush's
+ * <noscript> themes put a fallback <img> there for browsers without JavaScript, so bag-crush's
  * product names came back as '<img src="//mybagcrush.com/cdn/shop/file…'. Requires a tag-like
  * shape, so an ordinary "Size < 8" keeps its angle bracket.
  */
@@ -71,7 +71,7 @@ function fromTile(tileText: string): string {
 }
 
 /**
- * A candidate is only a name if it is words — not markup, and not the theme's own chrome. A badge
+ * A candidate is only a name if it is words, not markup, and not the theme's own chrome. A badge
  * reads as a name from any source, not just the tile: bag-crush quoted two pieces to its seller as
  * "SOLD OUT" because the filter only ran on the tile fallback.
  */
@@ -100,7 +100,7 @@ export function productsFromLinks(links: ProductLinkCandidate[]): PageProduct[] 
   const existing = byHandle.get(handle);
   if (!existing) { byHandle.set(handle, { handle, title: title.slice(0, MAX_TITLE) }); continue; }
   // A theme often emits the same product twice (a mobile link and a desktop one). Keep the first
-  // position — order is what the order comparison measures — but take a name if we did not have one.
+  // position, order is what the order comparison measures, but take a name if we did not have one.
   if (!existing.title && title) existing.title = title.slice(0, MAX_TITLE);
  }
  return [...byHandle.values()];
@@ -152,7 +152,7 @@ export const COLLECT_PRODUCT_LINKS = `(function () {
 /**
  * The headings on a page that are actually SECTIONS.
  *
- * Themes routinely mark a product's name as an `<h2>` — bag-crush's uses `product-item__title` — so
+ * Themes routinely mark a product's name as an `<h2>`, bag-crush's uses `product-item__title`, so
  * a featured strip showing different pieces was reported as "2 section headings missing" as well as
  * "2 products not shown here" and "2 products in a different order". One difference, counted three
  * times, and only one of the three was the truth.

@@ -1,4 +1,4 @@
-// Content sections — announcement, text, statement, marquee. Small sections that carry words rather
+// Content sections. Announcement, text, statement, marquee. Small sections that carry words rather
 // than merchandise, and where the layout choice is mostly about how loud the words are.
 import { FreeField, emptyHint, type EditKit } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
@@ -8,7 +8,7 @@ import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 // hairline rule, and a scrolling ticker for when there's more than one thing to say.
 // `vya-fill` is the contract that makes a section's resize handle drive THIS element's height (see
 // sectionOverrideCss). Without it the coloured band keeps its natural height and a resize just piles
-// empty page behind it — the seller drags for a taller bar and gets a short bar with a gap under it.
+// empty page behind it. The seller drags for a taller bar and gets a short bar with a gap under it.
 // With it, the colour is the section, at whatever height they choose, text centred in the middle.
 function AnnouncementBar({ kit }: { kit: EditKit }) {
  const { ctx, p, txt } = kit;
@@ -32,12 +32,12 @@ function AnnouncementQuiet({ kit }: { kit: EditKit }) {
  );
 }
 
-// A ticker. The message repeats across the strip and scrolls — for stores running several notices at
+// A ticker. The message repeats across the strip and scrolls, for stores running several notices at
 // once (shipping, a drop time, a discount). Paused and shown once in the editor so it's editable.
 function AnnouncementTicker({ kit }: { kit: EditKit }) {
  const { ctx, p, txt } = kit;
  if (!p.text) return null;
- // Centred in the editor, where the ticker is paused showing ONE copy — left-aligned it just reads as
+ // Centred in the editor, where the ticker is paused showing ONE copy. Left-aligned it just reads as
  // text that failed to load. Live it stays flush left: a strip that scrolls from a centred start
  // would visibly jump the moment the animation begins.
  return (
@@ -65,7 +65,7 @@ function TextCentered({ kit }: { kit: EditKit }) {
  );
 }
 
-// Left-aligned with the heading held in a narrow column beside the copy — the shape a magazine uses
+// Left-aligned with the heading held in a narrow column beside the copy. The shape a magazine uses
 // for a standfirst. Gives a long about-page paragraph somewhere to breathe.
 function TextEditorial({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
@@ -79,7 +79,7 @@ function TextEditorial({ kit }: { kit: EditKit }) {
  );
 }
 
-// The copy set in two columns, newspaper-style. Only worth choosing for genuinely long text — it's
+// The copy set in two columns, newspaper-style. Only worth choosing for genuinely long text. It's
 // the one layout here that gets better the more words you have.
 function TextColumns({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
@@ -128,7 +128,7 @@ function StatementBoxed({ kit }: { kit: EditKit }) {
  );
 }
 
-// The attribution sits beside the quote rather than under it, on its own hairline column — a credit
+// The attribution sits beside the quote rather than under it, on its own hairline column. A credit
 // line, the way a magazine runs a byline down the margin.
 function StatementSide({ kit }: { kit: EditKit }) {
  const { b, ctx, p, txtPlain } = kit;
@@ -192,7 +192,7 @@ function MarqueeStatic({ kit }: { kit: EditKit }) {
  );
 }
 
-// Oversized display type, scrolling. The names become the graphic rather than a footnote — good as a
+// Oversized display type, scrolling. The names become the graphic rather than a footnote. Good as a
 // break between two heavy sections.
 function MarqueeDisplay({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;

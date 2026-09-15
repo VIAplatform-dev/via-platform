@@ -2,7 +2,7 @@
 // We embed each listing photo so a new upload can be matched against the seller's
 // own past pieces ("this looks like 3 things you listed as Blumarine").
 //
-// Gated on VOYAGE_API_KEY — if it's not set, embedImage returns null and the whole
+// Gated on VOYAGE_API_KEY, if it's not set, embedImage returns null and the whole
 // visual-retrieval path degrades gracefully back to the v1 text hints.
 
 import { recordVoyage } from "./cost-tracker";
@@ -55,7 +55,7 @@ export async function embedImageResult(imageUrl: string): Promise<{ embedding: n
  return { embedding: null, status: "error" };
 }
 
-/** Embed an image the browser just captured (a data: URL), for Market Mode's photo search — no Blob
+/** Embed an image the browser just captured (a data: URL), for Market Mode's photo search, no Blob
  *  round-trip, so the seller isn't waiting on an upload before the match. Same model/space as the
  *  URL-embedded item index. */
 export async function embedImageData(dataUrl: string): Promise<number[] | null> {
@@ -81,7 +81,7 @@ export async function embedImage(imageUrl: string): Promise<number[] | null> {
  return (await embedImageResult(imageUrl)).embedding;
 }
 
-/** Embed several images in ONE Voyage call (far cheaper + faster than N calls) — used to
+/** Embed several images in ONE Voyage call (far cheaper + faster than N calls). Used to
  *  visually verify a batch of reverse-image comp thumbnails against the query photo. Returns a
  *  vector per input URL in order, null where that image failed. Chunks large batches. */
 export async function embedImages(imageUrls: string[]): Promise<(number[] | null)[]> {

@@ -48,7 +48,7 @@ const FASHION_STEM_PAIRS: [string, string][] = [
   ["platforms", "platform"],
   ["brogues", "brogue"],
   ["moccasins", "moccasin"],
-  // Clothing — tops
+  // Clothing: tops
   ["tops", "top"],
   ["shirts", "shirt"],
   ["blouses", "blouse"],
@@ -58,7 +58,7 @@ const FASHION_STEM_PAIRS: [string, string][] = [
   ["tees", "tee"],
   ["tunics", "tunic"],
   ["corsets", "corset"],
-  // Clothing — bottoms
+  // Clothing: bottoms
   ["pants", "pant"],
   ["trousers", "trouser"],
   ["leggings", "legging"],
@@ -66,7 +66,7 @@ const FASHION_STEM_PAIRS: [string, string][] = [
   ["shorts", "short"],
   ["skirts", "skirt"],
   ["jeans", "jean"],
-  // Clothing — dresses & suits
+  // Clothing: dresses & suits
   ["dresses", "dress"],
   ["gowns", "gown"],
   ["jumpsuits", "jumpsuit"],
@@ -74,7 +74,7 @@ const FASHION_STEM_PAIRS: [string, string][] = [
   ["overalls", "overall"],
   ["playsuits", "playsuit"],
   ["coordinates", "coordinate"],
-  // Clothing — outerwear
+  // Clothing: outerwear
   ["coats", "coat"],
   ["jackets", "jacket"],
   ["blazers", "blazer"],
@@ -165,7 +165,7 @@ function stemVariants(word: string): string[] {
 
 // Common search terms → internal category slug (used for quick-link chips)
 const categoryAliases: Record<string, string> = {
-  // Shoes — map to specific sub-slugs where they exist
+  // Shoes: map to specific sub-slugs where they exist
   boot: "boots", boots: "boots",
   bootie: "boots", booties: "boots",
   shoe: "shoes", shoes: "shoes",
@@ -283,10 +283,10 @@ const SYNONYMS: Record<string, string[]> = {
   "faux fur": ["teddy", "sherpa"],
   teddy: ["faux fur", "sherpa"],
   sherpa: ["faux fur", "teddy"],
-  // Footwear — UK/US
+  // Footwear: UK/US
   trainers: ["sneakers"],
   sneakers: ["trainers"],
-  // Footwear — style equivalents
+  // Footwear: style equivalents
   western: ["cowboy"],
   cowboy: ["western"],
   // Silhouette terms
@@ -352,7 +352,7 @@ function parseWords(q: string): string[] {
   return meaningful.length > 0 ? meaningful : all;
 }
 
-// Sanitize for plainto_tsquery — strips chars that could cause parse errors
+// Sanitize for plainto_tsquery: strips chars that could cause parse errors
 function toSafeTsQuery(q: string): string {
   return q.replace(/[^\w\s'\-]/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -360,7 +360,7 @@ function toSafeTsQuery(q: string): string {
 // ── "Did you mean …?" ────────────────────────────────────────────────────────
 //
 // The vocabulary is the one the search ALREADY knows: every brand alias, every category
-// alias, every fashion stem. No new list to keep in sync — a brand added to brandData is
+// alias, every fashion stem. No new list to keep in sync. A brand added to brandData is
 // spellable the day it lands.
 //
 // Corrections are offered per word, so "balencaga bag" becomes "balenciaga bag" and the
@@ -412,7 +412,7 @@ function nearestWord(word: string): string | null {
   let best: string | null = null;
   let bestD = max + 1;
   for (const cand of SPELL_VOCAB) {
-    if (cand === word) return null; // spelled correctly — nothing to suggest
+    if (cand === word) return null; // spelled correctly: nothing to suggest
     const d = editDistance(word, cand, max);
     if (d < bestD) { bestD = d; best = cand; }
   }
@@ -463,11 +463,11 @@ export async function GET(request: Request) {
 
   // Paging. The old handler had a hard LIMIT 200 and no total, so a query like "bag"
   // (706 matches) silently showed 200 and called it the answer. Now the count is the
-  // truth and the caller walks the rest a page at a time — returning all 706 in one
+  // truth and the caller walks the rest a page at a time. Returning all 706 in one
   // response is ~780KB, nearly all of it the per-product `images` JSON.
   const limit = Math.min(Math.max(Number(searchParams.get("limit")) || 96, 1), 200);
   const offset = Math.max(Number(searchParams.get("offset")) || 0, 0);
-  // Filter and sort run in SQL, over EVERY match — not over whatever page happens to be
+  // Filter and sort run in SQL, over EVERY match, not over whatever page happens to be
   // loaded. Client-side filtering of a paged list quietly lies about what it searched.
   const storeFilter = searchParams.get("store") ?? "";
   const sortParam = searchParams.get("sort") ?? "relevance";
@@ -476,7 +476,7 @@ export async function GET(request: Request) {
   // the ones in your size meant leaving search and browsing a category instead.
   //
   // Applied in SQL, not in JavaScript over the loaded page. The results are paginated, so
-  // filtering the 96 rows that happen to be downloaded would silently hide matches on page two —
+  // filtering the 96 rows that happen to be downloaded would silently hide matches on page two,
   // the same trap the store filter and the sort already had to be moved into SQL to avoid.
   const csv = (k: string) => (searchParams.get(k) ?? "").split(",").map((v) => v.trim()).filter(Boolean);
   const sizes = csv("sizes").map((v) => v.toUpperCase());
@@ -502,14 +502,14 @@ export async function GET(request: Request) {
     // ── 1. Parse query ────────────────────────────────────────────────────────
     const words = parseWords(q);
 
-    // A query that parses to nothing — punctuation, or two single letters — used to match
+    // A query that parses to nothing, punctuation, or two single letters. Used to match
     // EVERYTHING: `LIKE ALL('{}')` is TRUE in Postgres, so the "all typed words present"
     // clause passed every row. Searching ".." returned the whole catalogue.
     if (words.length === 0) {
       return NextResponse.json({ products: [], designers: [], categories: [], stores: [], storeFacets: [], total: 0, hasMore: false, suggestion: null });
     }
 
-    // Original word patterns — used for "all words present" scoring bonus.
+    // Original word patterns. Used for "all words present" scoring bonus.
     // Only the exact words typed (no expansion), so "leather jacket" ALL check
     // only fires when BOTH "leather" AND "jacket" are in the title.
     const originalWordPatterns = words.map(w => `%${w}%`);
@@ -553,7 +553,7 @@ export async function GET(request: Request) {
       ? `%${detectedBrand.keywords[0]}%`
       : phrasePattern;
 
-    // Every alias of the detected brand, as whole-word regexes — so "ysl" ALSO pulls titles that
+    // Every alias of the detected brand, as whole-word regexes, so "ysl" ALSO pulls titles that
     // say "Yves Saint Laurent" / "Saint Laurent" (and vice versa), instead of each spelling being
     // its own island. Whole-word \y keeps short aliases safe ("lv" ≠ "velvet").
     const brandAliasRegexes = detectedBrand
@@ -576,7 +576,7 @@ export async function GET(request: Request) {
     // appearing anywhere in the query as a plain substring, which made "silver" suggest
     // Louis Vuitton (it contains "lv") and "at" suggest Kate Spade, Ferragamo and Issey
     // Miyake. Short aliases are whole-worded by aliasMatches, exactly as detectBrand does,
-    // and a typed query only prefix-matches a label — "at" is not the start of anything.
+    // and a typed query only prefix-matches a label. "at" is not the start of anything.
     const matchedDesigners = brands
       .filter(b => {
         const bLabel = stripAccents(b.label.toLowerCase());
@@ -589,7 +589,7 @@ export async function GET(request: Request) {
       .slice(0, 5)
       .map(b => ({ slug: b.slug, label: b.label }));
 
-    // Category chips — check the full query and each word+variant for matches
+    // Category chips. Check the full query and each word+variant for matches
     const matchedCategories: { slug: string; label: string }[] = [];
     const seenCatSlugs = new Set<string>();
     const addCatChip = (slug: string) => {
@@ -627,7 +627,7 @@ export async function GET(request: Request) {
     //  10 000  exact title match ("boots" = title)
     //   5 000  title starts with query
     //   2 000  title contains ANY phrase variant (exact, stem, hyphen-swap, synonym)
-    //   0–1000 FTS ts_rank — handles stemming, word forms, partial matches
+    //   0–1000 FTS ts_rank: handles stemming, word forms, partial matches
     //     500  ALL original words present in title (multi-word quality signal)
     //     300  ANY expanded variant present (catches stems/synonyms not in phrase)
     //     800  product_type brand field matches detected brand
@@ -685,7 +685,7 @@ export async function GET(request: Request) {
             -- expanded word" rule, which let a single common word like "el" in
             -- "el dante" match every title containing "el" (yellow, velvet, …).
             OR unaccent(LOWER(title)) LIKE ALL(${originalWordPatterns})
-            -- Full-text (stemmed, ANDs the terms — so it's word-complete too)
+            -- Full-text (stemmed, ANDs the terms, so it's word-complete too)
             OR to_tsvector('english', unaccent(COALESCE(title, '')))
                @@ plainto_tsquery('english', unaccent(${safeQ}))
             OR (product_type IS NOT NULL
@@ -721,7 +721,7 @@ export async function GET(request: Request) {
 
     // Store facets over the WHOLE match set, so the filter chips are complete on page 1
     // and their counts don't change as you load more. It is a second pass over the same
-    // predicate, so it runs ONCE — on page one, unfiltered, and never for the header's
+    // predicate, so it runs ONCE, on page one, unfiltered, and never for the header's
     // autocomplete (facets=0), which fires on every keystroke and shows no chips.
     const wantFacets = offset === 0 && !storeFilter && searchParams.get("facets") !== "0";
     const facetRows = !wantFacets ? [] : await sql`
@@ -774,7 +774,7 @@ export async function GET(request: Request) {
           ...fuzzy.filter((p: Record<string, unknown>) => !existingIds.has(p.id)),
         ];
       } catch {
-        // pg_trgm not available — graceful no-op
+        // pg_trgm not available: graceful no-op
       }
     }
 
@@ -788,8 +788,8 @@ export async function GET(request: Request) {
       : 0;
 
     // ── 6. "Did you mean …?" ──────────────────────────────────────────────────
-    // Only when the result set is thin — a query returning plenty of what was asked for
-    // does not need second-guessing — and only on the first page. The candidate is then
+    // Only when the result set is thin. A query returning plenty of what was asked for
+    // does not need second-guessing, and only on the first page. The candidate is then
     // CHECKED against the catalogue: suggesting a correction that also finds nothing is
     // worse than saying nothing at all.
     let suggestion: { term: string; count: number } | null = null;
@@ -797,7 +797,7 @@ export async function GET(request: Request) {
       const candidate = spellSuggest(words);
       if (candidate && candidate !== q) {
         try {
-          // Every corrected word present, in any order — the same "all words" rule the
+          // Every corrected word present, in any order. The same "all words" rule the
           // main search uses. A phrase LIKE would undercount "leather jacket" against
           // titles that read "jacket, leather".
           const candPatterns = candidate.split(" ").map(w => `%${w}%`);
@@ -813,12 +813,12 @@ export async function GET(request: Request) {
           // vocabulary but perfectly well spelled.
           if (n >= total * 1.5 && n >= total + 15) suggestion = { term: candidate, count: n };
         } catch {
-          // Counting failed — just don't suggest.
+          // Counting failed, just don't suggest.
         }
       }
     }
 
-    // Fire-and-forget: log search analytics — committed searches only.
+    // Fire-and-forget: log search analytics. Committed searches only.
     // brand_slug is the canonical brand the query resolves to (via detectBrand),
     // so search DEMAND rolls up by brand instead of fragmenting across spellings
     // ("ysl", "yves saint laurent", "saint laurent" → all "saint-laurent"). NULL
@@ -860,7 +860,7 @@ export async function GET(request: Request) {
           const all = p.images ? JSON.parse(p.images as string) : undefined;
           parsedImages = Array.isArray(all) ? all.slice(0, 4) : all;
         } catch {
-          // malformed JSON — skip
+          // malformed JSON: skip
         }
         return {
           id: p.id,

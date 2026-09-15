@@ -4,7 +4,7 @@ import { neon } from "@neondatabase/serverless";
 // Domain renewal billing.
 //
 // A domain bought through VYA is registered on VYA's Vercel account with
-// auto-renew on. Year one nets out — the seller's card is charged the same
+// auto-renew on. Year one nets out. The seller's card is charged the same
 // amount VYA pays. Every year after that, Vercel charges VYA and nothing
 // charges the seller, so the cost quietly accumulates with every domain sold.
 //
@@ -25,7 +25,7 @@ export type RenewalStatus = "charged" | "failed" | "skipped";
 export type RenewalRow = {
  domain: string;
  storeSlug: string;
- periodEnd: string; // the expiry this charge covers — the idempotency key
+ periodEnd: string; // the expiry this charge covers. The idempotency key
  amountCents: number;
  status: RenewalStatus;
  detail: string | null;
@@ -56,7 +56,7 @@ async function ensure() {
 /**
  * Claim this domain's renewal period, returning false if it's already been
  * attempted. Written before the charge so a crash mid-charge can't produce a
- * second attempt — a stuck row is visible and fixable; a double charge is not.
+ * second attempt: a stuck row is visible and fixable; a double charge is not.
  */
 export async function claimRenewal(domain: string, storeSlug: string, periodEnd: string): Promise<boolean> {
  await ensure();
@@ -78,7 +78,7 @@ export async function settleRenewal(domain: string, periodEnd: string, r: { stat
  `;
 }
 
-/** Recent renewal attempts, newest first — for the admin and for support questions. */
+/** Recent renewal attempts, newest first, for the admin and for support questions. */
 export async function listRenewals(limit = 100): Promise<RenewalRow[]> {
  await ensure();
  const rows = (await db()`
@@ -96,7 +96,7 @@ export async function listRenewals(limit = 100): Promise<RenewalRow[]> {
  }));
 }
 
-/** Every store with a connected domain — the set the renewal cron walks. */
+/** Every store with a connected domain. The set the renewal cron walks. */
 export async function storesWithDomains(): Promise<{ storeSlug: string; domain: string }[]> {
  const rows = (await db()`
   SELECT store_slug, custom_domain FROM storefront_settings

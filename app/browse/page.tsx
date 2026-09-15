@@ -13,16 +13,16 @@ import { computeProductScore } from "@/app/lib/productRanking";
 import { getAllEditorsPicks } from "@/app/lib/editors-picks-db";
 
 export const metadata: Metadata = {
- title: "Browse Vintage & Secondhand — VYA",
+ title: "Browse Vintage & Secondhand. VYA",
  description: "Discover unique vintage and secondhand pieces from the world's best independent stores, all in one place.",
  openGraph: {
- title: "Browse Vintage & Secondhand — VYA",
+ title: "Browse Vintage & Secondhand. VYA",
  description: "Discover unique vintage and secondhand pieces from the world's best independent stores, all in one place.",
  images: [{ url: "/og-image.png", width: 1200, height: 630 }],
  },
  twitter: {
  card: "summary_large_image",
- title: "Browse Vintage & Secondhand — VYA",
+ title: "Browse Vintage & Secondhand. VYA",
  description: "Discover unique vintage and secondhand pieces from the world's best independent stores, all in one place.",
  images: ["/og-image.png"],
  },

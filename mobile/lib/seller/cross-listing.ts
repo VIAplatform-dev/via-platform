@@ -1,6 +1,6 @@
 // Which marketplaces the phone offers, and what it honestly promises about each.
 //
-// /api/store/cross-listing returns every channel VYA knows about — ten of them — each carrying a
+// /api/store/cross-listing returns every channel VYA knows about, ten of them. Each carrying a
 // `mode` that says how a piece would actually get posted. The phone was drawing all ten as equal
 // chips, so a seller could switch on Poshmark or Grailed and nothing would ever happen there.
 //

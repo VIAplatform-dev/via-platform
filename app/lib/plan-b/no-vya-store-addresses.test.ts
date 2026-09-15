@@ -6,9 +6,9 @@ import { join } from "node:path";
 // A STORE'S ADDRESS IS ITS OWN. This test reads the source and fails if anyone builds a store URL
 // on a VYA host.
 //
-// It exists because the same mistake was made independently in five places — the assistant's
+// It exists because the same mistake was made independently in five places. The assistant's
 // replies, the seller's share links, the editor's "View live" button, the storefront's SEO canonical
-// tag, and the proxy's missing redirect for /site — and each one looked reasonable on its own. They
+// tag, and the proxy's missing redirect for /site, and each one looked reasonable on its own. They
 // were all the same shape: a fallback, for the case where the store origin could not be resolved,
 // that quietly named a path on the marketplace instead.
 //
@@ -25,7 +25,7 @@ const SEARCH = ["app", "proxy.ts", "middleware.ts"];
 /** Building a storefront URL on a host that is VYA's rather than the seller's. */
 const FORBIDDEN = /(vyaplatform\.com|getvya\.ai)[^"'`\s]*\/(s|site)\//;
 
-/** Comment lines — this file's own subject matter is these strings, and so is a lot of prose. */
+/** Comment lines. This file's own subject matter is these strings, and so is a lot of prose. */
 const isComment = (line: string) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
 function* sources(dir: string): Generator<string> {
@@ -58,7 +58,7 @@ test("no source builds a store address on a VYA host", () => {
  assert.deepEqual(
   offenders,
   [],
-  `A store's address must come from storeAddress()/storePublicOrigin(), and null means hide the link —\n` +
+  `A store's address must come from storeAddress()/storePublicOrigin(), and null means hide the link. \n` +
   `never a path on vyaplatform.com or getvya.ai. Offending lines:\n  ${offenders.join("\n  ")}\n`,
  );
 });

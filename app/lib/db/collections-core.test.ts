@@ -7,7 +7,7 @@ const own = (id: string) => ({ id, origin: "user" });
 
 test("a rail synced from the seller's own site shows exactly what they filed there", () => {
  // Their "Dresses" rail holds 3 pieces. 300 more imported pieces happen to be categorised
- // "dresses" — those live in whatever rails the seller actually put them in, not this one.
+ // "dresses". Those live in whatever rails the seller actually put them in, not this one.
  const assigned = [src("a"), src("b"), src("c")];
  const matched = [src("a"), src("x"), src("y"), src("z")];
  const out = mergeStorefrontCollectionItems(assigned, matched);
@@ -22,7 +22,7 @@ test("a piece the seller adds in the portal still lands in the rail it belongs t
  assert.deepEqual(out.map((i) => i.id), ["a", "b", "new-1"]);
 });
 
-test("nothing filed and only imported matches — the collection is empty, not guessed at", () => {
+test("nothing filed and only imported matches. The collection is empty, not guessed at", () => {
  // This used to fall back to the guess "so the shopper doesn't see an empty page", and it bypassed
  // the imported-pieces rule below to do it. On blummier that served 28 Gucci-branded pieces under a
  // collection she had filed nothing into, and did the same for 25 others. An imported piece already
@@ -45,7 +45,7 @@ test("a piece is never listed twice", () => {
  assert.deepEqual(out.map((i) => i.id), ["a", "b", "c"]);
 });
 
-test("the seller's own order is preserved — assigned first, in their order", () => {
+test("the seller's own order is preserved. Assigned first, in their order", () => {
  const assigned = [src("c"), src("a"), src("b")];
  const out = mergeStorefrontCollectionItems(assigned, [own("z")]);
  assert.deepEqual(out.map((i) => i.id), ["c", "a", "b", "z"]);

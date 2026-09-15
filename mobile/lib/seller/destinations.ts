@@ -1,13 +1,13 @@
 // The places in the portal, as things you can search for.
 //
-// /api/store/search looks up DATA — a piece, an order, a customer, a discount code. It has no idea
+// /api/store/search looks up DATA. A piece, an order, a customer, a discount code. It has no idea
 // the app has screens. So typing "consignment" on Home, with a Consignment tile visible two inches
 // below the box, answered "Nothing matches 'consignment'". A search that cannot find the thing on
 // the screen behind it reads as broken.
 //
 // This is the other half: a small local index of destinations, matched on the phone with no
 // request, merged above the data hits. Local because it must answer instantly and must answer
-// offline — the whole point is that it is faster than remembering which drawer a setting lives in.
+// offline: the whole point is that it is faster than remembering which drawer a setting lives in.
 //
 // KEYWORDS ARE THE WORDS SHE WOULD ACTUALLY TYPE, not the words we named the screen. Nobody
 // searches "policy"; they search "returns" or "refunds". Nobody searches "domain"; they search

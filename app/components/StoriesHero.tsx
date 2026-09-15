@@ -37,7 +37,7 @@ export default function StoriesHero({ stories }: { stories: Story[] }) {
  <div className="overflow-hidden rounded-sm">
  {/* Mobile: stacked, Desktop: two columns */}
  <div className="flex flex-col md:grid md:grid-cols-2 md:min-h-[560px]">
- {/* Image — on top for mobile, right side for desktop */}
+ {/* Image, on top for mobile, right side for desktop */}
  <div className="relative aspect-[16/9] md:aspect-auto md:order-2">
  {stories.map((s, i) => {
  const next = (current + 1) % stories.length;
@@ -59,7 +59,7 @@ export default function StoriesHero({ stories }: { stories: Story[] }) {
  })}
  </div>
 
- {/* Logo + text panel — below image on mobile, left side for desktop */}
+ {/* Logo + text panel. Below image on mobile, left side for desktop */}
  <div className="flex flex-col justify-center items-center text-center px-6 sm:px-12 py-10 sm:py-16 bg-[#FFFDF8] md:order-1">
  {/* Store name */}
  <div

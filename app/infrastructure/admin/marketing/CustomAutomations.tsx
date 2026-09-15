@@ -1,11 +1,11 @@
 "use client";
 
-// The seller's own automatic emails — her triggers, her words — and the form that makes one.
+// The seller's own automatic emails, her triggers, her words, and the form that makes one.
 //
 // This used to be the bottom half of a separate Automations page whose top half listed the same
 // built-in flows, with the same toggles, that Your emails already showed. Two pages for one
 // question: "what does my shop send?" A seller reading them side by side said they felt "virtually
-// the same", and she was right — the only thing that page had of its own is here.
+// the same", and she was right. The only thing that page had of its own is here.
 
 import { useEffect, useState } from "react";
 import { Zap, Plus, X } from "lucide-react";
@@ -95,13 +95,13 @@ export function CustomAutomations() {
       <h2 className="mb-4 text-base font-semibold text-stone-900">New automation</h2>
       <div className="space-y-3">
        <Field label="Name"><Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Welcome new customers" /></Field>
-       <Field label="Trigger — when it sends">
+       <Field label="Trigger, when it sends">
         <select value={form.trigger} onChange={(e) => setForm((f) => ({ ...f, trigger: e.target.value }))} className="h-9 w-full rounded-md border border-stone-300 bg-white px-2 text-[13px] text-stone-900 outline-none focus:border-stone-400">
          {(data?.triggers || []).map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
        </Field>
        <Field label="Subject"><Input value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="Welcome to the family ✨" /></Field>
-       <Field label="Message"><EmailEditor body={form.body} onBody={(v) => setForm((f) => ({ ...f, body: v }))} subject={form.subject} link="" placeholder="Thanks for joining — here’s what to expect…" /></Field>
+       <Field label="Message"><EmailEditor body={form.body} onBody={(v) => setForm((f) => ({ ...f, body: v }))} subject={form.subject} link="" placeholder="Thanks for joining. Here’s what to expect…" /></Field>
       </div>
       {err && <p className="mt-3 text-xs text-red-600">{err}</p>}
       <div className="mt-5 flex items-center justify-end gap-2">

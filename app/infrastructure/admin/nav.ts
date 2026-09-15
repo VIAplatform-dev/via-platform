@@ -14,7 +14,7 @@ export type NavItem = {
  children?: NavSub[];
  /** Extra paths that keep this row active/expanded (a child that lives outside its prefix). */
  match?: string[];
- /** Counts what's waiting on the seller in this section — shown as a pill on the row. */
+ /** Counts what's waiting on the seller in this section. Shown as a pill on the row. */
  badgeKey?: "rentals" | "appointments";
 };
 export type NavGroup = { label?: string; items: NavItem[] };
@@ -33,7 +33,7 @@ export const GROUPS: NavGroup[] = [
    {
     href: `${B}/inventory`, label: "Inventory", icon: "Package",
     // Listing a piece belongs to Inventory rather than beside it. It briefly had a top-level row
-    // of its own — the reasoning being that it's the action that makes money — but two entries
+    // of its own, the reasoning being that it's the action that makes money, but two entries
     // pointing at the same work read as two different features.
     match: [`${B}/add-listing`, `${B}/bulk-upload`], // keep Inventory active/expanded while adding listings
     children: [
@@ -78,7 +78,7 @@ export const GROUPS: NavGroup[] = [
      { href: `${B}/marketing/campaigns`, label: "Campaigns" },
      { href: `${B}/marketing/design`, label: "Email design" },
      { href: `${B}/marketing/share-links`, label: "Share links" },
-     // Instagram auto-posting is built but NOT live — no seller should be able to connect an account
+     // Instagram auto-posting is built but NOT live, no seller should be able to connect an account
      // to something that will not post. Restore this line when it ships; the page itself still opens
      // for a platform admin so it can be finished and tested.
      { href: `${B}/marketing/automations`, label: "Automations" },
@@ -111,7 +111,7 @@ export const GROUPS: NavGroup[] = [
     href: `${B}/settings`, label: "Settings", icon: "Settings",
     // Five sections, not the sixteen the audit expanded to. `match` on /apps is deliberately NOT
     // here: main added it while Settings was the only home for Apps & integrations, and this
-    // restores Apps as its own group above — lighting both for one page is worse than neither.
+    // restores Apps as its own group above. Lighting both for one page is worse than neither.
     children: [
      { href: `${B}/settings/general`, label: "General" },
      { href: `${B}/settings/plan`, label: "Plan & billing" },
@@ -137,7 +137,7 @@ export const GROUPS: NavGroup[] = [
 // ── Market Mode ──────────────────────────────────────────────────────────────────────────────
 // A temporary operating mode for selling in person. When ON (per store, server-persisted so every
 // device agrees), the nav collapses to just what a market needs and a phone gets a bottom tab bar.
-// Turning it off is instant and never touches a checkout in flight — those live on the server.
+// Turning it off is instant and never touches a checkout in flight. Those live on the server.
 export const MARKET_GROUPS: NavGroup[] = [
  { items: [{ href: M, label: "Market home", icon: "Home" }] },
  { label: "Sell", items: [
@@ -147,7 +147,7 @@ export const MARKET_GROUPS: NavGroup[] = [
   { href: `${M}/sales`, label: "Sales today", icon: "Receipt" },
  ] },
  { label: "Inventory", items: [{ href: `${M}/inventory`, label: "At this market", icon: "Boxes" }, { href: `${M}/bring`, label: "Bring list", icon: "ClipboardList" }] },
- // Payments is the SAME Payments as Settings › Payments — one place to look, whichever mode she is in.
+ // Payments is the SAME Payments as Settings › Payments. One place to look, whichever mode she is in.
  { label: "Market", items: [{ href: `${M}/setup`, label: "Setup", icon: "SlidersHorizontal" }, { href: `${B}/payments`, label: "Payments", icon: "CreditCard" }] },
 ];
 
@@ -161,7 +161,7 @@ export const MARKET_TABS: { href: string; label: string; icon: string }[] = [
 ];
 
 // VYA's own tooling, not a store's. Trends, AI accuracy and the golden set are how WE measure the
-// model. "Import your site" is a step INSIDE onboarding, not a place in the workspace — a seller
+// model. "Import your site" is a step INSIDE onboarding, not a place in the workspace. A seller
 // who has just imported her site should not see an invitation to import it again. Owner-only.
 export const INTERNAL = new Set([`${B}/trends`, `${B}/ai`, `${B}/golden-review`, `${B}/setup-funnel`, `${B}/apps`, `${B}/import`, `${B}/users`]);
 
@@ -194,7 +194,7 @@ export function visibleNavGroups({ isOwner, rentalsOn = null, apptsOn = null, in
  *
  * NOT CURRENTLY RENDERED. It drove a row of pills along the bottom of the phone layout, which was
  * removed: six children don't fit across a phone either, so the bar scrolled sideways with a word
- * cut off at each edge — the same fault the analytics tab strip had. Kept because the lookup is
+ * cut off at each edge. The same fault the analytics tab strip had. Kept because the lookup is
  * right and tested, and the problem it was aimed at (reaching Drafts from Inventory without opening
  * a full-screen drawer) is still real; the next attempt needs a shape that fits, not new data.
  *
@@ -204,7 +204,7 @@ export function visibleNavGroups({ isOwner, rentalsOn = null, apptsOn = null, in
  */
 export function sectionFor(pathname: string, groups: NavGroup[] = GROUPS): { item: NavItem; current: string } | null {
  const path = (pathname || "").split("?")[0].replace(/\/+$/, "") || "/";
- // Settings has its own bar (settings/layout.tsx) listing its GROUPS — Store, Selling, Channels —
+ // Settings has its own bar (settings/layout.tsx) listing its GROUPS, Store, Selling, Channels,
  // because sixteen sections don't fit along the bottom and the five children below are an arbitrary
  // handful of them. Two bars stacked is worse than either.
  if (path === `${B}/settings` || path.startsWith(`${B}/settings/`)) return null;

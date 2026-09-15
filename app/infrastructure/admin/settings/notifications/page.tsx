@@ -7,7 +7,7 @@ import { PUSH_EVENTS, EMAIL_EVENTS, PUSH_LABELS, EMAIL_LABELS, normalizePrefs, m
 
 // Notifications: the same seven switches the phone's Notifications screen shows, on the web.
 //
-// One toggle is one PUT naming only the key that changed — the server merges it — so a flip here
+// One toggle is one PUT naming only the key that changed, the server merges it, so a flip here
 // never overwrites a choice made on the phone a minute ago. Push needs the phone app (a browser
 // tab cannot buzz); the page says so rather than offering a switch that can do nothing here.
 
@@ -55,13 +55,13 @@ export default function NotificationsSettingsPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Notifications" subtitle="What VYA tells you about your own shop — which sales, messages and summaries reach your phone and your inbox. Nothing here is sent to your customers." />
+   <AdminHeader eyebrow="Settings" title="Notifications" subtitle="Choose which sales, messages and summaries reach your phone and inbox. None of this goes to your customers." />
    {err && <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] text-rose-700">{err}</div>}
    {msg && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">{msg}</div>}
 
    <TechCard className="mb-4 p-5">
     <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-stone-400"><Smartphone size={13} /> Push</div>
-    <p className="mb-2 text-[12.5px] text-stone-500">Buzzes the VYA app on your phone. Needs the app installed and signed in — a browser tab can’t be pushed to.</p>
+    <p className="mb-2 text-[12.5px] text-stone-500">Buzzes the VYA app on your phone. Needs the app installed and signed in. A browser tab can’t be pushed to.</p>
     <div className="divide-y divide-stone-100">
      {prefs ? PUSH_EVENTS.map((k: PushEvent) => row(PUSH_LABELS[k], prefs.push[k], () => flip({ push: { [k]: !prefs.push[k] } }, `push:${k}`), busyKey === `push:${k}`, `pref-push-${k}`)) : <p className="py-3 text-[13px] text-stone-400">Loading…</p>}
     </div>

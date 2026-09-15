@@ -14,15 +14,15 @@ function db() {
  return neon(url);
 }
 
-// GET /api/store/market-insights?window=7d — seller-facing market signal.
+// GET /api/store/market-insights?window=7d: seller-facing market signal.
 // EVERY market figure passes through gateSegments first, so a seller only ever
-// sees aggregated, anonymized, ≥5-store data — never another store's numbers.
+// sees aggregated, anonymized, ≥5-store data, never another store's numbers.
 export async function GET(request: NextRequest) {
  const storeSlug = await resolveStoreSlug(request);
  if (!storeSlug) return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
 
- // No plan gate. What to source is the answer to the question a vintage seller actually asks —
- // what should I buy next — and it is the one thing here she cannot work out from her own shop.
+ // No plan gate. What to source is the answer to the question a vintage seller actually asks,
+ // what should I buy next, and it is the one thing here she cannot work out from her own shop.
  // Holding it behind a tier meant the sellers with the least data got the least help, and the
  // home page led with a padlock. Every figure below is still aggregated to >=5 stores by
  // gateSegments, so opening it up exposes nobody's numbers.
@@ -60,10 +60,10 @@ export async function GET(request: NextRequest) {
   txnCount: Number(r.txn_count),
  }));
 
- // Privacy gate FIRST — nothing downstream ever sees a sub-threshold segment.
+ // Privacy gate FIRST: nothing downstream ever sees a sub-threshold segment.
  const gated = gateSegments(raw, PRIVACY);
 
- // Fill price with the ASKING benchmark from the live catalog (large sample) — realized sale prices
+ // Fill price with the ASKING benchmark from the live catalog (large sample): realized sale prices
  // are still too thin to show. Asking prices are public, so no extra gate beyond segment visibility.
  const ask = await askingPriceLookup();
  const visible = gated.map((s) => {
@@ -71,16 +71,16 @@ export async function GET(request: NextRequest) {
   return { ...s, priceP25: a.p25, priceMedian: a.median, priceP75: a.p75, hasPriceData: a.median != null };
  });
 
- // 1. Trending — high demand AND low supply (supply gap), brands + categories.
+ // 1. Trending: high demand AND low supply (supply gap), brands + categories.
  const trending = visible
   .filter((s) => s.segmentType === "brand" || s.segmentType === "category")
   .sort((a, b) => b.supplyGapScore - a.supplyGapScore || b.demandIndex - a.demandIndex)
   .slice(0, 12);
 
- // 2. Price-benchmark lookup — all visible segments (UI filters by search).
+ // 2. Price-benchmark lookup: all visible segments (UI filters by search).
  const priceBenchmarks = [...visible].sort((a, b) => b.demandIndex - a.demandIndex);
 
- // 3. Your store vs market — the seller's OWN brands (their data) next to the
+ // 3. Your store vs market. The seller's OWN brands (their data) next to the
  //    aggregated market index. Market index is null when it can't be shown safely.
  const curStart = new Date(Date.now() - windowDays * 86_400_000).toISOString();
  const mineRows = (await sql`
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ windowKey, asOfDate, trending, priceBenchmarks, yourStoreVsMarket, privacyFloor: PRIVACY });
  } catch (err) {
  console.error("[store/market-insights] error:", err);
- // Table not built yet, etc. — degrade to empty rather than error the dashboard.
+ // Table not built yet, etc. degrade to empty rather than error the dashboard.
  return NextResponse.json({ windowKey, asOfDate: null, trending: [], priceBenchmarks: [], yourStoreVsMarket: [], privacyFloor: PRIVACY, empty: true });
  }
 }

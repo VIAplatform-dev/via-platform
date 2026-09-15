@@ -11,14 +11,14 @@ const excluded = (cls: string) =>
 
 test("recommendation strips are excluded from the comparison", () => {
  // "You may also like" is picked fresh per visit, by her shop and by ours, from different pools.
- // Comparing what is in it compares noise — and the census ALREADY grades that difference as
+ // Comparing what is in it compares noise, and the census ALREADY grades that difference as
  // cosmetic. Counting the same difference again as a blocking price mismatch is double-counting.
  for (const cls of ["product-recommendations", "related-products", "also-like-grid", "complete-the-look"]) {
   assert.ok(excluded(cls), cls);
  }
 });
 
-test("recently-viewed is excluded — it is per shopper, not per shop", () => {
+test("recently-viewed is excluded. It is per shopper, not per shop", () => {
  assert.ok(excluded("recently-viewed"));
 });
 

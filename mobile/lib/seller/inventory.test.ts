@@ -11,7 +11,7 @@ const items = [
   { id: "6", title: "Old thing", status: "removed" },
 ];
 
-test("the All chip hides removed pieces — they are deleted, not a state to browse", () => {
+test("the All chip hides removed pieces. They are deleted, not a state to browse", () => {
   assert.deepEqual(filterItems(items, "all").map((i) => i.id), ["1", "2", "3", "4", "5"]);
 });
 
@@ -21,7 +21,7 @@ test("each chip shows exactly its own state", () => {
   assert.deepEqual(filterItems(items, "sold").map((i) => i.id), ["3"]);
 });
 
-test("a reserved piece counts as live — it is on the site and spoken for, not sold", () => {
+test("a reserved piece counts as live. It is on the site and spoken for, not sold", () => {
   // Market Mode reserves an item mid-sale. Showing it under Sold would tell her she has money she
   // has not been paid, and hiding it entirely would look like the piece vanished.
   assert.deepEqual(filterItems(items, "live").map((i) => i.status).includes("reserved"), false);

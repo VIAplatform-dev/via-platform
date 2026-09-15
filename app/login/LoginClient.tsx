@@ -22,7 +22,7 @@ export default function LoginClient() {
  const [sent, setSent] = useState(false);
  const searchParams = useSearchParams();
  // Where to land after signing in. On the seller OS host (getvya.ai) default to the workspace
- // (/admin) — its layout then routes to onboarding or the dashboard. On the marketplace
+ // (/admin): its layout then routes to onboarding or the dashboard. On the marketplace
  // (vyaplatform.com) default to home. An explicit ?callbackUrl always wins.
  const [next, setNext] = useState("/");
  useEffect(() => {

@@ -7,11 +7,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiPost, ApiError } from "../../lib/api";
 import { colors, spacing, fonts } from "../../lib/theme";
-import { uploadPhoto } from "../../lib/seller/intake";
+import { uploadPhoto, draftListing } from "../../lib/seller/intake";
+import { fillDraftBlanks } from "../../lib/seller/fill";
+import { filledFields } from "../../lib/seller/listing";
 import { CATEGORY_GROUPS, CATEGORY_LABELS } from "../../lib/seller/categories";
 import { SelectRow } from "../../components/seller/Select";
 
-// Quick list — a piece that is on the table but not in the system.
+// Quick list: a piece that is on the table but not in the system.
 //
 // Same route as the desktop: POST /api/store/market/quick-list/create makes a draft with a price
 // and, when asked, starts a cash checkout for it in the same call. The description, era and the
@@ -22,12 +24,12 @@ import { SelectRow } from "../../components/seller/Select";
 // market means turning away anybody without notes on them.
 //
 // Card takes two calls, not one: quick-list/create only ever opens a CASH checkout (see its route),
-// so a card sale creates the piece first and then opens a `qr` checkout against it — the same two
+// so a card sale creates the piece first and then opens a `qr` checkout against it. The same two
 // steps the desktop takes when it hands the confirm screen `?go=qr`.
 //
 // IT ASKS WHAT KIND OF PIECE IT IS, and that is not a fourth optional box.
 //
-// Measurements are chosen by category (lib/seller/measurements.ts) — a dress is asked for a waist,
+// Measurements are chosen by category (lib/seller/measurements.ts). A dress is asked for a waist,
 // a bag for a strap drop, a piece with no category for a length and a width and nothing else. Every
 // piece this screen has ever made arrived in Drafts with `category` either empty or holding a typed
 // word the templates don't know, so finishing one later offered the generic pair no matter what it
@@ -35,7 +37,7 @@ import { SelectRow } from "../../components/seller/Select";
 // she will never again be as sure what it is.
 //
 // It asks; it does not block. The ask is the tender button opening the picker instead of listing,
-// once, with the tender remembered — so answering costs one tap and carries straight on into the
+// once, with the tender remembered, so answering costs one tap and carries straight on into the
 // sale. "Not sure" is one of the answers, because a queue at a stall beats a taxonomy.
 
 export default function QuickList() {
@@ -51,13 +53,16 @@ export default function QuickList() {
   /** The tender she reached for while the category was still unanswered, resumed once it is. */
   const [pending, setPending] = useState<"card" | "cash" | null | undefined>(undefined);
   const [busy, setBusy] = useState<"list" | "sell" | "card" | null>(null);
+  const [filling, setFilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The hosted URL, once something has needed it, so a fill and a sale don't upload twice. */
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   async function snap() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) { setError("Camera access is off for VYA — turn it on in Settings."); return; }
+    if (!perm.granted) { setError("Camera access is off for VYA. Turn it on in Settings."); return; }
     const r = await ImagePicker.launchCameraAsync({ quality: 0.7 });
-    if (!r.canceled && r.assets[0]?.uri) setPhoto(r.assets[0].uri);
+    if (!r.canceled && r.assets[0]?.uri) { setPhoto(r.assets[0].uri); setPhotoUrl(null); }
   }
 
   /**
@@ -70,14 +75,14 @@ export default function QuickList() {
     const n = Number(price.replace(/[^0-9.]/g, ""));
     if (!(n > 0)) { setError("Enter a price."); return; }
     // Ask once. Answering resumes this exact tender from the picker's onChange, so nothing is lost
-    // and nothing is repeated — and once answered, every later piece goes straight through.
+    // and nothing is repeated, and once answered, every later piece goes straight through.
     if (!chosen) { setPending(tender); setAskCategory(true); return; }
     setBusy(tender === "cash" ? "sell" : tender === "card" ? "card" : "list");
     try {
       // Upload first: the route takes a hosted URL, not bytes.
-      const imageUrl = photo ? await uploadPhoto(photo).catch(() => null) : null;
+      const imageUrl = photoUrl ?? (photo ? await uploadPhoto(photo).catch(() => null) : null);
       const r = await apiPost<{ ok: boolean; item: { id: string }; checkout: { id: string } | null }>("/api/store/market/quick-list/create", {
-        // "Not sure" is stored as no category at all, never as the word — the storefront navigates
+        // "Not sure" is stored as no category at all, never as the word. The storefront navigates
         // by these slugs and "skip" is not one of them.
         price: n, brand, category: chosen === "skip" ? "" : chosen, imageUrl,
         ...(tender === "cash" ? { startCheckout: "cash", clientKey: `phone-ql-${Date.now()}` } : {}),
@@ -92,7 +97,7 @@ export default function QuickList() {
       if (tender === "card") {
         // Second call: the piece exists, now open a card checkout against it. The route refuses
         // with `payments_disabled` when Stripe isn't finished, and that message is worth showing
-        // as-is — it names the fix.
+        // as-is. It names the fix.
         const co = await apiPost<{ ok: boolean; checkout: { id: string } }>("/api/store/market/checkout", {
           itemId: r.item.id,
           clientKey: `phone-card-${Date.now()}`,
@@ -105,6 +110,37 @@ export default function QuickList() {
     } catch (e) {
       setError(e instanceof ApiError && e.message ? e.message : "Couldn't list that.");
       setBusy(null);
+    }
+  }
+
+  /**
+   * FILL WITH AI, at the stall.
+   *
+   * Only brand and category, because they are the only two fields on this screen the AI has any
+   * business with: the price is the whole reason she is standing here and it is hers. Both go
+   * straight into the piece, so a quick list stops arriving in Drafts as an unbranded, uncategorised
+   * square she has to finish from memory a week later.
+   *
+   * BLANKS ONLY, like everywhere else: a brand she has typed is not replaced. The upload is kept,
+   * so filling and then selling costs one upload rather than two, which matters with a queue.
+   */
+  async function fillWithAI() {
+    if (!photo) { setError("Take the photo first. It reads the photograph."); return; }
+    setError(null);
+    setFilling(true);
+    try {
+      const url = photoUrl ?? (await uploadPhoto(photo));
+      setPhotoUrl(url);
+      const { fields } = await draftListing([url], filledFields({ brand, category }));
+      const { fields: next, filled } = fillDraftBlanks(fields, { brand, category });
+      if (next.brand && !brand.trim()) setBrand(next.brand);
+      // Only a slug the storefront actually navigates by. The model can answer with a word.
+      if (next.category && !category && (CATEGORY_LABELS as Record<string, string>)[next.category]) setCategory(next.category);
+      if (filled.length === 0) setError("Nothing it could read that you haven't already said.");
+    } catch {
+      setError("Couldn't read that photo. Fill it in yourself and carry on.");
+    } finally {
+      setFilling(false);
     }
   }
 
@@ -126,7 +162,7 @@ export default function QuickList() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* The market screen sets the bar light for its wine band; this screen is cream, so it
-          must set it back — the bar is per-screen, and a light bar on cream is invisible. */}
+          must set it back. The bar is per-screen, and a light bar on cream is invisible. */}
       <StatusBar style="dark" />
       <View style={{ flexDirection: "row", alignItems: "center", paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
         <Pressable hitSlop={12} onPress={() => router.back()}><Text style={{ fontSize: 15, color: colors.accent, fontWeight: "600" }}>Back</Text></Pressable>
@@ -139,10 +175,24 @@ export default function QuickList() {
           {photo ? <Image source={{ uri: photo }} style={{ width: "100%", height: "100%" }} /> : <Text style={{ fontSize: 14, color: colors.textMuted }}>Add a photo (optional)</Text>}
         </Pressable>
 
+        {/* Only once there is something to read. Offered before the photo it is a button that can
+            only tell her off. */}
+        {photo ? (
+          <Pressable
+            disabled={filling || busy !== null}
+            onPress={() => void fillWithAI()}
+            style={{ alignSelf: "flex-start", marginTop: spacing.sm, backgroundColor: colors.chip, borderRadius: 999, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, opacity: filling ? 0.6 : 1 }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>
+              {filling ? "Reading…" : "Fill with AI"}
+            </Text>
+          </Pressable>
+        ) : null}
+
         <View style={{ marginTop: spacing.lg }}>
           {field("Price", price, setPrice, { numeric: true, autoFocus: true })}
           {field("Brand", brand, setBrand)}
-          {/* The taxonomy the storefront navigates by, grouped as its nav groups it — not a text
+          {/* The taxonomy the storefront navigates by, grouped as its nav groups it, not a text
               box, because "bag", "Bags" and "handbag" are three different category pages and two
               of them are empty. */}
           <SelectRow
@@ -169,13 +219,13 @@ export default function QuickList() {
           />
         </View>
         <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
-          It decides which measurements the draft asks you for later — a dress is asked for a waist,
+          It decides which measurements the draft asks you for later. A dress is asked for a waist,
           a bag for its strap drop.
         </Text>
 
         {error ? <Text style={{ fontSize: 13.5, color: colors.text, marginTop: spacing.md }}>{error}</Text> : null}
 
-        {/* Card on its own, cash and "just list" sharing the row under it — the desktop's shape.
+        {/* Card on its own, cash and "just list" sharing the row under it. The desktop's shape.
             The old buttons were two full-width slabs at 24pt of padding each, which ate the screen
             and made the least common action as loud as the most. */}
         <Pressable

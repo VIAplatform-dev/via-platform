@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Returns a Stripe-hosted URL where the store connects its bank. Nothing is saved until the store
-// finishes there and Stripe tells us so — see the store_bank_mandate case in the Stripe webhook.
+// finishes there and Stripe tells us so. See the store_bank_mandate case in the Stripe webhook.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
  }
 }
 
-// Revoke. Debits already clearing are unaffected — they are authorised by the mandate that was live
+// Revoke. Debits already clearing are unaffected. They are authorised by the mandate that was live
 // when they started, and cancelling one is a separate act with its own consequences for a balance.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

@@ -14,7 +14,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
  return (
  <div className="flex min-h-screen" style={{ fontFamily: "Arial, sans-serif" }}>
- {/* Mobile top bar — visible below md, hidden on desktop */}
+ {/* Mobile top bar: visible below md, hidden on desktop */}
  <div className="flex md:hidden fixed top-0 left-0 right-0 h-[52px] items-center px-4 z-[60]"
  style={{ background: "#0d0f12", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
  <button
@@ -30,7 +30,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
  </span>
  </div>
 
- {/* Backdrop — mobile only, when sidebar is open */}
+ {/* Backdrop: mobile only, when sidebar is open */}
  {sidebarOpen && (
  <div
  onClick={() => setSidebarOpen(false)}
@@ -40,7 +40,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
 
  <AdminNav mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
 
- {/* Main content — full width on mobile with top padding for the bar; offset by sidebar on desktop */}
+ {/* Main content: full width on mobile with top padding for the bar; offset by sidebar on desktop */}
  <main className="flex-1 pt-[52px] md:pt-0 md:ml-[220px]">
  {children}
  </main>

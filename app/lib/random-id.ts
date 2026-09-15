@@ -1,15 +1,15 @@
-// A random id that works in every browser context — not just secure ones.
+// A random id that works in every browser context, not just secure ones.
 //
 // `crypto.randomUUID()` exists only in a SECURE context. On https it is there; on a plain-http page
 // it is undefined, and calling it throws `TypeError: crypto.randomUUID is not a function`. That is
 // not a hypothetical: a hosted storefront served over http (every store domain in local
 // development) threw it from the analytics tracker on mount, the throw escaped to React's error
-// boundary, and VYA's CHECKOUT PAGE rendered "This page couldn't load" — a page-view id took the
+// boundary, and VYA's CHECKOUT PAGE rendered "This page couldn't load". A page-view id took the
 // whole purchase down.
 //
 // So the id degrades instead of throwing: the real UUID where it exists, cryptographic randomness
 // where that exists, and finally something merely unique-enough. An analytics session id has no
-// security requirement — it only has to be different from the next one.
+// security requirement: it only has to be different from the next one.
 
 /** A UUID-shaped id, by whatever means the current context allows. */
 export function randomId(): string {

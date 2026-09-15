@@ -176,7 +176,7 @@ export default function AdminReturnsPage() {
  onMouseLeave={(e) => (e.currentTarget.style.background = "")}
  >
  <td style={{ padding: "12px 16px", color: "#71717a", whiteSpace: "nowrap" }}>
- {r.returnedAt ? fmtDate(r.returnedAt) : "—"}
+ {r.returnedAt ? fmtDate(r.returnedAt) : "-"}
  </td>
  <td style={{ padding: "12px 16px", color: "#09090b", fontWeight: 500 }}>
  <Link href={`/admin/stores/${r.storeSlug}`} style={{ color: "#09090b", textDecoration: "none" }}>

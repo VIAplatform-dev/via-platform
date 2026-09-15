@@ -1,11 +1,11 @@
 // Pull flat measurements out of an imported description (Shopify body_html prose usually carries
-// them — "Bust 34\" · Waist 28\" · Length 40\"") into a clean, structured string for the item's
+// them: "Bust 34\" · Waist 28\" · Length 40\"") into a clean, structured string for the item's
 // measurements field. Conservative: only emits when it finds unambiguous garment measurements, so a
 // stray "width" in unrelated copy doesn't produce a junk value.
 
 // Canonical label + its aliases. ORDER MATTERS: compound phrases run first and their matched text is
 // masked out, so "sleeve length" is claimed by Sleeve (not Length) and "shoulder to hem" by Length
-// (not Hem). "Length" appears twice — the specific phrase first, then bare "length" for what's left.
+// (not Hem). "Length" appears twice: the specific phrase first, then bare "length" for what's left.
 const LABELS: Array<{ canon: string; alias: string; strong: boolean }> = [
  { canon: "Pit to pit", alias: "pit[\\s-]?to[\\s-]?pit|p2p|armpit[\\s-]?to[\\s-]?armpit|across[\\s-]?chest", strong: true },
  { canon: "Sleeve", alias: "sleeve(?:\\s+length)?", strong: true },
@@ -18,8 +18,8 @@ const LABELS: Array<{ canon: string; alias: string; strong: boolean }> = [
  { canon: "Rise", alias: "(?:front\\s+)?rise", strong: true },
  { canon: "Thigh", alias: "thigh", strong: true },
  { canon: "Leg opening", alias: "leg[\\s-]?opening", strong: true },
- { canon: "Length", alias: "length", strong: true }, // bare — after Sleeve/Shoulder-to-hem are masked
- // Footwear + boots (this is a resale marketplace — lots of shoes). "Heel" runs before "Height".
+ { canon: "Length", alias: "length", strong: true }, // bare, after Sleeve/Shoulder-to-hem are masked
+ // Footwear + boots (this is a resale marketplace. Lots of shoes). "Heel" runs before "Height".
  { canon: "Heel", alias: "heel[\\s-]?height|heel", strong: true },
  { canon: "Platform", alias: "platform(?:\\s+height)?", strong: true },
  { canon: "Shaft", alias: "(?:boot\\s+)?shaft(?:\\s+height)?", strong: true },

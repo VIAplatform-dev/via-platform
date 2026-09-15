@@ -58,7 +58,7 @@ test("a currency the phone doesn't have a symbol for still prints its code", () 
   assert.equal(tierPriceLine(t, "month"), "CAD 15/mo");
 });
 
-test("an invoice keeps its pennies — it is what actually left her account", () => {
+test("an invoice keeps its pennies. It is what actually left her account", () => {
   const i = { id: "in_1", number: "A-1", amountCents: 2900, currency: "USD", status: "paid", createdAt: "2026-10-01T00:00:00.000Z", pdfUrl: null };
   assert.equal(invoiceLine(i), "1 Oct 2026 · $29.00");
   assert.equal(invoiceLine({ ...i, amountCents: 2934, currency: "GBP" }), "1 Oct 2026 · £29.34");

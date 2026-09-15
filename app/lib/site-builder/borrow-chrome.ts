@@ -2,7 +2,7 @@
 //
 // Two pages VYA builds for a store are not pages of her site: the cart page, when her own was never
 // captured (fallback-cart-page.ts), and a page she adds in the Pages panel (pages.ts). Both want the
-// same thing — keep the chrome of a page we DO hold, drop that page's content, put ours in its place —
+// same thing, keep the chrome of a page we DO hold, drop that page's content, put ours in its place,
 // and the cart page had the only copy of it. One definition, so a fix to one is a fix to both.
 //
 // Pure: a loaded document in, the same document changed in place.

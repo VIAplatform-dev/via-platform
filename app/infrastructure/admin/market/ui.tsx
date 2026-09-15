@@ -52,10 +52,10 @@ export function usePoll<T>(path: string | null, ms: number, keepGoing: boolean |
  if (!alive) return;
  let more = typeof keepGoing === "function" ? true : keepGoing;
  if (r.ok) { setData(r.data as T); setError(null); if (typeof keepGoing === "function") more = keepGoing(r.data as T); }
- else setError(r.status === 401 ? "You've been signed out — sign in again. Your checkout is safe on the server and will still complete." : r.data.error || `Error ${r.status}`);
+ else setError(r.status === 401 ? "You've been signed out. Sign in again. Your checkout is safe on the server and will still complete." : r.data.error || `Error ${r.status}`);
  if (alive && more) timer = setTimeout(run, ms);
  return;
- } catch { if (alive) setError("Offline — retrying…"); }
+ } catch { if (alive) setError("Offline: retrying…"); }
  if (alive) timer = setTimeout(run, ms);
  };
  run();
@@ -121,7 +121,7 @@ const BIG: Record<BigVariant, string> = {
 // HOW BIG EACH ONE NEEDS TO BE.
 //
 // Everything was 56px tall, which is right for the one button you press at a market with a customer
-// waiting and wrong for the three sitting under it — the screen ended up as a stack of slabs. The
+// waiting and wrong for the three sitting under it. The screen ended up as a stack of slabs. The
 // action that takes the money keeps the big target; Cash steps down, and Clear cart is a way out
 // rather than a thing to hit.
 const BIG_HEIGHT: Record<BigVariant, string> = {
@@ -188,7 +188,7 @@ export function ItemCard({ item, to, right, dim, highlight }: { item: MarketItem
  <Thumb src={item.image} alt={item.title} size={64} />
  <div className="min-w-0 flex-1">
  <p className="line-clamp-2 text-[15px] font-medium leading-snug text-stone-900"><Highlight text={item.title} query={highlight} /></p>
- <p className="mt-0.5 truncate text-[12.5px] text-stone-500"><Highlight text={[item.brand, item.size && `Size ${item.size}`, item.category].filter(Boolean).join(" · ") || "—"} query={highlight} /></p>
+ <p className="mt-0.5 truncate text-[12.5px] text-stone-500"><Highlight text={[item.brand, item.size && `Size ${item.size}`, item.category].filter(Boolean).join(" · ") || "-"} query={highlight} /></p>
  <div className="mt-1.5 flex items-center gap-2"><StatusChip status={item.status} />{!item.onBringList && <span className="text-[11px] text-stone-400">not on bring list</span>}</div>
  </div>
  <div className="shrink-0 text-right">{right ?? <p className="text-[17px] font-semibold text-stone-900">{money(item.priceCents, item.currency)}</p>}</div>
@@ -197,7 +197,7 @@ export function ItemCard({ item, to, right, dim, highlight }: { item: MarketItem
  return to ? <Link href={href(to)} className="block">{body}</Link> : body;
 }
 
-// Thumbnail grid tile — the "see the rack at a glance" view. Same data and tap target as ItemCard.
+// Thumbnail grid tile: the "see the rack at a glance" view. Same data and tap target as ItemCard.
 export function ItemTile({ item, to, dim }: { item: MarketItem; to?: string; dim?: boolean }) {
  return (
  <Link href={href(to ?? `${B}/item/${item.id}`)} className={cn("block overflow-hidden rounded-2xl border border-stone-200 bg-white active:bg-stone-50", dim && "opacity-60")}>
@@ -223,7 +223,7 @@ export function Thumb({ src, alt, size = 64, className, fill }: { src: string | 
 
 export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
  return (
- // Three across on a 360px phone leaves ~72px inside p-4 — too narrow for "$1,234" at 26px.
+ // Three across on a 360px phone leaves ~72px inside p-4. Too narrow for "$1,234" at 26px.
  <div className="min-w-0 rounded-2xl border border-stone-200 bg-white p-3 sm:p-4">
  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">{label}</p>
  <p className="mt-1 text-[22px] font-semibold tracking-tight text-stone-900 sm:text-[26px]" style={{ fontFamily: "var(--font-display)" }}>{value}</p>

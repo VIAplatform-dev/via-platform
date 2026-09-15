@@ -1,5 +1,5 @@
 // Taste-test options for the new-user quiz. Every dimension maps to lowercase
-// title/brand keywords used to SOFTLY bias the personalized feed — they only ever
+// title/brand keywords used to SOFTLY bias the personalized feed. They only ever
 // ADD to a product's score, never filter it out. So loving Y2K + orange surfaces a
 // Y2K orange piece even from a brand you didn't pick. Keys are stable; the mobile
 // app references the same keys (see via-app/lib/tasteVibes.ts).
@@ -45,7 +45,7 @@ export const ERAS: KeyedOption[] = [
  { key: "vintage-pre70", label: "True Vintage (pre-'70s)", keywords: ["60s", "1960s", "50s", "1950s", "victorian", "edwardian", "antique", "deco"] },
 ];
 
-// Categories the user shops — self-contained keywords so they bias the feed too.
+// Categories the user shops. Self-contained keywords so they bias the feed too.
 export const TASTE_CATEGORIES: KeyedOption[] = [
  { key: "clothing", label: "Clothing", keywords: ["top", "shirt", "blouse", "sweater", "knit", "skirt", "pants", "trousers", "tee"] },
  { key: "dresses", label: "Dresses", keywords: ["dress", "gown", "slip dress", "maxi", "midi"] },

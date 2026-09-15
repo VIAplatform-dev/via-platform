@@ -12,9 +12,9 @@ import { stores } from "@/app/lib/stores";
 
 export const dynamic = "force-dynamic";
 
-// POST { tenderedCents?, receiptEmail? } — the seller took cash. The one place a sale completes
+// POST { tenderedCents?, receiptEmail? }: the seller took cash. The one place a sale completes
 // without a payment provider. Records what was handed over and the change due. With an email, a
-// receipt goes out afterwards and the customer joins the list tagged with this market — both
+// receipt goes out afterwards and the customer joins the list tagged with this market. Both
 // best-effort, never in the way of the sale.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);
@@ -26,19 +26,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const tendered = body?.tenderedCents == null ? null : Math.round(Number(body.tenderedCents));
  const receiptEmail = normalizeReceiptEmail(body?.receiptEmail);
  const change = changeDue(c.amountCents, tendered);
- if (tendered != null && change == null) return NextResponse.json({ error: `That's short — the total is ${(c.amountCents / 100).toFixed(2)}.` }, { status: 400 });
+ if (tendered != null && change == null) return NextResponse.json({ error: `That's short: the total is ${(c.amountCents / 100).toFixed(2)}.` }, { status: 400 });
  if (c.status === "awaiting_payment") await setCash(c.id, tendered, change);
  const r = await finalizeMarketSale({ checkoutId: id, paymentIntent: null, tender: "cash", source: "cash", receiptEmail });
- if (r.status === "not_claimable") return NextResponse.json({ error: `This checkout is ${r.checkout?.status ?? "gone"} — start again.`, checkout: r.checkout }, { status: 409 });
+ if (r.status === "not_claimable") return NextResponse.json({ error: `This checkout is ${r.checkout?.status ?? "gone"}: start again.`, checkout: r.checkout }, { status: 409 });
  if (tendered != null) await setOrderCash(c.id, { tenderedCents: tendered, changeCents: change }).catch(() => {});
- // The QR / keyed intent may still be open on the customer's phone — close it (a late payment is
+ // The QR / keyed intent may still be open on the customer's phone. Close it (a late payment is
  // still caught by the webhook and auto-refunded, but better never to take it).
  if (c.stripeCheckoutSession || c.stripePaymentIntent) {
  const acct = await sellerAccount(acting.slug);
  if (acct) expireMarketPayment({ session: c.stripeCheckoutSession, paymentIntent: c.stripePaymentIntent, acct: acct.acct }).catch(() => {});
  }
- if (r.status === "paid_conflict") return NextResponse.json({ error: "Some of these items sold elsewhere just now — check Sales today.", checkout: r.checkout, changeCents: change }, { status: 409 });
- // The receipt, once the sale is a fact. Only on the call that recorded it — a retry that finds the
+ if (r.status === "paid_conflict") return NextResponse.json({ error: "Some of these items sold elsewhere just now. Check Sales today.", checkout: r.checkout, changeCents: change }, { status: 409 });
+ // The receipt, once the sale is a fact. Only on the call that recorded it. A retry that finds the
  // sale already paid must not send a second receipt.
  let receipt: { emailed: boolean; tagged: boolean } | null = null;
  if (r.status === "paid" && receiptEmail) {

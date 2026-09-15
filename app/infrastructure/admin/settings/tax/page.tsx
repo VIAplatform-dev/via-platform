@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Receipt } from "lucide-react";
 import { AdminHeader, TechCard, TechButton, TechButtonLink, StatusPill, Toggle, cn } from "../../ui";
+import { Scale } from "lucide-react";
+import { thresholdFor, unconfirmedNote, internationalNote } from "@/app/lib/tax-thresholds";
 import { authorityFor } from "@/app/lib/tax-authorities";
 
 // Sales tax. VYA calculates nothing: storefront sales are direct charges on the
@@ -16,7 +18,66 @@ type TaxState = {
  payoutsReady: boolean;
  stripeTaxActive: boolean;
  registrations: number;
+ /** Where the store is established, from its ship-from. Decides which threshold applies. */
+ homeCountry?: string | null;
+ /** Whether it posts outside its own country at all. */
+ shipsAbroad?: boolean;
 };
+
+/** The rule for her country, stated rather than implied, with a way to check it. */
+function WhetherYouNeedIt({ homeCountry, shipsAbroad }: { homeCountry?: string | null; shipsAbroad: boolean }) {
+ const t = thresholdFor(homeCountry);
+ return (
+  <TechCard className="mb-4 p-5">
+   <div className="flex items-center gap-2">
+    <Scale size={15} className="text-stone-400" />
+    <h2 className="text-[13px] font-semibold text-stone-800">Do you need to register?</h2>
+   </div>
+
+   {t ? (
+    <>
+     <p className="mt-2.5 text-[13px] leading-relaxed text-stone-700">
+      Not until you pass <span className="font-semibold text-stone-900">{t.amount}</span> in sales
+      over {t.period}. That is {t.authority}&rsquo;s {t.tax} threshold, not ours.
+     </p>
+     <p className="mt-1.5 text-[12.5px] leading-relaxed text-stone-500">{t.note}</p>
+     <p className="mt-2.5 text-[12px] text-stone-400">
+      <a href={t.url} target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-stone-700">
+       Check it with {t.authority}
+      </a>
+      {" · "}we last confirmed this figure on {new Date(t.asOf).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+     </p>
+    </>
+   ) : (
+    <p className="mt-2.5 max-w-[64ch] text-[13px] leading-relaxed text-stone-600">
+     {unconfirmedNote(homeCountry)}
+     {!homeCountry && " Add your ship-from address under Shipping and duties and we can be more specific."}
+    </p>
+   )}
+
+   {/* Only for a store that actually posts abroad. For one that doesn't, it is a paragraph about
+       a situation she is not in. */}
+   {shipsAbroad && (
+    <p className="mt-3 rounded-lg bg-stone-50 px-3.5 py-2.5 text-[12.5px] leading-relaxed text-stone-600">
+     {internationalNote()}
+    </p>
+   )}
+
+   {/* WHOSE IT IS. Not a disclaimer at the bottom of a page: the seller is merchant of record on
+       VYA, the charge goes to her own Stripe account and the order is in her name, so every
+       registration is hers. Left unsaid, a seller reasonably assumes the platform handles it. */}
+   <p className="mt-3 text-[12px] leading-relaxed text-stone-500">
+    <span className="font-medium text-stone-700">These registrations are yours, not VYA&rsquo;s.</span>{" "}
+    You are the seller on every order: the payment goes to your own account and your name is on the
+    receipt. VYA calculates and collects what your registrations say to, and never holds it.
+   </p>
+   <p className="mt-2 text-[11.5px] leading-relaxed text-stone-400">
+    This is where the rule is written down, not advice about your business. If you are near the
+    line, ask an accountant.
+   </p>
+  </TechCard>
+ );
+}
 
 export default function TaxSettingsPage() {
  const [s, setS] = useState<TaxState | null>(null);
@@ -58,6 +119,15 @@ export default function TaxSettingsPage() {
     subtitle="Sales tax is added at checkout and paid to you with the order. You file it yourself. VYA never holds it."
    />
 
+   {/* DO YOU EVEN NEED TO REGISTER?
+       
+       The page offered a registration form and never said whether she needed one. A seller had no
+       way to learn from us that a threshold exists, what it is, or that crossing it is her job. The
+       honest answer is not advice: it is the number, whose number it is, and the page that governs
+       it. Every figure here was checked against the authority itself and carries the date, so a
+       stale one is visible rather than quietly trusted (tax-thresholds.ts). */}
+   <WhetherYouNeedIt homeCountry={s.homeCountry} shipsAbroad={Boolean(s.shipsAbroad)} />
+
    <TechCard className="p-5">
     <div className="flex items-start justify-between gap-4">
      <div className="min-w-0">
@@ -85,7 +155,7 @@ export default function TaxSettingsPage() {
      // A SENTENCE THAT NAMED A TASK AND OFFERED NO WAY TO DO IT. Twice on this page, in fact, and in
      // both places the next step was a screen the seller then had to go and find. Say it, then open it.
      <div className="text-[12.5px] leading-relaxed text-stone-600">
-      <p>Set up payments first — tax is worked out on your own Stripe account, so there has to be one.</p>
+      <p>Set up payments first. Tax is worked out on your own Stripe account, so there has to be one.</p>
       <TechButtonLink href="/admin/settings/payments" className="mt-3 inline-flex">Set up payments</TechButtonLink>
      </div>
     ) : collecting ? (
@@ -96,12 +166,12 @@ export default function TaxSettingsPage() {
     ) : (
      <div className="space-y-2 text-[12.5px] leading-relaxed text-stone-600">
       <p>
-       Nothing is being charged yet. Sales tax starts with registering for a permit in the states where you owe it —
+       Nothing is being charged yet. Sales tax starts with registering for a permit in the states where you owe it,
        usually your home state, plus anywhere you&apos;ve passed that state&apos;s sales threshold.
       </p>
       <p>
        Once you&apos;ve registered, add each one in Stripe under <span className="font-medium text-stone-800">Tax → Registrations</span>.
-       Checkout picks them up straight away — nothing to change here.
+       Checkout picks them up straight away. Nothing to change here.
       </p>
      </div>
     )}
@@ -111,12 +181,12 @@ export default function TaxSettingsPage() {
        
        This was a paragraph about New York's $110 clothing threshold, Pennsylvania and New Jersey,
        then a six-row table of categories and how each is treated. All true, none of it a decision
-       the seller makes here — she chooses a category when she lists a piece, and everything else
+       the seller makes here. She chooses a category when she lists a piece, and everything else
        follows from Stripe's own rules. Reference material shown as if it needed reading. */}
    <TechCard className="mt-4 p-5">
     <p className="text-[13px] font-medium text-stone-700">Taxed by category</p>
     <p className="mt-1 text-[12.5px] leading-relaxed text-stone-500">
-     Each piece is taxed as what it is — clothing is exempt in some states, bags and jewellery are taxable
+     Each piece is taxed as what it is. Clothing is exempt in some states, bags and jewellery are taxable
      everywhere. Categorise a piece correctly when you list it and the rest follows.
     </p>
    </TechCard>
@@ -124,7 +194,7 @@ export default function TaxSettingsPage() {
    <Registrations />
 
    <p className={cn("mt-4 text-[11.5px] leading-relaxed text-stone-400")}>
-    Tax collected is shown separately in Profit &amp; loss and in your orders export — it isn&apos;t revenue, it&apos;s held
+    Tax collected is shown separately in Profit &amp; loss and in your orders export. It isn&apos;t revenue, it&apos;s held
     for the state until you file. VYA doesn&apos;t file on your behalf, and this isn&apos;t tax advice.
    </p>
   </div>
@@ -200,7 +270,7 @@ function Registrations() {
     <div className="border-b border-amber-200 bg-amber-50 px-5 py-3">
      <p className="text-[12.5px] leading-relaxed text-amber-900">
       <b>You ship to {gaps.map((g) => g.label).join(", ")} without a registration there.</b> Those sales are
-      going out with no tax charged. Whether you owe any depends on how much you sell into each country —
+      going out with no tax charged. Whether you owe any depends on how much you sell into each country,
       worth checking with an accountant before it accumulates.
      </p>
      <p className="mt-2 text-[12px] leading-relaxed text-amber-900">
@@ -222,7 +292,7 @@ function Registrations() {
     <p className="px-5 py-6 text-[13px] text-stone-400">Loading…</p>
    ) : !connected ? (
     <div className="px-5 py-6">
-     <p className="text-[13px] text-stone-500">Set up payments first — where you&apos;re registered lives on your own Stripe account.</p>
+     <p className="text-[13px] text-stone-500">Set up payments first, where you&apos;re registered lives on your own Stripe account.</p>
      <TechButtonLink href="/admin/settings/payments" className="mt-3 inline-flex">Set up payments</TechButtonLink>
     </div>
    ) : (
@@ -264,7 +334,7 @@ function Registrations() {
       <TechButton onClick={add} disabled={busy || country.length !== 2}>Add registration</TechButton>
       {err && <span className="text-[12px] text-rose-700">{err}</span>}
      </div>
-     {/* The step sellers actually get stuck on isn't this form — it's getting the number in the first
+     {/* The step sellers actually get stuck on isn't this form. It's getting the number in the first
          place. Name the authority and link straight at it, as soon as we know which place she means. */}
      {(() => {
       const a = authorityFor(country, state);
@@ -272,7 +342,7 @@ function Registrations() {
       if (a.kind === "none") return <p className="px-5 pb-4 text-[12px] text-stone-500">{a.message} Nothing to register.</p>;
       return (
        <p className="px-5 pb-4 text-[12px] leading-relaxed text-stone-500">
-        Don’t have one yet? {a.authority.what} comes from {a.authority.authority} —{" "}
+        Don’t have one yet? {a.authority.what} comes from {a.authority.authority}: {" "}
         <a href={a.authority.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-stone-800">register here</a>.
         {a.authority.note ? ` ${a.authority.note}` : ""}
        </p>
@@ -282,7 +352,7 @@ function Registrations() {
      )}
      <p className="border-t border-stone-100 px-5 py-3 text-[11.5px] leading-relaxed text-stone-400">
       US registrations are per state. Everywhere else is country-wide. These are written straight to your
-      Stripe account — VYA keeps no copy, so what you see here is what actually decides whether tax is charged.
+      Stripe account: VYA keeps no copy, so what you see here is what actually decides whether tax is charged.
      </p>
     </>
    )}

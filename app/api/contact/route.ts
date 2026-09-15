@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
  if (!storeSlug || !message) {
  return NextResponse.json({ error: "Message required." }, { status: 400 });
  }
- // Honor the store's Buyer-messaging toggle — if they've turned messaging off, don't open a thread.
+ // Honor the store's Buyer-messaging toggle, if they've turned messaging off, don't open a thread.
  const settings = await getInboxSettings(storeSlug).catch(() => null);
  if (settings && !settings.messagingEnabled) {
  return NextResponse.json({ error: "This store isn’t taking messages right now." }, { status: 403 });
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
  itemTitle,
  message: message.slice(0, 5000),
  });
- // Notify the store — email + (if configured) a text to the seller's phone.
+ // Notify the store: email + (if configured) a text to the seller's phone.
  notifyStoreOfMessage(storeSlug, { itemTitle, buyerName: name, message: message.slice(0, 5000), conversationId: id }).catch(() => {});
  return NextResponse.json({ ok: true, token });
  } catch {

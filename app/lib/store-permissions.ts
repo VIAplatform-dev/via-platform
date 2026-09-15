@@ -5,7 +5,7 @@
 // lists shouldn't necessarily see what every piece cost or what the store made, and someone hired to
 // answer messages has no reason to be able to delete inventory.
 //
-// So the OWNER keeps everything — that never changes, and there is always at least one — and staff
+// So the OWNER keeps everything, that never changes, and there is always at least one, and staff
 // get a set of areas the owner picks per person. A staff member with nothing chosen still gets the
 // default set below, so nobody who already had access loses it when this ships.
 //
@@ -56,7 +56,7 @@ export type Person = { role: StoreRole; permissions?: Area[] | null };
 /** Everything this person can reach. An owner gets the lot. */
 export function areasFor(p: Person): Area[] {
  if (p.role === "owner") return AREAS.map((a) => a.key);
- // null means "never chosen" — the default. An empty array means the owner deliberately took
+ // null means "never chosen". The default. An empty array means the owner deliberately took
  // everything away, and that has to be respected rather than read as unset.
  return p.permissions == null ? [...DEFAULT_STAFF] : p.permissions.filter(isArea);
 }
@@ -80,7 +80,11 @@ export function normalisePermissions(v: unknown): Area[] {
 export function summarise(p: Person): string {
  if (p.role === "owner") return "Everything, including billing and access";
  const n = areasFor(p).length;
- if (n === 0) return "Nothing yet — pick what they can do";
+ // Zero is only ever DELIBERATE. `permissions: null` means nobody has chosen, and areasFor answers
+ // that with the default set, so an empty list here is an owner who ticked nothing, not a blank
+ // waiting to be filled. It used to read "Nothing yet. Pick what they can do", which described the
+ // one state it could never be in, and told an owner to redo a decision she had just made.
+ if (n === 0) return "No areas. They can sign in and see nothing";
  if (n === AREAS.length) return "Everything except billing and access";
  return `${n} of ${AREAS.length} areas`;
 }

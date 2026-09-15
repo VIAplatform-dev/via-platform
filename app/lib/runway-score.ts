@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Runway matching — the decision rules (pure, no I/O, unit-tested).
+// Runway matching. The decision rules (pure, no I/O, unit-tested).
 //
 // Kept apart from runway-index.ts on purpose, the same way data-layer/metrics.ts
 // sits apart from market-metrics-db.ts. Naming a show raises a piece's asking
@@ -21,7 +21,7 @@ export type RunwayCandidate = RunwayLook & { similarity: number };
 export type RunwayVerdict = {
  runway: string | null;
  confidence: number;
- /** Why it landed where it did — surfaced in logs and the admin, never invented. */
+ /** Why it landed where it did. Surfaced in logs and the admin, never invented. */
  reason: "no-index" | "below-threshold" | "no-consensus" | "brand-mismatch" | "matched";
  best?: RunwayCandidate;
  supporting?: number;
@@ -52,7 +52,7 @@ const SEASONS: Record<string, string> = { "s/s": "S/S", "f/w": "F/W", resort: "R
 
 /**
  * Inverse of formatRunway: "Tom Ford for Gucci S/S 2004" back into its parts, or null when the
- * string isn't a season at all. Deliberately strict — this gates what gets written INTO the index,
+ * string isn't a season at all. Deliberately strict: this gates what gets written INTO the index,
  * and a mis-parsed house would quietly poison every future match against it.
  */
 export function parseRunway(label: string): Pick<RunwayLook, "house" | "season" | "year"> | null {
@@ -69,7 +69,7 @@ export function parseRunway(label: string): Pick<RunwayLook, "house" | "season" 
  *
  * The bar mirrors the caption heuristic this sits beside: a season is asserted
  * only when it is the closest match AND either corroborated by a second look
- * from the same show or strong enough alone — and when it clearly beats the
+ * from the same show or strong enough alone, and when it clearly beats the
  * next-best season, so two plausible shows cancel out rather than one winning
  * by a hair.
  */

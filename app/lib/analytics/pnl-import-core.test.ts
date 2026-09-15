@@ -15,7 +15,7 @@ test("currency symbols and thousands separators", () => {
  assert.equal(parseMoney("€1.234,56"), 123_456); // European: last separator is the decimal
 });
 
-test("accountants' brackets are negative — every ledger export writes them", () => {
+test("accountants' brackets are negative. Every ledger export writes them", () => {
  assert.equal(parseMoney("(45.00)"), -4_500);
  assert.equal(parseMoney("-45"), -4_500);
  assert.equal(parseMoney("45-"), -4_500);
@@ -62,7 +62,7 @@ test("nonsense is null", () => {
 test("day-first is detected from the file, not assumed", () => {
  assert.equal(detectDayFirst(["03/04/2026", "14/05/2026"]), true);
  assert.equal(detectDayFirst(["03/04/2026", "05/14/2026"]), false);
- assert.equal(detectDayFirst(["03/04/2026"]), false); // nothing proves it — keep the safe default
+ assert.equal(detectDayFirst(["03/04/2026"]), false); // nothing proves it: keep the safe default
  // Dots are the European way of writing it: 04.03.2026 is 4 March, and reading it as 3 April would
  // move her takings into the wrong month silently.
  assert.equal(detectDayFirst(["04.03.2026"]), true);

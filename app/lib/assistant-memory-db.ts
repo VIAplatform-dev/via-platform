@@ -1,8 +1,8 @@
 import { neon } from "@neondatabase/serverless";
 
 // Memory for the VYA Sidekick, per store:
-//  • thread   — the running conversation, so it survives refreshes/sessions.
-//  • memory   — durable facts the seller told it to remember (brand voice, preferences,
+//  • thread: the running conversation, so it survives refreshes/sessions.
+//  • memory: durable facts the seller told it to remember (brand voice, preferences,
 //               decisions), injected into the system prompt so it "remembers" across chats.
 // Self-healing tables (created on first use), so there's no separate migration step.
 
@@ -32,7 +32,7 @@ export async function loadThread(slug: string): Promise<ThreadMessage[]> {
  } catch { return []; }
 }
 
-// Persist the visible thread (user turns + assistant replies — not the tool-call internals).
+// Persist the visible thread (user turns + assistant replies, not the tool-call internals).
 export async function saveThread(slug: string, messages: ThreadMessage[]): Promise<void> {
  try {
  const sql = db(); await ensure(sql);

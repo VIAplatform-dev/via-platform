@@ -11,7 +11,7 @@ import { SellerScreen } from "../../../components/seller/Screen";
 // One thread.
 //
 // The piece being asked about is PINNED at the top. Without it she is answering "is it still
-// available?" with no idea which "it" — the single most common message a vintage seller gets.
+// available?" with no idea which "it". The single most common message a vintage seller gets.
 
 type Conversation = { id: number; buyerName: string | null; buyerEmail: string | null; itemTitle: string | null };
 type Message = { id: number; sender: "buyer" | "store"; body: string; createdAt: string };

@@ -38,7 +38,7 @@ test("shared wording travels to the other product pages", () => {
  assert.equal(cheerio.load(out.html)(".atc").text(), "Add to bag");
 });
 
-test("a piece's own name does NOT travel — that is what makes this safe", () => {
+test("a piece's own name does NOT travel. That is what makes this safe", () => {
  const edits = { edits: [{ eid: eidOf(A, "h1"), text: "Silk Slip Dress (1970s)" }] };
  const tmpl = extractScopedEdits(A, edits, "body");
  const out = applyScopedEditsToPage(B, tmpl, "body");
@@ -58,7 +58,7 @@ test("a shared link travels", () => {
  assert.equal(cheerio.load(out.html)(".guide").attr("href"), "/pages/measurements");
 });
 
-test("a header edit is NOT carried by the product pass — the chrome pass owns it", () => {
+test("a header edit is NOT carried by the product pass. The chrome pass owns it", () => {
  // Otherwise both passes rewrite the same element and the two could disagree.
  const edits = { edits: [{ eid: eidOf(A, "header a"), text: "Bag" }] };
  const tmpl = extractScopedEdits(A, edits, "body");

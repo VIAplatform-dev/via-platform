@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { polishDescriptionForSeo } from "@/app/lib/ai-intake";
 import { getVoice } from "@/app/lib/store-voice";
+import { getStoreBrief } from "@/app/lib/store-brief-db";
 
 export const dynamic = "force-dynamic";
 
@@ -21,17 +22,19 @@ export async function POST(request: NextRequest) {
 
  try {
   const voice = await getVoice(slug).catch(() => null);
+  // Polishing for search must not quietly undo the layout she chose. See description-layout.ts.
+  const brief = await getStoreBrief(slug).catch(() => null);
   const polished = await polishDescriptionForSeo(
    {
     description,
     title: body?.title, brand: body?.brand, era: body?.era, material: body?.material,
     condition: body?.condition, size: body?.size, category: body?.category,
    },
-   voice,
+   { ...(voice ?? { guide: "", examples: [] }), layout: brief?.layout ?? [] },
   );
-  if (!polished) return NextResponse.json({ error: "Couldn't polish that — try again." }, { status: 502 });
+  if (!polished) return NextResponse.json({ error: "Couldn't polish that: try again." }, { status: 502 });
   return NextResponse.json({ ok: true, description: polished });
  } catch {
-  return NextResponse.json({ error: "Couldn't polish right now — try again in a moment." }, { status: 502 });
+  return NextResponse.json({ error: "Couldn't polish right now. Try again in a moment." }, { status: 502 });
  }
 }

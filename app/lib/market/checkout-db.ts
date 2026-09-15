@@ -122,7 +122,7 @@ export async function getCheckoutByClientKey(sellerId: string, clientKey: string
  return rows[0] ? row(rows[0]) : null;
 }
 
-/** The open (awaiting) checkout holding an item, if any — so a second device sees who holds it. */
+/** The open (awaiting) checkout holding an item, if any, so a second device sees who holds it. */
 export async function getOpenCheckoutForItem(itemId: string): Promise<MarketCheckout | null> {
  await ensureMarketCheckoutTables();
  const rows = await db()`SELECT * FROM market_checkouts WHERE status = 'awaiting_payment' AND (item_id = ${itemId} OR items @> ${JSON.stringify([{ itemId }])}::jsonb) ORDER BY created_at DESC LIMIT 1`;
@@ -135,7 +135,7 @@ export type StartResult =
 
 /**
  * Start a checkout for one or more items: reserve each (atomic; contends with online buyers), then
- * record the intent. All-or-nothing — if any item can't be held, the ones already held are released.
+ * record the intent. All-or-nothing, if any item can't be held, the ones already held are released.
  * Idempotent on (seller, clientKey). Never charges here.
  */
 export async function startCheckout(o: { sellerId: string; lines: { itemId: string; saleCents?: number | null }[]; sessionId: string | null; clientKey: string; tender: MarketTender; deviceLabel?: string | null }): Promise<StartResult> {
@@ -155,7 +155,7 @@ export async function startCheckout(o: { sellerId: string; lines: { itemId: stri
  if (item.status === "reserved") {
  const open = await getOpenCheckoutForItem(item.id);
  if (open) return { ok: false, code: "in_progress", message: `A checkout is already in progress for “${item.title}”${open.deviceLabel ? ` on ${open.deviceLabel}` : ""}.`, holder: open.id, itemId: item.id };
- return { ok: false, code: "reserved", message: `“${item.title}” is reserved by an online checkout — try again in a few minutes.`, itemId: item.id };
+ return { ok: false, code: "reserved", message: `“${item.title}” is reserved by an online checkout. Try again in a few minutes.`, itemId: item.id };
  }
  const requested = o.lines.find((l) => l.itemId === w.itemId)?.saleCents;
  const saleCents = requested == null ? item.priceCents : Math.max(0, Math.min(item.priceCents, Math.round(Number(requested) || 0)));
@@ -226,7 +226,7 @@ export type FinalizeResult = { status: "paid" | "already_paid" | "paid_conflict"
 /**
  * The ONLY path to `paid`. Money first: claim the checkout row (unique on the PaymentIntent, guarded
  * on the statuses a payment may arrive from). Then flip each item to sold and record one order per
- * item. Idempotent — webhook, poll and cron may all call this; one records the sale, the rest observe
+ * item. Idempotent: webhook, poll and cron may all call this; one records the sale, the rest observe
  * it. A crash mid-way is repaired by calling again (existing orders are adopted, not duplicated).
  * If some item can no longer be sold (its hold lapsed and it sold elsewhere) that LINE is refunded
  * automatically and the checkout is flagged `paid_conflict` for the seller to see.
@@ -294,14 +294,14 @@ export async function finalizeMarketSale(o: { checkoutId: string; paymentIntent:
  const refundCents = conflicts.reduce((s, l) => s + l.saleCents, 0);
  await db()`UPDATE market_checkouts SET status = 'paid_conflict', updated_at = now() WHERE id = ${c.id} AND status = 'paid'`;
  await logEvent(c.id, o.source, "paid", "paid_conflict", { items: conflicts.map((l) => l.itemId), refundCents });
- // LOGGED, NOT EMAILED — AND ONLY ONCE.
+ // LOGGED, NOT EMAILED, AND ONLY ONCE.
  //
  // This sent TWO emails per checkout: an ops alert, and a `critical` error log which emails again.
  // When the reconcile cron was first scheduled it worked through a backlog and sent a dozen at
- // once, each reading "Auto-refund of 57800 USD attempted — verify in Stripe". Wrong three ways:
+ // once, each reading "Auto-refund of 57800 USD attempted. Verify in Stripe". Wrong three ways:
  // the figure is cents, no refund had been attempted (none of those checkouts had a payment
  // intent), and nothing needed a human at 11pm. The row is already marked paid_conflict and the
- // event log already records it — that is where this belongs.
+ // event log already records it. That is where this belongs.
  //
  // A refund that genuinely FAILS still shouts, because that is money stuck in the wrong place.
  const pi = o.paymentIntent || c.stripePaymentIntent;
@@ -316,14 +316,14 @@ export async function finalizeMarketSale(o: { checkoutId: string; paymentIntent:
  return { status: "paid", checkout: { ...c, orderId: orderIds[0] ?? null }, orderId: orderIds[0] ?? null, orderIds };
 }
 
-/** Every open checkout platform-wide — the reconcile cron's worklist. */
+/** Every open checkout platform-wide. The reconcile cron's worklist. */
 export async function listOpenCheckouts(limit = 200): Promise<MarketCheckout[]> {
  await ensureMarketCheckoutTables();
  const rows = await db()`SELECT * FROM market_checkouts WHERE status = 'awaiting_payment' ORDER BY created_at ASC LIMIT ${limit}`;
  return rows.map(row);
 }
 
-/** Paid but missing orders (crashed between claim and insert) — the cron finishes them. */
+/** Paid but missing orders (crashed between claim and insert). The cron finishes them. */
 export async function listPaidWithoutOrder(limit = 50): Promise<MarketCheckout[]> {
  await ensureMarketCheckoutTables();
  const rows = await db()`SELECT c.* FROM market_checkouts c WHERE c.status = 'paid' AND c.paid_at < now() - interval '30 seconds'

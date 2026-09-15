@@ -1,5 +1,5 @@
 /**
- * The shape a LIST of pieces travels in — as opposed to the shape one open piece travels in.
+ * The shape a LIST of pieces travels in, as opposed to the shape one open piece travels in.
  *
  * WHY THIS EXISTS. /api/store/items returned every column of every row. The `items` table has 44 of
  * them, and for the largest store on the platform (2nd Street, 5,297 pieces) that is 12.5 MB of
@@ -14,16 +14,16 @@
  *
  * Projecting to what the list actually reads takes the same store to 1.8 MB.
  *
- * THE FIRST PHOTOGRAPH ONLY. Both list screens draw `images[0]` and nothing else — a row thumbnail
+ * THE FIRST PHOTOGRAPH ONLY. Both list screens draw `images[0]` and nothing else. A row thumbnail
  * or a grid tile. The rest of the photographs belong to the piece, and arrive when she opens it.
  * Sending one preserves the only other thing the list asks of this field, which is whether there is
  * a photograph AT ALL ("No photo" in Needs you): none stays none, some stays some.
  *
  * COST STAYS, AND IT IS THE EXCEPTION. Cost is hers and not a shopper's business, and it does not
- * travel anywhere a customer can reach — but the list itself reads it, for the "No cost" filter
+ * travel anywhere a customer can reach, but the list itself reads it, for the "No cost" filter
  * that finds live pieces she priced before she knew what she paid. A flag would do, at the cost of
- * a second way to ask the same question. The sourcing fields around it — where it came from, when,
- * which lot — are not read here and do not come.
+ * a second way to ask the same question. The sourcing fields around it, where it came from, when,
+ * which lot: are not read here and do not come.
  *
  * NOT THE DEFAULT. Every caller that asks for no particular view still gets the whole row, because
  * the desktop Inventory edits in place and reads most of them. This is opt-in, via ?view=list.

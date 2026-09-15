@@ -11,13 +11,13 @@ import { Button, Notice } from "../../components/seller/Form";
 import { PAYOUT_METHOD_LABELS } from "../../lib/seller/consignors";
 import { payoutActionFor } from "../../lib/seller/payouts";
 
-// What is OWED first, because that is the question. Then who — and now, paying them.
+// What is OWED first, because that is the question. Then who, and now, paying them.
 //
 // "Paying consignors out is on the desktop" was the last line on this screen, under a list of people
 // and the exact amounts they were owed. Everything needed to act was on screen except the ability to.
 //
 // PAYABLE IS NOT THE SAME AS OWED and the difference is the whole design. A sale inside the return
-// hold is owed but not yet payable; a sale on eBay is owed, and payable, but only by hand — the
+// hold is owed but not yet payable; a sale on eBay is owed, and payable, but only by hand. The
 // marketplace paid the store directly, so VYA has nothing to send. Each row says which of those it
 // is rather than offering a Pay button that would fail (see lib/seller/payouts.ts).
 
@@ -156,7 +156,7 @@ export default function ConsignmentScreen() {
               {tab === "owed" ? "DUE NOW" : "STILL ON HOLD"}
             </Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text, marginTop: spacing.sm }}>
-              {q.data ? formatMoney(tab === "owed" ? q.data.availableCents : q.data.onHoldCents, currency) : "—"}
+              {q.data ? formatMoney(tab === "owed" ? q.data.availableCents : q.data.onHoldCents, currency) : "-"}
             </Text>
             <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 4 }}>
               {rows.length} {rows.length === 1 ? "consignor" : "consignors"}

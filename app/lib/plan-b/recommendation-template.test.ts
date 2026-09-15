@@ -74,7 +74,7 @@ test("sanitize leaves the theme's server-rendered price behind for us to overwri
  assert.match($("ul li").first().text(), /\$44\.00/);
 });
 
-test("sanitize keeps Alpine's hidden panels hidden — a shopper must never be told 'Added to Cart!' unprompted", () => {
+test("sanitize keeps Alpine's hidden panels hidden. A shopper must never be told 'Added to Cart!' unprompted", () => {
  const $ = cheerio.load(sanitizeRecommendationTemplate(TEMPLATE), null, false);
  const panel = $(".added-panel").first();
  assert.equal(panel.length, 1, "the element stays, in case the theme's layout counts on it");
@@ -90,7 +90,7 @@ test("renders one theme card per live piece, in the theme's own markup", () => {
  assert.equal($("section").attr("data-color-scheme"), "scheme4", "and its colour band");
 });
 
-test("each card shows OUR piece — its photo, name, price and link", () => {
+test("each card shows OUR piece. Its photo, name, price and link", () => {
  const $ = cheerio.load(render(), null, false);
  const first = $("ul li").first();
  assert.equal(first.find("img").attr("src"), "https://vya.test/green.jpg");
@@ -117,7 +117,7 @@ test("the theme's add-to-cart form points at this piece and is intercepted, not 
  assert.ok(!render().includes("<script"), "no script that could never execute");
 });
 
-test("the section is renamed to the one THIS page asked for — per-section custom CSS is scoped to it", () => {
+test("the section is renamed to the one THIS page asked for, per-section custom CSS is scoped to it", () => {
  const out = render();
  assert.equal(templateSectionId(out), SECTION);
  assert.ok(!out.includes("template--111__related-products"), "no trace of the id it was captured under");

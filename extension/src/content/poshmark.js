@@ -1,12 +1,12 @@
-// VYA Cross-Lister — Poshmark adapter (content script).
+// VYA Cross-Lister: Poshmark adapter (content script).
 // Two jobs on poshmark.com, in the seller's own logged-in session:
 //   1. Fill the "create listing" form from a VYA item (photos, title, description, price), then the
 //      seller confirms category/size/brand and hits Publish. On publish we capture the new listing
-//      URL and report it — which is ALSO what unlocks stat attribution for Poshmark.
+//      URL and report it, which is ALSO what unlocks stat attribution for Poshmark.
 //   2. Read the like count off the seller's own listing/closet pages and report it to VYA.
 //
 // ⚠️ Poshmark's sell-form + like-count selectors are best-effort and MUST be verified against the
-//    seller's live (logged-in) DOM — the public listing page shows a Like button but no count, so
+//    seller's live (logged-in) DOM: the public listing page shows a Like button but no count, so
 //    the count location needs a logged-in-owner pass. The plumbing around them is production-grade.
 
 // ── listing fill ──────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ async function fillListing(item) {
     note: "Filled photos, title, description & price. Confirm category/size/brand and hit List.",
   };
 }
-// After the seller publishes, Poshmark routes to /listing/<slug>-<id> — capture + report it.
+// After the seller publishes, Poshmark routes to /listing/<slug>-<id> capture + report it.
 function watchForPublish() {
   let last = location.href;
   setInterval(() => {
@@ -109,7 +109,7 @@ function parseCount(text) {
 }
 
 // The public listing shows a Like button (div[data-et-name="like"]) with no count; the seller's own
-// view carries the number nearby / in a "N likes" string. Best-effort — verify on the owner's DOM.
+// view carries the number nearby / in a "N likes" string. Best-effort: verify on the owner's DOM.
 function readListingLikes() {
   const near = document.querySelector('[data-et-name="like"]');
   if (near) {
@@ -121,7 +121,7 @@ function readListingLikes() {
   return m ? parseCount(m[1]) : null;
 }
 // Best-effort per-listing offer signal (Poshmark surfaces offer activity to the seller on their own
-// listing). Left conservative — reports only when a clear count is present.
+// listing). Left conservative: reports only when a clear count is present.
 function readListingOffers() {
   const m = document.body.innerText.match(/([\d,]+)\s+offers?\b/i);
   return m ? parseCount(m[1]) : null;
@@ -167,7 +167,7 @@ function runStatsScan() {
   scrapeListingPage().catch(() => {});
   scrapeClosetPage().catch(() => {});
 }
-// Poshmark is a SPA — re-scan on navigation, after a beat for render.
+// Poshmark is a SPA. Re-scan on navigation, after a beat for render.
 let _lastScan = "";
 setInterval(() => {
   if (location.href === _lastScan) return;

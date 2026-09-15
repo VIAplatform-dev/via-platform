@@ -7,11 +7,11 @@ import { stores, convertCurrencyToUSD } from "@/app/lib/stores";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// "Why isn't this Collabs order in the conversions table?" — read-only diagnostic + a ?recover=1 mode
+// "Why isn't this Collabs order in the conversions table?". Read-only diagnostic + a ?recover=1 mode
 // that inserts the missing ones. For a store it fetches the partnership's recent Collabs commissions
 // (ALL groups incl. IN_HOLDING_PERIOD) exactly like the sync, groups them by order, and shows which
 // orders are in conversions vs MISSING (the ones that slipped past the delta pointer). recover=1 inserts
-// the missing ones (deduped by order id). This is scoped to ONE store + a recent window — no mass backfill.
+// the missing ones (deduped by order id). This is scoped to ONE store + a recent window, no mass backfill.
 //   /api/admin/collabs-order-debug?store=Lovergirl%20Vintage&days=45            (see the truth)
 //   /api/admin/collabs-order-debug?store=Lovergirl%20Vintage&days=45&recover=1  (fix the missing ones)
 
@@ -42,7 +42,7 @@ function resolveStoreSlug(brandName: string): string {
 type CollabsCommission = { commissionId: string; orderName: string | null; commissionUsd: number; group: string; earnedAt: string; orderTotalUsd: number | null };
 
 // Fetches recent commissions across all groups, stepping the query down (full → partial → minimal)
-// on GraphQL error exactly like the sync — and returns per-group debug so we can SEE why it's empty.
+// on GraphQL error exactly like the sync, and returns per-group debug so we can SEE why it's empty.
 async function fetchPartnershipCommissions(partnershipId: string, cookie: string, csrf: string, sinceIso: string): Promise<{ commissions: CollabsCommission[]; groupDebug: Record<string, unknown> }> {
  const groups = ["NEXT_PAYOUT", "IN_HOLDING_PERIOD", "PAYOUT_REQUESTED", "CREATOR_ACTION_REQUIRED", "PAID_OUT"];
  const headers = {
@@ -92,14 +92,14 @@ export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const q = new URL(request.url).searchParams;
 
- // ── ?all=1 — sweep EVERY Collabs partnership and flag stores where Collabs' order count > ours.
+ // ── ?all=1: sweep EVERY Collabs partnership and flag stores where Collabs' order count > ours.
  // Cheap: one grouped conversions count + the in-memory snapshot, NO per-order Collabs fetch. This
- // answers "which other stores are we missing orders for?" — then deep-dive/recover each flagged store.
+ // answers "which other stores are we missing orders for?", then deep-dive/recover each flagged store.
  if (q.get("all") === "1") {
   const raw = await getSetting("collabs_data").catch(() => null);
   let partnerships: Array<{ id: string; name: string; totalOrders?: number; commissionRules?: Array<{ value: number }> }> = [];
   if (raw) { try { partnerships = JSON.parse(raw); } catch { /* ignore */ } }
-  if (!partnerships.length) return NextResponse.json({ error: "collabs_data snapshot empty — open/sync the Collabs tab first, then retry." });
+  if (!partnerships.length) return NextResponse.json({ error: "collabs_data snapshot empty: open/sync the Collabs tab first, then retry." });
   const sqlAll = db();
   const counts = (await sqlAll`SELECT store_slug, count(*)::int AS n FROM conversions WHERE conversion_id LIKE 'collabs_%' GROUP BY store_slug`) as Array<{ store_slug: string; n: number }>;
   const countBySlug = new Map(counts.map((c) => [c.store_slug, c.n]));
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
    return { store: slug, storeName: store?.name || p.name, partnershipId: p.id, matched: !!store, collabsTotalOrders: collabsTotal, ourCollabsConversions: ours, gap: collabsTotal - ours };
   }).sort((a, b) => b.gap - a.gap);
   const withGap = report.filter((r) => r.gap > 0);
-  const unmatched = report.filter((r) => !r.matched); // Collabs partnership whose name doesn't resolve to a VYA store — a slug-mismatch bug (orders would NEVER record)
+  const unmatched = report.filter((r) => !r.matched); // Collabs partnership whose name doesn't resolve to a VYA store. A slug-mismatch bug (orders would NEVER record)
   return NextResponse.json({
    mode: "all-stores-dry-run",
    storesChecked: report.length,
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
    try { const arr = JSON.parse(raw) as Array<{ id: string; name: string; totalOrders?: number; totalCommissionEarned?: string; commissionRules?: Array<{ value: number }> }>; partnership = arr.find((p) => resolveStoreSlug(p.name) === slug) ?? null; } catch { /* ignore */ }
   }
   if (!partnership) {
-   return NextResponse.json({ store: slug, storeName, ourConversions, error: `No Collabs partnership resolves to '${slug}'. Either the store name doesn't match Collabs (add a collabsHandleOverride) or the snapshot is empty — open/sync the Collabs tab first.` });
+   return NextResponse.json({ store: slug, storeName, ourConversions, error: `No Collabs partnership resolves to '${slug}'. Either the store name doesn't match Collabs (add a collabsHandleOverride) or the snapshot is empty. Open/sync the Collabs tab first.` });
   }
 
   const [cookie, csrf] = await Promise.all([getSetting("collabs_cookie"), getSetting("collabs_csrf_token")]);
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
   const byOrder = new Map<string, CollabsCommission[]>();
   for (const c of commissions) { const key = c.orderName || `commission-${c.commissionId}`; const g = byOrder.get(key) ?? []; g.push(c); byOrder.set(key, g); }
 
-  const rate = Number(partnership.commissionRules?.[0]?.value) || null; // % — for back-calc when Collabs gives no order total
+  const rate = Number(partnership.commissionRules?.[0]?.value) || null; // percent, for back-calc when Collabs gives no order total
   const rows: Array<{ orderName: string | null; orderId: string; group: string; commissionUsd: number; orderTotalUsd: number | null; earnedAt: string; inConversions: boolean }> = [];
   for (const [, items] of byOrder) {
    const orderName = items[0].orderName;
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
   rows.sort((a, b) => (a.earnedAt < b.earnedAt ? 1 : -1));
   const missing = rows.filter((r) => !r.inConversions);
 
-  // ── recover=1 — insert the missing orders (deduped by order id). Only ones with a resolvable total. ──
+  // ── recover=1: insert the missing orders (deduped by order id). Only ones with a resolvable total. ──
   const recovered: Array<{ orderName: string | null; orderId: string; orderTotalUsd: number; commissionUsd: number }> = [];
   if (recover) {
    for (let i = 0; i < missing.length; i++) {
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
    windowDays: days,
    recentCollabsOrders: rows.length,                    // orders Collabs shows in the window
    alreadyInConversions: rows.filter((r) => r.inConversions).length,
-   missingCount: missing.length,                        // in Collabs but NOT in our table — the culprits
+   missingCount: missing.length,                        // in Collabs but NOT in our table. The culprits
    missing,                                             // each with orderId, group (holding?), commission, total
    ...(recover ? { recovered, recoveredCount: recovered.length } : { hint: "add &recover=1 to insert the missing ones" }),
   });

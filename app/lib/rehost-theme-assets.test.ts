@@ -25,12 +25,12 @@ test("collects theme assets from markup and from inlined CSS", () => {
  ]) assert.ok(urls.includes(want), `missing ${want}`);
 });
 
-test("the fingerprint query survives — it identifies WHICH build of a file", () => {
+test("the fingerprint query survives. It identifies WHICH build of a file", () => {
  const urls = collectAssetUrls(`<script src="/cdn/shop/t/1/assets/theme.js?v=164905933048"></script>`, ORIGIN);
  assert.deepEqual(urls, ["https://blummier.com/cdn/shop/t/1/assets/theme.js?v=164905933048"]);
 });
 
-test("trackers and popup apps are never owned — they are dropped at serve time instead", () => {
+test("trackers and popup apps are never owned. They are dropped at serve time instead", () => {
  const html = `<html><body>
   <script src="https://cdn.shopify.com/extensions/abc/omnisend-55/assets/omnisend-in-shop.js"></script>
   <script src="https://cdn3.hextom.com/js/tms/tms.js"></script>
@@ -57,7 +57,7 @@ test("a root-relative asset with no known origin is skipped rather than guessed 
  assert.deepEqual(collectAssetUrls(`<script src="/cdn/shop/t/1/assets/theme.js"></script>`, null), []);
 });
 
-test("an external stylesheet is left to the proxy — moving it would break its own relative url() refs", () => {
+test("an external stylesheet is left to the proxy. Moving it would break its own relative url() refs", () => {
  // blummier's real base.css says `url(./sparkle.gif)`. Relative to Shopify that resolves and serves
  // (HTTP 200); relative to a Blob key it 404s. Owning the .css trades a working asset for a broken one.
  const urls = collectAssetUrls(`<link rel="stylesheet" href="/cdn/shop/t/1/assets/base.css">`, ORIGIN);
@@ -65,12 +65,12 @@ test("an external stylesheet is left to the proxy — moving it would break its 
 });
 
 // The rewrite itself, exercised through the real function by stubbing storage with a fake db module
-// is more than a unit test should carry — so the ordering property it depends on is pinned here.
+// is more than a unit test should carry, so the ordering property it depends on is pinned here.
 import { rewriteAllForTest } from "./rehost-theme-assets.ts";
 
 test("a shorter asset URL never corrupts a longer one it prefixes (longest-first rewrite)", () => {
- // Reproduced before the fix: `theme.js?v=94` became `blob/AAA.js?v=94` — the WRONG file with a
- // dangling query — because the bare `theme.js` entry rewrote first and ate the middle of it.
+ // Reproduced before the fix: `theme.js?v=94` became `blob/AAA.js?v=94`: the WRONG file with a
+ // dangling query, because the bare `theme.js` entry rewrote first and ate the middle of it.
  const html = `<script src="https://x.com/cdn/assets/theme.js?v=94"></script><img src="https://x.com/cdn/assets/theme.js">`;
  const map = new Map([
   ["https://x.com/cdn/assets/theme.js", "https://blob/AAA.js"],
@@ -91,9 +91,9 @@ test("a URL stored with &amp; in the HTML is rewritten even though the collector
  assert.equal(out, `<img src="https://blob/L.png">`);
 });
 
-test("a product photo is one the items table owns — a section image with ?width= is NOT skipped", () => {
+test("a product photo is one the items table owns. A section image with ?width= is NOT skipped", () => {
  // Shopify adds ?width= to every rendered image. Keying on it excluded the logo, hero and all
- // section images on the test store — exactly the branding the blackout gate exists to protect.
+ // section images on the test store. Exactly the branding the blackout gate exists to protect.
  const html = `<img src="/cdn/shop/files/objects_considered.png?v=1&amp;width=500">
   <img src="/cdn/shop/files/IMG_2773.jpg?v=2&amp;width=700">`;
  const productFiles = new Set(["IMG_2773"]); // only this one is a product photo
@@ -102,7 +102,7 @@ test("a product photo is one the items table owns — a section image with ?widt
  assert.ok(!urls.some((u) => u.includes("IMG_2773")), "the product photo is left to the image cron");
 });
 
-test("a product-card image IS taken — a product strip in the site chrome is never replaced at serve time", () => {
+test("a product-card image IS taken. A product strip in the site chrome is never replaced at serve time", () => {
  // The exclusion this replaces left two photos per page loading from Shopify on a fresh crawl.
  const html = `<img src="/cdn/shop/files/logo.png?width=300">
   <a href="/products/silk-dress"><img src="/cdn/shop/files/IMG_1.jpg?width=533" srcset="/cdn/shop/files/IMG_1.jpg?width=165 165w"></a>`;
@@ -118,7 +118,7 @@ test("a srcset ladder is ONE file: every width variant shares a key, one variant
  const keys = new Set(rungs.map(variantKey));
  assert.equal(keys.size, 1, "all rungs collapse to one key");
  assert.equal([...keys][0], "https://x.com/cdn/shop/files/a.jpg?v=17", "the fingerprint survives, the sizing does not");
- assert.equal(pickVariant(rungs), "https://x.com/cdn/shop/files/a.jpg?v=17&width=2000", "largest rung at or under 2048px — never the 3000px original");
+ assert.equal(pickVariant(rungs), "https://x.com/cdn/shop/files/a.jpg?v=17&width=2000", "largest rung at or under 2048px, never the 3000px original");
 });
 
 test("pickVariant: no sizing → the url itself; everything oversized → the smallest", () => {
@@ -137,17 +137,17 @@ test("rehostPageAssets: a shared asset uploads once across pages, every rung rep
  const page2 = `<script src="https://x.com/cdn/shop/t/1/assets/theme.js?v=7"></script><p>same theme, second page</p>`;
  const out1 = await rehostPageAssets(page1, "https://x.com", "s", cache, take);
  const out2 = await rehostPageAssets(page2, "https://x.com", "s", cache, take);
- assert.equal(taken.length, 2, "theme.js and logo — two uploads, not three (page 2 hit the cache)");
+ assert.equal(taken.length, 2, "theme.js and logo. Two uploads, not three (page 2 hit the cache)");
  assert.ok(taken.some((u) => u.includes("width=300")), "the larger logo rung was the one taken");
  assert.ok(!out1.includes("x.com/cdn"), "page 1 has no source references left");
  assert.ok(!out2.includes("x.com/cdn"), "page 2 has no source references left");
  assert.ok(out1.includes("srcset=\"https://blob/"), "the srcset ladder repointed too");
  const uploaderFailed = async () => null;
  const out3 = await rehostPageAssets(`<img src="https://x.com/cdn/shop/files/hero.jpg">`, "https://x.com", "s", new Map(), uploaderFailed);
- assert.ok(out3.includes("x.com/cdn/shop/files/hero.jpg"), "a failed upload leaves the source reference intact — never a broken URL");
+ assert.ok(out3.includes("x.com/cdn/shop/files/hero.jpg"), "a failed upload leaves the source reference intact, never a broken URL");
 });
 
-test("import-map module URLs are collected — a theme that loads only through an importmap has no src to find", () => {
+test("import-map module URLs are collected. A theme that loads only through an importmap has no src to find", () => {
  const html = `<script type="importmap">{ "imports": { "vendor": "//x.com/cdn/shop/t/56/assets/vendor.bundle.min.js?v=15", "data-island": "//x.com/cdn/shop/t/56/assets/data-island.bundle.js?v=18" } }</script>`;
  const urls = collectAssetUrls(html, "https://x.com");
  assert.ok(urls.includes("https://x.com/cdn/shop/t/56/assets/vendor.bundle.min.js?v=15"));
@@ -164,10 +164,10 @@ test("rewriteAll repoints the protocol-relative and root-relative forms, not jus
  assert.ok(out.includes("url(https://blob/A.png)"), "inline-style protocol-relative background repointed");
  assert.ok(out.includes('"vendor":"https://blob/V.js"'), "importmap value repointed");
  assert.ok(out.includes('src="https://blob/L.png"'), "root-relative src repointed");
- assert.ok(out.includes('src="/cdn/shop/files/logo.png?v=2"'), "a DIFFERENT versioned file is left alone — delimited match only");
+ assert.ok(out.includes('src="/cdn/shop/files/logo.png?v=2"'), "a DIFFERENT versioned file is left alone. Delimited match only");
 });
 
-test("extensionless Shopify font URLs are collected — the extension comes from the response, not the URL", () => {
+test("extensionless Shopify font URLs are collected. The extension comes from the response, not the URL", () => {
  const html = `<link rel="preload" href="https://x.com/cdn/fonts/karla/karla_n4.40497e07df527e6a50e58fb17ef1950c72f3e32c" as="font">`;
  assert.deepEqual(collectAssetUrls(html, "https://x.com"), ["https://x.com/cdn/fonts/karla/karla_n4.40497e07df527e6a50e58fb17ef1950c72f3e32c"]);
 });
@@ -210,7 +210,7 @@ const rw = (html: string) => rewritePageUrls(html, SRCSET_MAP, "https://shop.exa
 
 test("a protocol-relative srcset entry is repointed at our copy", () => {
  // THE BUG: the asset was copied to our storage and the page kept loading it from the seller. A
- // srcset entry is followed by a width descriptor and a comma, never by a quote or bracket — so the
+ // srcset entry is followed by a width descriptor and a comma, never by a quote or bracket, so the
  // delimiter guard rejected every one. 104 URLs on one store alone, copied and paid for, unused.
  const out = rw(`<img srcset="//shop.example.com/cdn/shop/files/a.jpg 400w, //other/b.jpg 800w">`);
  assert.match(out, /blob\.example/);
@@ -228,7 +228,7 @@ test("a root-relative srcset entry is repointed", () => {
 });
 
 test("a root-relative src in quotes still works", () => {
- // The case the old guard was written for — it must keep working.
+ // The case the old guard was written for. It must keep working.
  assert.match(rw(`<img src="/cdn/shop/files/a.jpg">`), /blob\.example/);
 });
 
@@ -253,7 +253,7 @@ const seen = (html: string) => collectAssetUrls(html, "https://shop.example.com"
 
 test("a lazysizes background is collected", () => {
  // `data-bgset` is how lazysizes carries a background image. we-thieves' collection hero was one,
- // and it is one of only two assets the whole fleet actually lost at cancellation — because nobody
+ // and it is one of only two assets the whole fleet actually lost at cancellation, because nobody
  // ever looked at the attribute. 39 URLs on that store alone.
  const urls = seen(`<div data-bgset="//shop.example.com/cdn/shop/files/hero.jpg 600w, //shop.example.com/cdn/shop/files/hero-2.jpg 1200w"></div>`);
  assert.ok(urls.some((u) => u.includes("hero.jpg")), urls.join(" "));
@@ -270,11 +270,11 @@ test("the media URLs a theme stashes for its own JavaScript are collected", () =
    data-product-variant-media="//shop.example.com/cdn/shop/files/v.jpg"
    data-original-src="//shop.example.com/cdn/shop/files/o.jpg"></div>`;
  const urls = seen(html);
- for (const f of ["f.jpg", "v.jpg", "o.jpg"]) assert.ok(urls.some((u) => u.endsWith(f)), `${f} — got ${urls.join(" ")}`);
+ for (const f of ["f.jpg", "v.jpg", "o.jpg"]) assert.ok(urls.some((u) => u.endsWith(f)), `${f}: got ${urls.join(" ")}`);
 });
 
 test("the social share image is collected", () => {
- // og:image is never rendered, so no check has ever noticed it — and every share card breaks the
+ // og:image is never rendered, so no check has ever noticed it, and every share card breaks the
  // day a seller cancels. Between 6 and 304 URLs per store, invisible to the blackout gate.
  const urls = seen(`<meta property="og:image" content="https://shop.example.com/cdn/shop/files/share.jpg">`);
  assert.ok(urls.some((u) => u.endsWith("share.jpg")), urls.join(" "));
@@ -302,7 +302,7 @@ test("a size template is asked for at one concrete size, not left as a placehold
 // ── asking storage once per store, not once per asset ────────────────────────────────────────────
 test("the blob index answers from memory instead of a call per asset", () => {
  // THE COST: rehostAsset asked Blob "do I have this?" once per asset. montrose-edit has 8,213 of
- // them, four at a time — about 2,000 sequential round trips, 31 minutes, every run, to be told
+ // them, four at a time, about 2,000 sequential round trips, 31 minutes, every run, to be told
  // "yes" 8,213 times. One paginated listing per store answers all of it.
  const idx = blobIndexFrom([
   { pathname: "theme/x/aaaa1111bbbb2222.jpg", url: "https://blob/aaaa.jpg", size: 10 },
@@ -333,7 +333,7 @@ test("a rimg size template is repointed at our copy, not left on the seller's CD
  // bag-crush's theme lazy-loads through `data-rimg-template`: its script reads that attribute,
  // substitutes a width, blanks `src` to an SVG placeholder and loads from there. We were copying
  // the image to Blob and setting `src` correctly, then the theme overwrote `src` from a template
- // still pointing at mybagcrush.com — 1,391 references across her 44 pages, every one of which
+ // still pointing at mybagcrush.com. 1,391 references across her 44 pages, every one of which
  // would die the day she cancels Shopify. `src` looked right in the markup, so nothing caught it.
  const map = new Map([["https://shop.example.com/cdn/shop/files/bag_1024x.jpg?v=9", "https://blob.test/theme/x/aa.jpg"]]);
  const html = `<img src="https://blob.test/theme/x/aa.jpg" data-rimg="lazy" data-rimg-template="//shop.example.com/cdn/shop/files/bag_{size}.jpg?v=9">`;
@@ -358,7 +358,7 @@ test("a root-relative rimg template resolves against the origin", () => {
 
 test("a script carried by a CUSTOM ELEMENT's src is collected too", () => {
  // thenicheshop's theme boots its quick-buy island from <data-island src="…island-quick-buy.bundle.js">.
- // The collector asked for `script[src]` and `img[src]` — tag-scoped — so a custom element holding a
+ // The collector asked for `script[src]` and `img[src]`, tag-scoped, so a custom element holding a
  // src matched nothing, and the file was never copied. Under blackout that page dropped from 162
  // loaded images to 90, because the script that builds the grid lives on the seller's platform.
  const html = `<data-island class="contents" x-data="QuickBuy({})" src="//shop.example.com/cdn/shop/t/56/assets/island-quick-buy.bundle.js?v=123"></data-island>`;

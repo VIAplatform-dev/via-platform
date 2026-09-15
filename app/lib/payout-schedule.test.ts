@@ -24,7 +24,7 @@ test("'returns at our discretion' (no stated window) is treated as the default 1
  assert.equal(payoutScheduleFor(policy({ returnWindowDays: 0 })).delayDays, 17);
 });
 
-test("a final-sale store is paid as fast as Stripe allows — there is nothing to hold against", () => {
+test("a final-sale store is paid as fast as Stripe allows. There is nothing to hold against", () => {
  const s = payoutScheduleFor(policy({ refundsEnabled: false, returnWindowDays: 30 }));
  assert.equal(s.delayDays, "minimum");
  assert.equal(s.clamped, false);
@@ -34,7 +34,7 @@ test("a window longer than Stripe will hold is clamped, and the store is told", 
  const s = payoutScheduleFor(policy({ returnWindowDays: 60 }));
  assert.equal(s.delayDays, STRIPE_MAX_DELAY_DAYS);
  assert.equal(s.windowDays, 60);
- assert.equal(s.clamped, true, "the seller's own policy outlives the hold — they must know");
+ assert.equal(s.clamped, true, "the seller's own policy outlives the hold. They must know");
  const notice = payoutScheduleNotice(s);
  assert.match(notice || "", /60/, "says what their policy promises");
  assert.match(notice || "", /30/, "and what Stripe will actually hold");

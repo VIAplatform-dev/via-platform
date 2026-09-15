@@ -5,7 +5,7 @@
 // twenty cost £340") and the cost is split across the pieces IN PROPORTION TO THEIR PRICES, so the
 // per-piece cost does not exist until after they are priced. There is no earlier moment to check.
 //
-// So the check happens the instant the cost lands, and this is the arithmetic for it. Pure — no I/O —
+// So the check happens the instant the cost lands, and this is the arithmetic for it. Pure, no I/O,
 // so the rule can be tested without a database.
 
 export type FloorMiss = { id: string; priceCents: number; costCents: number; floorCents: number; shortCents: number };
@@ -18,7 +18,7 @@ export function floorFor(costCents: number, minMarkupBps: number): number {
 /**
  * The pieces whose price sits under their own floor, worst shortfall first.
  *
- * A piece with no cost, or no price, is not a miss — a floor over an unknown cost is not a floor, and
+ * A piece with no cost, or no price, is not a miss. A floor over an unknown cost is not a floor, and
  * an unpriced draft has not been priced wrongly yet. Both are skipped rather than reported, so the
  * warning only ever names pieces she can actually act on.
  */

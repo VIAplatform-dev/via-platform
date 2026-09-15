@@ -12,6 +12,7 @@ import { createPaidOrder, recordPayout, orderExistsForPaymentIntent, claimOrders
 import { deliveryFromMetadata } from "@/app/lib/checkout-delivery.ts";
 import { recordDiscountRedemption } from "@/app/lib/store-discounts-db";
 import { recordTaxTransaction } from "@/app/lib/sales-tax";
+import { recordOrderTaxTransaction } from "@/app/lib/order-tax-db";
 import { pushSellerPayout } from "@/app/lib/seller-push";
 import { getStoreSlugByStripeAccount, updateSellerStatus } from "@/app/lib/seller-payments-db";
 import { logError } from "@/app/lib/error-log";
@@ -48,7 +49,7 @@ function getStripe(): Stripe {
 
 type ShipAddr = { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal?: string | null; country?: string | null } | null;
 
-// Shared fulfillment for a confirmed payment — used by both the Checkout Session
+// Shared fulfillment for a confirmed payment. Used by both the Checkout Session
 // flow (Buy-now / hosted) and the Payment Element flow (embedded card + wallets).
 // Idempotent on the PaymentIntent, so a session payment that also fires
 // payment_intent.succeeded never records twice.
@@ -63,7 +64,7 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  for (const itemId of o.itemIds) {
  const sold = await markSold(itemId);
  if (!sold) { idx++; continue; }
- // On a binding-offer checkout the buyer paid the AGREED price, not the list price — record the
+ // On a binding-offer checkout the buyer paid the AGREED price, not the list price. Record the
  // order, seller payout, and consignor credit at what was actually charged. Offers are single-item,
  // so the override applies to the first (only) item.
  const salePriceCents = idx === 0 && o.salePriceCents != null ? o.salePriceCents : sold.priceCents;
@@ -76,7 +77,7 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  stripePaymentIntent: o.pi,
  });
  // Tax sits on the SESSION, not the line item, so it lands whole on the first
- // order of a multi-item checkout — the same rule shipping already follows.
+ // order of a multi-item checkout. The same rule shipping already follows.
  if (o.taxCents != null && idx === 0) await setOrderTax(order.id, o.taxCents, o.taxJurisdiction ?? null).catch(() => {});
  // Collected in store: record it so the Orders view says "collection" and never offers a label.
  if (delivery.method === "pickup") await setOrderPickup(String(order.id), { collectFrom: delivery.collectFrom, instructions: delivery.instructions }).catch((e) => logError("order-pickup-stamp", e, { context: { orderId: order.id } }));
@@ -98,15 +99,15 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  const r = await generateOrderLabel(order.id).catch((e) => { logError("auto-generate-label", e, { context: { orderId: order.id } }); return { ok: false, reason: "threw" }; });
  // A failure here used to be a console.log and nothing else: the seller had a paid order, no
  // label, and no way to find out why. "no-rates" in particular meant something was wrong with the
- // store's own address — two stores had a country the carriers reject — and it was invisible.
+ // store's own address, two stores had a country the carriers reject, and it was invisible.
  // The manual button still works; this is so somebody KNOWS it has to be pressed.
  if (!r.ok && r.reason && r.reason !== "already-labeled") {
   console.log(`[auto-label] order ${order.id}: ${r.reason}`);
   await sendOpsAlert(
-   `Label didn't buy itself — seller ${o.sellerId} order ${order.id}`,
+   `Label didn't buy itself. Seller ${o.sellerId} order ${order.id}`,
    `Reason: ${r.reason}. The buyer has paid and there is no label. ` +
    (r.reason === "no-rates"
-    ? "No carrier would quote it — check the store's ship-from address (a country that isn't a two-letter code returns no rates) and the piece's weight."
+    ? "No carrier would quote it. Check the store's ship-from address (a country that isn't a two-letter code returns no rates) and the piece's weight."
     : r.reason === "no-ship-from"
      ? "The store has no complete ship-from address in Settings → Locations."
      : "Check Shippo/EasyPost configuration."),
@@ -117,7 +118,7 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  }
  }
  if (o.pi) {
- // Atomic claim — when checkout.session.completed and payment_intent.succeeded fire together,
+ // Atomic claim, when checkout.session.completed and payment_intent.succeeded fire together,
  // only ONE wins each order, so the buyer never gets a duplicate confirmation.
  const claimed = await claimOrdersForConfirmation(o.pi);
  for (const ord of claimed) {
@@ -127,9 +128,22 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  // A collection: tell her where to come, not that it's being posted.
  const collect = delivery.method === "pickup" ? { address: delivery.collectFrom, instructions: delivery.instructions } : null;
  if (ord.buyerEmail) await sendBuyerOrderConfirmation({ storeSlug: ord.sellerSlug || "", buyerEmail: ord.buyerEmail, orderId: ord.id, itemTitle: ord.itemTitle || "your item", imageUrl: img, subtotalCents: ord.amountCents, shippingCents: ord.shippingPaidCents || 0, currency: ord.currency, storeName: ord.sellerName || "the store", ship, collect, replyTo: ord.sellerEmail });
+ // A SALE NOBODY IS TOLD ABOUT IS THE WORST FAILURE HERE. This was a bare `if (ord.sellerEmail)`,
+ // so a shop with a blank email address sold a piece and no one heard: not her, not us. She finds
+ // out when the buyer asks where it is. 17 shops with live pieces have no usable address on file,
+ // so this is not hypothetical. The sale is safe either way (the order row is already written); what
+ // changes is that somebody now knows to go and get her.
+ if (!ord.sellerEmail) {
+ await sendOpsAlert(
+  `Sold, but the seller has no email: ${ord.sellerSlug || "(unknown store)"}`,
+  `Order ${ord.id}: "${ord.itemTitle || "a piece"}" for ${ord.amountCents} ${ord.currency}. ` +
+  `${ord.sellerName || "The store"} has no usable email on file, so the "you sold it, here is your label" ` +
+  `message could not be sent. She does not know she has a sale. Add her address in admin and resend.`,
+ ).catch(() => {});
+ }
  if (ord.sellerEmail) await sendSellerSaleNotification({ storeSlug: ord.sellerSlug || "", sellerEmail: ord.sellerEmail, storeName: ord.sellerName || "your store", itemTitle: ord.itemTitle || "your item", amountCents: ord.amountCents, currency: ord.currency, buyerName: ord.buyerName, ship, collect, orderId: ord.id });
  } catch (e) {
- // Email failed — un-claim so a later event retries it (no duplicate, no silent miss).
+ // Email failed. Un-claim so a later event retries it (no duplicate, no silent miss).
  await resetConfirmationSent(ord.id).catch(() => {});
  await logError("order-confirmation-email", e, { context: { orderId: ord.id } });
  }
@@ -140,9 +154,9 @@ async function fulfill(o: { itemIds: string[]; sellerId: string; pi: string | nu
  }
  }
 }
-// Unwind a sale when money is clawed back — a LOST dispute/chargeback or an out-of-band Stripe
+// Unwind a sale when money is clawed back. A LOST dispute/chargeback or an out-of-band Stripe
 // refund. Relists each one-of-one, reverses any consignor credit so a reversed sale is never paid
-// out, and marks the order refunded. Idempotent (an already-refunded order is skipped) — so it's
+// out, and marks the order refunded. Idempotent (an already-refunded order is skipped), so it's
 // safe even when it double-fires with our own refund button. NOT run on dispute.created (which may
 // still be won); only on a definite loss/refund.
 async function unwindByPaymentIntent(pi: string | null, reason: string) {
@@ -154,13 +168,13 @@ async function unwindByPaymentIntent(pi: string | null, reason: string) {
  await reverseConsignedSale({ productId: o.itemId, orderId: o.id }).catch(() => {});
  await voidOrderLabel(o.id).catch(() => {}); // recover the label cost if it hadn't shipped
  await updateOrderStatus(o.id, "refunded").catch(() => {});
- console.error(`[connect-webhook] unwound order ${o.id} (item ${o.itemId}) — ${reason}`);
+ console.error(`[connect-webhook] unwound order ${o.id} (item ${o.itemId}): ${reason}`);
  }
 }
 
 // Stripe Connect webhook for buyer checkouts. On a confirmed payment we mark each
 // one-of-one item sold, record the order (with buyer + shipping) + the seller's
-// payout, then send confirmation emails to both sides — idempotently.
+// payout, then send confirmation emails to both sides. Idempotently.
 export async function POST(request: NextRequest) {
  const secret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
  if (!secret) return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
@@ -178,7 +192,7 @@ export async function POST(request: NextRequest) {
  // ── Market Mode (in-person) payments ─────────────────────────────────────────────────────
  // Tagged in metadata at creation. They have no shipping, no buyer address and no label, so they
  // ── A SELLER FINISHING ONBOARDING ────────────────────────────────────────────────────────────
- // `charges_enabled` is read from OUR row, not from Stripe, on every checkout — payableAccountId
+ // `charges_enabled` is read from OUR row, not from Stripe, on every checkout. PayableAccountId
  // refuses an account we have recorded as not ready. That row was refreshed in exactly one place:
  // when the seller happened to open her own Payments page. So a seller who finished Stripe's
  // onboarding and never went back was told "this store can't take payments yet" indefinitely, while
@@ -202,7 +216,7 @@ export async function POST(request: NextRequest) {
  // this is the only place that knows.
  //
  // Requires `payout.paid` on the Connect webhook endpoint. Until that is subscribed nothing arrives
- // here and nothing breaks — the branch simply never runs.
+ // here and nothing breaks. The branch simply never runs.
  if (event.type === "payout.paid" && event.account) {
  const po = event.data.object as { id?: string; amount?: number; currency?: string };
  const slug = await getStoreSlugByStripeAccount(event.account).catch(() => null);
@@ -226,21 +240,34 @@ export async function POST(request: NextRequest) {
  } else if (event.type === "checkout.session.expired") {
  await closeCheckout(md.market_checkout_id, "expired", "webhook"); // restores draft/active correctly (not releaseReservation)
  }
- // charge.refunded / dispute.closed fall through to unwindByPaymentIntent below — it works by PI.
+ // FILE THE TAX ON AN IN-PERSON SALE TOO. Collecting it is half the job: without a Tax
+ // Transaction it never reaches the seller's Stripe Tax reports, which is the half that matters at
+ // filing time. The storefront has done this all along; market sales charged no tax at all, so
+ // there was nothing to file. Same mechanism and the same metadata key (sales-tax.ts).
+ const paidPi = event.type === "checkout.session.completed"
+  ? (typeof obj.payment_intent === "string" ? obj.payment_intent : obj.payment_intent?.id ?? null)
+  : event.type === "payment_intent.succeeded" ? String(obj.id) : null;
+ if (md.tax_calculation && event.account && paidPi) {
+  const taxAcct = event.account;
+  void recordTaxTransaction({ acctId: taxAcct, calculationId: md.tax_calculation, reference: paidPi })
+   .then((txnId) => (txnId ? recordOrderTaxTransaction(paidPi, txnId, taxAcct) : undefined))
+   .catch(() => {});
+ }
+ // charge.refunded / dispute.closed fall through to unwindByPaymentIntent below. It works by PI.
  if (event.type !== "charge.refunded" && event.type !== "charge.dispute.closed") return NextResponse.json({ received: true });
  }
  }
 
  // ── Rentals ──────────────────────────────────────────────────────────────────────────────
  // A rental is not a sale: the piece isn't sold, isn't reserved by status, and stays in inventory.
- // What payment buys is the DATES, which the booking row has already been holding — so this never
+ // What payment buys is the DATES, which the booking row has already been holding, so this never
  // goes through fulfill(), it just turns the hold into a confirmed booking.
  {
  const obj = event.data.object as { metadata?: Record<string, string> | null; id?: string };
  const md = (obj.metadata || {}) as Record<string, string>;
   if (md.rentalBookingId && event.type === "payment_intent.succeeded") {
  // The checkout wrote the renter into this payment's metadata. It's the only place those details
- // exist, and this is the only moment we see them — so they go onto the booking here, or the store
+ // exist, and this is the only moment we see them, so they go onto the booking here, or the store
  // ends up with a piece out and no idea whose name is on it.
  await confirmBookingPaid(md.rentalBookingId, String(obj.id || ""), {
   name: md.ship_name, email: md.buyer_email, phone: md.buyer_phone, delivery: md.delivery,
@@ -253,7 +280,7 @@ export async function POST(request: NextRequest) {
 
  // ── Appointment deposits ─────────────────────────────────────────────────────────────────
  // A deposit buys a SLOT, not a piece. Nothing is sold, so this never goes through fulfill():
- // the money landing is what turns a held time into a real one — and only then is anyone told,
+ // the money landing is what turns a held time into a real one, and only then is anyone told,
  // so an abandoned payment page never emails a shop about a booking that isn't happening.
  {
  const obj = event.data.object as { metadata?: Record<string, string> | null; id?: string };
@@ -330,14 +357,19 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
   : addr2 ? { line1: addr2.line1, line2: addr2.line2, city: addr2.city, state: addr2.state, postal: addr2.postal_code, country: addr2.country } : null;
  await fulfill({ itemIds: piItemIds, sellerId: piSellerId, pi: p.id, buyerEmail: p.receipt_email || md2.buyer_email || null, buyerName: md2.ship_name || md2.buyer_name || sh?.name || null, buyerPhone: md2.buyer_phone || sh?.phone || null, ship: ship2, shippingPaidCents: md2.shipping_paid_cents ? parseInt(md2.shipping_paid_cents, 10) || 0 : 0, currency: p.currency || "usd", salePriceCents: md2.sale_price_cents ? parseInt(md2.sale_price_cents, 10) || null : null, offerToken: md2.offer_token || null, delivery: deliveryFromMetadata(md2),
  // Tax the embedded Payment Element collected. It comes off OUR metadata rather than a session's
- // total_details, because a PaymentIntent has no session — see app/lib/sales-tax.ts.
+ // total_details, because a PaymentIntent has no session. See app/lib/sales-tax.ts.
  taxCents: md2.tax_cents ? parseInt(md2.tax_cents, 10) || null : null,
  });
  // COLLECTING TAX IS HALF THE JOB. Turning the calculation into a Tax Transaction is what puts it
  // in the seller's Stripe Tax reports, which is the half that matters at filing time. Idempotent on
  // the intent id, so a webhook delivered twice files once.
  if (md2.tax_calculation && event.account) {
- void recordTaxTransaction({ acctId: event.account, calculationId: md2.tax_calculation, reference: p.id });
+  const acct = event.account;
+  void recordTaxTransaction({ acctId: acct, calculationId: md2.tax_calculation, reference: p.id })
+   // Kept, because a refund has to reverse THIS transaction and Stripe cannot find one by the
+   // reference we gave it. See order-tax-db.ts.
+   .then((txnId) => (txnId ? recordOrderTaxTransaction(p.id, txnId, acct) : undefined))
+   .catch(() => {});
  }
  // Per-store discount redemption for a single-item embedded checkout (idempotent per store+code+order).
  if (md2.discount_code && md2.discount_store) {
@@ -356,14 +388,14 @@ if (piItemIds.length && piSellerId && p.status === "succeeded") {
  const itemIds = (s.metadata?.itemIds || s.metadata?.itemId || "").split(",").map((t) => t.trim()).filter(Boolean);
  for (const itemId of itemIds) await releaseReservation(itemId);
  } else if (event.type === "charge.refunded") {
- // Refund issued directly in Stripe (not via our order button) — unwind the sale so records + ledger stay true.
+ // Refund issued directly in Stripe (not via our order button). Unwind the sale so records + ledger stay true.
  const c = event.data.object as Stripe.Charge;
  // A partial refund (one line of a Market Mode basket, or a restocking-fee refund) is already recorded
  // by the endpoint that issued it; only a FULL refund of the charge unwinds every order on the intent.
  if ((c.amount_refunded ?? 0) >= (c.amount_captured ?? c.amount ?? 0)) {
  await unwindByPaymentIntent(typeof c.payment_intent === "string" ? c.payment_intent : null, "charge.refunded");
  } else {
- console.log(`[connect-webhook] partial refund on ${typeof c.payment_intent === "string" ? c.payment_intent : "?"} (${c.amount_refunded}/${c.amount_captured}) — not unwinding`);
+ console.log(`[connect-webhook] partial refund on ${typeof c.payment_intent === "string" ? c.payment_intent : "?"} (${c.amount_refunded}/${c.amount_captured}), not unwinding`);
  }
  } else if (event.type === "charge.dispute.closed") {
  // Chargeback resolved. Only unwind if the seller LOST (funds actually clawed back); a won dispute keeps the sale.

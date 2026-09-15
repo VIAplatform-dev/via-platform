@@ -1,15 +1,15 @@
-// VYA Cross-Lister — Vestiaire Collective adapter (content script).
+// VYA Cross-Lister: Vestiaire Collective adapter (content script).
 // Vestiaire's deposit is a MULTI-STEP wizard spanning two URLs + five SPA routes:
-//   /sell-clothes-online/               step 1 — universe (radio) · category (<select>) · brand (autocomplete)
+//   /sell-clothes-online/               step 1: universe (radio) · category (<select>) · brand (autocomplete)
 //   submit-an-item.shtml#/informations  subcategory · material · color · pattern (autocompletes) · size (<select>)
 //   submit-an-item.shtml#/photos        photo upload (#file_upload, ≥3 photos)
 //   submit-an-item.shtml#/description   textarea#description
 //   submit-an-item.shtml#/price         price
 // The item is stashed in sessionStorage so it survives the step-1 → submit-an-item navigation, and a
 // watcher fills whichever recognized fields are on screen as the seller advances. The seller confirms
-// each screen, adds anything VYA doesn't know, and submits — we never auto-submit.
+// each screen, adds anything VYA doesn't know, and submits. We never auto-submit.
 //
-// ⚠️ Later-step selectors are mapped from Vestiaire's live DOM (2026-07) but its UI changes — verify
+// ⚠️ Later-step selectors are mapped from Vestiaire's live DOM (2026-07) but its UI changes. Verify
 //    on a real listing. Brand/material/color autocompletes are confirmed to accept programmatic input.
 
 console.log("[VYA] Cross-Lister content script loaded on", location.href);
@@ -97,7 +97,7 @@ function setSelectByText(sel, text) {
 }
 
 // Vestiaire's category is granular (Boots/Trainers/Sandals…), while VYA's is generic ("Shoes").
-// Match a Vestiaire option whose label appears in the item's TITLE (or category) — "…Suede Boots" → Boots.
+// Match a Vestiaire option whose label appears in the item's TITLE (or category): "…Suede Boots" → Boots.
 function pickCategory(sel, item) {
   if (!sel) return null;
   const hay = ((item.title || "") + " " + (item.category || "")).toLowerCase();
@@ -155,7 +155,7 @@ function vcConditionLabel(cond) {
   return null;
 }
 
-// Condition — a custom #condition dropdown (div[role=button] → styles_dropDownItem__title items).
+// Condition: a custom #condition dropdown (div[role=button] → styles_dropDownItem__title items).
 async function fillCondition(item) {
   if (!item.condition) return false;
   const want = vcConditionLabel(item.condition);
@@ -177,7 +177,7 @@ async function fillCondition(item) {
   return true;
 }
 
-// Size — set the unit select to US (VYA sizes are US), then pick the #size option whose text matches.
+// Size: set the unit select to US (VYA sizes are US), then pick the #size option whose text matches.
 async function fillSize(item) {
   if (!item.size) return false;
   const sizeSel = document.querySelector("#size");
@@ -222,20 +222,20 @@ async function fillDescriptionStep(item) {
 }
 
 async function fillPriceStep(item) {
-  // #priceField is the real price input — NOT a generic number field (measurements like heel height
+  // #priceField is the real price input, NOT a generic number field (measurements like heel height
   // are also type=number and must never be touched).
   const price = await waitFor('#priceField, input[name*="price" i]', 6000);
   if (price && item.priceDollars != null) { setNativeValue(price, String(item.priceDollars)); console.log("[VYA] VC price filled"); }
 }
 
-// Auto-advance: after filling a step, click the wizard's "Continue"/"Next" IF it's enabled — never
+// Auto-advance: after filling a step, click the wizard's "Continue"/"Next" IF it's enabled, never
 // the final "Post"/"Submit" (the seller presses that). If it's disabled, a required field is still
 // empty, so we pause and let the seller fill it, then they click Continue and we pick up again.
 function maybeAdvance() {
   const btn = [...document.querySelectorAll("button, a")].find((b) =>
     /^(continue|next)$/i.test((b.textContent || "").trim()) && !b.disabled && b.offsetParent !== null);
   if (btn) { console.log("[VYA] VC auto-advancing →", (btn.textContent || "").trim()); btn.click(); return true; }
-  console.log("[VYA] VC paused — finish the required field(s) on this screen and it continues.");
+  console.log("[VYA] VC paused. Finish the required field(s) on this screen and it continues.");
   return false;
 }
 
@@ -250,7 +250,7 @@ async function fillCurrentStep() {
       if (/photos/.test(hash)) await fillPhotosStep(item);
       else if (/description/.test(hash)) await fillDescriptionStep(item);
       else if (/price/.test(hash)) await fillPriceStep(item);
-      else if (/seller/.test(hash)) { /* address — nothing to fill, just advance */ }
+      else if (/seller/.test(hash)) { /* address. Nothing to fill, just advance */ }
       else await fillInformations(item); // #/informations (default landing route)
     }
     await new Promise((r) => setTimeout(r, 1000)); // let the fields register + Continue enable
@@ -276,14 +276,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     stashItem(msg.item);
     try { sessionStorage.setItem("vya_pending_item", msg.item.id); } catch { /* ignore */ }
     fillCurrentStep()
-      .then(() => sendResponse({ ok: true, needsReview: true, note: "Filling Vestiaire step-by-step — confirm each screen (universe, brand, category, photos, description, price are auto-filled where VYA has them) and hit Continue. Add anything missing, then submit." }))
+      .then(() => sendResponse({ ok: true, needsReview: true, note: "Filling Vestiaire step-by-step: confirm each screen (universe, brand, category, photos, description, price are auto-filled where VYA has them) and hit Continue. Add anything missing, then submit." }))
       .catch((e) => sendResponse({ ok: false, error: String(e && e.message ? e.message : e) }));
     return true; // async
   }
   return false;
 });
 
-// A published Vestiaire item page ends in "-<id>.shtml" — capture that as the live listing URL.
+// A published Vestiaire item page ends in "-<id>.shtml". Capture that as the live listing URL.
 function watchForPublish() {
   let last = location.href;
   setInterval(() => {

@@ -37,7 +37,7 @@ test("every page answered: reviewed, editing opens", () => {
  assert.equal(g.passed === true && g.reason, "reviewed");
 });
 
-test("'skip' counts as an answer — she saw the page and chose not to judge it", () => {
+test("'skip' counts as an answer. She saw the page and chose not to judge it", () => {
  // A gate that refused `skip` would push sellers into clicking "Looks right" on pages they have
  // not really formed a view on, just to unlock the editor. That corrupts the very signal the
  // review exists to collect.
@@ -45,7 +45,7 @@ test("'skip' counts as an answer — she saw the page and chose not to judge it"
  assert.equal(g.passed, true);
 });
 
-test("'something’s off' does not block editing — it is the strongest reason to let her in", () => {
+test("'something’s off' does not block editing. It is the strongest reason to let her in", () => {
  const g = reviewGate({ screens: ["/"], answered: ["/"] });
  assert.equal(g.passed, true);
 });
@@ -61,7 +61,7 @@ test("duplicate answers for one page do not stand in for another", () => {
  assert.equal(g.passed === false && g.reviewed, 1);
 });
 
-test("a trailing slash is the same page — she should not be asked to review it twice", () => {
+test("a trailing slash is the same page. She should not be asked to review it twice", () => {
  const g = reviewGate({ screens: ["/pages/about-us/"], answered: ["/pages/about-us"] });
  assert.equal(g.passed, true);
 });

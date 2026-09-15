@@ -21,7 +21,7 @@ const ITEMS = [
  { id: "4", sourceId: "chili-pepper-italian-charm", category: "charms" },
 ];
 
-test("scopes recommendations to the anchor's own category — a shorts page recommends other shorts, not charms", () => {
+test("scopes recommendations to the anchor's own category. A shorts page recommends other shorts, not charms", () => {
  const pool = pickRecommendationPool(ITEMS, "http://x/products/attrak-dark-denim-shorts");
  assert.deepEqual(pool.map((i) => i.id), ["2"]);
 });
@@ -37,7 +37,7 @@ test("falls back to everything-but-the-anchor when nothing else shares its categ
  assert.deepEqual(pool.map((i) => i.id).sort(), ["1", "2", "3", "4"]);
 });
 
-test("falls back to the full list — not empty — when there's no referer at all", () => {
+test("falls back to the full list, not empty, when there's no referer at all", () => {
  const pool = pickRecommendationPool(ITEMS, null);
  assert.equal(pool.length, ITEMS.length);
 });
@@ -53,7 +53,7 @@ test("falls back to the full list when the anchor has no category set", () => {
  assert.deepEqual(pool.map((i) => i.id), ["2"]);
 });
 
-test("recommendationCardsHtml gives every card a real, working add-to-cart form — the reference site's cards all have one, ours had none", () => {
+test("recommendationCardsHtml gives every card a real, working add-to-cart form. The reference site's cards all have one, ours had none", () => {
  const out = recommendationCardsHtml(
   [{ id: "1", title: "Green Pink Flower Silk Top", priceCents: 5400, currency: "USD", image: "https://x/a.jpg", sourceId: "green-pink-flower-silk-top" }],
   (it) => `/products/${it.sourceId}`,
@@ -65,7 +65,7 @@ test("recommendationCardsHtml gives every card a real, working add-to-cart form 
 
 test("recommendationCardsHtml's forms are marked for the page's interceptor, and carry no script of their own", () => {
  // A native submit would navigate the whole page to the bridge's raw JSON response instead of
- // staying put, even though the item really did get added — so the form must be marked. The handler
+ // staying put, even though the item really did get added, so the form must be marked. The handler
  // that honours the mark canNOT ship in here: this fragment is assigned with innerHTML, and a
  // <script> inserted that way never executes. It is injected into the page instead.
  const out = recommendationCardsHtml(

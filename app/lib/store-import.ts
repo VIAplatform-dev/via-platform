@@ -9,23 +9,23 @@ import { makeBlock, type BlockType } from "./storefront-blocks.ts";
 import type { StoreProfile } from "./store-profile.ts";
 import { detectPlatform, declineMessage } from "./import-engine/detect.ts";
 import { fetchWooProducts, fetchViaJsonLd, BlockedByStoreError } from "./import-engine/rungs.ts";
-import type { ProductLayout } from "./storefront-templates";
-import type { ProductPageConfig } from "./storefront-product-page";
-import type { SiteEffects } from "./storefront-effects";
-import type { StorefrontWords } from "./storefront-words";
+import type { ProductLayout } from "./storefront-templates.ts";
+import type { ProductPageConfig } from "./storefront-product-page.ts";
+import type { SiteEffects } from "./storefront-effects.ts";
+import type { StorefrontWords } from "./storefront-words.ts";
 
 /** One storefront section as an editable studio block (matches StorefrontTheme.blocks). */
 type HomeBlock = { id: string; type: string; props: Record<string, string>; style?: { bg?: string } };
 
 // ───────────────────────────────────────────────────────────────────────────
-// Pull a real storefront (Shopify / Squarespace) from a pasted URL — name, brand
+// Pull a real storefront (Shopify / Squarespace) from a pasted URL. Name, brand
 // color, and products + images. Shared by the public /infrastructure demo AND
 // the real seller onboarding import (which persists the result as a VYA store).
 // ───────────────────────────────────────────────────────────────────────────
 
 export type ImportedProduct = {
  name: string;
- /** Display price, pre-formatted for the demo/preview UI. NOT a source of truth for money —
+ /** Display price, pre-formatted for the demo/preview UI. NOT a source of truth for money,
   *  anything that stores or compares a price must use `priceCents` + `currency` (parsing digits
   *  back out of "£120.00" is how imported GBP catalogues ended up labelled USD). */
  price: string;
@@ -41,13 +41,13 @@ export type ImportedProduct = {
  tags?: string[]; // category/collection tags (for the Shop dropdown filter)
  // ── Source identity: what makes re-import a MERGE instead of a duplicate ──
  sourcePlatform?: string | null;
- sourceId?: string | null; // platform's own stable id/handle — survives a rename
+ sourceId?: string | null; // platform's own stable id/handle. Survives a rename
  sourceUrl?: string | null;
  variants?: { sourceVariantId?: string | null; size?: string | null; color?: string | null; priceCents?: number | null; available: boolean }[];
  /** Her shop only RENTS this piece: nothing to buy, but a priced rental option. It arrives with no
   *  price, and the importer keeps it off sale. See variant-pricing.ts. */
  rentOnly?: boolean;
- /** The piece's rental price ladder (days → cents), when it has one — regardless of whether it also
+ /** The piece's rental price ladder (days → cents), when it has one. Regardless of whether it also
   *  has a buy price. Empty when nothing rents. */
  rentalTiers?: { days: number; cents: number }[];
  /** Collections this product belongs to, when the source tells us directly (a connected store's
@@ -64,14 +64,14 @@ export type StorefrontTheme = {
  // out of their old site's CSS, where the "accent" is often a spurious colour (a sale-tag red, a
  // link blue) and the ink is the safer match. Absent = treated as studio.
  colorsFrom?: "studio" | "imported";
- radius?: "sharp" | "soft" | "round"; // global corner style ("shapes") — rounds product cards, images, buttons
- skin?: "gallery" | "editorial" | "boutique" | "archive" | "statement"; // global style skin — type scale, spacing, and button shape across every section (storefront-skins.ts)
+ radius?: "sharp" | "soft" | "round"; // global corner style ("shapes"). Rounds product cards, images, buttons
+ skin?: "gallery" | "editorial" | "boutique" | "archive" | "statement"; // global style skin: type scale, spacing, and button shape across every section (storefront-skins.ts)
  // The palette + type the store had BEFORE its first skin was applied, so clearing the skin can put
  // the store back rather than stranding it on the last skin's colours. Written when a skin is first
  // applied, cleared when the skin is removed.
  preSkin?: { colors?: { bg?: string; text?: string; accent?: string }; fonts?: { heading?: string; body?: string } };
- customCss?: string; // raw custom CSS layered over the storefront — AI- or hand-written; targets .vya-* classes
- template?: string; // chosen starter template id (storefront-templates.ts) — drives hero style
+ customCss?: string; // raw custom CSS layered over the storefront. AI- or hand-written; targets .vya-* classes
+ template?: string; // chosen starter template id (storefront-templates.ts). Drives hero style
  // The catalogue grid on the Shop page. Seeded by the template (Vitrine runs 2-up, The Index 5-up)
  // and editable after. Absent = the platform default, which is what every store rendered before
  // templates carried a grid.
@@ -79,7 +79,7 @@ export type StorefrontTheme = {
  // How a single product page is arranged. Seeded by the template: "rail" keeps the details beside you
  // while the images scroll, "stacked" runs the photographs full width with the copy beneath, "classic"
  // is the conventional two-column page. Absent = classic, which is what every store rendered before.
- productLayout?: ProductLayout; // every layout in storefront-templates.ts — the product page renders all six
+ productLayout?: ProductLayout; // every layout in storefront-templates.ts. The product page renders all six
  // Per-store product-page copy/visibility, site effects, custom JS, storefront wording and the
  // footer newsletter lines. All optional and resolved with defaults by their own modules
  // (storefront-product-page.ts, storefront-effects.ts, storefront-words.ts); the design route,
@@ -119,7 +119,7 @@ export type StorefrontTheme = {
  }[];
  categories?: { label: string; slug: string }[];
  pages?: { slug: string; label: string; title: string | null; blocks: { type: string; value: string }[]; pageType?: string }[];
- // store understanding — voice, pricing, typical inventory (see store-profile.ts).
+ // store understanding. Voice, pricing, typical inventory (see store-profile.ts).
  profile?: StoreProfile;
 };
 
@@ -135,7 +135,7 @@ export type ImportResult = {
  error?: string;
  /**
   * Did this read reach the END of the seller's catalogue? Only a complete read may license the
-  * import's sold-sweep. Absent means unknown, which refuses the sweep — see feed-completeness.ts.
+  * import's sold-sweep. Absent means unknown, which refuses the sweep. See feed-completeness.ts.
   */
  feedComplete?: boolean;
  /**
@@ -153,7 +153,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 
 // One User-Agent for every outbound import fetch, matching site-capture and import-engine/rungs.
 // A "VYA-Importer/1.0" UA is 403'd by common WordPress/Cloudflare bot rules, and a blocked response
-// looks like an empty page — which made a perfectly importable WooCommerce store get detected as a
+// looks like an empty page, which made a perfectly importable WooCommerce store get detected as a
 // client-rendered shell and declined. Identify the same way the capture crawler does.
 const BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
 
@@ -187,7 +187,7 @@ function absolutize(src: string, origin: string): string {
  return origin + "/" + src;
 }
 
-/** Pull the EXACT fonts, colours, and logo out of the homepage HTML/CSS — reading
+/** Pull the EXACT fonts, colours, and logo out of the homepage HTML/CSS. Reading
  * the real CSS custom properties + Google Fonts the theme declares, not guessing. */
 export function extractTheme(head: string, origin: string, themeColor: string | null): StorefrontTheme {
  const isRealFont = (f: string) => Boolean(f) && f.length > 1 && f.length < 40 && !/^(inherit|sans-serif|serif|monospace|system-ui|ui-|-apple|blinkmac|segoe|roboto|arial|helvetica|times|var\(|initial|unset|none|swap|auto)/i.test(f);
@@ -214,7 +214,7 @@ export function extractTheme(head: string, origin: string, themeColor: string | 
  if (!body) body = gf.find((g) => g.toLowerCase() !== (heading || "").toLowerCase()) || gf[0] || heading;
  const fonts = heading || body ? { heading: (heading || body)!, body: (body || heading)! } : undefined;
 
- // Colours — exact CSS custom properties first (#hex OR "r, g, b" triplets).
+ // Colours: exact CSS custom properties first (#hex OR "r, g, b" triplets).
  const toHex = (v: string): string | null => {
  const hx = v.match(/#([0-9a-fA-F]{6})\b/); if (hx) return "#" + hx[1].toLowerCase();
  const rgb = v.match(/(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/); if (rgb) return "#" + [rgb[1], rgb[2], rgb[3]].map((n) => Math.min(255, +n).toString(16).padStart(2, "0")).join("");
@@ -248,7 +248,7 @@ export function extractTheme(head: string, origin: string, themeColor: string | 
  if (text) colors.text = text;
  if (accent) colors.accent = accent;
 
- // Logo — an <img> that smells like a logo.
+ // Logo: an <img> that smells like a logo.
  let logo: string | null = null;
  const logoM = head.match(/<img[^>]*\b(?:class|id|alt|src)=["'][^"']*logo[^"']*["'][^>]*>/i);
  if (logoM) { const s = logoM[0].match(/\bsrc=["']([^"']+)["']/i); if (s) logo = absolutize(s[1], origin); }
@@ -258,7 +258,7 @@ export function extractTheme(head: string, origin: string, themeColor: string | 
 }
 
 /** Pull store name / brand color / platform hints from the homepage <head>. */
-/** Parse a homepage's real sections into editable studio blocks — an approximate
+/** Parse a homepage's real sections into editable studio blocks. An approximate
  *  section-by-section replica the seller can then refine, instead of a generic
  *  template. Best-effort: we classify each top-level section by what it CONTAINS
  *  (hero / product grid / split / text / image / newsletter) rather than trying to
@@ -276,7 +276,7 @@ export function extractHomeBlocks(html: string, origin: string): HomeBlock[] {
  };
  const clean = (t?: string | null): string => (t || "").replace(/\s+/g, " ").trim();
 
- // Best image URL from an <img> — prefer the largest srcset candidate, skip data: URIs.
+ // Best image URL from an <img> prefer the largest srcset candidate, skip data: URIs.
  const bestImg = (el: Element): string => {
   const $el = $(el);
   const ss = $el.attr("srcset") || $el.attr("data-srcset") || "";
@@ -310,7 +310,7 @@ export function extractHomeBlocks(html: string, origin: string): HomeBlock[] {
   const $s = $(el);
   const cls = (($s.attr("class") || "") + " " + ($s.attr("id") || "")).toLowerCase();
   if (SKIP.test(cls)) continue;
-  // Skip a wrapper that merely contains other candidate sections — keep the leaf sections.
+  // Skip a wrapper that merely contains other candidate sections. Keep the leaf sections.
   if ($s.find("*").toArray().some((d) => secSet.has(d))) continue;
 
   const heading = clean($s.find("h1, h2, h3").first().text()).slice(0, 120);
@@ -330,7 +330,7 @@ export function extractHomeBlocks(html: string, origin: string): HomeBlock[] {
   }
   const cta = clean($s.find("a.button, a.btn, a[class*='button'], a[class*='btn'], a[role='button']").first().text()).slice(0, 24);
 
-  // Classify — order matters (most specific signal wins).
+  // Classify: order matters (most specific signal wins).
   if (isNewsletter) { push("newsletter", { heading: heading || "Join the list", subtext: paras[0] || "" }); continue; }
   if (productLinks >= 2) { push("featured", { heading: heading || "Shop" }); continue; }
   if (!heroDone && image && heading) { push("hero", { heading, subtext: paras[0] || "", cta: cta || "", image }); heroDone = true; continue; }
@@ -341,7 +341,7 @@ export function extractHomeBlocks(html: string, origin: string): HomeBlock[] {
 
   // ── Lossless fallback ──────────────────────────────────────────────────────────────────
   // Anything the rules above can't name used to fall off the end of this loop and vanish, so a
-  // section the seller had built — a size guide, an authentication promise, a press strip — was
+  // section the seller had built, a size guide, an authentication promise, a press strip. Was
   // simply missing from the imported storefront with nothing to say so. Keep it verbatim as a
   // `custom` block instead: it renders as its own markup (sanitized on save, inheriting the
   // store's colours and type), and the seller can edit, reorder or delete it like any other
@@ -361,7 +361,7 @@ const VERBATIM_MAX_CHARS = 20000;
 
 /** A section's own markup, stripped of anything that can't survive re-hosting.
  *
- *  Scripts and inline handlers go (the same rule the capture applies — we never execute a third
+ *  Scripts and inline handlers go (the same rule the capture applies. We never execute a third
  *  party's JS on our origin), as do form actions that would POST back to the old platform. What's
  *  left is inert, styled markup. Returns "" when there's nothing meaningful to keep. */
 function verbatimHtml($: cheerio.CheerioAPI, el: Element): string {
@@ -386,7 +386,7 @@ function verbatimHtml($: cheerio.CheerioAPI, el: Element): string {
  *  Shopify's public products.json carries bare price strings with no currency, so importing a UK
  *  store used to label its GBP prices as USD. The shop states it in `Shopify.currency` (and most
  *  platforms in an og/meta/JSON-LD field); everything else is a guess and we'd rather have none. */
-/** The shop's home country — Shopify's `countryCode` in the shop object, present whatever market
+/** The shop's home country. Shopify's `countryCode` in the shop object, present whatever market
  *  the page was served in. It is what lets the feed be requested in the seller's OWN currency. */
 function readHomeCountry(html: string): string | null {
  return html.match(/"countryCode"\s*:\s*"([A-Z]{2})"/)?.[1] || html.match(/Shopify\.country\s*=\s*"([A-Z]{2})"/)?.[1] || null;
@@ -423,7 +423,7 @@ async function readHomepage(origin: string) {
  let name = (ogSite || title || "")
  .replace(/[\u200B-\u200D\uFEFF\u00A0\u202A-\u202E]/g, "") // zero-width / control chars
  .trim();
- name = name.split(/\s+[|–—·-]\s+/)[0].trim(); // "Store — tagline" → "Store"
+ name = name.split(/\s+[|–—·-]\s+/)[0].trim(); // "Store: tagline" → "Store"
  const theme = extractTheme(head, origin, color);
  const platformHint = /cdn\.shopify|myshopify|Shopify\.theme/i.test(head)
  ? "shopify"
@@ -439,9 +439,9 @@ async function readHomepage(origin: string) {
  ? "bigcommerce"
  : "unknown";
  const blocks = extractHomeBlocks(html, origin);
- // Currency is searched across the WHOLE document, not just the 80KB head slice — themes print
+ // Currency is searched across the WHOLE document, not just the 80KB head slice. Themes print
  // Shopify.currency in a footer script.
- // `html` rides along so platform detection can run on the SAME response we already fetched —
+ // `html` rides along so platform detection can run on the SAME response we already fetched,
  // a second request could be served a different market/variant of the page.
  return { name: name.length >= 2 ? name : null, color, hero, theme, platformHint, blocks, currency: readCurrency(html), country: readHomeCountry(html), html };
  } catch {
@@ -450,7 +450,7 @@ async function readHomepage(origin: string) {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/** Size from a Squarespace variant — newer stores use optionValues, older use attributes. */
+/** Size from a Squarespace variant. Newer stores use optionValues, older use attributes. */
 function sizeFromVariant(variant: any): string | null {
  const ov = variant?.optionValues;
  if (Array.isArray(ov)) {
@@ -460,7 +460,7 @@ function sizeFromVariant(variant: any): string | null {
  return variant?.attributes?.Size || variant?.attributes?.size || null;
 }
 
-/** Find a Squarespace store's *fullest* product collection — read the nav + sitemap,
+/** Find a Squarespace store's *fullest* product collection: read the nav + sitemap,
  * score every commerce page, and prefer the biggest non-"sold" catalog. */
 async function pickSquarespaceCollection(origin: string, startUrl: string): Promise<string | null> {
  const UA = { "User-Agent": BROWSER_UA };
@@ -551,7 +551,7 @@ async function fetchSquarespaceLite(shopUrl: string, max = 1500): Promise<Import
  const description = String(it.excerpt || it.body || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 2000) || null;
  const tags = [...(Array.isArray(it.categories) ? it.categories : []), ...(Array.isArray(it.tags) ? it.tags : [])].filter((t: any) => typeof t === "string");
  // Source identity, straight off the feed. Squarespace gives every product an `id`, a `urlSlug`
- // and the `fullUrl` of its own page, and this reader used to keep NONE of them — so every
+ // and the `fullUrl` of its own page, and this reader used to keep NONE of them, so every
  // Squarespace-imported piece arrived anonymous, linked on the mirrored storefront by its VYA
  // uuid, and the product route (which looks for `/products/{handle}`, Shopify's shape) had nothing
  // to resolve: every product click on those stores ended at "Couldn't load that product."
@@ -578,7 +578,7 @@ async function fetchSquarespaceLite(shopUrl: string, max = 1500): Promise<Import
  return out;
 }
 
-/** Exact category membership from Shopify's PUBLIC collection endpoints — maps each product
+/** Exact category membership from Shopify's PUBLIC collection endpoints. Maps each product
  * HANDLE to the collection slugs it belongs to. Handles (not titles) because the handle is the
  * product's stable identity: it survives retitling, and two different one-of-one pieces that
  * happen to share a title stay distinct. This is the accurate way to fill collections (and the
@@ -596,7 +596,7 @@ export type CollectionMembershipRead = {
   *  zero-of-zero would read as "she has no sold pieces", which is how a failed read would come to
   *  empty a seller's archive. See app/lib/collection-sold-policy.ts. */
  stock: Map<string, { unavailable: number; total: number }>;
- /** Collections read to the end without error — the only ones whose EMPTY answer we believe. */
+ /** Collections read to the end without error. The only ones whose EMPTY answer we believe. */
  completed: Set<string>;
  /** Collections whose listing could NOT be read in full. Whatever they contributed to `membership`
   *  is partial, so the caller must never read it as "these are all the members". */
@@ -604,14 +604,14 @@ export type CollectionMembershipRead = {
 };
 
 /** One page of a collection listing, retried through the transient throttling that a full-site
- *  crawl provokes — the membership pass runs seconds after we've just pulled ~60 pages and the
+ *  crawl provokes. The membership pass runs seconds after we've just pulled ~60 pages and the
  *  product feed off the same host, which is exactly when a storefront starts refusing.
  *  Returns null when the page still won't read, so the caller can mark the collection UNREAD
  *  rather than silently treating it as empty. */
 async function collectionPage(host: string, slug: string, page: number): Promise<CollectionPageResult> {
  const url = `https://${host}/collections/${slug}/products.json?limit=250&page=${page}`;
  // Server wobbles are retried here; a 429 is NOT. It is handed back to the caller, which knows the
- // store's pace and slows everything down — retrying it here for a second and giving up is what lost
+ // store's pace and slows everything down. Retrying it here for a second and giving up is what lost
  // blummier every collection from "ralph-lauren" to the end of the alphabet.
  for (let attempt = 0; attempt < 3; attempt++) {
   if (attempt) await new Promise((r) => setTimeout(r, 600 * 2 ** attempt));
@@ -628,10 +628,10 @@ async function collectionPage(host: string, slug: string, page: number): Promise
     const after = parseInt(r.headers.get("Retry-After") ?? "", 10);
     return { throttled: true, ...(Number.isFinite(after) && after > 0 ? { retryAfterMs: Math.min(after * 1000, 60000) } : {}) };
    }
-   // 404/403 is a settled answer — retrying it just hammers the store.
+   // 404/403 is a settled answer. Retrying it just hammers the store.
    if (r.status < 500) return null;
   } catch {
-   /* timeout or transport error — retry, then give up as unread */
+   /* timeout or transport error. Retry, then give up as unread */
   }
  }
  return null;
@@ -643,24 +643,24 @@ export async function getShopifyCollectionMembership(domain: string, slugs: stri
  // after 25 collections, which is why ~500 collections across the fleet held nothing at all.
  // A budget the read STOPS at, so the step cannot outlive the invocation running it. Production
  // caps a function at maxDuration 300s; without this the read simply ran until something killed it
- // and every collection it had already read was lost with it — 25 minutes and nothing to show, on a
+ // and every collection it had already read was lost with it. 25 minutes and nothing to show, on a
  // 761-collection store. 150s leaves room for the write pass and the steps after it.
  const read = await readCollectionMembership(slugs, { fetchPage: (slug, page) => collectionPage(host, slug, page), budgetMs: 150_000 });
  if (read.notAttempted.length) {
-  console.log(`[collections] ${host}: ${read.notAttempted.length} collection(s) not read (past the ceiling, or the read ran out of time) — marked unread, so what we hold for them stands`);
+  console.log(`[collections] ${host}: ${read.notAttempted.length} collection(s) not read (past the ceiling, or the read ran out of time). Marked unread, so what we hold for them stands`);
  }
- if (read.throttleHits) console.log(`[collections] ${host}: asked to slow down ${read.throttleHits}\u00d7 — paced accordingly`);
+ if (read.throttleHits) console.log(`[collections] ${host}: asked to slow down ${read.throttleHits}\u00d7: paced accordingly`);
  // A collection bigger than one pass. What we read is used; the shortfall is ours, not the seller's.
- if (read.truncated.length) console.log(`[collections] ${host}: ${read.truncated.length} collection(s) larger than one read (${read.truncated.slice(0, 3).join(", ")}) — filed as much as we could`);
+ if (read.truncated.length) console.log(`[collections] ${host}: ${read.truncated.length} collection(s) larger than one read (${read.truncated.slice(0, 3).join(", ")}): filed as much as we could`);
  const out = new Map<string, string[]>();
  for (const [k, v] of read.membership) out.set(k, [...v]);
- // The order comes off the very same pages — no extra request. See syncCollectionOrder().
+ // The order comes off the very same pages, no extra request. See syncCollectionOrder().
  return { membership: out, order: read.order, stock: read.stock, completed: read.completed, incomplete: read.incomplete };
 }
 
 /** Pull a store from a URL: Shopify public products.json, then Squarespace JSON. */
 // 1,500 stopped short of three stores in the fleet (chill-boutique 1,837). The ceiling still exists
-// so a runaway feed can't pin the process open — but hitting it is now recorded, and a read that
+// so a runaway feed can't pin the process open, but hitting it is now recorded, and a read that
 // hits it is never allowed to mark anything sold. See feed-completeness.ts.
 export async function importStoreFromUrl(raw: string, max = 5000): Promise<ImportResult> {
  const u = await assertPublicUrl(raw); // DNS-resolves + rejects internal IPs (SSRF)
@@ -687,11 +687,11 @@ export async function importStoreFromUrl(raw: string, max = 5000): Promise<Impor
  try {
  // Pass the shop's REAL currency (read from its storefront) instead of assuming USD.
  const shopCurrency = meta.currency || "USD";
- // On timeout the fallback carries NO outcome — which readEndedCleanly treats as an incomplete
+ // On timeout the fallback carries NO outcome, which readEndedCleanly treats as an incomplete
  // read, so an empty feed from a slow store can never be read as "the shop is empty now".
  // 25s was not enough for a real catalogue: chill-boutique's 1,791 pieces are 36 sequential
  // requests, and a throttle retry on top pushed it over, which returned an EMPTY feed. Harmless now
- // that an empty read can never sweep — but it also meant the store simply did not import.
+ // that an empty read can never sweep, but it also meant the store simply did not import.
  const r = await withTimeout(fetchShopifyProductsPublic(domain, storeName, max, shopCurrency, true, meta.country), 60000, { products: [], skippedCount: 0 });
  const shopifyComplete = r.outcome ? readEndedCleanly(r.outcome) : false;
  // Every source id the read SAW, before the image filter below drops any. A piece with no photo is
@@ -734,7 +734,7 @@ export async function importStoreFromUrl(raw: string, max = 5000): Promise<Impor
  /* fall through to squarespace */
  }
 
- // 2) Squarespace — discover the fullest product collection, then paginate it.
+ // 2) Squarespace: discover the fullest product collection, then paginate it.
  if (!products.length) {
  const best = await pickSquarespaceCollection(origin, u.href);
  if (best) {
@@ -746,7 +746,7 @@ export async function importStoreFromUrl(raw: string, max = 5000): Promise<Impor
  }
  }
 
- // 3) WooCommerce — its public Store API is as clean as Shopify's feed (prices in minor units
+ // 3) WooCommerce: its public Store API is as clean as Shopify's feed (prices in minor units
  // with an explicit currency), it just was never wired up.
  let blocked: BlockedByStoreError | null = null;
  if (!products.length && (detection.platform === "woocommerce" || detection.platform === "wordpress")) {
@@ -776,12 +776,12 @@ export async function importStoreFromUrl(raw: string, max = 5000): Promise<Impor
  return { ok: false, storeName, platform, brandColor: meta.color, hero: meta.hero, theme: meta.theme, products: [], error: decline };
  }
  const messages: Record<string, string> = {
- wix: "This looks like a Wix store. Automatic import for Wix isn’t supported yet — you can add your items manually for now.",
- square: "This looks like a Square Online store. Automatic import for Square isn’t supported yet — you can add your items manually for now.",
- woocommerce: "This looks like a WooCommerce store. Automatic import for WooCommerce isn’t supported yet — you can add your items manually for now.",
- bigcommerce: "This looks like a BigCommerce store. Automatic import isn’t supported yet — you can add your items manually for now.",
- shopify: "We detected Shopify but couldn’t read products — the store may be password-protected or hiding its public catalog.",
- squarespace: "We detected Squarespace but couldn’t find a product collection — add your items manually, or check that the shop page is public.",
+ wix: "This looks like a Wix store. Automatic import for Wix isn’t supported yet. You can add your items manually for now.",
+ square: "This looks like a Square Online store. Automatic import for Square isn’t supported yet. You can add your items manually for now.",
+ woocommerce: "This looks like a WooCommerce store. Automatic import for WooCommerce isn’t supported yet. You can add your items manually for now.",
+ bigcommerce: "This looks like a BigCommerce store. Automatic import isn’t supported yet. You can add your items manually for now.",
+ shopify: "We detected Shopify but couldn’t read products. The store may be password-protected or hiding its public catalog.",
+ squarespace: "We detected Squarespace but couldn’t find a product collection. Add your items manually, or check that the shop page is public.",
  unknown: "We couldn’t read products from this site. It may be password-protected, built without a supported store platform, or render products only in the browser. You can add your items manually.",
  };
  return {
@@ -800,7 +800,7 @@ export async function importStoreFromUrl(raw: string, max = 5000): Promise<Impor
 }
 
 /** Homepage-only: a section-by-section replica of the source home as studio blocks.
- *  Cheap (one homepage fetch, no product crawl) — used to seed the visual builder on
+ *  Cheap (one homepage fetch, no product crawl). Used to seed the visual builder on
  *  capture without re-running the full product import. */
 export async function importStoreBlocks(raw: string): Promise<HomeBlock[]> {
  const u = await assertPublicUrl(raw);
@@ -810,7 +810,7 @@ export async function importStoreBlocks(raw: string): Promise<HomeBlock[]> {
 }
 
 // Like importStoreBlocks, but also returns the store's OWN theme (real colours, fonts, logo) and brand
-// name — so an import can look like their site, not our starter theme. One homepage read, both outputs.
+// name, so an import can look like their site, not our starter theme. One homepage read, both outputs.
 export async function importStoreThemeAndBlocks(raw: string): Promise<{ theme: StorefrontTheme | null; blocks: HomeBlock[]; name: string | null }> {
  const u = await assertPublicUrl(raw);
  if (!u) return { theme: null, blocks: [], name: null };

@@ -32,7 +32,7 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
 }
 
 export function RichText({ text }: { text: string }) {
- // Split on code fences — odd segments are code blocks.
+ // Split on code fences. Odd segments are code blocks.
  const segments = text.split(/```/);
  return (
  <>

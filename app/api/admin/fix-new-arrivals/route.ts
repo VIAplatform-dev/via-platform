@@ -19,7 +19,7 @@ function isAuthorized(request: NextRequest): boolean {
  * 30 days ago so only genuinely new products (first synced after this runs)
  * appear in the New Arrivals section.
  *
- * Safe to run multiple times — subsequent syncs will NOT overwrite created_at
+ * Safe to run multiple times. Subsequent syncs will NOT overwrite created_at
  * since the upsert no longer touches it on conflict.
  */
 export async function POST(request: NextRequest) {

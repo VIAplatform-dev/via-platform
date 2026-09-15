@@ -2,7 +2,7 @@
 // is the single strongest intrinsic price signal: for the same garment, natural/luxury fibers
 // (silk, leather, cashmere, wool, linen) resell well above synthetics (polyester, acrylic, nylon).
 // This is a deterministic, defensible classification (fiber science + resale reality), not a
-// hand-curated per-item judgement — so it stays unbiased and explainable.
+// hand-curated per-item judgement, so it stays unbiased and explainable.
 
 export type MaterialTier = "premium" | "mid" | "base";
 
@@ -14,7 +14,7 @@ const MID = /\b(cotton|viscose|rayon|tencel|lyocell|modal|cupro|denim|ramie|bamb
 const BASE = /\b(polyester|acrylic|nylon|polyamide|spandex|elastane|lycra|acetate|\bpvc\b|polyurethane)\b/i;
 
 /** Classify a stated material into a resale-value tier. Returns null tier when the material is
- *  empty or unrecognized (so callers can fall back to "unknown — price conservatively"). A blend
+ *  empty or unrecognized (so callers can fall back to "unknown. Price conservatively"). A blend
  *  is scored by the best fiber present (a silk blend still beats pure polyester). */
 export function materialTier(material: string | null | undefined): { tier: MaterialTier | null; label: string | null } {
  const m = (material || "").toLowerCase().trim();

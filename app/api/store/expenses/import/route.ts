@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 // of guessing wrong is wrong money in their books. The seller sees the rows, fixes the column
 // mapping if we got it wrong, and only then confirms.
 //
-// The reading itself is in expense-import.ts and is pure — this route is auth, limits, and writes.
+// The reading itself is in expense-import.ts and is pure. This route is auth, limits, and writes.
 
 /** Bigger than any real costs sheet, small enough that a bad upload can't tie up the process. */
 const MAX_CHARS = 2_000_000;
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
  const text = typeof body?.text === "string" ? body.text : "";
  if (!text.trim()) return NextResponse.json({ error: "That file looks empty." }, { status: 400 });
  if (text.length > MAX_CHARS) {
-  return NextResponse.json({ error: "That file is too big to read here — split it, or trim it to the year you need." }, { status: 413 });
+  return NextResponse.json({ error: "That file is too big to read here. Split it, or trim it to the year you need." }, { status: 413 });
  }
  // A real .xlsx is a zip, so what arrives is binary noise. Say what to do rather than "0 rows found".
  if (looksBinary(text)) {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ error: "Couldn’t find any rows in that file. It needs a header row with a date, a description and an amount." }, { status: 400 });
  }
  if (parsed.expenses.length > MAX_ROWS) {
-  return NextResponse.json({ error: `That file has ${parsed.expenses.length.toLocaleString()} rows — more than can be imported at once. Split it by year.` }, { status: 413 });
+  return NextResponse.json({ error: `That file has ${parsed.expenses.length.toLocaleString()} rows. More than can be imported at once. Split it by year.` }, { status: 413 });
  }
 
  const totalCents = parsed.expenses.reduce((n, e) => n + e.amountCents, 0);

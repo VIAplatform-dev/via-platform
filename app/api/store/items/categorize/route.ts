@@ -8,9 +8,9 @@ import { toCategorySlug, isCanonicalCategory } from "@/app/lib/item-tags";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const MAX_BATCH = 60; // a sweep, not a whole-catalog migration — keeps us inside maxDuration
+const MAX_BATCH = 60; // a sweep, not a whole-catalog migration. Keeps us inside maxDuration
 
-// POST { ids?: string[], scope?: "untagged" } — re-tag the acting store's items from their
+// POST { ids?: string[], scope?: "untagged" }: re-tag the acting store's items from their
 // photos. `ids` targets an explicit selection; `scope: "untagged"` picks every item whose
 // stored category doesn't fold onto the taxonomy. Items the model can't place are skipped,
 // not guessed at, and reported back in `skipped`.
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
  const untaggedOnly = body?.scope === "untagged";
  if (!ids.length && !untaggedOnly) return NextResponse.json({ error: "Nothing to tag" }, { status: 400 });
 
- // Scope to the seller's own items — an id from another store is simply not found.
+ // Scope to the seller's own items. An id from another store is simply not found.
  const all = await listSellerItems(seller.id);
  let targets = ids.length ? all.filter((i) => ids.includes(i.id)) : all;
  if (untaggedOnly) targets = targets.filter((i) => !isCanonicalCategory(toCategorySlug(i.category)));

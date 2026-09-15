@@ -1,6 +1,6 @@
 "use client";
 
-// The visual colour picker used across the storefront editors — a draggable saturation/value square + a
+// The visual colour picker used across the storefront editors. A draggable saturation/value square + a
 // hue bar + a hex field (like Figma/Canva), plus a swatch that opens it in a popover. Shared so both the
 // blocks studio and the captured-site editor use the exact same control (never the native OS picker).
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -41,7 +41,7 @@ export function hsvToHex(h: number, s: number, v: number): string {
  const hx = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, "0");
  return `#${hx(r)}${hx(g)}${hx(b)}`;
 }
-// The eyedropper — sellers asked to sample a colour they can already see (the live preview behind the
+// The eyedropper: sellers asked to sample a colour they can already see (the live preview behind the
 // popover, a product photo, another swatch) instead of copying a hex. The native EyeDropper API hands
 // back the pixel under the cursor anywhere on screen. Chrome/Edge only, so the button renders only where
 // it works rather than showing a control that does nothing (Safari/Firefox keep the hex field).
@@ -61,7 +61,7 @@ export function EyeDropperButton({ onPick }: { onPick: (hex: string) => void }) 
  const { sRGBHex } = await new window.EyeDropper!().open();
  if (/^#[0-9a-f]{6}$/i.test(sRGBHex)) onPick(sRGBHex.toLowerCase());
  } catch {
- // Esc / dismissed — keep the current colour.
+ // Esc / dismissed. Keep the current colour.
  } finally {
  setPicking(false);
  }
@@ -124,18 +124,18 @@ export function ColorPicker({ value, onChange }: { value: string; onChange: (v: 
  );
 }
 // The picker popover, positioned `fixed` to the anchor button's rect. Portaled to <body> so it escapes
-// BOTH overflow-clipping AND transformed ancestors — a `transform` on an ancestor would otherwise make
+// BOTH overflow-clipping AND transformed ancestors. A `transform` on an ancestor would otherwise make
 // `position: fixed` resolve against that ancestor (not the viewport), re-clipping the popover (e.g. the
-// element toolbar, which is translateX(-50%) + overflow-x-auto — the swatch popover was invisible there).
+// element toolbar, which is translateX(-50%) + overflow-x-auto: the swatch popover was invisible there).
 export function PickerPopover({ anchor, value, onChange, onClose }: { anchor: DOMRect; value: string; onChange: (v: string) => void; onClose: () => void }) {
- // Below the swatch by default. But a swatch near the foot of a long scrolled panel — Accent, at the
- // bottom of the Design sidebar — left the popover hanging off the window: the hex field and the
+ // Below the swatch by default. But a swatch near the foot of a long scrolled panel. Accent, at the
+ // bottom of the Design sidebar. Left the popover hanging off the window: the hex field and the
  // eyedropper were simply not on screen, which reads as "that control disappears at some scroll
  // positions". So it flips above the swatch when it won't fit below, and clamps either way.
  //
  // Measured in a ref callback (commit phase, before paint) rather than from a hardcoded height: no
  // setState, no second render, and it stays right if the picker ever grows another row. `top` is set
- // imperatively and deliberately left OUT of the style prop below — dragging the saturation square
+ // imperatively and deliberately left OUT of the style prop below. Dragging the saturation square
  // re-renders this popover on every pointer move, and a `top` in the prop would be rewritten to the
  // un-flipped value each time (the callback only re-runs when the anchor changes), so the popover
  // would jump back down mid-drag. A property React never sets is a property it never resets.
@@ -168,7 +168,7 @@ export function ColorSwatch({ value, onChange }: { value: string; onChange: (v: 
  </div>
  );
 }
-// Compact swatch-only variant for tight floating toolbars — opens the visual picker popover on click.
+// Compact swatch-only variant for tight floating toolbars. Opens the visual picker popover on click.
 export function ColorDot({ value, onChange, title }: { value: string; onChange: (v: string) => void; title?: string }) {
  const [anchor, setAnchor] = useState<DOMRect | null>(null);
  return (

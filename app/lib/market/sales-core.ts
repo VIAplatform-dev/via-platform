@@ -1,4 +1,4 @@
-// Pure sales roll-up for a market session — no DB, unit-tested.
+// Pure sales roll-up for a market session, no DB, unit-tested.
 
 export type SaleLike = { amountCents: number; status: string; tender: string | null; discountCents?: number | null };
 

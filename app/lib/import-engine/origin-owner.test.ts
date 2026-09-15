@@ -16,7 +16,7 @@ test("the same shop, held by another store, is refused", () => {
  assert.equal(conflictingOwner("https://tesselizabethvintage.com/", "gianna-marie-raucher", claims), "tesselizabethvintage");
 });
 
-test("re-importing your OWN shop is always allowed — that is the repair path", () => {
+test("re-importing your OWN shop is always allowed. That is the repair path", () => {
  assert.equal(conflictingOwner("https://tesselizabethvintage.com/", "tesselizabethvintage", claims), null);
 });
 
@@ -45,7 +45,7 @@ test("force is the deliberate override, for scripts and genuine re-assignment", 
  assert.equal(conflictingOwner("https://tesselizabethvintage.com", "gianna-marie-raucher", claims, true), null);
 });
 
-test("junk in never blocks — URL validation is somebody else's job", () => {
+test("junk in never blocks. URL validation is somebody else's job", () => {
  assert.equal(conflictingOwner("not a url", "gianna-marie-raucher", claims), null);
  assert.equal(conflictingOwner("", "gianna-marie-raucher", claims), null);
 });

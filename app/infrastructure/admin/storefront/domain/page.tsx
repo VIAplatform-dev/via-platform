@@ -5,7 +5,7 @@ import { useInSiteDialog } from "@/app/components/InSiteDialog";
 import { Globe, Check, Copy } from "lucide-react";
 import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill, TH, TD, cn } from "../../ui";
 
-// Your own domain — connect one you already own, or buy one here.
+// Your own domain: connect one you already own, or buy one here.
 //
 // The API has done both since it shipped; the only way in was the legacy /store
 // portal, so in practice almost no store has a domain set. This is that panel,
@@ -173,7 +173,7 @@ export default function DomainPage() {
  }
 
  async function transferOut() {
-  if (!(await dialog.confirm({ title: `Move ${domain} to another registrar?`, body: `You keep the domain — we'll give you the auth code to hand your new registrar. Your storefront stays live until the transfer completes on their side.`, confirmLabel: "Start transfer", tone: "primary" }))) return;
+  if (!(await dialog.confirm({ title: `Move ${domain} to another registrar?`, body: `You keep the domain. We'll give you the auth code to hand your new registrar. Your storefront stays live until the transfer completes on their side.`, confirmLabel: "Start transfer", tone: "primary" }))) return;
   setDnsBusy(true); setDnsErr(null);
   const r = await fetch("/api/store/domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "transfer-out" }) });
   const d2 = await r.json().catch(() => ({}));
@@ -184,7 +184,7 @@ export default function DomainPage() {
 
  const live = status?.verified && !status?.misconfigured;
  const renews = info?.expiresAt ? new Date(info.expiresAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : null;
- // The records to add at her provider — drawn as a table from tablet up and as blocks on a phone.
+ // The records to add at her provider. Drawn as a table from tablet up and as blocks on a phone.
  const dnsRows = [...(status?.records ?? []), ...(status?.verification ?? []).map((v) => ({ type: v.type as "A" | "CNAME", name: v.domain, value: v.value }))];
 
  return (
@@ -231,7 +231,7 @@ export default function DomainPage() {
        {!live && (status?.records?.length || status?.verification?.length) ? (
         <>
         {/* Phone: each record as a block. In a table the long values pushed Name and Value off the
-            side of the card — and those are the two things she has to copy. */}
+            side of the card, and those are the two things she has to copy. */}
         <div className="mt-4 divide-y divide-stone-100 rounded-xl border border-stone-200 sm:hidden">
          {dnsRows.map((r, i) => (
           <div key={`${r.type}-${r.name}-${i}`} className="space-y-1.5 px-3 py-2.5">
@@ -264,7 +264,7 @@ export default function DomainPage() {
        <TechCard className="p-5">
         <p className="text-[13px] font-medium text-stone-700">DNS records</p>
         <p className="mb-3 mt-0.5 text-[12px] text-stone-400">
-         Everything else your domain does — email, verifying it with Instagram, pointing a subdomain somewhere else.
+         Everything else your domain does. Email, verifying it with Instagram, pointing a subdomain somewhere else.
          The two records that keep your shop online are locked.
         </p>
 
@@ -353,7 +353,7 @@ export default function DomainPage() {
           {renews ? <>Renews on <span className="font-medium text-stone-800">{renews}</span>.</> : "Renews annually."}{" "}
           {info.autoRenew
            ? "We charge your card on file about a month before, then renew it for you."
-           : "Auto-renew is off — the domain expires on that date unless you turn it back on."}
+           : "Auto-renew is off: the domain expires on that date unless you turn it back on."}
          </p>
          <p className="text-stone-500">It&apos;s your domain. You can move it to another registrar whenever you like.</p>
         </div>
@@ -379,7 +379,7 @@ export default function DomainPage() {
        {/* ── Buy one ── */}
        <TechCard className="p-5">
         <p className="text-[13px] font-medium text-stone-700">Find a domain</p>
-        <p className="mb-3 mt-0.5 text-[12px] text-stone-400">Type your shop name — we&apos;ll check the .com first, then the rest.</p>
+        <p className="mb-3 mt-0.5 text-[12px] text-stone-400">Type your shop name. We&apos;ll check the .com first, then the rest.</p>
         <div className="flex flex-wrap gap-2">
          <input
           value={search}
@@ -393,7 +393,7 @@ export default function DomainPage() {
          </TechButton>
         </div>
 
-        {options && options.length === 0 && <p className="mt-3 text-[12px] text-stone-400">Nothing came back for that — try another name.</p>}
+        {options && options.length === 0 && <p className="mt-3 text-[12px] text-stone-400">Nothing came back for that. Try another name.</p>}
 
         {options && options.length > 0 && !picked && (
          <div className="mt-4 divide-y divide-stone-100 overflow-hidden rounded-xl border border-stone-200">
@@ -448,7 +448,7 @@ export default function DomainPage() {
 
           <div className="mt-3.5 flex flex-wrap items-center gap-3">
            <TechButton className="px-4 py-2 text-[13px]" disabled={buying !== null} onClick={() => buy(picked)}>
-            {buying ? "Buying…" : `Buy ${picked.domain}${picked.priceCents != null ? ` — ${money(picked.priceCents)}` : ""}`}
+            {buying ? "Buying…" : `Buy ${picked.domain}${picked.priceCents != null ? `: ${money(picked.priceCents)}` : ""}`}
            </TechButton>
            <span className="text-[11px] text-stone-400">Charges your card on file. Refunded automatically if registration fails.</span>
           </div>

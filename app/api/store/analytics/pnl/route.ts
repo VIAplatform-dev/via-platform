@@ -8,7 +8,7 @@ import { saveImport, importedEntries, listImports, deleteImport } from "@/app/li
 
 export const dynamic = "force-dynamic";
 
-// The P&L as a grid — months across, lines down — over VYA's own records PLUS whatever the seller
+// The P&L as a grid, months across, lines down. Over VYA's own records PLUS whatever the seller
 // brought over from her spreadsheet. See app/lib/analytics/pnl-grid.ts for why it is a grid at all.
 
 /** The lines, in the order a P&L reads. Fixed, so an empty month still shows every row. */
@@ -27,7 +27,7 @@ function db() {
  return neon(url);
 }
 
-/** VYA's own records, by month. Mirrors the single-period query in analytics/margin.ts — same joins,
+/** VYA's own records, by month. Mirrors the single-period query in analytics/margin.ts. Same joins,
  *  same tax rule (revenue is the sale LESS the tax collected, which is never the seller's money). */
 async function vyaEntries(sellerId: string, slug: string): Promise<LedgerEntry[]> {
  const out: LedgerEntry[] = [];
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, grid, batches });
 }
 
-// POST { csv, fileName?, dayFirst?, commit? } — read a spreadsheet. Without `commit` nothing is
+// POST { csv, fileName?, dayFirst?, commit? }: read a spreadsheet. Without `commit` nothing is
 // written: she sees what we read, and what we couldn't, before any of it counts.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, committed: true, batchId, summary });
 }
 
-// DELETE { batchId } — take one upload back out, whole.
+// DELETE { batchId }, take one upload back out, whole.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

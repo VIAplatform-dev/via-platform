@@ -70,7 +70,7 @@ function EditInner() {
  {!f && !err && <p className="text-[13px] text-stone-400">Loading…</p>}
  {f && (
  <div className="space-y-4">
- {status === "sold" && <Notice tone="warn">This item is sold — edits won’t change the sale.</Notice>}
+ {status === "sold" && <Notice tone="warn">This item is sold. Edits won’t change the sale.</Notice>}
  {quick && <Notice tone="info">Quick-listed at a market. Add what you paid and the size so your margins and listing are complete.</Notice>}
  <div>
  <span className={label}>Photos</span>

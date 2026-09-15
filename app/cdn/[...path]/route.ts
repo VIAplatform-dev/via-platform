@@ -4,7 +4,7 @@ import { getCaptureOrigin } from "@/app/lib/site-capture-db";
 import { planCdnRequest } from "@/app/lib/plan-b/asset-proxy";
 import { safeFetch } from "@/app/lib/safe-url";
 
-// `/cdn/*` on a Plan B store origin — the theme's own assets, fetched from the site we captured.
+// `/cdn/*` on a Plan B store origin. The theme's own assets, fetched from the site we captured.
 //
 // See app/lib/plan-b/asset-proxy.ts for WHY this route has to exist (short version: Shopify themes
 // publish their import map with root-relative `/cdn/…` specifiers, which resolve against us).
@@ -49,7 +49,7 @@ async function handle(req: NextRequest, method: "GET" | "HEAD"): Promise<Respons
  if (ct) headers.set("Content-Type", ct);
  headers.set("Cache-Control", upstream.headers.get("cache-control") || FALLBACK_CACHE);
  // Deliberately NOT forwarding Content-Length or Content-Encoding. `fetch` decompresses the body
- // for us, so upstream's length describes the *compressed* bytes — copying it across truncates every
+ // for us, so upstream's length describes the *compressed* bytes. Copying it across truncates every
  // gzipped asset at that byte count, which fails as a silent syntax error partway through a theme
  // module rather than as an error anyone can see. Let the response be chunked instead.
  // Fonts loaded by the theme's CSS are cross-origin from the browser's point of view on the source

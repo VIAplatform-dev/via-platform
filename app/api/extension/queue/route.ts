@@ -10,8 +10,8 @@ import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 export const dynamic = "force-dynamic";
 
 // The VYA Cross-Lister browser extension calls this (with the seller's vyaplatform.com session
-// cookie) to get their active listings, each pre-formatted for the target marketplace — title within
-// its char limit, caption (+inline hashtags where the feed uses them), price, and image URLs — so
+// cookie) to get their active listings, each pre-formatted for the target marketplace. Title within
+// its char limit, caption (+inline hashtags where the feed uses them), price, and image URLs, so
 // the extension can fill the seller's own sell form. No marketplace API is involved; the extension
 // automates the seller's logged-in session (the only way these sites allow). ?platform= picks the
 // formatting (depop | poshmark | …); defaults to depop.
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
  getCrossListingsByPlatform(slug, platform).catch(() => []),
  ]);
  // Hide only items actually PUBLISHED on this marketplace (status 'listed'). A 'pending' marker
- // means a fill was started but not published — keep those in the queue so they can be retried.
+ // means a fill was started but not published. Keep those in the queue so they can be retried.
  const listedIds = new Set(alreadyListed.filter((c) => c.status === "listed").map((c) => c.itemId));
  const items = rawItems.filter((it) => it.status !== "removed" && !listedIds.has(it.id)).map((it) => {
  const brand = it.brand || inferBrandFromTitle(it.title) || null;
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
  return {
  id: it.id,
  title: c.title,
- body: c.body, // caption (with inline #hashtags on hashtag-driven feeds) — the "description" field
+ body: c.body, // caption (with inline #hashtags on hashtag-driven feeds). The "description" field
  tags: c.tags,
  priceDollars: Math.round((it.priceCents || 0) / 100),
  size: it.size,

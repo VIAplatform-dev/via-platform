@@ -56,7 +56,7 @@ const ECOM_JUNK_LINE_RE = /regular\s+price|sale\s+price|unit\s+price|sold\s+out|
 
 // Allowlist for seller-imported description HTML. Product descriptions are synced from
 // external stores (semi-trusted), so they're rendered via dangerouslySetInnerHTML and
-// MUST be sanitized — strip <script>/<iframe>/on*-handlers/javascript: URLs and keep
+// MUST be sanitized. Strip <script>/<iframe>/on*-handlers/javascript: URLs and keep
 // only basic formatting tags.
 const DESCRIPTION_SANITIZE_OPTS: sanitizeHtml.IOptions = {
  allowedTags: ["p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li",
@@ -168,8 +168,8 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  const currentCategorySlug = inferCategoryFromTitle(product.title);
 
  // Build recommendation pool from three sources:
- // 1. Brand-keyword pool — fetches items whose title contains the brand name (e.g. "dolce & gabbana")
- // 2. Item-type pool — fetches items whose title contains the item type word (e.g. "top", "ballet flat")
+ // 1. Brand-keyword pool: fetches items whose title contains the brand name (e.g. "dolce & gabbana")
+ // 2. Item-type pool: fetches items whose title contains the item type word (e.g. "top", "ballet flat")
  // 3. Random fallback for variety
  const [favoriteCount, cartCount, brandCandidates, itemTypeCandidates, randomCandidates] = await Promise.all([
  getProductFavoriteCount(dbId).catch(() => 0),
@@ -225,7 +225,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
 
  // WHERE THIS SHOP POSTS, SAID HERE RATHER THAN AT THE CARD.
  //
- // A store that doesn't serve a region refused the order at CHECKOUT — after the shopper had chosen
+ // A store that doesn't serve a region refused the order at CHECKOUT, after the shopper had chosen
  // the piece, typed a name, a street and a postcode, and reached payment. The rule was knowable from
  // the first page view and nothing said it until the last one. The country is whatever the edge saw
  // (the header store-visits already reads); with no country, shippingReach says where the shop posts
@@ -233,8 +233,8 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  // never in doubt.
  // WHAT THE SELLER WROTE, NOT WHAT WE TYPED FOR HER.
  //
- // This page read `stores[].shippingPolicy` and `.returnPolicy` — text hardcoded in the repo when
- // each partner was onboarded — and never looked at store_profiles.policies, which is what
+ // This page read `stores[].shippingPolicy` and `.returnPolicy`: text hardcoded in the repo when
+ // each partner was onboarded, and never looked at store_profiles.policies, which is what
  // Settings → Policies saves. So a seller rewrote her returns policy, saw it live on her own
  // storefront, and the marketplace kept showing the words VYA wrote for her months earlier.
  const profile = await getStoreProfile(storeSlug).catch(() => null);
@@ -275,7 +275,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  const videoUrl = product.video_url || null;
 
  // Build direct cart URL for Shopify stores only (variant IDs are numeric).
- // Square/Squarespace stores use their own URL format — use external_url as-is.
+ // Square/Squarespace stores use their own URL format. Use external_url as-is.
  let checkoutUrl = product.external_url || "";
  if (product.variant_id && product.external_url && (store as any).commissionType === "shopify-collabs") {
  try {
@@ -340,7 +340,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  <div className="max-w-6xl mx-auto px-6 pb-24">
  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-16 md:items-start">
 
- {/* Images — carousel on mobile, vertical stack on desktop. A video (if the
+ {/* Images: carousel on mobile, vertical stack on desktop. A video (if the
  store listed one) leads the gallery. */}
  <div>
  <div className="md:hidden -mx-6">
@@ -386,7 +386,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  </div>
  </div>
 
- {/* Details — sticky on desktop, independently scrollable if content exceeds viewport */}
+ {/* Details: sticky on desktop, independently scrollable if content exceeds viewport */}
  <div className="flex flex-col pt-4 pb-1 md:pt-1 md:sticky md:top-8 md:self-start md:max-h-[calc(100vh-4rem)] md:overflow-y-auto md:pr-2 scrollbar-hide">
  <TrackedStoreLink
  href={`/stores/${store.slug}`}
@@ -425,7 +425,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  )}
  </div>
 
- {/* VYA Verified — links to the trust / authenticity page */}
+ {/* VYA Verified. Links to the trust / authenticity page */}
  <div className="-mt-2 mb-4 md:mb-8">
  <VyaVerifiedBadge />
  </div>
@@ -490,7 +490,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  <p className="mb-3 font-medium text-black">{storeConfig.perk}</p>
  )}
  <p className="mb-1 font-medium text-black text-xs uppercase tracking-wide">Shipping</p>
- {/* The one line a shopper outside the shipping area needs — before she spends ten minutes
+ {/* The one line a shopper outside the shipping area needs, before she spends ten minutes
      on an address that will be refused at the card. */}
  <p className={`mb-2 ${reach.ships === false ? "font-medium text-black" : ""}`}>{reach.line}</p>
  <p className="mb-4 whitespace-pre-line">
@@ -520,7 +520,7 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
  productUrl={`https://vyaplatform.com/products/${compositeId}`}
  />
 
- {/* CTAs — Buy Now primary, Add to Cart secondary */}
+ {/* CTAs: Buy Now primary, Add to Cart secondary */}
  {product.external_url ? (
  <>
  <BuyNowButton

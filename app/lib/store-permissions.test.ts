@@ -10,7 +10,7 @@ test("an owner can do everything, whatever is stored against them", () => {
  assert.equal(can(owner, "people"), true);
 });
 
-test("billing and access are the owner's alone — no permission grants them", () => {
+test("billing and access are the owner's alone, no permission grants them", () => {
  const staff = { role: "staff" as const, permissions: AREAS.map((a) => a.key) };
  assert.equal(can(staff, "settings"), true, "store settings can be given");
  assert.equal(can(staff, "billing"), false);
@@ -36,13 +36,16 @@ test("an empty list means 'nothing', not 'unset'", () => {
 test("whatever the form sends is cleaned before it's stored", () => {
  assert.deepEqual(normalisePermissions(["orders", "orders", "nonsense", 7, null]), ["orders"]);
  assert.deepEqual(normalisePermissions("orders"), [], "not a list, so nothing");
- // Catalogue order, not the order they arrived in — so two identical sets compare equal.
+ // Catalogue order, not the order they arrived in, so two identical sets compare equal.
  assert.deepEqual(normalisePermissions(["orders", "inventory"]), ["inventory", "orders"]);
 });
 
 test("the row summary says something true at each extreme", () => {
  assert.match(summarise({ role: "owner" }), /Everything/);
- assert.match(summarise({ role: "staff", permissions: [] }), /Nothing yet/);
+ // An empty list is the owner having ticked nothing, not a choice still to make, only `null`
+ // means unchosen, and that summarises as the default set below.
+ assert.match(summarise({ role: "staff", permissions: [] }), /^No areas/);
+ assert.match(summarise({ role: "staff", permissions: null }), /^7 of 14 areas$/);
  assert.match(summarise({ role: "staff", permissions: AREAS.map((a) => a.key) }), /except billing/);
  assert.match(summarise({ role: "staff", permissions: ["orders"] }), /1 of \d+/);
 });

@@ -33,9 +33,9 @@ function SalesInner() {
  <MarketPage title="Sales today" back={B}>
  {err && <div className="mb-3"><Notice tone="danger">{err}</Notice></div>}
  <div className="grid grid-cols-3 gap-2">
- <Stat label="Items" value={data ? data.summary.count : "—"} />
- <Stat label="Gross" value={data ? money(data.summary.grossCents) : "—"} />
- <Stat label="Avg" value={data ? money(data.summary.avgCents) : "—"} />
+ <Stat label="Items" value={data ? data.summary.count : "-"} />
+ <Stat label="Gross" value={data ? money(data.summary.grossCents) : "-"} />
+ <Stat label="Avg" value={data ? money(data.summary.avgCents) : "-"} />
  </div>
  <div className="mt-5 space-y-2">
  {data && data.orders.length === 0 && <p className="py-10 text-center text-[13.5px] text-stone-400">No sales yet today. Find an item to get started.</p>}

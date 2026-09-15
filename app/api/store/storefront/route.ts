@@ -11,6 +11,7 @@ import {
  deleteStorefront,
  normalizeHandle,
  setWishlistEnabled,
+ setProductNotesEnabled,
  type StorefrontSettings,
 } from "@/app/lib/storefront-db";
 import { deleteCaptures } from "@/app/lib/site-capture-db";
@@ -36,10 +37,11 @@ function defaultsFor(slug: string): StorefrontSettings {
  theme: null,
  serveMode: null,
  wishlistEnabled: false,
+ productNotesEnabled: false,
  };
 }
 
-// GET — the acting store's storefront settings (or sensible defaults), plus the
+// GET: the acting store's storefront settings (or sensible defaults), plus the
 // display info the editor needs (name, logo).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
 
  // The address her storefront actually answers on, from the one helper that is the inverse of the
  // proxy's own routing (storePublicOrigin). The builder hardcoded ".getvya.ai" and the imported
- // editor fell back to a vyaplatform.com path — so one store was shown two different addresses on
+ // editor fell back to a vyaplatform.com path, so one store was shown two different addresses on
  // two screens, and neither of them serves it.
  const publicOrigin = storePublicOrigin(settings.handle || slug);
 
@@ -59,11 +61,11 @@ export async function GET(request: NextRequest) {
  settings,
  publicOrigin,
  store: { slug, name: store?.name ?? slug, logo: store?.logo ?? null },
- admin: isAdminRequest(request), // platform admin (your admin login) — gates the Delete action
+ admin: isAdminRequest(request), // platform admin (your admin login): gates the Delete action
  });
 }
 
-// POST — save the acting store's storefront settings.
+// POST: save the acting store's storefront settings.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -92,14 +94,14 @@ export async function POST(request: NextRequest) {
 
  // "Set up but held": a self-onboarded store can build + preview during its trial, but the
  // storefront can't go publicly LIVE until a paid tier is active. Gated to trial-model stores
- // (a store_accounts row) — the owner (admin) and curated marketplace stores are exempt, so
+ // (a store_accounts row): the owner (admin) and curated marketplace stores are exempt, so
  // nothing existing breaks. Payouts follow the same lever: no live storefront ⇒ no public sales.
  const wantsLive = Boolean(body.enabled);
  if (wantsLive && !isAdminRequest(request)) {
  const account = await getStoreAccount(slug);
  if (account && !(await isStorePro(slug))) {
  return NextResponse.json(
- { error: "Pick a plan to take your store live — you can keep building and previewing until then.", code: "subscription_required" },
+ { error: "Pick a plan to take your store live. You can keep building and previewing until then.", code: "subscription_required" },
  { status: 402 },
  );
  }
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
 
  // Saved pieces is deliberately NOT part of upsertStorefront. The editor posts its whole form on
  // every save, and a switch that lives on a different screen would be turned back off by a save
- // that never mentioned it. Only an explicit key changes it — and after the upsert, so a store
+ // that never mentioned it. Only an explicit key changes it, and after the upsert, so a store
  // whose row is being created here has one to update.
  if (body.wishlistEnabled !== undefined) {
   const on = Boolean(body.wishlistEnabled);
@@ -124,12 +126,19 @@ export async function POST(request: NextRequest) {
   saved.wishlistEnabled = on;
  }
 
+ // Same reasoning for the shipping-and-returns note under a piece: its own screen, its own key.
+ if (body.productNotesEnabled !== undefined) {
+  const on = Boolean(body.productNotesEnabled);
+  await setProductNotesEnabled(slug, on);
+  saved.productNotesEnabled = on;
+ }
+
  return NextResponse.json({ ok: true, settings: saved });
 }
 
-// DELETE ?store=<slug> — completely remove a store's storefront (settings, theme, pages, publish
+// DELETE ?store=<slug> completely remove a store's storefront (settings, theme, pages, publish
 // state). The public handle stops resolving and the editor reopens blank; a fresh one can be built
-// from scratch. PLATFORM ADMIN ONLY — not the store owner; only your admin login can do this.
+// from scratch. PLATFORM ADMIN ONLY, not the store owner; only your admin login can do this.
 export async function DELETE(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Admin only." }, { status: 401 });
  const slug = new URL(request.url).searchParams.get("store") || (await resolveStoreSlugAny(request));
@@ -137,9 +146,9 @@ export async function DELETE(request: NextRequest) {
  await deleteStorefront(slug);
  // Platform-admin full reset: remove the imported site (captured pages) AND its imported inventory,
  // so nothing from the import lingers. Otherwise the wrapper still sees a capture and reopens the
- // captured editor after reload — and the imported products stay in inventory.
+ // captured editor after reload, and the imported products stay in inventory.
  // `keepAdded: false`: a platform-admin wipe means the whole hosted site, including pages she built
- // here. A re-import, the other caller, spares those by default — see deleteCaptures.
+ // here. A re-import, the other caller, spares those by default. See deleteCaptures.
  await deleteCaptures(slug, { keepAdded: false }).catch(() => {});
  await (await import("@/app/lib/site-builder/pages-db")).clearStoreBuilderRows(slug).catch(() => {});
  const seller = await getSellerBySlug(slug).catch(() => null);

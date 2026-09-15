@@ -18,7 +18,7 @@ export async function GET(request: Request) {
  const prunedCompCache = await pruneCompCache(90).catch(() => 0);
  const rows = Object.values(result.windows ?? {}).reduce((a, b) => a + b, 0);
  if (rows === 0) {
- await sendOpsAlert("build-market-metrics wrote 0 rows", `as-of ${result.asOfDate}: no market_metrics rows produced — the events log may be empty or the upstream build-events run failed.`);
+ await sendOpsAlert("build-market-metrics wrote 0 rows", `as-of ${result.asOfDate}: no market_metrics rows produced. The events log may be empty or the upstream build-events run failed.`);
  }
  return NextResponse.json({ ok: true, rows, prunedCompCache, ...result });
  } catch (err) {

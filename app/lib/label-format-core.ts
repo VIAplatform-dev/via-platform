@@ -1,8 +1,8 @@
 // What a shipping label comes out as, and where that choice is made.
 //
-// THE PROBLEM. We never told the carrier what we wanted, so it returned its default — for USPS
+// THE PROBLEM. We never told the carrier what we wanted, so it returned its default, for USPS
 // that is an 8.5×11 PDF with the label occupying the top quarter and three-quarters of a blank
-// page under it. Anyone with a thermal label printer (a Rollo, a DYMO, a Zebra — which is what a
+// page under it. Anyone with a thermal label printer (a Rollo, a DYMO, a Zebra, which is what a
 // resale shop actually owns) got a page they had to scale, crop or scissor. On a phone it is worse
 // still: there is no crop step, so the only path was AirPrint an A4 sheet and cut it out.
 //
@@ -15,7 +15,7 @@
 export type LabelPrinter = "sheet" | "thermal";
 
 export const LABEL_PRINTERS: { key: LabelPrinter; label: string; hint: string }[] = [
-  { key: "thermal", label: "Label printer", hint: "4×6 — Rollo, DYMO, Zebra" },
+  { key: "thermal", label: "Label printer", hint: "4×6: Rollo, DYMO, Zebra" },
   { key: "sheet", label: "Regular printer", hint: "Full page, cut it out" },
 ];
 
@@ -27,7 +27,7 @@ export function isLabelPrinter(v: unknown): v is LabelPrinter {
  * The carrier options for a printer choice.
  *
  * PDF rather than PNG or ZPL, deliberately. ZPL is the native language of a Zebra and prints
- * pixel-perfect — but it is a text blob no phone, no email client and no Files app can display, so
+ * pixel-perfect, but it is a text blob no phone, no email client and no Files app can display, so
  * a seller who opened it would see gibberish and think the label had failed. Every thermal printer
  * sold to a small shop prints a 4×6 PDF correctly through the normal print dialog. Correct
  * everywhere beats optimal on one device.
@@ -50,7 +50,7 @@ export function shippoLabelFileType(printer: LabelPrinter): string {
 export function labelFormatNote(printer: LabelPrinter): string {
   return printer === "thermal"
     ? "4×6, ready for a label printer."
-    : "Full page — you'll need to cut it out.";
+    : "Full page: you'll need to cut it out.";
 }
 
 /**

@@ -3,7 +3,7 @@ import { resolveStore, cartToken, currentCart, cartResponse, errorResponse } fro
 
 export const dynamic = "force-dynamic";
 
-// GET /cart.js — the theme asks for the current cart on page load and after every mutation.
+// GET /cart.js. The theme asks for the current cart on page load and after every mutation.
 // Middleware rewrites the store origin's /cart.js (and /cart.json) here.
 export async function GET(request: NextRequest) {
  const store = await resolveStore(request);

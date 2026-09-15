@@ -9,7 +9,7 @@ import type { Product } from "./types";
 // TWO THINGS THE API DECIDES, NOT US:
 //
 // `favorited` MUST be sent explicitly. The route reads `body?.favorited === true`, so a request
-// carrying only a productId is read as "unfavorite" — a toggle that omitted it could add nothing,
+// carrying only a productId is read as "unfavorite". A toggle that omitted it could add nothing,
 // ever, and looked like the heart was broken.
 //
 // `soldOut` comes back per entry, which is what splits the Obsessions and Sold Out tabs. There is a
@@ -19,7 +19,7 @@ import type { Product } from "./types";
 export type Favorite = Product & { soldOut?: boolean };
 
 /**
- * A favourite whose product row AND snapshot are both gone renders as the API's placeholder —
+ * A favourite whose product row AND snapshot are both gone renders as the API's placeholder,
  * name "Item", price "$0", no image, no store. It is a dead pointer, not a piece; showing it gives
  * a blank card that navigates nowhere.
  */
@@ -45,11 +45,11 @@ export function useFavorites() {
   // IDENTITY MATTERS HERE, not just contents.
   //
   // `ids` was a fresh Set on every render, so the two callbacks below were fresh too, so
-  // ProductCard's memo — which compares onToggleFavorite by reference — never held. One heart tap
+  // ProductCard's memo, which compares onToggleFavorite by reference, never held. One heart tap
   // re-rendered every card on screen and every image gallery inside them. Keyed on the ids
   // themselves, the Set survives renders that did not change what is saved.
   // `all` is itself memoized on q.data, and React Query's structural sharing keeps that object
-  // identical across a refetch that changed nothing — so this Set survives those too.
+  // identical across a refetch that changed nothing, so this Set survives those too.
   const ids = useMemo(() => new Set(all.map((p) => p.id)), [all]);
 
   // The toggle reads the CURRENT set through a ref rather than closing over it, so its own

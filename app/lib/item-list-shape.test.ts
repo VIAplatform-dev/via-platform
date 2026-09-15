@@ -28,11 +28,11 @@ test("nothing the list does not draw comes with it", () => {
 });
 
 test("cost comes, because the list is what finds the pieces missing it", () => {
- // "No cost" flags live pieces priced before she knew what she paid — the list applies that filter
+ // "No cost" flags live pieces priced before she knew what she paid. The list applies that filter
  // itself, so the number has to be here. It reaches her phone and nowhere a shopper can see.
  assert.equal(toListItem(row).costCents, 40000);
  assert.equal(toListItem({ ...row, costCents: null }).costCents, null);
- // Zero is a cost she recorded — it is not the same as never having said.
+ // Zero is a cost she recorded. It is not the same as never having said.
  assert.equal(toListItem({ ...row, costCents: 0 }).costCents, 0);
 });
 

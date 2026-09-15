@@ -4,7 +4,7 @@ import { lookup } from "dns/promises";
  * SSRF guard for any server-side fetch of a user-supplied URL (store import, site capture).
  *
  * `safeUrl` is the cheap synchronous parse-level guard (scheme + obvious internal hosts). But a
- * public hostname pointed at an internal IP (DNS rebinding) or a redirect to one slips past parsing —
+ * public hostname pointed at an internal IP (DNS rebinding) or a redirect to one slips past parsing,
  * so the real defense is `assertPublicUrl` (resolves DNS + rejects private/reserved IPs) and
  * `safeFetch` (validates, then re-validates every redirect hop). Use those for untrusted URLs.
  */
@@ -24,7 +24,7 @@ export function safeUrl(raw: string): URL | null {
  return u;
 }
 
-/** True for loopback / private / link-local / CGNAT / metadata / reserved addresses — anything that
+/** True for loopback / private / link-local / CGNAT / metadata / reserved addresses. Anything that
  *  must never be reachable from a user-supplied URL. Handles IPv4, IPv6, and IPv4-mapped IPv6. */
 export function isPrivateIp(ip: string): boolean {
  const addr = ip.toLowerCase().trim();

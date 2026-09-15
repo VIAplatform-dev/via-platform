@@ -1,11 +1,11 @@
-# Plan B — testing it locally, without registering a domain
+# Plan B: testing it locally, without registering a domain
 
 Plan B serves a seller's captured storefront from a **separate registrable domain**, so the
 browser's same-origin policy isolates their JavaScript from VYA and their theme's own code can run.
 That is what reaches 1-to-1 fidelity where the capture shim can only approximate.
 
 You do **not** need to own a domain to build or verify any of it. `.test` is reserved by RFC 6761,
-never resolves publicly, and — crucially — the browser treats `vyasites.test` as a *different
+never resolves publicly, and, crucially. The browser treats `vyasites.test` as a *different
 registrable domain* from `vyaplatform.test`, which is exactly the relationship the real domains will
 have. Registration is a deployment step, not a development one.
 
@@ -33,10 +33,10 @@ Then start a dev server. **This repo runs two**, and Plan B works on either:
 | `npm run dev:os` | 3333 | the seller OS (middleware treats port 3333 as the getvya.ai host) |
 
 A store hostname is resolved **before** the port-3333 OS heuristic, so an explicit store origin always
-wins over the dev-port convenience — and `localhost:3333` / `getvya.ai` keep behaving exactly as they
+wins over the dev-port convenience, and `localhost:3333` / `getvya.ai` keep behaving exactly as they
 did. Use whichever port you already have running; the examples below use 3333.
 
-Unset the variable and Plan B switches off entirely — no host is a store origin, and captures go back
+Unset the variable and Plan B switches off entirely, no host is a store origin, and captures go back
 to storing no scripts.
 
 ## What you can prove without a browser
@@ -66,10 +66,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: blummier.notvyasites.test' lo
 Load `http://blummier.vyasites.test:3333` after importing that store **with `STORE_HOST_SUFFIX`
 set** (the capture only keeps the seller's scripts when Plan B is configured).
 
-- Their own carousel, dropdowns and cart drawer work — no shim involved.
+- Their own carousel, dropdowns and cart drawer work, no shim involved.
 - DevTools → Network during add-to-cart → checkout: **zero requests to `*.myshopify.com` or
   `shop.app`**. That criterion is about what the *page* requests, so localhost proves it fully.
-- Compare against `http://vyaplatform.test:3333/site/blummier` — the same stored capture, served on
+- Compare against `http://vyaplatform.test:3333/site/blummier`: the same stored capture, served on
   a VYA origin, must come back with **no scripts at all** (see `stripScripts`). That is the boundary
   that keeps a Plan B capture from becoming stored XSS on VYA's own domain.
 
@@ -78,7 +78,7 @@ set** (the capture only keeps the seller's scripts when Plan B is configured).
 Only deployment-shaped things, none of which change the design:
 
 - The Vercel wildcard domain and its certificate.
-- Real HTTPS cookie semantics (`Secure`, `SameSite=None`) — localhost counts as a secure context, so
+- Real HTTPS cookie semantics (`Secure`, `SameSite=None`): localhost counts as a secure context, so
   a few edge cases differ.
 - Production edge headers.
 

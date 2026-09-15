@@ -1,4 +1,4 @@
-// How long a piece has been on the rail — the phone's copy of app/lib/aging-core.ts.
+// How long a piece has been on the rail. The phone's copy of app/lib/aging-core.ts.
 // Kept in sync by hand; both have tests pinning the same numbers.
 
 const DAY_MS = 86_400_000;

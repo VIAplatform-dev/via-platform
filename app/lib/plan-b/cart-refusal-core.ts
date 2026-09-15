@@ -1,4 +1,4 @@
-// Why the seller's own Add-to-cart button (driving VYA's bag) turns a piece away. Pure — no I/O.
+// Why the seller's own Add-to-cart button (driving VYA's bag) turns a piece away. Pure, no I/O.
 //
 // One-of-one: a piece that cannot be bought is refused in the theme's own error shape. The words
 // used to be "has sold" for every refusal, which told the customer a held piece was gone. They now

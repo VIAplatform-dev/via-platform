@@ -1,5 +1,5 @@
 {
-  // The main tsconfig excludes "scripts", so `npx tsc --noEmit` cannot catch a broken .mts —
+  // The main tsconfig excludes "scripts", so `npx tsc --noEmit` cannot catch a broken .mts,
   // an orphaned import there stays invisible until someone runs the script. This config
   // typechecks the scripts and the library code they import, with the real path aliases.
   //

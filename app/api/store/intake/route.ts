@@ -23,7 +23,7 @@ const AI_GATE = () => gate("intake-ai", Number(process.env.INTAKE_AI_CONCURRENCY
 
 // The reverse-image matches are the same piece found across the web, so their titles
 // carry the real brand. Run each through the canonical brand matcher and take the
-// consensus — deterministic, so we don't depend on the model choosing to trust them.
+// consensus. Deterministic, so we don't depend on the model choosing to trust them.
 function brandFromMatches(matches: VisualMatch[]): { brand: string | null; hits: number } {
  const tally = new Map<string, number>();
  for (const m of matches) {
@@ -42,18 +42,18 @@ function brandFromMatches(matches: VisualMatch[]): { brand: string | null; hits:
 function reverseImageHint(matches: VisualMatch[], brandKnown = false): string {
  const rows = matches.filter((m) => m.title).slice(0, 12);
  if (!rows.length) return "";
- const list = rows.map((m) => `- "${m.title.slice(0, 110)}"${m.source ? ` — ${m.source}` : ""}`).join("\n");
- const head = `\n\nINTERNAL EVIDENCE — reverse-image search of the primary photo returned these visually-matching products from across the web:\n${list}\n\n`;
+ const list = rows.map((m) => `- "${m.title.slice(0, 110)}"${m.source ? `: ${m.source}` : ""}`).join("\n");
+ const head = `\n\nINTERNAL EVIDENCE. Reverse-image search of the primary photo returned these visually-matching products from across the web:\n${list}\n\n`;
  const body = brandKnown
- ? `The seller already gave the brand (authoritative — keep it). Use these same-brand matches to pin down the ERA. Only set the runway field if this is genuinely a documented archival RUNWAY look AND the matches consistently name the same specific season — a mass-produced production piece (e.g. a Baguette or other standard handbag line) is NOT runway even if some titles cite a debut season, so leave runway null for it. Do NOT change the brand.`
- : `These are the STRONGEST evidence of the ACTUAL brand/designer, item type, and era — the same piece found elsewhere. If they consistently point to a brand/designer, use it with high confidence even if your visual instinct differs; if they're clearly irrelevant or contradictory, return brand null rather than forcing one.`;
- const tail = ` THIS IS BACKGROUND DATA FOR YOU ONLY: never mention the reverse-image search, "web matches", or "the photos" in the title or description — silently use it to fill the brand/era/runway fields.`;
+ ? `The seller already gave the brand (authoritative: keep it). Use these same-brand matches to pin down the ERA. Only set the runway field if this is genuinely a documented archival RUNWAY look AND the matches consistently name the same specific season. A mass-produced production piece (e.g. a Baguette or other standard handbag line) is NOT runway even if some titles cite a debut season, so leave runway null for it. Do NOT change the brand.`
+ : `These are the STRONGEST evidence of the ACTUAL brand/designer, item type, and era. The same piece found elsewhere. If they consistently point to a brand/designer, use it with high confidence even if your visual instinct differs; if they're clearly irrelevant or contradictory, return brand null rather than forcing one.`;
+ const tail = ` THIS IS BACKGROUND DATA FOR YOU ONLY: never mention the reverse-image search, "web matches", or "the photos" in the title or description. Silently use it to fill the brand/era/runway fields.`;
  return head + body + tail;
 }
 
-// POST { imageUrls, filled? } — fill in the BLANKS of a listing the seller started.
+// POST { imageUrls, filled? }: fill in the BLANKS of a listing the seller started.
 // Manual-first: the seller types what they know; we only run the AI DRAFT work the gaps
-// actually need. Pricing always runs (cheaply, off our own data) — when the seller set a
+// actually need. Pricing always runs (cheaply, off our own data), when the seller set a
 // price it comes back as an over/under-market flag rather than overwriting their number.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
  if (imageUrls.length === 0) return NextResponse.json({ error: "imageUrl(s) required" }, { status: 400 });
  const mainUrl = imageUrls[0]; // ghost, embedding + comp photo use the primary shot
 
- // What the seller already filled in — we only generate the rest.
+ // What the seller already filled in. We only generate the rest.
  const filled: Record<string, unknown> = body?.filled && typeof body.filled === "object" ? body.filled : {};
  const has = (k: string) => typeof filled[k] === "string" && (filled[k] as string).trim().length > 0;
  const val = (k: string) => (has(k) ? (filled[k] as string).trim() : "");
@@ -82,16 +82,32 @@ export async function POST(request: NextRequest) {
 
  // Only learn the store voice when we're actually writing copy. Fold in the owner's
  // brief (what they explicitly told us) as authoritative directives on top of the
- // voice we learned from their listings — what they SAY overrides what we inferred.
- const voice = needDraft ? ((await getVoice(slug).catch(() => null)) ?? (await buildStoreVoice(slug).catch(() => null))) : null;
- const directives = needDraft ? briefVoiceDirectives(await getStoreBrief(slug).catch(() => null)) : "";
+ // voice we learned from their listings. What they SAY overrides what we inferred.
+ // A voice learned before templates were read has `template` null, and the nightly refresh would
+ // otherwise be the only thing that ever fixes it: a seller drafting this morning would get the old
+ // shapeless copy. So a voice missing its template is relearned once, here. A store that genuinely
+ // writes freehand gets a template object saying so, not a null, so this happens once and not again.
+ const saved = needDraft ? await getVoice(slug).catch(() => null) : null;
+ const voice = needDraft
+ ? (saved?.template ? saved : ((await buildStoreVoice(slug).catch(() => null)) ?? saved))
+ : null;
+ const brief = needDraft ? await getStoreBrief(slug).catch(() => null) : null;
+ const directives = needDraft ? briefVoiceDirectives(brief) : "";
  const combinedGuide = directives
- ? `The store owner's explicit instructions — follow these exactly, they override everything else: ${directives}`
+ ? `The store owner's explicit instructions. Follow these exactly, they override everything else: ${directives}`
   + (voice?.guide ? `\n\nHow they tend to write (learned from their listings): ${voice.guide}` : "")
  : (voice?.guide || "");
- const voiceArg = (combinedGuide || voice?.examples?.length) ? { guide: combinedGuide, examples: voice?.examples ?? [] } : undefined;
+ // The template travels with the voice. A shop can have a readable template and a voice guide that
+ // failed to generate, and the template is the half that matters most, so it alone is enough to
+ // send. See app/lib/description-format.ts.
+ // Her chosen layout travels with the voice, and is enough on its own: a store can set one on day
+ // one with nothing imported to learn a voice from.
+ const layout = brief?.layout ?? [];
+ const voiceArg = (combinedGuide || voice?.examples?.length || voice?.template?.templated || layout.length)
+ ? { guide: combinedGuide, examples: voice?.examples ?? [], template: voice?.template ?? null, layout }
+ : undefined;
 
- // "Enough evidence — stop searching frames" gate for the multi-frame reverse image. Brand
+ // "Enough evidence: stop searching frames" gate for the multi-frame reverse image. Brand
  // typed → we only need enough SAME-BRAND priced comps to value the specific piece; brand
  // unknown → we need a confident brand CONSENSUS plus something to price against.
  const brandTyped = has("brand") ? val("brand") : null;
@@ -103,7 +119,7 @@ export async function POST(request: NextRequest) {
  return hits >= 2 && priced.length >= 2;
  };
 
- // Embedding (memory) + correction hints + reverse-image — each only when relevant. Reverse
+ // Embedding (memory) + correction hints + reverse-image. Each only when relevant. Reverse
  // image now scans multiple frames adaptively: a clean primary photo costs one Lens call; a
  // weak one escalates to later frames (the tag shot, a front-flat) to rescue the ID.
  const [embedding, brandHints, reverse] = await Promise.all([
@@ -113,11 +129,11 @@ export async function POST(request: NextRequest) {
  ]);
  const matches = reverse.matches;
  // Near-duplicate RECALL: is this photo the SAME item we've already resolved (≥ NEAR_DUP bar)? If so
- // we lock its stored identity + reuse its price instead of re-generating — and we suppress the
+ // we lock its stored identity + reuse its price instead of re-generating, and we suppress the
  // look-alike hints below so a different piece can't bleed its model/copy into this one.
  const exact = embedding ? await resolveExactPiece(embedding, slug).catch(() => null) : null;
  // Per-store visual memory + CROSS-STORE confirmed pieces (the compounding loop: every seller's
- // verified listings sharpen everyone's — incl. a brand-new store's first upload). Brand-scoped
+ // verified listings sharpen everyone's. Incl. a brand-new store's first upload). Brand-scoped
  // when the seller typed one, so the references are same-brand and directly instructive.
  const [visualHints, crossHints] = needDraft && embedding
  ? await Promise.all([
@@ -125,7 +141,7 @@ export async function POST(request: NextRequest) {
  getCrossStoreSimilar(embedding, has("brand") ? val("brand") : null).catch(() => ""),
  ])
  : ["", ""];
- // Cross-store brand prior — what this (known) brand's pieces tend to be + resell for on VYA.
+ // Cross-store brand prior: what this (known) brand's pieces tend to be + resell for on VYA.
  const brandPrior = needDraft && has("brand") ? await getBrandPrior(val("brand")).catch(() => "") : "";
  // Specific-piece resolution (Phase 2): match the photo to the exact known model/line in the
  // reference index. When confident, it names the piece (sharpens title/era) AND gives a tight
@@ -135,22 +151,22 @@ export async function POST(request: NextRequest) {
  const specific = !exact && embedding && (needReverse || needPrice)
  ? await resolveSpecificPiece(embedding, has("brand") ? val("brand") : null).catch(() => null)
  : null;
- // A sub-threshold match is a LOOK-ALIKE, not this piece — it may inform ERA only. It must NOT supply
+ // A sub-threshold match is a LOOK-ALIKE, not this piece. It may inform ERA only. It must NOT supply
  // a model name (that's how a Baguette's copy leaked onto a two-way bag). Model/material come from the
  // photo; the exact-recall path above is the only thing allowed to assert a specific model.
  const specificHint = specific
- ? `\n\nERA REFERENCE ONLY — a similar-looking ${specific.brand || "catalog"} piece exists (${Math.round(specific.similarity * 100)}% visual match)${specific.era ? `, era ${specific.era}` : ""}. Use it ONLY to calibrate the ERA if the photo is ambiguous. Do NOT borrow a specific MODEL/line name, material, condition, or variant from it — those are a look-alike and routinely differ (same-logo bags especially). Identify the model, silhouette, and material ONLY from what you can SEE in THIS photo or its tag; if unsure of the exact model, describe the silhouette generically rather than naming a famous model. Never mention this reference.`
+ ? `\n\nERA REFERENCE ONLY: a similar-looking ${specific.brand || "catalog"} piece exists (${Math.round(specific.similarity * 100)}% visual match)${specific.era ? `, era ${specific.era}` : ""}. Use it ONLY to calibrate the ERA if the photo is ambiguous. Do NOT borrow a specific MODEL/line name, material, condition, or variant from it. Those are a look-alike and routinely differ (same-logo bags especially). Identify the model, silhouette, and material ONLY from what you can SEE in THIS photo or its tag; if unsure of the exact model, describe the silhouette generically rather than naming a famous model. Never mention this reference.`
  : "";
  // If the seller typed the brand, keep only same-brand matches (a look-alike in a
- // different label must not sway the copy) — but still use them to find the runway/era.
+ // different label must not sway the copy), but still use them to find the runway/era.
  const relevantMatches = has("brand") ? matches.filter((m) => titleHasBrand(m.title, val("brand"))) : matches;
  // Exact recall: a CONFIRMED identity for this exact photo. Instruct the model to reuse it and NOT
  // substitute a different (even more famous) model of the same brand.
  const recallHint = exact
- ? `\n\nEXACT MATCH — this photo is the SAME piece already catalogued on VYA: "${exact.title}"${exact.era ? ` (${exact.era})` : ""}. This identity is CONFIRMED for this photo — reuse this exact model/piece. Do NOT re-guess the model or substitute a different, more famous model of the same brand. Write the title and description for THIS piece, keeping the specific model in the title.`
+ ? `\n\nEXACT MATCH: this photo is the SAME piece already catalogued on VYA: "${exact.title}"${exact.era ? ` (${exact.era})` : ""}. This identity is CONFIRMED for this photo. Reuse this exact model/piece. Do NOT re-guess the model or substitute a different, more famous model of the same brand. Write the title and description for THIS piece, keeping the specific model in the title.`
  : "";
  // With an exact recall we drop the look-alike hints (visual/cross-store/brand-prior/specific) so a
- // different piece can't contaminate the copy — brand grounding + seller memory + the recall stay.
+ // different piece can't contaminate the copy. Brand grounding + seller memory + the recall stay.
  const hints = exact
  ? reverseImageHint(relevantMatches, has("brand")) + brandHints + recallHint
  : reverseImageHint(relevantMatches, has("brand")) + brandHints + visualHints + crossHints + brandPrior + specificHint;
@@ -161,7 +177,7 @@ export async function POST(request: NextRequest) {
  const known: Record<string, string> = {};
  for (const k of ["title", "brand", "era", "material", "condition", "size", "category", "description"]) if (has(k)) known[k] = val(k);
  // Recall fills the identity fields the seller left blank, so the draft is written FOR this exact
- // piece rather than re-guessed. Seller-typed values always win — recall only fills gaps.
+ // piece rather than re-guessed. Seller-typed values always win. Recall only fills gaps.
  if (exact) {
  const fill = (k: string, v: string | null) => { if (v && v.trim() && !known[k]) known[k] = v.trim(); };
  fill("title", exact.title); fill("brand", exact.brand); fill("era", exact.era);
@@ -180,7 +196,7 @@ export async function POST(request: NextRequest) {
  }
  const draft = draftRes.status === "fulfilled" ? draftRes.value : null;
 
- // Lock the recalled identity onto the draft for every field the seller didn't type — a hint isn't
+ // Lock the recalled identity onto the draft for every field the seller didn't type. A hint isn't
  // enough (the model can still drift), so a near-duplicate makes the stored answer authoritative.
  if (exact && draft) {
  if (exact.title && !has("title")) draft.title = exact.title;
@@ -197,14 +213,14 @@ export async function POST(request: NextRequest) {
  const blob = await put(`intake/${slug}/${Date.now()}-ghost.png`, Buffer.from(ghostPng.value), { access: "public", contentType: "image/png" });
  ghostUrl = blob.url;
  } catch {
- /* ghost is optional — keep the draft */
+ /* ghost is optional: keep the draft */
  }
  }
 
  // Brand resolution priority (seller's input is always authoritative and untouched):
- //   1. the LABEL — a brand name transcribed off the tag, or an RN that resolves to a maker.
+ //   1. the LABEL: a brand name transcribed off the tag, or an RN that resolves to a maker.
  //      A printed identity beats any visual guess, so it wins over Lens/vision.
- //   2. reverse-image (Lens) consensus — overrides the model's uncertainty.
+ //   2. reverse-image (Lens) consensus. Overrides the model's uncertainty.
  //   3. the model's own visual inference (already in draft.brand).
  const idBrand = brandFromMatches(matches);
  let labelBrand: string | null = null;
@@ -220,10 +236,10 @@ export async function POST(request: NextRequest) {
  const disagrees = !cur || draft.brand.confidence < 0.7 || !cur.toLowerCase().includes(idBrand.brand.toLowerCase());
  if (disagrees) draft.brand = { value: idBrand.brand, confidence: idBrand.hits >= 2 ? 0.85 : 0.6 };
  }
- // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label —
+ // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label,
  // learn it so a later faded-name/legible-RN tag can still resolve. (Not circular: two OCR'd facts.)
  if (draft?.tag?.rn && draft.tag?.brandText) learnRnBrand(draft.tag.rn, draft.tag.brandText, "label").catch(() => {});
- console.log(`[intake ${slug}] needDraft=${needDraft} needPrice=${needPrice} lens=${matches.length}/${reverse.framesUsed}f label=${labelBrand ?? "—"} brand=${draft?.brand?.value ?? idBrand.brand ?? "—"} specific=${specific ? `${specific.model.slice(0, 40)}@${specific.similarity}` : "—"}`);
+ console.log(`[intake ${slug}] needDraft=${needDraft} needPrice=${needPrice} lens=${matches.length}/${reverse.framesUsed}f label=${labelBrand ?? "-"} brand=${draft?.brand?.value ?? idBrand.brand ?? "-"} specific=${specific ? `${specific.model.slice(0, 40)}@${specific.similarity}` : "-"}`);
 
  // Price + over/under-market flag + runway. In draftOnly mode (phase 1) we SKIP this so the
  // form can render the drafted FIELDS immediately; the client then calls
@@ -234,7 +250,7 @@ export async function POST(request: NextRequest) {
  let runway: string | null = has("runway") ? val("runway") : (draft?.runway ?? null);
  let celebrity: string | null = has("celebrity") ? val("celebrity") : null;
  // Price comps must be SAME-BRAND or they poison the valuation. Filter the reverse-image matches to
- // the resolved brand — the seller's if they typed one, else the Lens-consensus / drafted brand
+ // the resolved brand: the seller's if they typed one, else the Lens-consensus / drafted brand
  // (the common AI-intake case, where without this the raw look-alike matches flowed in unfiltered).
  // Fall back to the seller-brand-filtered set only if brand-filtering leaves nothing to price from.
  const resolvedBrand = (has("brand") ? val("brand") : (draft?.brand?.value || idBrand.brand)) || "";
@@ -248,7 +264,7 @@ export async function POST(request: NextRequest) {
  const finalPricingMatches = visFiltered ? verifiedPricing : pricingMatches;
  const reverseComps = matchesToComps(finalPricingMatches);
  const reverseTitles = finalPricingMatches.map((m) => m.title);
- // Editorial/Getty captions from the FULL match set (not brand-filtered) — provenance evidence
+ // Editorial/Getty captions from the FULL match set (not brand-filtered). Provenance evidence
  // for runway season + celebrity "worn by", which rarely repeat the brand in the caption.
  const editorialTitles = editorialCaptions(matches);
  if (!draftOnly) {
@@ -286,7 +302,7 @@ export async function POST(request: NextRequest) {
  }
 
  // Persist this resolution keyed by the photo's fingerprint, so re-drafting the SAME photo later
- // recalls it verbatim — the fix for the answer that used to vanish because drafts were never saved.
+ // recalls it verbatim: the fix for the answer that used to vanish because drafts were never saved.
  if (Array.isArray(embedding) && embedding.length) {
  const rTitle = has("title") ? val("title") : (draft?.title || exact?.title || "");
  if (rTitle) rememberDraftResolution(slug, {
@@ -306,15 +322,15 @@ export async function POST(request: NextRequest) {
 
  return NextResponse.json({
  ok: true, draft, ghostUrl, photoroom: isPhotoroomConfigured(), estimate, priceFlag, runway, celebrity, embedding, promptVersion: PROMPT_VERSION,
- // Near-duplicate recall marker — for a "✓ Recognized — same piece you listed" cue in the UI.
+ // Near-duplicate recall marker, for a "✓ Recognized. Same piece you listed" cue in the UI.
  recalled: exact ? { title: exact.title, similarity: exact.similarity, ageDays: exact.ageDays, ownStore: exact.ownStore, source: exact.source } : null,
  // For phase 2 (/api/store/intake/pricing): the reverse-image comps/titles + whether the draft ran.
- // searchQuery is the EFFECTIVE comp query (the specific-piece query when we resolved one) — the
+ // searchQuery is the EFFECTIVE comp query (the specific-piece query when we resolved one). The
  // client threads it to /pricing so phase-2 comps are as tight as phase-1's.
  needDraft, reverseComps, reverseTitles, editorialTitles, searchQuery: specific?.query || draft?.searchQuery || null,
  // Specific-piece resolution (Phase 2): the exact model we matched, for the "Looks like…" cue.
  specificPiece: specific ? { model: specific.model, similarity: specific.similarity, era: specific.era, source: specific.source, refPriceCents: specific.priceCents } : null,
- // Only surface the reverse-image brand banner when WE identified the brand — never
+ // Only surface the reverse-image brand banner when WE identified the brand, never
  // when the seller supplied it (their brand stands, and Lens can find a look-alike).
  reverseImage: needReverse && !has("brand") ? { matches: matches.length, brand: idBrand.brand, hits: idBrand.hits, sampleTitles: matches.slice(0, 6).map((m) => m.title) } : null,
  });

@@ -9,14 +9,14 @@ import { inferEra } from "./enrich";
 import { AI_MODELS } from "../ai-models";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Substack culture signal (POC) — the LEADING, editorial layer.
+// Substack culture signal (POC): the LEADING, editorial layer.
 //
 // Fashion writers on Substack predict trends before they show up in resale demand. We poll a
 // ROSTER of publications (tracking the fashion & beauty leaderboard, refreshed weekly), extract
 // the trends each post is calling, map them to the SAME canonical segments the rest of the model
 // uses (brand / era / color / category) plus a NEW `style` dimension the quantitative side can't
 // see, and build a WEEKLY CONSENSUS: a trend counts when MANY independent writers converge on it,
-// not because one loud voice said it. It's a soft, leading signal — it informs "emerging / watch",
+// not because one loud voice said it. It's a soft, leading signal. It informs "emerging / watch",
 // never a hard "source now" on its own.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ async function ensureTables(): Promise<void> {
  `;
  await sql`ALTER TABLE substack_sources ADD COLUMN IF NOT EXISTS rank INT`;
  await sql`ALTER TABLE substack_sources ADD COLUMN IF NOT EXISTS discovered_at TIMESTAMPTZ`;
- // Posts we've already processed (dedupe by guid) — also the audit trail for extraction.
+ // Posts we've already processed (dedupe by guid): also the audit trail for extraction.
  await sql`
   CREATE TABLE IF NOT EXISTS substack_posts (
    guid TEXT PRIMARY KEY,
@@ -67,7 +67,7 @@ async function ensureTables(): Promise<void> {
    processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )
  `;
- // The extracted trend mentions — one row per (post × segment the post calls out).
+ // The extracted trend mentions. One row per (post × segment the post calls out).
  await sql`
   CREATE TABLE IF NOT EXISTS culture_mentions (
    id SERIAL PRIMARY KEY,
@@ -118,7 +118,7 @@ export async function listSubstackSources(): Promise<SubstackSource[]> {
 }
 
 // ── Auto-discovery: Substack's OWN ranked Fashion & Beauty leaderboard ───────
-// The roster is not hand-picked — it's Substack's algorithmic ranking (by subscribers/engagement),
+// The roster is not hand-picked. It's Substack's algorithmic ranking (by subscribers/engagement),
 // so there's no selection bias toward writers WE like. Refreshed weekly; non-fashion posts from any
 // publication contribute nothing (the extractor returns [] for them), so the list self-cleans.
 const FASHION_CATEGORY_ID = 49715; // Substack "Fashion & Beauty"
@@ -196,15 +196,15 @@ async function fetchFeed(feedUrl: string): Promise<FeedItem[]> {
 // ── LLM extraction → canonical segments ──────────────────────────────────────
 type RawMention = { type: string; value: string; direction?: string };
 
-const EXTRACT_PROMPT = `You extract WEARABLE VINTAGE/RESALE FASHION trends a post is calling out — for a secondhand clothing marketplace. Return ONLY a JSON array (no prose) of at most 10 objects:
+const EXTRACT_PROMPT = `You extract WEARABLE VINTAGE/RESALE FASHION trends a post is calling out, for a secondhand clothing marketplace. Return ONLY a JSON array (no prose) of at most 10 objects:
 [{"type":"brand|era|color|category|style","value":"<short canonical value>","direction":"emerging|rising|fading|neutral"}]
 Rules:
-- Only include a trend the writer is actually SIGNALING as notable/rising/fading — not every noun. If the post isn't about wearable fashion trends, return [].
+- Only include a trend the writer is actually SIGNALING as notable/rising/fading, not every noun. If the post isn't about wearable fashion trends, return [].
 - STRICTLY EXCLUDE beauty, skincare, makeup, fragrance/perfume, wellness, cosmetic procedures, hair, fitness, food, tech, and general lifestyle/politics/culture-commentary. This marketplace sells CLOTHING, SHOES, BAGS, and ACCESSORIES only.
 - type "color": a single clothing colour word (e.g. "teal","burgundy","butter yellow"→"yellow").
 - type "era": a decade/era of the garment (e.g. "Y2K","1990s","1970s").
 - type "category": a garment/accessory type (e.g. "bags","dresses","boots","denim","scarves").
-- type "style": a silhouette / cut / aesthetic / detail of clothing (e.g. "dropped waist","barrel jeans","boat neck","wide-leg","balletcore"). This is the richest signal — capture it, but it MUST be about how a garment looks/fits, never a lifestyle/beauty vibe.
+- type "style": a silhouette / cut / aesthetic / detail of clothing (e.g. "dropped waist","barrel jeans","boat neck","wide-leg","balletcore"). This is the richest signal. Capture it, but it MUST be about how a garment looks/fits, never a lifestyle/beauty vibe.
 - type "brand": a specific FASHION label/designer only if named as trending (never a beauty brand).
 - "value" is short (1-3 words), lowercase. Never invent; only what the text supports.
 Post title: `;
@@ -340,7 +340,7 @@ export async function getSubstackConsensus(windowDays = 7, limit = 20): Promise<
 // Both the consensus and market_metrics map to the SAME segments, so we can check whether a trend
 // the writers converged on `leadDays` ago went on to rise in actual VYA demand. That hit rate turns
 // "writers are talking about X" into a CALIBRATED early signal. Only the shared segments (brand /
-// category / era / color) can be scored — `style` has no demand counterpart. Needs weeks of history.
+// category / era / color) can be scored. `style` has no demand counterpart. Needs weeks of history.
 export type ScorecardEntry = { segmentType: string; segmentValue: string; writersThen: number; demandThen: number | null; demandNow: number | null; demandTrendNow: string | null; led: boolean };
 export type Scorecard = { leadDays: number; evaluated: number; hits: number; hitRate: number | null; note?: string; entries: ScorecardEntry[] };
 
@@ -358,7 +358,7 @@ export async function getConsensusScorecard(leadDays = 21, windowDays = 7): Prom
   HAVING COUNT(DISTINCT source_name) >= ${CONSENSUS_MIN_WRITERS}
  `.catch(() => [])) as { segment_type: string; segment_value: string; writers: number }[];
  if (!picks.length) {
-  return { leadDays, evaluated: 0, hits: 0, hitRate: null, note: "Not enough consensus history yet — the scorecard fills in after a few weekly runs.", entries: [] };
+  return { leadDays, evaluated: 0, hits: 0, hitRate: null, note: "Not enough consensus history yet. The scorecard fills in after a few weekly runs.", entries: [] };
  }
  const entries: ScorecardEntry[] = [];
  for (const p of picks) {

@@ -2,18 +2,53 @@
 
 import { useEffect, useState } from "react";
 import { Users as UsersIcon, Crown, ChevronDown } from "lucide-react";
-import { AREAS, areasFor, summarise, type Area } from "@/app/lib/store-permissions";
+import { AREAS, DEFAULT_STAFF, areasFor, summarise, type Area } from "@/app/lib/store-permissions";
 import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
 
 // Who can get into this store.
 //
-// Seats include the owner, which is how a seller reads "2 seats" — the owner plus one. The limit
+// Seats include the owner, which is how a seller reads "2 seats". The owner plus one. The limit
 // comes from her plan, and the page shows it as a count rather than only failing on submit: finding
 // out you're full at the moment you invite someone is a worse experience than knowing beforehand.
 
 type Role = "owner" | "staff";
 type StoreUser = { email: string; role: Role; permissions: Area[] | null; createdAt: string };
 type Seats = { used: number; limit: number; remaining: number };
+
+/**
+ * The fourteen areas as ticks. One component, used for a person who is already here AND for the one
+ * about to be invited. The two forms said the same thing in two places, and the invite form's copy
+ * ("you can change exactly what each person can open once they're added") was the giveaway that the
+ * choice was only reachable on one of them.
+ */
+function AreaTicks({ who, chosen, onToggle }: { who: string; chosen: Area[]; onToggle: (a: Area, on: boolean) => void }) {
+ return (
+  <>
+   <p className="mb-2.5 text-[12px] text-stone-500">
+    Tick what {who} can open. Billing and this page stay with owners.
+   </p>
+   <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
+    {AREAS.map((a) => {
+     const on = chosen.includes(a.key);
+     return (
+      <label key={a.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-stone-50">
+       <input
+        type="checkbox"
+        checked={on}
+        onChange={() => onToggle(a.key, on)}
+        className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-stone-900"
+       />
+       <span className="min-w-0">
+        <span className="block text-[13px] text-stone-800">{a.label}</span>
+        <span className="block text-[11.5px] leading-relaxed text-stone-400">{a.hint}</span>
+       </span>
+      </label>
+     );
+    })}
+   </div>
+  </>
+ );
+}
 
 export default function UsersSettingsPage() {
  const [users, setUsers] = useState<StoreUser[]>([]);
@@ -27,8 +62,13 @@ export default function UsersSettingsPage() {
  // Which person's permissions are open. One at a time: a page of fourteen checkboxes per person is
  // a wall, and an owner is usually changing one person.
  const [openFor, setOpenFor] = useState<string | null>(null);
+ // What the person ABOUT to be invited will be able to open, and whether that picker is showing.
+ // Starts on the default staff set, so the button does the same thing it always did until she
+ // touches it, and she can see what that default actually is before anyone gets a sign-in link.
+ const [newAreas, setNewAreas] = useState<Area[]>([...DEFAULT_STAFF]);
+ const [pickAreas, setPickAreas] = useState(false);
 
- /** Save one person's areas. Optimistic — the row already shows what was ticked. */
+ /** Save one person's areas. Optimistic: the row already shows what was ticked. */
  async function savePermissions(target: string, areas: Area[]) {
   setUsers((cur) => cur.map((u) => (u.email === target ? { ...u, permissions: areas } : u)));
   setErr(null);
@@ -60,11 +100,15 @@ export default function UsersSettingsPage() {
   setBusy(true); setErr(null);
   const r = await fetch("/api/store/users", {
    method: "POST", headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({ email: email.trim(), role }),
+   // The areas travel WITH the invite. Sending them after would mean a window in which they could
+   // open the everyday set, and the mail with the working sign-in link has already gone.
+   body: JSON.stringify({ email: email.trim(), role, ...(role === "staff" ? { permissions: newAreas } : {}) }),
   }).then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
   setBusy(false);
   if (!r || !r.ok) { setErr(r?.d?.error || "Couldn’t add them."); return; }
-  setEmail(""); apply(r.d);
+  // Back to the default for the next person. Carrying one hire's areas over to the next is how
+  // somebody quietly gets an access set that was decided for a different job.
+  setEmail(""); setNewAreas([...DEFAULT_STAFF]); setPickAreas(false); apply(r.d);
  }
 
  async function remove(target: string) {
@@ -130,35 +174,18 @@ export default function UsersSettingsPage() {
          )
         )}
 
-        {/* What this person can reach. Owners never appear here — they have everything, and a form
+        {/* What this person can reach. Owners never appear here. They have everything, and a form
             that let you untick an area for an owner would describe something we don't do. */}
         {openFor === u.email && u.role !== "owner" && (
          <div className="w-full border-t border-stone-100 pt-3.5">
-          <p className="mb-2.5 text-[12px] text-stone-500">
-           Tick what {u.email.split("@")[0]} can open. Billing and this page stay with owners.
-          </p>
-          <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
-           {AREAS.map((a) => {
-            const on = areasFor(u).includes(a.key);
-            return (
-             <label key={a.key} className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-stone-50">
-              <input
-               type="checkbox"
-               checked={on}
-               onChange={() => {
-                const now = areasFor(u);
-                savePermissions(u.email, on ? now.filter((k) => k !== a.key) : [...now, a.key]);
-               }}
-               className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-stone-900"
-              />
-              <span className="min-w-0">
-               <span className="block text-[13px] text-stone-800">{a.label}</span>
-               <span className="block text-[11.5px] leading-relaxed text-stone-400">{a.hint}</span>
-              </span>
-             </label>
-            );
-           })}
-          </div>
+          <AreaTicks
+           who={u.email.split("@")[0]}
+           chosen={areasFor(u)}
+           onToggle={(key, on) => {
+            const now = areasFor(u);
+            savePermissions(u.email, on ? now.filter((k) => k !== key) : [...now, key]);
+           }}
+          />
          </div>
         )}
        </div>
@@ -174,7 +201,7 @@ export default function UsersSettingsPage() {
       ) : (
        <>
         <div className="flex flex-wrap items-end gap-2">
-         {/* Its own full-width row on a phone — flex-1 alone let the select and button squeeze it. */}
+         {/* Its own full-width row on a phone. Flex-1 alone let the select and button squeeze it. */}
          <label className="min-w-0 flex-1 text-[11px] text-stone-500 max-sm:basis-full">
           <span className="mb-1 block">Email</span>
           <input
@@ -195,10 +222,45 @@ export default function UsersSettingsPage() {
          </label>
          <TechButton onClick={invite} disabled={busy || !email.trim()}>{busy ? "Adding…" : "Add person"}</TechButton>
         </div>
+
+        {/* WHAT THEY CAN DO, BEFORE THE INVITE GOES. Adding someone mails them a sign-in link that
+            works immediately, so choosing their areas afterwards meant they arrived holding the
+            default set, inventory, orders, the inbox, the whole customer list. Whatever the owner
+            was actually intending. The same ticks as a person's row, on the way in. */}
+        {role === "staff" ? (
+         <div className="mt-3">
+          <button
+           type="button"
+           onClick={() => setPickAreas(!pickAreas)}
+           aria-expanded={pickAreas}
+           className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1 text-[12px] text-stone-600 transition hover:bg-stone-50"
+          >
+           {summarise({ role: "staff", permissions: newAreas })}
+           <ChevronDown size={12} className={cn("transition", pickAreas && "rotate-180")} />
+          </button>
+
+          {pickAreas && (
+           <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50/60 p-3.5">
+            <AreaTicks
+             who={email.trim() ? email.trim().split("@")[0] : "they"}
+             chosen={newAreas}
+             onToggle={(key, on) => setNewAreas((cur) => (on ? cur.filter((k) => k !== key) : [...cur, key]))}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-2.5">
+             <button type="button" onClick={() => setNewAreas(AREAS.map((a) => a.key))} className="text-[12px] text-stone-500 underline underline-offset-2 hover:text-stone-900">Everything</button>
+             <button type="button" onClick={() => setNewAreas([...DEFAULT_STAFF])} className="text-[12px] text-stone-500 underline underline-offset-2 hover:text-stone-900">The everyday set</button>
+             <button type="button" onClick={() => setNewAreas([])} className="text-[12px] text-stone-500 underline underline-offset-2 hover:text-stone-900">Nothing</button>
+            </div>
+           </div>
+          )}
+         </div>
+        ) : null}
+
         <p className={cn("mt-3 text-[11.5px] leading-relaxed text-stone-400")}>
-         Owners can do everything, including billing and adding people. Staff start with the everyday
-         work — listing, orders, messages — and you can change exactly what each person can open once
-         they’re added. {seats ? `${seats.remaining} ${seats.remaining === 1 ? "seat" : "seats"} left on your plan.` : ""}
+         {role === "owner"
+          ? "Owners can do everything, including billing and adding people. There is nothing to limit."
+          : "Staff start with the everyday work. Listing, orders, messages. Change it above before you add them, or on their row any time after."}
+         {" "}{seats ? `${seats.remaining} ${seats.remaining === 1 ? "seat" : "seats"} left on your plan.` : ""}
         </p>
        </>
       )}

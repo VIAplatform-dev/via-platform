@@ -27,7 +27,7 @@ function getDatabaseUrl(): string {
 
 // Coarse normalizeCategory family → broad TYPE (vision-comparable) → display family.
 // We only correct cross-TYPE errors (a bag filed under clothing, a wallet under
-// jewelry) — within-clothing nuance (jeans vs pants) isn't reliably readable from a
+// jewelry): within-clothing nuance (jeans vs pants) isn't reliably readable from a
 // photo and isn't actionable. The TYPE doubles as the override family (the
 // displayCategory slugs are bags/shoes/accessories/clothing).
 function coarseToFamily(coarse: string | null): CategoryFamily | null {
@@ -48,14 +48,14 @@ const TYPE_PHRASE: Record<string, string> = {
  home: "Home goods",
 };
 
-// GET — list current overrides (for the admin UI).
+// GET: list current overrides (for the admin UI).
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const overrides = await listCategoryOverrides();
  return NextResponse.json({ overrides });
 }
 
-// PATCH { storeSlug, productId, family } — manually set/correct a single override.
+// PATCH { storeSlug, productId, family }. Manually set/correct a single override.
 export async function PATCH(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => ({}));
@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest) {
  return NextResponse.json({ ok: true });
 }
 
-// DELETE ?store=&id= — remove an override (revert to title inference).
+// DELETE ?store=&id= remove an override (revert to title inference).
 export async function DELETE(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const store = request.nextUrl.searchParams.get("store");
@@ -81,21 +81,21 @@ export async function DELETE(request: NextRequest) {
 
 // POST /api/admin/category-sweep?limit=200&offset=0&store=sacrare
 // Scans a batch of products, compares the storefront category (title inference)
-// against an independent vision read, and — for cross-TYPE mismatches a stronger
-// model confirms — writes a category_override so the item filters/displays in the
+// against an independent vision read, and, for cross-TYPE mismatches a stronger
+// model confirms. Writes a category_override so the item filters/displays in the
 // right family. Trigger in batches (bump offset until nextOffset is null). Optional
 // ?store= restricts to one store; ?dryRun=1 reports without writing.
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  if (!isVisionConfigured()) {
- return NextResponse.json({ ok: false, notConfigured: true, error: "ANTHROPIC_API_KEY not set — vision is off." }, { status: 503 });
+ return NextResponse.json({ ok: false, notConfigured: true, error: "ANTHROPIC_API_KEY not set: vision is off." }, { status: 503 });
  }
 
  const limit = Math.min(Math.max(parseInt(request.nextUrl.searchParams.get("limit") ?? "150", 10), 1), 400);
  const offset = Math.max(parseInt(request.nextUrl.searchParams.get("offset") ?? "0", 10), 0);
  const store = request.nextUrl.searchParams.get("store");
  const dryRun = request.nextUrl.searchParams.get("dryRun") === "1";
- // Strict (default): a stronger model must confirm the mismatch before flagging —
+ // Strict (default): a stronger model must confirm the mismatch before flagging,
  // low false positives, but drops anything it's unsure about. strict=0 ("thorough")
  // trusts the stage-1 vision read and reports every cross-type disagreement, so you
  // see far more candidates to review. Use thorough + dry run to audit, then apply.
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
  const imageFamily = coarseToFamily(visionRaw ? normalizeCategory(visionRaw) : null);
  if (!imageFamily) { skipped++; return; }
  checked++;
- if (p.storefrontFamily === imageFamily) return; // agrees — nothing to do
+ if (p.storefrontFamily === imageFamily) return; // agrees. Nothing to do
 
  // Stage 2 (strict only): a stronger model confirms the photo really ISN'T the
  // filed type. In thorough mode we trust the stage-1 read and skip this, so more

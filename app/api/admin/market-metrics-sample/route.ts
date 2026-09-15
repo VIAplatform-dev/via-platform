@@ -24,7 +24,7 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 // GET /api/admin/market-metrics-sample?window=7d&store=to-us-vintage&type=brand
-// Admin-only sanity view of the RAW computed metrics (ungated) — shows
+// Admin-only sanity view of the RAW computed metrics (ungated). Shows
 // store_count / txn_count and whether each segment WOULD be hidden from sellers,
 // so you can verify the numbers and the privacy gate before anyone sees them.
 export async function GET(request: NextRequest) {
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
  `) as Array<Record<string, unknown>>;
 
  if (rows.length === 0) {
-  return NextResponse.json({ windowKey, asOfDate: null, segments: [], note: "No market_metrics yet — run build-events then build-market-metrics." });
+  return NextResponse.json({ windowKey, asOfDate: null, segments: [], note: "No market_metrics yet: run build-events then build-market-metrics." });
  }
 
  const segments = rows.map((r) => {

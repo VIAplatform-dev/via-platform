@@ -5,8 +5,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 // The FULL bundle, not the default entry.
 //
 // posthog-js normally lazy-loads the session recorder from {api_host}/static/<v>/posthog-recorder.js
-// at runtime. That request is blocked in ordinary Chrome — not by an ad blocker, by the browser's
-// own tracking protection matching the filename — and the block is silent: events keep arriving, so
+// at runtime. That request is blocked in ordinary Chrome, not by an ad blocker, by the browser's
+// own tracking protection matching the filename, and the block is silent: events keep arriving, so
 // the data looks healthy while every replay is missing.
 //
 // The reverse proxy already defeats DOMAIN blocking (the request goes to our origin, never
@@ -14,15 +14,15 @@ import { usePathname, useSearchParams } from "next/navigation";
 //
 // This entry ships the recorder inside our own bundle instead, so it arrives as a hashed Next.js
 // chunk with no name worth matching and no separate request to block. Costs ~370KB of JS, which is
-// a fair trade on a workspace people keep open all day — and it is the admin only; the marketplace
+// a fair trade on a workspace people keep open all day, and it is the admin only; the marketplace
 // never loads any of this.
 import posthog from "posthog-js/dist/module.full.no-external";
 import { redactOnPrivateScreens } from "./analytics-redact";
 
 // PostHog, mounted ONLY inside the seller workspace.
 //
-// Deliberately not in the root layout. The root layout wraps the marketplace — every shopper
-// browsing vyaplatform.com — and the question this is here to answer is "what does a STORE do when
+// Deliberately not in the root layout. The root layout wraps the marketplace. Every shopper
+// browsing vyaplatform.com, and the question this is here to answer is "what does a STORE do when
 // she gets onto VYA?". Instrumenting the shopper site too would bury that in three orders of
 // magnitude more traffic, and would start recording people who never agreed to be part of it.
 //
@@ -32,8 +32,8 @@ import { redactOnPrivateScreens } from "./analytics-redact";
 //    layout), which is what stitches the two halves together.
 //  · Nothing is captured for a signed-out visitor, because there is no workspace to be in.
 //
-// Everything no-ops when NEXT_PUBLIC_POSTHOG_KEY is unset, so a developer without a key — and every
-// preview build — behaves exactly as before rather than erroring or silently half-initialising.
+// Everything no-ops when NEXT_PUBLIC_POSTHOG_KEY is unset, so a developer without a key, and every
+// preview build: behaves exactly as before rather than erroring or silently half-initialising.
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "/ingest";
@@ -52,7 +52,7 @@ export default function StoreAnalytics({ slug, isOwner }: { slug: string | null;
    // The reverse proxy in next.config serves PostHog from our own origin, but the assets and the
    // UI links still need to know where PostHog actually lives.
    ui_host: "https://us.posthog.com",
-   // We send pageviews ourselves below — the App Router changes the URL without a page load, so
+   // We send pageviews ourselves below. The App Router changes the URL without a page load, so
    // PostHog's own listener would miss every in-workspace navigation after the first.
    capture_pageview: false,
    capture_pageleave: true,

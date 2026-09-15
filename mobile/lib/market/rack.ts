@@ -5,14 +5,14 @@
 // "fendi bag". And the home screen showed three numbers but not one item, so there was no way to
 // see what you had brought without selling something.
 //
-// The server already has both halves — /api/store/market/inventory?view=available returns the
+// The server already has both halves. /api/store/market/inventory?view=available returns the
 // whole rack (up to 2000), and /api/store/market/search does the text lookup. The phone called
 // neither. This module is the client half: the rack arrives once, and filtering happens HERE, on
 // the phone, because a market has bad signal and the answer should land before she finishes typing.
 //
 // The matching rule mirrors app/lib/market/inventory-db.ts searchMarketItems deliberately: EVERY
 // WORD must appear somewhere in the piece's text, not the whole phrase in one field. No single
-// field holds "dior blazer" — the brand is "Dior", the title says "Jacket" — and a seller typing
+// field holds "dior blazer", the brand is "Dior", the title says "Jacket", and a seller typing
 // the two words she would actually say must not be told the piece does not exist.
 
 export type RackItem = {
@@ -39,7 +39,7 @@ function haystack(it: RackItem): string {
 /**
  * The rack, narrowed by what she typed.
  *
- * An empty query returns everything — the point is that the rack is visible by default, not that
+ * An empty query returns everything. The point is that the rack is visible by default, not that
  * you have to search to see anything.
  */
 export function filterRack(items: RackItem[], query: string): RackItem[] {

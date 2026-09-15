@@ -70,7 +70,7 @@ export default function StoreMessages({ previewStore }: { previewStore: string |
  if (!res.ok) throw new Error();
  const data = await res.json();
  setMessages(data.messages ?? []);
- // The store just read this thread — clear its unread badge locally.
+ // The store just read this thread. Clear its unread badge locally.
  setConversations((cs) => cs.map((c) => (c.id === id ? { ...c, storeUnread: 0 } : c)));
  } catch {
  setMessages([]);

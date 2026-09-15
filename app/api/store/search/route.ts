@@ -12,9 +12,9 @@ import { itemSearchText, itemStatusWord } from "@/app/lib/search-core";
 
 export const dynamic = "force-dynamic";
 
-// GET ?q= — the global ⌘K lookup. Searches orders, inventory, customers and consignors at once and
+// GET ?q= the global ⌘K lookup. Searches orders, inventory, customers and consignors at once and
 // returns grouped, jump-to-detail results. Each entity is flattened to one searchable string so a
-// single query matches order #, SKU, name, email, item title, brand, status, etc. — "look up anything".
+// single query matches order #, SKU, name, email, item title, brand, status, etc. "look up anything".
 const B = "/infrastructure/admin";
 type Hit = { id: string; label: string; sub: string; href: string; /** The piece's cover photo, for the surfaces that show one. Null for non-item hits. */ image?: string | null };
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
  // Neither was searchable, so both returned nothing at all.
  seller ? listCollections(seller.id, true).catch(() => []) : [],
  listDiscounts(slug).catch(() => []),
- // Which reserved pieces are HOLDS (a person) rather than a buyer mid-checkout — the sub line
+ // Which reserved pieces are HOLDS (a person) rather than a buyer mid-checkout. The sub line
  // says "on hold" for one and "reserved" for the other.
  seller ? listHolds(seller.id).then((h) => new Set(h.holds.map((x) => x.itemId))).catch(() => new Set<string>()) : new Set<string>(),
  ]);
@@ -45,16 +45,16 @@ export async function GET(request: NextRequest) {
  const orderHits: Hit[] = orders
  .filter((o) => has(`#${1000 + o.orderNo} ${o.itemTitle || ""} ${o.buyerEmail || ""} ${o.status}`))
  .slice(0, 6)
- .map((o) => ({ id: String(o.id), label: `#${1000 + o.orderNo} · ${o.itemTitle || "Item"}`, sub: `${o.buyerEmail || "—"} · ${money(o.amountCents)} · ${o.status}`, href: `${B}/orders/${o.id}` }));
+ .map((o) => ({ id: String(o.id), label: `#${1000 + o.orderNo} · ${o.itemTitle || "Item"}`, sub: `${o.buyerEmail || "-"} · ${money(o.amountCents)} · ${o.status}`, href: `${B}/orders/${o.id}` }));
 
- // Title, brand, category, size, SKU, status — and where it came from, its flaws and the condition
+ // Title, brand, category, size, SKU, status, and where it came from, its flaws and the condition
  // note, which are how a seller actually remembers a piece (search-core.ts).
  const itemHits: Hit[] = items
  .filter((it) => itemSearchText(it).includes(q))
  .slice(0, 6)
  // The piece's own photo travels with the hit. A row of results that all say INVENTORY and a SKU
  // is a row you have to read; a row of pictures is one you recognise. Searching BY sku still works
- // — itemSearchText matches it — it just isn't the thing shown back.
+ // itemSearchText matches it: it just isn't the thing shown back.
  .map((it) => ({ id: it.id, label: `${it.title}`, sub: `SKU-${1000 + it.sku} · ${money(it.priceCents)} · ${itemStatusWord(it.status, holds.has(it.id))}`, image: Array.isArray(it.images) ? it.images[0] ?? null : null, href: `${B}/inventory?item=${it.id}` }));
 
  const custHits: Hit[] = customers

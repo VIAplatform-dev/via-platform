@@ -5,7 +5,7 @@ import { type TierId, type Feature, type Interval, TIER_ORDER, tierIncludesFeatu
 // to one of 3 paid tiers (starter/studio/atelier, see plans.ts) with a 30-day trial.
 // `tier` drives feature gating; `plan` ("free"|"pro") is kept for back-compat with
 // older Pro gates (any active tier ⇒ "pro"). Stripe fields back the subscription.
-// This is the getvya.ai OS subscription — NOT the vyaplatform.com marketplace.
+// This is the getvya.ai OS subscription, NOT the vyaplatform.com marketplace.
 
 const ACTIVE_STATUSES = ["active", "trialing", "past_due"]; // trial + grace count as entitled
 const DEAD_STATUSES = ["canceled", "unpaid", "incomplete_expired", "incomplete"];
@@ -95,7 +95,7 @@ export async function getStoreTier(storeSlug: string): Promise<TierId | null> {
  return isEntitled(p) ? p.tier : null;
 }
 
-/** Tier-aware feature gate — the canonical check for workspace features. */
+/** Tier-aware feature gate: the canonical check for workspace features. */
 export async function storeHasFeature(storeSlug: string, feature: Feature): Promise<boolean> {
  if (storeSlug === "via-admin") return true;
  const tier = await getStoreTier(storeSlug);

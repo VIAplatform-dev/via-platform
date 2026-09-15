@@ -1,11 +1,11 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — item vision identification.
+// Data Layer: item vision identification.
 //
 // Sends a seller's photo(s) to Claude and gets back structured attributes
 // (brand, item type, era, condition, colour). We then run those through the
 // SAME canonical inference (inferBrandFromTitle / inferCategoryFromTitle /
 // inferEra) used to build the events log, so a scan maps onto the exact same
-// market_metrics segments the demand search uses. No SDK — plain fetch.
+// market_metrics segments the demand search uses. No SDK: plain fetch.
 //
 // Guiding rule (same as the rest of the data layer): never guess. The prompt
 // tells the model to return null for brand/era/condition when it isn't sure.
@@ -31,12 +31,12 @@ export type VisionImage = { mediaType: string; data: string }; // base64 (no dat
 const PROMPT = `You are an expert authenticator and buyer for a vintage & secondhand designer fashion marketplace. Identify the item in the photo(s) for a reseller deciding whether to source it.
 
 Be CONSERVATIVE and never guess:
-- brand: the designer/label ONLY if you can identify it from a visible logo, hardware, monogram, tag, or an unmistakable signature style. If you cannot tell, return null. A wrong brand misleads the seller — null is better than a guess.
+- brand: the designer/label ONLY if you can identify it from a visible logo, hardware, monogram, tag, or an unmistakable signature style. If you cannot tell, return null. A wrong brand misleads the seller. Null is better than a guess.
 - brandConfidence: "high" only with a clear logo/tag; "medium" for a strong style signal; "low" otherwise.
 - itemType: the specific piece, e.g. "mesh top", "saddle bag", "slip dress", "kitten heels".
 - category: a broad category, e.g. "tops", "bags", "dresses", "shoes", "lingerie".
 - era: the decade if the style clearly indicates it (e.g. "90s", "Y2K", "70s"); else null.
-- condition: only if visible — "Excellent", "Very Good", "Good", or "Fair" based on visible wear/flaws; else null.
+- condition: only if visible: "Excellent", "Very Good", "Good", or "Fair" based on visible wear/flaws; else null.
 - color: the dominant colour.
 - summary: one short human sentence, e.g. "Black 90s Roberto Cavalli mesh top".
 
@@ -66,12 +66,12 @@ export function isVisionConfigured(): boolean {
 }
 
 // Builds the colour prompt. When we know WHAT the listing is selling (from its
-// title), we tell the model so it colours the right garment — a model often wears
+// title), we tell the model so it colours the right garment. A model often wears
 // other clothing (e.g. a black cardigan over a tan skirt) that would otherwise
 // dominate a whole-image colour read and mislabel the item.
 function colorPrompt(itemHint?: string | null): string {
  const focus = itemHint && itemHint.trim()
- ? `This listing is selling: "${itemHint.trim()}". Identify the dominant colour of THAT specific item. A model may be wearing other garments alongside it — focus ONLY on the item being sold and ignore the model's other clothing, the background, and any props.`
+ ? `This listing is selling: "${itemHint.trim()}". Identify the dominant colour of THAT specific item. A model may be wearing other garments alongside it. Focus ONLY on the item being sold and ignore the model's other clothing, the background, and any props.`
  : `Identify the single dominant colour of the MAIN garment/bag/shoe in this product photo, ignoring the background and any model.`;
  return `${focus} Reply with just one common colour word (e.g. black, navy, burgundy, cream, charcoal). If you genuinely can't tell, reply exactly: unknown.`;
 }
@@ -115,7 +115,7 @@ export async function identifyColor(imageUrl: string, itemHint?: string | null):
 }
 
 // Lean category-only read for the category QA. Deliberately does NOT take the
-// listing title — we want an INDEPENDENT read of what the photo shows, so it can
+// listing title: we want an INDEPENDENT read of what the photo shows, so it can
 // be compared against the title-inferred category to catch mislabels (e.g. a
 // "Bracelet Bag" the title-keyword logic filed under jewelry). Returns the raw
 // category word (caller maps via normalizeCategory); null on no answer.
@@ -162,7 +162,7 @@ export async function identifyCategory(imageUrl: string): Promise<string | null>
 // Verification pass for the category QA. Given the broad GROUP a product is filed
 // under, asks a stronger model to confirm whether the MAIN item in the photo
 // actually belongs to that group. Returns "match" | "mismatch" | null (unsure).
-// Run only on Stage-1 candidates so the strong-model cost stays tiny — this is
+// Run only on Stage-1 candidates so the strong-model cost stays tiny. This is
 // what drives the false-positive rate down (cheap Haiku flags, strong model
 // confirms before we report). Defaults to Opus for accuracy.
 const VERIFY_MODEL = process.env.VISION_VERIFY_MODEL || "claude-opus-4-8";
@@ -187,7 +187,7 @@ export async function confirmCategoryGroup(imageUrl: string, groupPhrase: string
   role: "user",
   content: [
    { type: "image", source: { type: "url", url: imageUrl } },
-   { type: "text", text: `This product is listed under "${groupPhrase}". Look ONLY at the main item being sold — ignore any model's other clothing, the background, and props. Does that item genuinely belong to "${groupPhrase}"? Answer with exactly one word: YES or NO.` },
+   { type: "text", text: `This product is listed under "${groupPhrase}". Look ONLY at the main item being sold. Ignore any model's other clothing, the background, and props. Does that item genuinely belong to "${groupPhrase}"? Answer with exactly one word: YES or NO.` },
   ],
   },
  ],

@@ -1,6 +1,6 @@
 // Pure helper: given priced items, find the UNIQUE subset whose prices sum to a
 // target total (within ±$1). Used to recover an order's line items from the set
-// of items that sold out around the order — but only when there's exactly one
+// of items that sold out around the order, but only when there's exactly one
 // matching combination, so we never write a guessed line-item list. No imports,
 // so it runs under raw `node --test`.
 

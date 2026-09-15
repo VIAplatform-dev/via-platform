@@ -1,4 +1,4 @@
-// VYA Cross-Lister — popup. Loads the seller's VYA queue (formatted for the chosen marketplace) and
+// VYA Cross-Lister: popup. Loads the seller's VYA queue (formatted for the chosen marketplace) and
 // lets them fill one listing at a time, plus sync likes back into VYA.
 
 const statusEl = document.getElementById("status");
@@ -55,11 +55,11 @@ async function load() {
   const items = r.items || [];
   statusEl.textContent = items.length
     ? `${items.length} item${items.length === 1 ? "" : "s"} ready to list on ${cap(platform)}`
-    : "Nothing to cross-list yet — add listings in VYA first.";
+    : "Nothing to cross-list yet. Add listings in VYA first.";
   render(items);
 }
 
-// Marketplace toggle — switches which marketplace the queue is formatted for.
+// Marketplace toggle: switches which marketplace the queue is formatted for.
 function wireTabs() {
   document.querySelectorAll("#tabs button").forEach((b) => {
     b.addEventListener("click", () => {
@@ -71,7 +71,7 @@ function wireTabs() {
 }
 
 // Sync likes: opens the seller's shop/closet page; its content script reads the like counts and
-// reports them to VYA. Passive — we never auto-click or submit anything on the marketplace.
+// reports them to VYA. Passive: we never auto-click or submit anything on the marketplace.
 function wireSync(id, plat) {
   const btn = document.getElementById(id);
   if (!btn) return;

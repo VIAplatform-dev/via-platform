@@ -1,7 +1,7 @@
 // The Notifications screen's rows, and the PUT it sends. Mirrors app/lib/notification-prefs-core.ts.
 //
 // One toggle is one key: the patch names only what changed, the server merges it. That is what
-// makes the optimistic flip safe — reverting is re-applying the old value, and a change made on
+// makes the optimistic flip safe. Reverting is re-applying the old value, and a change made on
 // another device in the meantime is never overwritten by six keys this phone did not touch.
 
 export type PushKey = "sold" | "message" | "offer" | "payout";
@@ -46,7 +46,7 @@ export function toggled(prefs: Prefs, group: "push" | "email", key: string): Pre
   return { email: { [key]: !prefs.email[key as EmailKey] } };
 }
 
-/** A patch applied locally — the optimistic state, and the revert when the PUT fails. */
+/** A patch applied locally. The optimistic state, and the revert when the PUT fails. */
 export function applyPatch(prefs: Prefs, patch: PrefsPatch): Prefs {
   return { push: pick(prefs.push, patch.push), email: pick(prefs.email, patch.email) };
 }

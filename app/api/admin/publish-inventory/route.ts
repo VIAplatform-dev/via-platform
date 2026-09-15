@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 // Promote a store's imported storefront listings (display-only) into buyable
 // VYA-native items (the transactional inventory the cart/checkout sells from).
-// Idempotent by title — safe to re-run. Admin-gated by middleware.
+// Idempotent by title: safe to re-run. Admin-gated by middleware.
 // POST /api/admin/publish-inventory?store=<slug>[&dry=1]
 export async function POST(request: NextRequest) {
  const slug = request.nextUrl.searchParams.get("store") || "";
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
  const key = (l.title || "").trim().toLowerCase();
  if (!key || existing.has(key)) { skipped++; continue; }
  existing.add(key);
- if (samples.length < 5) samples.push(`${l.title} — $${l.price}`);
+ if (samples.length < 5) samples.push(`${l.title}: $${l.price}`);
  if (!dry) {
  await createItem({
  sellerId: seller.id,

@@ -8,7 +8,7 @@ import { listOnEtsy, endOnEtsy, etsyConnected, type EtsyResult } from "./etsy";
 // marketplaces; when it sells ANYWHERE, we pull it from everywhere (no double-sell).
 //
 // Reality check baked into the design: Depop/Poshmark/Grailed have NO public listing
-// API, so we can't literally auto-post or auto-remove there — we generate paste-ready
+// API, so we can't literally auto-post or auto-remove there. We generate paste-ready
 // content and track status, and tell the seller exactly where to pull a sold item.
 // eBay/Etsy DO have APIs (hasApi), so real auto-post/remove can plug in there later.
 
@@ -17,7 +17,7 @@ import { listOnEtsy, endOnEtsy, etsyConnected, type EtsyResult } from "./etsy";
 import { platformByKey } from "./cross-listing-platforms";
 export { PLATFORMS, platformByKey, effectiveMode, EXTENSION_IN_REVIEW, type Platform, type PlatformMode } from "./cross-listing-platforms";
 
-// Paste-ready listing content per platform — pure, in cross-listing-core.ts so it can be tested
+// Paste-ready listing content per platform. Pure, in cross-listing-core.ts so it can be tested
 // without a database. Re-exported here so every existing caller keeps its import.
 export { crossPostContent, type ItemForPost } from "./cross-listing-core";
 
@@ -44,7 +44,7 @@ async function ensureTables() {
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_cross_listings_item ON cross_listings (item_id)`;
  // Engagement per (item, platform): likes/offers/views/watchers, fed by the extension (no-API
- // channels), the eBay/Etsy APIs, and VYA-native events — the single source the dashboard rolls up.
+ // channels), the eBay/Etsy APIs, and VYA-native events. The single source the dashboard rolls up.
  await sql`CREATE TABLE IF NOT EXISTS cross_listing_stats (
   id SERIAL PRIMARY KEY, store_slug TEXT NOT NULL, item_id TEXT NOT NULL, platform TEXT NOT NULL,
   likes INTEGER NOT NULL DEFAULT 0, offers INTEGER NOT NULL DEFAULT 0,
@@ -53,7 +53,7 @@ async function ensureTables() {
   UNIQUE (store_slug, item_id, platform)
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_cross_listing_stats_store ON cross_listing_stats (store_slug)`;
- // One row per sale, tagged with the marketplace it sold on — powers per-channel revenue on the
+ // One row per sale, tagged with the marketplace it sold on. Powers per-channel revenue on the
  // cross-listing dashboard. Written when a piece is marked sold (going forward; no backfill).
  await sql`CREATE TABLE IF NOT EXISTS cross_listing_sales (
   id SERIAL PRIMARY KEY, store_slug TEXT NOT NULL, item_id TEXT NOT NULL, platform TEXT NOT NULL,
@@ -61,7 +61,7 @@ async function ensureTables() {
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_cross_listing_sales_store ON cross_listing_sales (store_slug)`;
  // WHAT SOLD, kept rather than borrowed. The title used to be fetched by joining `items` at read
- // time, which works right up until the item is gone — and a piece that sold on eBay six months ago
+ // time, which works right up until the item is gone, and a piece that sold on eBay six months ago
  // is exactly the kind of thing that gets tidied out of inventory. Both of the real eBay sales in
  // this database already point at items that no longer exist, so their titles are lost for good.
  // A sale is a historical fact; it keeps its own copy, the same way imported_orders does.
@@ -69,7 +69,7 @@ async function ensureTables() {
  await sql`ALTER TABLE cross_listing_sales ADD COLUMN IF NOT EXISTS currency TEXT`;
  // Rescue what can still be rescued: rows recorded before the title was kept, whose piece is
  // somehow still in inventory. Idempotent and cheap (only ever touches NULLs), and it runs once per
- // process. Rows whose item has already gone cannot be recovered — that is the bug, not an oversight.
+ // process. Rows whose item has already gone cannot be recovered. That is the bug, not an oversight.
  await sql`UPDATE cross_listing_sales c SET item_title = i.title, currency = COALESCE(c.currency, i.currency)
   FROM items i WHERE i.id::text = c.item_id AND c.item_title IS NULL AND COALESCE(i.title, '') <> ''`.catch(() => {});
  ensured = true;
@@ -120,7 +120,7 @@ export async function createCrossListingsForItem(storeSlug: string, itemId: stri
 // background: on success we store the live listing URL, on failure the error message.
 export async function syncItemToApiPlatforms(storeSlug: string, itemId: string, only?: string[] | null): Promise<void> {
  // The seller's explicit per-item picks win. WITHOUT them, fall back to each channel's auto-list
- // default — the same rule createCrossListingsForItem applies two functions up. This used to fall
+ // default: the same rule createCrossListingsForItem applies two functions up. This used to fall
  // back to "everything connected", so a seller who unchecked eBay still got a live eBay post: the
  // queue row was correctly skipped, but the API push went out anyway. Connected is not wanted.
  const accounts = await getPlatformAccounts(storeSlug).catch(() => [] as PlatformAccount[]);
@@ -197,7 +197,7 @@ export async function getCrossListingErrors(storeSlug: string, platform?: string
   .map((r) => ({ itemId: r.item_id, title: r.title ?? "(unknown item)", platform: r.platform, status: r.status, error: r.external_url ?? null, updatedAt: r.updated_at }));
 }
 
-/** How many pieces have at least one failed post — the Home row, not the per-platform detail. */
+/** How many pieces have at least one failed post. The Home row, not the per-platform detail. */
 export async function countCrossListingErrors(storeSlug: string): Promise<number> {
  await ensureTables();
  const rows = (await db()`SELECT count(DISTINCT item_id)::int AS n FROM cross_listings WHERE store_slug = ${storeSlug} AND status = 'error'`) as Array<{ n: number }>;
@@ -258,10 +258,10 @@ export async function delistEverywhere(itemId: string, soldPlatform: string): Pr
  const isSoldHere = r.platform === soldPlatform;
  const next = isSoldHere ? "sold" : "removed";
  await sql`UPDATE cross_listings SET status = ${next}, updated_at = now() WHERE item_id = ${itemId} AND platform = ${r.platform}`.catch(() => {});
- // eBay has an API — actually end the live listing (unless eBay is where it sold).
+ // eBay has an API. Actually end the live listing (unless eBay is where it sold).
  if (!isSoldHere && r.platform === "ebay") endOnEbay(storeSlug, itemId).catch(() => {});
  if (!isSoldHere && r.platform === "depop") endOnDepop(storeSlug, itemId).catch(() => {});
- // Etsy has an API — deactivate the live listing (its id lives in the stored listing URL).
+ // Etsy has an API. Deactivate the live listing (its id lives in the stored listing URL).
  if (!isSoldHere && r.platform === "etsy" && r.external_url) endOnEtsy(storeSlug, String(r.external_url)).catch(() => {});
  if (!isSoldHere && r.status !== "removed" && r.status !== "sold") {
  const p = platformByKey(r.platform);
@@ -272,7 +272,7 @@ export async function delistEverywhere(itemId: string, soldPlatform: string): Pr
 }
 
 export type BoardRow = { itemId: string; title: string; priceCents: number; image: string | null; status: string; brand: string | null;
- /** What Vestiaire's form gates on — carried so the board can warn before the seller opens their site. */
+ /** What Vestiaire's form gates on. Carried so the board can warn before the seller opens their site. */
  photoCount: number; category: string | null; condition: string | null; material: string | null; size: string | null; description: string | null;
  listings: Record<string, string>; errors: Record<string, string>; stats: { totals: PlatformStats; byPlatform: Record<string, PlatformStats> } };
 
@@ -291,7 +291,7 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
   FROM items i JOIN sellers s ON s.id = i.seller_id
   LEFT JOIN cross_listings c ON c.item_id = i.id::text AND c.store_slug = ${storeSlug}
   -- Drafts included on purpose. A draft cannot be cross-listed, but leaving it out meant a piece
-  -- the seller had just made was simply absent here with no explanation — "missing my dior blazer".
+  -- the seller had just made was simply absent here with no explanation. "missing my dior blazer".
   -- It shows with its status so she can see where it is and what it needs, rather than hunting.
   WHERE s.slug = ${storeSlug} AND i.status IN ('active', 'reserved', 'draft')
   GROUP BY i.id, i.title, i.price_cents, i.images, i.status, i.brand,
@@ -331,7 +331,7 @@ export async function getCrossListBoard(storeSlug: string): Promise<BoardRow[]> 
 }
 
 // ── per-marketplace sales + rollup (dashboard) ────────────────────────────────
-/** Record a sale on a given marketplace at the item's current price (idempotency isn't needed —
+/** Record a sale on a given marketplace at the item's current price (idempotency isn't needed,
  *  markSold is a deliberate one-shot action). Looks up the item price itself. */
 export async function recordCrossListingSale(storeSlug: string, itemId: string, platform: string): Promise<void> {
  await ensureTables();
@@ -352,7 +352,7 @@ export type MarketplaceRollup = {
  sold: number; revenueCents: number; // realised sales on this channel (forward-looking)
 };
 
-/** One aggregate row per marketplace the store touches — the dashboard's summary. */
+/** One aggregate row per marketplace the store touches. The dashboard's summary. */
 export async function getMarketplaceRollup(storeSlug: string): Promise<MarketplaceRollup[]> {
  await ensureTables();
  const sql = db();

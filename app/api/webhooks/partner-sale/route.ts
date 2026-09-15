@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveConversion } from "@/app/lib/analytics-db";
 
-// Map from webhook token → store slug. Tokens come ONLY from env vars — never hardcode
+// Map from webhook token → store slug. Tokens come ONLY from env vars, never hardcode
 // a credential in source (a committed literal is a live commission-fraud vector since this
 // endpoint records sales). Set PARTNER_WEBHOOK_TOKEN_CARROLL in the environment.
 const TOKEN_TO_STORE: Record<string, string> = {};

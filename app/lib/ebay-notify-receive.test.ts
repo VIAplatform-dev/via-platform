@@ -101,7 +101,7 @@ test("the store is found by listing id or by eBay user when the sku is not ours"
  assert.deepEqual(byUser.synced.map((s) => s.slug), ["scottie"]);
 });
 
-test("a forged signature is a 401 and touches nothing — not the log, not the sync", async () => {
+test("a forged signature is a 401 and touches nothing, not the log, not the sync", async () => {
  const f = fakes({ bySku: { item_abc: "scottie" } });
  const body = order();
  const forged = signed(body.replace("12-1", "12-2")); // signature of a different body
@@ -129,7 +129,7 @@ test("an unknown store on a big fleet is a 202, logged as unknown-store with the
  assert.match(String(f.records[0].detail), /orderId, seller, lineItems/);
 });
 
-test("an unknown store on a small fleet syncs every connected store — the hourly cron, now", async () => {
+test("an unknown store on a small fleet syncs every connected store. The hourly cron, now", async () => {
  const f = fakes({ connected: ["scottie", "tess"] });
  const body = order({ sku: "zzz", itemId: "1", seller: "nobody" });
  const r = await handleDelivery({ body, signatureHeader: signed(body) }, f.deps);
@@ -161,7 +161,7 @@ test("a signed but malformed body is a 202 and logged, so eBay stops retrying an
  assert.equal(f.synced.length, 0);
 });
 
-test("a signed notice on another topic is acknowledged and ignored — never a sync", async () => {
+test("a signed notice on another topic is acknowledged and ignored, never a sync", async () => {
  const f = fakes({ byUser: { scottie_vintage: "scottie" } });
  const body = order({ topic: "FEEDBACK_RECEIVED" });
  const r = await handleDelivery({ body, signatureHeader: signed(body) }, f.deps);
@@ -178,7 +178,7 @@ test("a sync that hangs is capped: eBay still gets a 2xx, the record says timeou
  assert.equal(f.records[0].outcome, "timeout");
 });
 
-test("a sync that throws is a 2xx with the error recorded — a bug in the sync must not disable the endpoint", async () => {
+test("a sync that throws is a 2xx with the error recorded. A bug in the sync must not disable the endpoint", async () => {
  const f = fakes({ bySku: { item_abc: "scottie" }, sync: async () => { throw new Error("boom"); } });
  const body = order();
  const r = await handleDelivery({ body, signatureHeader: signed(body) }, f.deps);

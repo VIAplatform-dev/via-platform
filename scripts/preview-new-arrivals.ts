@@ -1,5 +1,5 @@
 /**
- * Send yourself the New Arrivals email exactly as the cron would build it — using the code in THIS
+ * Send yourself the New Arrivals email exactly as the cron would build it. Using the code in THIS
  * working tree, before anything is deployed.
  *
  * The admin test-send endpoint can only ever show you what production is already running. This
@@ -40,7 +40,7 @@ async function main() {
 
  console.log(`source:  ${usingPicks ? `curated picks (${picks.length})` : "newest 12 (nothing curated yet)"}`);
  console.log(`showing: the first ${Math.min(NEW_ARRIVALS_ITEM_COUNT, products.length)} of them, two across`);
- console.log(`subject: ${subject ? `"${subject}"` : '(not set — falls back to "Just in")'}`);
+ console.log(`subject: ${subject ? `"${subject}"` : '(not set: falls back to "Just in")'}`);
 
  const { sent, failed } = await sendNewArrivalsEmail([to], products, usingPicks, subject);
  console.log(`\nsent ${sent}, failed ${failed} → ${to}`);

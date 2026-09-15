@@ -5,7 +5,7 @@ import { listCheckouts } from "@/app/lib/market/checkout-db";
 
 export const dynamic = "force-dynamic";
 
-// POST — close the open session (refused while a checkout is still awaiting payment).
+// POST: close the open session (refused while a checkout is still awaiting payment).
 export async function POST(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

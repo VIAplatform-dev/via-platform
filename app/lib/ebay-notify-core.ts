@@ -1,20 +1,20 @@
 import { createHash, createPublicKey, verify as cryptoVerify } from "node:crypto";
 
 // The pure half of eBay sale notifications: what eBay checks us against, how a delivery is read,
-// and which store it belongs to. No network, no database — see ebay-notify-db.ts for the IO and
+// and which store it belongs to. No network, no database. See ebay-notify-db.ts for the IO and
 // ebay-notify-receive.ts for the request handling.
 //
 // WHICH MECHANISM. eBay's Commerce Notification API (the modern, signed webhook) gained a seller
 // topic ORDER_CONFIRMATION in release 1.6.6 (2025-12-01): "sent to a seller when the buyer
 // completes checkout and payment clears". It needs the seller's user token with sell.fulfillment
-// — the same scope getOrders (our poll) needs. The legacy Trading API "platform notifications"
+// the same scope getOrders (our poll) needs. The legacy Trading API "platform notifications"
 // (ItemSold / FixedPriceTransaction over SOAP) still exist, but need eBay to whitelist the app for
 // OAuth use and are on the retirement path. So: subscribe through the Notification API; parse and
 // verify a Trading-style SOAP delivery too, so an endpoint that is ever registered there still works.
 
 // ── Endpoint verification (eBay calls GET ?challenge_code=… when a destination is created) ────
 
-/** sha256(challengeCode + verificationToken + endpoint) as hex — the order is eBay's, not ours. */
+/** sha256(challengeCode + verificationToken + endpoint) as hex. The order is eBay's, not ours. */
 export function challengeResponse(challengeCode: string, verificationToken: string, endpoint: string): string {
  return createHash("sha256").update(challengeCode + verificationToken + endpoint).digest("hex");
 }
@@ -72,7 +72,7 @@ export function verifyNotificationSignature(o: { body: string; signature: string
 
 // ── Trading API platform-notification signature (legacy) ────────────────────────────────────────
 
-/** base64(md5(Timestamp + DevId + AppId + CertId)) — the SOAP header's NotificationSignature. */
+/** base64(md5(Timestamp + DevId + AppId + CertId)). The SOAP header's NotificationSignature. */
 export function tradingSignature(timestamp: string, devId: string, appId: string, certId: string): string {
  return createHash("md5").update(timestamp + devId + appId + certId).digest("base64");
 }
@@ -81,14 +81,14 @@ export function tradingSignature(timestamp: string, devId: string, appId: string
 
 export type ParsedNotification = {
  kind: "notification-api" | "trading";
- /** eBay's notificationId (or a derived key for SOAP) — the dedupe key. */
+ /** eBay's notificationId (or a derived key for SOAP). The dedupe key. */
  id: string;
  topic: string;
  ebayUserIds: string[];
  itemIds: string[];
  skus: string[];
  orderId: string | null;
- /** Top-level keys of notification.data — kept (values are not) so the first real delivery shows its shape. */
+ /** Top-level keys of notification.data. Kept (values are not) so the first real delivery shows its shape. */
  dataKeys: string[];
  trading?: { signature: string | null; timestamp: string | null };
 };
@@ -192,8 +192,8 @@ export type StoreChoice = { slugs: string[]; how: "matched" | "broadcast" | "non
 
 /**
  * `matched` are the stores the IO layer found by sku, listing id or eBay user. A match wins. With
- * no match, a SALE on a small fleet syncs every connected store — exactly what the hourly cron
- * does, brought forward to now — because the ORDER_CONFIRMATION data shape is not fully
+ * no match, a SALE on a small fleet syncs every connected store. Exactly what the hourly cron
+ * does, brought forward to now, because the ORDER_CONFIRMATION data shape is not fully
  * published and a sale must still arrive in seconds on day one. Above the cap it is logged only.
  */
 export function chooseStores(o: { matched: string[]; connected: string[]; saleTopic: boolean; broadcastCap?: number }): StoreChoice {
@@ -227,7 +227,7 @@ function shortDate(iso: string): string {
 }
 
 export function describeNotifyState(o: { since: string | null; lastReceivedAt: string | null; now: number }): string {
- if (!o.since) return "off — run setup";
+ if (!o.since) return "off: run setup";
  const last = o.lastReceivedAt ? `last received ${ago(o.now - Date.parse(o.lastReceivedAt))}` : "nothing received yet";
  return `on since ${shortDate(o.since)} · ${last}`;
 }

@@ -28,8 +28,8 @@ export type BuyerOrderView = {
  paidAt: Date | null;
 };
 
-/** Everything a buyer-facing order page needs — order details + the store's brand (colours, fonts,
- * name, handle) — in one call. Used by both /checkout/success and /order/[token]. Null if not found. */
+/** Everything a buyer-facing order page needs. Order details + the store's brand (colours, fonts,
+ * name, handle), in one call. Used by both /checkout/success and /order/[token]. Null if not found. */
 export async function loadBuyerOrder(orderId: string): Promise<BuyerOrderView | null> {
  const o = await getOrderDetail(orderId).catch(() => null);
  if (!o) return null;
@@ -38,7 +38,7 @@ export async function loadBuyerOrder(orderId: string): Promise<BuyerOrderView | 
  const sf = slug ? await getStorefrontBySlug(slug).catch(() => null) : null;
  const theme = sf?.theme ?? {};
  const images = Array.isArray(o.itemImages) ? (o.itemImages as string[]) : [];
- // Delivered or collected — additive raw-SQL columns, so read alongside the drizzle row. Any
+ // Delivered or collected. Additive raw-SQL columns, so read alongside the drizzle row. Any
  // failure reads as a delivery, which is what every order placed before collection existed is.
  const del = await getOrderDelivery(o.id).catch(() => ({ method: "ship" as const, collectFrom: null, instructions: null }));
  return {

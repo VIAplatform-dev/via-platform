@@ -8,11 +8,11 @@ import { uniqueSubsetForTotal } from "./subset-match";
 // Collabs is the SOLE source of truth for which orders count and what we get
 // paid (commission/revenue). But the Collabs feed often returns no itemized
 // line items, so a conversion ends up labeled with just the product the buyer
-// clicked — which may not be what they actually bought.
+// clicked, which may not be what they actually bought.
 //
 // The Shopify order webhook receives every paid order with its REAL line items.
 // We cache those here (keyed by store + Shopify order name). The Collabs sync
-// then reads this cache to replace the guessed product with the true cart —
+// then reads this cache to replace the guessed product with the true cart,
 // WITHOUT the webhook ever recording a conversion or touching a dollar figure.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -89,7 +89,7 @@ export type CacheMatch = { orderName: string; totalUsd: number; items: CachedLin
  * Find a cached order's real line items for a Collabs conversion.
  * Primary join: exact Shopify order name. Fallback: same store + total within
  * $0.50 + ordered within ±`windowDays` of the commission timestamp (closest in
- * time wins). Returns null when nothing confidently matches — caller then keeps
+ * time wins). Returns null when nothing confidently matches. Caller then keeps
  * whatever items it already had. Never invents data.
  */
 export async function findCachedOrder(args: {
@@ -109,7 +109,7 @@ export async function findCachedOrder(args: {
  WHERE store_slug = ${storeSlug} AND order_name = ${orderName}
  LIMIT 1
  `) as Array<{ order_name: string; total_usd: string; items: CachedLineItem[]; email: string | null }>;
- // Exact order-name match is confident — return it even if items are empty so the
+ // Exact order-name match is confident. Return it even if items are empty so the
  // buyer email is still recovered (caller guards line-item use on items.length).
  if (rows.length > 0) {
  return { orderName: rows[0].order_name, totalUsd: Number(rows[0].total_usd), items: Array.isArray(rows[0].items) ? rows[0].items : [], email: rows[0].email ?? null };
@@ -141,7 +141,7 @@ export async function findCachedOrder(args: {
 // When an order's items are unknown, the items the buyer took have since sold out
 // at the store. We diff our last-synced feed against the store's LIVE products.json
 // to find what's no longer purchasable, then look for ONE combination of those
-// whose prices sum to the order total. Only used when the match is unambiguous —
+// whose prices sum to the order total. Only used when the match is unambiguous,
 // never guesses. (Shopify stores only; silently skipped otherwise.)
 
 type SoldOutItem = { title: string; price: number };
@@ -185,7 +185,7 @@ async function fetchSoldOutItems(storeSlug: string): Promise<SoldOutItem[]> {
 
 /**
  * Backfill: re-enrich EXISTING Collabs conversions with real line items. Tries the
- * webhook cache first, then the sold-out-diff fallback. Collabs stays the recorder —
+ * webhook cache first, then the sold-out-diff fallback. Collabs stays the recorder,
  * we only replace the `items` JSON (never totals or commission). Conservative:
  * sold-out-diff only writes when exactly one item combination matches the total.
  */

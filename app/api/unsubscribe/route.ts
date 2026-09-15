@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
  // The flag that actually stops the mail.
  //
- // `pilot_access.email_unsubscribed` above is read by exactly ONE query — the new-arrivals blast.
+ // `pilot_access.email_unsubscribed` above is read by exactly ONE query. The new-arrivals blast.
  // Every other send (favourites, trending, winback, last chance, viewed item, price drops, the
  // store digest, the Insider newsletter) filters on `users.notification_emails_enabled`, and
  // unsubscribing never touched it. So someone clicked Unsubscribe, was told they'd hear nothing
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
  `;
 
  // Someone who is on no list at all still deserves a record of having asked, so a later import or
- // signup can't quietly resubscribe them. An INSERT only when nothing matched — never overwriting
+ // signup can't quietly resubscribe them. An INSERT only when nothing matched, never overwriting
  // an existing row's status.
  await sql`
  INSERT INTO pilot_access (email, status, email_unsubscribed, unsubscribe_reason, unsubscribe_detail, unsubscribed_at)

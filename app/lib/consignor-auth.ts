@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-// A lightweight signed session for the consignor portal — HS256 over NEXTAUTH_SECRET, same
+// A lightweight signed session for the consignor portal. HS256 over NEXTAUTH_SECRET, same
 // secret the rest of auth uses. The session just carries the consignor's email; their data is
 // looked up by that email, so a session only ever exposes the matching consignor's own statement.
 

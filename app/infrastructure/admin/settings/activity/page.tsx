@@ -7,7 +7,7 @@ import { describeActivity, collapse, ago, isNavigation, type Activity } from "@/
 
 // What one seller has actually been doing.
 //
-// PostHog answers "how many" across everyone. This answers "what happened to her" — the question you
+// PostHog answers "how many" across everyone. This answers "what happened to her". The question you
 // have when a single store is trying VYA for the first time and you want to know whether she got
 // stuck on step two or listed nine pieces and left happy.
 
@@ -29,7 +29,7 @@ export default function ActivityPage() {
  }, []);
 
  useEffect(() => { void load(store); }, [load, store]);
- // A log you're watching should keep up on its own — you're usually looking at it while someone
+ // A log you're watching should keep up on its own. You're usually looking at it while someone
  // is mid-signup, and refreshing by hand is how you miss the step that went wrong.
  useEffect(() => {
   const t = setInterval(() => void load(store), 20_000);

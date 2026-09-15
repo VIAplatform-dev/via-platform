@@ -2,12 +2,12 @@ import { sqlRows, safe, int, ratePct, meanCents } from "./core";
 import { ensureAnalyticsViews } from "./views";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — listing quality vs outcome.
+// Analytics: listing quality vs outcome.
 //
 // The question every reseller actually asks: *what should I do differently to
 // the next piece I list?* This compares a store's OWN listings that carry a
-// signal against its own listings that don't — measurements present, photo
-// count, brand filled in, size, condition, description length — and reports the
+// signal against its own listings that don't. Measurements present, photo
+// count, brand filled in, size, condition, description length, and reports the
 // difference in sell-through, days to sell and realised price.
 //
 // Two deliberate design choices:
@@ -19,13 +19,13 @@ import { ensureAnalyticsViews } from "./views";
 //
 //   WHOLE CATALOG, NOT THE PERIOD. "Do measurements help?" is a structural
 //   question about how this seller lists, not something that changes quarter to
-//   quarter — and the answer needs every listing it can get for sample. The UI
+//   quarter, and the answer needs every listing it can get for sample. The UI
 //   labels this section as ignoring the date filter.
 //
 //   OBSERVABLE LISTINGS ONLY. A piece imported as already-sold never sat on a
 //   VYA shelf, and imported batches have systematically different field
 //   completeness from natively-listed ones. Including them produced confident,
-//   backwards findings — one store's data said "noting the condition HURTS
+//   backwards findings. One store's data said "noting the condition HURTS
 //   sales" (z = -13.9) purely because one import batch arrived sold and without
 //   condition set. So a sold piece only counts as evidence when it has a real
 //   dwell time: sold_at present and later than created_at. Everything else is
@@ -33,7 +33,7 @@ import { ensureAnalyticsViews } from "./views";
 //
 // This is association, not proof: a seller who measures carefully probably also
 // photographs carefully. The copy says so. What makes it actionable anyway is
-// the opportunity count — how many LIVE listings are missing a signal that this
+// the opportunity count: how many LIVE listings are missing a signal that this
 // store's own history says moves the needle.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ export type QualitySignal = {
  verdict: Verdict;
  /** Test statistic behind the verdict; |z| ≥ 1.96 is the 95% bar. */
  z: number | null;
- /** Live listings missing this signal — the size of the opportunity. */
+ /** Live listings missing this signal. The size of the opportunity. */
  activeMissing: number;
 };
 
@@ -86,7 +86,7 @@ export type PhotoRung = {
  items: number;
  sold: number;
  sellThroughPct: number;
- /** Too few listings in this rung to read much into it — the UI greys it out. */
+ /** Too few listings in this rung to read much into it. The UI greys it out. */
  sparse: boolean;
 };
 
@@ -97,7 +97,7 @@ export type QualityMetrics = {
  /** Listings that could be judged: live now, or sold after real time on the shelf. */
  catalogSize: number;
  totalSold: number;
- /** Sold pieces left out because they arrived already sold — no shelf life to learn from. */
+ /** Sold pieces left out because they arrived already sold, no shelf life to learn from. */
  excludedImports: number;
  enoughData: boolean;
  signals: QualitySignal[];
@@ -114,7 +114,7 @@ const SIGNAL_COPY: Record<string, { label: string; action: string; withLabel: st
  brand: { label: "Brand filled in", action: "Name the brand, even if it's unbranded vintage", withLabel: "Brand set", withoutLabel: "No brand" },
  size: { label: "Size filled in", action: "Set the size field, not just the title", withLabel: "Size set", withoutLabel: "No size" },
  condition: { label: "Condition noted", action: "State the condition honestly", withLabel: "Condition set", withoutLabel: "Not noted" },
- description: { label: "Fuller description", action: "Write 200+ characters — fabric, fit, flaws", withLabel: "200+ characters", withoutLabel: "Shorter" },
+ description: { label: "Fuller description", action: "Write 200+ characters. Fabric, fit, flaws", withLabel: "200+ characters", withoutLabel: "Shorter" },
 };
 
 function outcomeOf(r: Record<string, unknown> | undefined): Outcome {
@@ -136,7 +136,7 @@ function rel(cur: number | null, base: number | null): number | null {
 }
 
 /**
- * Two-proportion z-test on sell-through. Null when either side is empty — there
+ * Two-proportion z-test on sell-through. Null when either side is empty. There
  * is nothing to compare, which is a different answer from "no effect".
  */
 function zScore(a: Outcome, b: Outcome): number | null {
@@ -167,7 +167,7 @@ export async function getQualityMetrics(sellerId: string): Promise<QualityMetric
   const sql = sqlRows();
 
   // One materialised pass over the catalog; every branch below reads it once.
-  // Drafts are excluded — a piece that was never live can't have failed to sell.
+  // Drafts are excluded. A piece that was never live can't have failed to sell.
   const [signalRows, ladderRows, totals, activeRows] = await Promise.all([
    sql`
     WITH it AS MATERIALIZED (

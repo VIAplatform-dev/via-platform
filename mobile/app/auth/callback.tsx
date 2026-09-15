@@ -8,8 +8,8 @@ import { colors, fonts, spacing } from "../../lib/theme";
 // Where the emailed link lands. The deep link carries the one-time token as `?token=`; exchanging it
 // for a session JWT is the whole job of this screen.
 //
-// It is a screen rather than a silent handler because the exchange can fail — an expired link, a
-// link opened on a different device — and that has to be sayable. A silent failure would drop
+// It is a screen rather than a silent handler because the exchange can fail. An expired link, a
+// link opened on a different device, and that has to be sayable. A silent failure would drop
 // someone back on the sign-in form with no idea why.
 
 export default function AuthCallback() {
@@ -26,19 +26,19 @@ export default function AuthCallback() {
     verifyMagicLink(token)
       .then((slug) => {
         // DISMISS THE SHEET FIRST. The emailed link can open the app while auth/login is
-        // presented as a modal, and replacing from inside a modal keeps the presentation — so
+        // presented as a modal, and replacing from inside a modal keeps the presentation, so
         // the whole signed-in app rendered in a card with a grey gutter above it that could be
         // swiped away. Dismiss back to the root, then replace.
-        try { router.dismissAll(); } catch { /* nothing presented — a cold open from the link */ }
+        try { router.dismissAll(); } catch { /* nothing presented. A cold open from the link */ }
         // A SELLER LANDS IN HER OWN APP.
         //
         // This replaced to /(tabs) whatever the link was for, so a store owner who signed in ended
-        // up in the shopper marketplace with no route to her workspace — the seller half of the app
+        // up in the shopper marketplace with no route to her workspace. The seller half of the app
         // was simply unreachable from a fresh sign-in. The verify call already knows which store the
         // address belongs to; the sign-in screen has always routed on it (app/auth/login.tsx) and
         // this is the same rule for the emailed link.
         // WHICH DOOR SHE CAME THROUGH. A store sign-in that finds no shop must not quietly become
-        // a shopper sign-in — she asked for her shop and is owed a sentence. See signin-intent.ts.
+        // a shopper sign-in: she asked for her shop and is owed a sentence. See signin-intent.ts.
         void takeIntent().then((intent) => {
           const to = destinationFor(slug, intent, user?.email ?? null);
           if (to.route === "/auth/no-store") router.replace({ pathname: "/auth/no-store", params: { email: to.email ?? "" } });

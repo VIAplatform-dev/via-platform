@@ -7,7 +7,7 @@ import { claimSourcingRequest } from "@/app/lib/sourcing-db";
 /**
  * Which shop this person is acting for.
  *
- * store_users FIRST, the hardcoded roster second — the same order storeAuth.ts uses, for the same
+ * store_users FIRST, the hardcoded roster second. The same order storeAuth.ts uses, for the same
  * reason. These routes read the static map alone, which is a list of OWNER addresses: a teammate
  * invited into a shop exists only in store_users, so sourcing told her she was unauthorised in a
  * workspace she had just been given access to.

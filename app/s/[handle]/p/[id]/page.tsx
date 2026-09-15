@@ -4,8 +4,6 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { storefrontVisibility } from "@/app/lib/storefront-visibility";
-import { viewerCanEdit } from "@/app/lib/storefront-viewer";
-import NotOpenYet from "@/app/s/NotOpenYet";
 import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { getItem } from "@/app/lib/db/inventory";
 import { getInboxSettings } from "@/app/lib/storefront-settings-db";
@@ -13,6 +11,7 @@ import { getRefundPolicy, policySummary } from "@/app/lib/store-policy-db";
 import { formatPrice, formatPriceCents } from "@/app/lib/formatPrice";
 import { getShippingSettings, hasShippingRow } from "@/app/lib/store-shipping-db";
 import { quoteShipping, DEFAULT_ZONES } from "@/app/lib/shipping-zones";
+import { showsProductNotes, isMeasured } from "@/app/lib/storefront-product-notes";
 import { freeShippingFor } from "@/app/lib/checkout-delivery.ts";
 import { shipsToLine } from "@/app/lib/ships-to-core";
 import { sizeLine, formatSizeLine } from "@/app/lib/size-display-core";
@@ -37,10 +36,12 @@ import { storePublicOrigin, isStoreHost } from "@/app/lib/plan-b/store-host";
 import { storefrontScript } from "@/app/lib/storefront-code";
 import { headers } from "next/headers";
 import { resolveProductPage, visibleFields, buttonCss, type ProductSlot } from "@/app/lib/storefront-product-page";
+import { getSellerPayments } from "@/app/lib/seller-payments-db";
+import { payableAccountId } from "@/app/lib/stripe-mode";
 
 export const dynamic = "force-dynamic";
 
-// The canonical serif list lives with the fonts themselves — this page kept its own copy, which went
+// The canonical serif list lives with the fonts themselves. This page kept its own copy, which went
 // stale the moment a template picked Spectral or Zilla Slab and got a sans fallback here only.
 const ff = (n?: string) => (n ? `'${n}', ${SERIF_FONTS.has(n) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 
@@ -73,7 +74,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
  const storeName = sf.theme?.storeName || seller.name || handle.replace(/-/g, " ");
  const price = formatPrice(item.priceCents / 100, item.currency);
  // Prefer the store's own words (organic, unique). Fall back to a keyword-rich but natural
- // sentence built from the real attributes — never stuffed, just descriptive.
+ // sentence built from the real attributes, never stuffed, just descriptive.
  const desc = item.description
   ? clean(item.description)
   : clean(`${[item.brand, item.era, item.title].filter(Boolean).join(" ")}${item.size ? `, size ${item.size}` : ""}${item.condition ? `, ${item.condition}` : ""}. ${price} at ${storeName}. One-of-one vintage, secure checkout.`);
@@ -81,7 +82,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
  const url = `${STOREFRONT_BASE}/s/${handle}/p/${id}`;
  const image = (item.images || []).filter(Boolean)[0];
  const hasDomain = !!sf.customDomain;
- // Index live product pages so they rank — but only the store's REAL address. Once a store has one
+ // Index live product pages so they rank, but only the store's REAL address. Once a store has one
  // of its own (a connected domain, or its {slug}.vyasites.com origin), this /s/ copy is a mirror and
  // is left out of the index so Google doesn't choose between two of the same page.
  const ownOrigin = storePublicOrigin(sf.storeSlug);
@@ -102,10 +103,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const { preview } = await searchParams;
  const sf = await getStorefrontByHandleAny(handle).catch(() => null);
  if (!sf) return notFound();
- // Same rule as the shop's home page: an unpublished shop shows itself to the person who
- // built it, and says "not open yet" to anyone else, rather than a developer's 404.
- const visibility = storefrontVisibility(!!sf.enabled, { previewing: !!preview, hasAccess: await viewerCanEdit(sf.storeSlug) });
- if (visibility === "closed") return <NotOpenYet />;
+ // An unpublished shop shows its preview rather than a developer's 404.
+ const visibility = storefrontVisibility(!!sf.enabled);
  const previewing = visibility === "preview";
  const seller = await getSellerBySlug(sf.storeSlug).catch(() => null);
  const item = await getItem(id).catch(() => null);
@@ -117,7 +116,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  const fams = [sf.theme?.fonts?.heading, sf.theme?.fonts?.body].filter(Boolean).map((f) => `family=${(f as string).replace(/ /g, "+")}:wght@400;500;600;700`).join("&");
  const storeName = sf.theme?.storeName || seller.name || handle.replace(/-/g, " ");
  const images = (item.images || []).filter(Boolean);
- // A held piece (kept back for a named customer) reads as "On hold", never "Sold" — the shopper who
+ // A held piece (kept back for a named customer) reads as "On hold", never "Sold". The shopper who
  // wanted it should know to ask, not give up.
  const held = item.status === "reserved";
  const sold = item.status === "sold" || held;
@@ -131,22 +130,40 @@ export default async function ProductPage({ params, searchParams }: Props) {
  // rents but doesn't sell must not show a Buy button.
  const rental = await rentalContext(item.id, sf.storeSlug).catch(() => null);
  const terms = rental?.terms ? { tiersCount: rental.terms.tiers.length, alsoForSale: rental.terms.alsoForSale } : null;
- const { rentable, buyable } = resolveOffer(Boolean(rental?.settings.enabled), terms);
+ const { rentable, buyable: offeredForSale } = resolveOffer(Boolean(rental?.settings.enabled), terms);
+ // CAN THIS SHOP ACTUALLY TAKE THE MONEY? 32 of 37 shops with live pieces have no Stripe account
+ // connected yet, and every one of them was showing "Buy now" and failing at the last step with
+ // "This store can't take payments yet" AFTER the shopper had chosen, entered an address and
+ // committed. Finding that out on the product page is a disappointment; finding it out at the card
+ // form is the shop looking broken. The piece still shows, and she can still ask about it.
+ const payable = Boolean(payableAccountId(await getSellerPayments(sf.storeSlug).catch(() => null)));
+ const buyable = offeredForSale && payable;
  // Honor the store's Buyer-messaging toggle (defaults on if settings are unavailable).
  const inbox = await getInboxSettings(sf.storeSlug).catch(() => null);
- // The store's return/refund policy — shown so a buyer knows before they buy.
+ // The store's return/refund policy. Shown so a buyer knows before they buy.
  const policy = await getRefundPolicy(sf.storeSlug).catch(() => null);
- // Where it ships, and from how much — in the piece's own currency, never a hardcoded "$". A store
+ // Where it ships, and from how much, in the piece's own currency, never a hardcoded "$". A store
  // that has never saved shipping says nothing here (the Buy button carries that); one that has
  // names its zones (ships-to-core.ts) and its own price for this parcel at home (shipping-zones.ts).
+ //
+ // AND ONLY IF SHE ASKED FOR IT. This block used to appear the moment a store saved a ship-from
+ // address, which is saved so labels can be bought, not so the website can quote postage to
+ // strangers. Every storefront ended up promising "Shipping from $8" in the shop's own name. It is
+ // a switch now (Settings → Shipping), and it starts off for everyone. See storefront-product-notes.ts.
  const [shippingRow, shipping] = await Promise.all([hasShippingRow(sf.storeSlug).catch(() => false), getShippingSettings(sf.storeSlug).catch(() => null)]);
- const shipsTo = shippingRow && shipping ? shipsToLine(shipping.zones ?? DEFAULT_ZONES, shipping.shipFrom?.country) : null;
+ const notes = showsProductNotes(sf.productNotesEnabled, shippingRow);
+ const parcel = { weightOz: item.weightOz, lengthIn: item.lengthIn, widthIn: item.widthIn, heightIn: item.heightIn };
+ const shipsTo = notes && shipping ? shipsToLine(shipping.zones ?? DEFAULT_ZONES, shipping.shipFrom?.country) : null;
  const shipFromLine = (() => {
-  if (!shippingRow || !shipping || sold || !buyable) return null;
+  if (!notes || !shipping || sold || !buyable) return null;
   if (freeShippingFor(shipping, item.priceCents)) return "Free shipping";
+  // No price for a piece nobody has weighed: assignTier falls back to Medium, and printing that
+  // guess reads as a measurement. The zone line still shows, where she ships is a fact.
+  if (!isMeasured(parcel)) return null;
   const home = shipping.shipFrom?.country || "US";
-  const q = quoteShipping({ fromCountry: home, toCountry: home, parcel: { weightOz: item.weightOz, lengthIn: item.lengthIn, widthIn: item.widthIn, heightIn: item.heightIn }, zones: shipping.zones });
+  const q = quoteShipping({ fromCountry: home, toCountry: home, parcel, zones: shipping.zones });
   if (!q.ok) return null;
+  // "from" is load-bearing: this is the domestic rate, and a buyer further out pays more.
   const from = `Shipping from ${formatPriceCents(q.amountCents, item.currency)}`;
   return shipping.mode === "free_over" && shipping.freeThresholdCents ? `${from} · free over ${formatPriceCents(shipping.freeThresholdCents, item.currency)}` : from;
  })();
@@ -160,7 +177,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
  // ── Store chrome ──
  // This page used to render its own two-link nav and a "Powered by VYA" line, so a shopper who
- // clicked a product left the store's design behind — no logo, no collections, none of the pages the
+ // clicked a product left the store's design behind, no logo, no collections, none of the pages the
  // template ships with, no footer. It now renders the SAME header and footer as every other page.
  const theme = sf.theme ?? {};
  const collections = await listCollections(seller.id).catch(() => []);
@@ -222,7 +239,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
  // ── The three arrangements ──
  // The gallery and the details are built once and PLACED differently, so a layout change can never
- // alter what a product page contains — only where the parts sit and how the images are sized.
+ // alter what a product page contains, only where the parts sit and how the images are sized.
  // Plain functions rather than components: nothing here holds state, and inline components would be
  // re-created on every render.
  const gallery = (stacked?: boolean) =>
@@ -251,7 +268,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  );
 
  // One fact. `description` is the piece's own writing so it prints without a heading when it's
- // inline — a paragraph labelled "Description" is a form, not a listing. Everything else is
+ // inline: a paragraph labelled "Description" is a form, not a listing. Everything else is
  // labelled, because "Italy" on its own says nothing.
  const fact = (f: { key: string; label: string; value: string; mode: string }) =>
   f.mode === "drawer" ? (
@@ -262,7 +279,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
     <p className="mt-2.5 whitespace-pre-wrap text-sm leading-[1.7] opacity-75">{f.value}</p>
    </details>
   ) : f.mode === "chip" ? (
-   // A pill, the way most fashion sites show a size. Always fully round — that IS the shape being
+   // A pill, the way most fashion sites show a size. Always fully round: that IS the shape being
    // asked for, so it doesn't follow the store's corner setting the way a card or button does.
    <div key={f.key} className="mt-5">
     <p className="text-[11px] uppercase tracking-[0.2em] opacity-50">{f.label}</p>
@@ -278,7 +295,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   );
 
  // Every photograph at once, two up. Where `rail` gives one wide column and `classic` gives a hero
- // with thumbnails, this treats the roll as a contact sheet — no photo is the important one.
+ // with thumbnails, this treats the roll as a contact sheet, no photo is the important one.
  const galleryGrid = () =>
  images.length === 0 ? (
   <div className="vya-round aspect-[4/5] w-full bg-black/5" />
@@ -294,14 +311,14 @@ export default async function ProductPage({ params, searchParams }: Props) {
 
  // ── The details column, in the seller's order ───────────────────────────────────────────────────
  // Each part is built once and PLACED by the slot list, so reordering can never change what a
- // product page contains — only the order it says it in. The back link is pinned above the list
+ // product page contains, only the order it says it in. The back link is pinned above the list
  // (it's navigation, not content) and the returns policy below it (it's the shop's, not the piece's).
  const slotTitle = (
   <h1 className="text-3xl leading-[1.1] sm:text-[2.5rem]" style={{ fontFamily: heading }}>{item.title}</h1>
  );
 
  // A rentable piece leads with its RENTAL price, which the rent box shows. Printing the sale price
- // above it reads as the rental cost — and on a rent-only piece it's often $0.
+ // above it reads as the rental cost, and on a rent-only piece it's often $0.
  const slotPrice = (!rentable || sold) ? (
   <p className="flex flex-wrap items-baseline gap-2.5 text-xl" style={{ color: sold ? "inherit" : c.accent, opacity: sold ? 0.5 : 1 }}>
    {compareAt && <span className="text-base line-through opacity-45">{compareAt}</span>}
@@ -310,7 +327,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
   </p>
  ) : null;
 
- // Flaws, as a list, directly under Condition — the thing a secondhand buyer reads before paying.
+ // Flaws, as a list, directly under Condition. The thing a secondhand buyer reads before paying.
  // Not a configurable field: it prints whenever the piece has any, and nothing when it has none.
  const flaws = Array.isArray(item.flaws) ? item.flaws.filter((f): f is string => typeof f === "string" && !!f.trim()) : [];
  const flawsBlock = flaws.length ? (
@@ -319,7 +336,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
    <ul className="mt-1.5 list-disc pl-4 text-sm leading-[1.7] opacity-75">{flaws.map((f, i) => <li key={i}>{f}</li>)}</ul>
   </div>
  ) : null;
- // The grade's one-line meaning and the seller's note, under Condition — only for a piece graded
+ // The grade's one-line meaning and the seller's note, under Condition, only for a piece graded
  // on the scale; free text saved before it prints as she wrote it (condition-core.ts).
  const grade = isConditionGrade(item.condition) ? item.condition : null;
  const conditionExtra = grade || item.conditionNote ? (
@@ -341,7 +358,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  ) : null;
  // Built in the seller's fact order, with the extra blocks hung off their anchors: measurements
  // under Size, the grade's meaning and the flaws under Condition. A store that hides Condition
- // still gets its flaws printed (at the end, as before) — a buyer reads those before paying.
+ // still gets its flaws printed (at the end, as before). A buyer reads those before paying.
  const nodes: ReactNode[] = [];
  const hasSize = facts.some((f) => f.key === "size");
  const hasCondition = facts.some((f) => f.key === "condition");
@@ -369,6 +386,11 @@ export default async function ProductPage({ params, searchParams }: Props) {
         : "vya-cta block w-full py-4 text-center text-[11px] uppercase tracking-[0.2em] text-white transition hover:opacity-90"}
        style={rentable ? undefined : { background: c.accent }}
       >Buy {rentable ? "outright" : "now"}, {price}</a>
+     )}
+     {offeredForSale && !payable && (
+      <p className="vya-cta border border-current/20 py-4 text-center text-[11px] uppercase tracking-[0.2em] opacity-45">
+       Not for sale online yet
+      </p>
      )}
     </>
    )}
@@ -411,7 +433,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
    })}
   </div>
   {shipsToBlock}
-  {policy && <p className="mt-3 text-[11px] leading-relaxed opacity-60" title={policy.policyText || undefined}>{policySummary(policy)}</p>}
+  {notes && policy && <p className="mt-3 text-[11px] leading-relaxed opacity-60" title={policy.policyText || undefined}>{policySummary(policy)}</p>}
  </div>
  );
 
@@ -430,7 +452,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
      store set to round corners had square ones on every product it sells. */}
  <style dangerouslySetInnerHTML={{ __html: storefrontCss(theme.radius, theme.skin) + buttonCss(pageCopy.buttons, c.accent) }} />
 
- {/* The same pointer effect the rest of the site wears — an effect that stopped at the product
+ {/* The same pointer effect the rest of the site wears. An effect that stopped at the product
      page would be the one page where it's most obviously missing. */}
  {hasEffects(siteEffects) && <SiteEffects effects={siteEffects} accent={c.accent} />}
  {storeCode && <script dangerouslySetInnerHTML={{ __html: storeCode }} />}
@@ -458,8 +480,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
   <div className="mx-auto max-w-3xl px-6 py-14 sm:px-8">{details(true)}</div>
  </div>
  ) : productLayout === "mirror" ? (
- // Classic, reversed: the writing leads. A shop whose pieces need explaining — provenance, a
- // designer nobody knows yet — sells on the paragraph, and this puts it where reading starts.
+ // Classic, reversed: the writing leads. A shop whose pieces need explaining. Provenance, a
+ // designer nobody knows yet. Sells on the paragraph, and this puts it where reading starts.
  // The photographs come FIRST in the DOM order on a phone, where there is no left and right and a
  // wall of text above the picture is nobody's product page.
  <div className="mx-auto grid max-w-6xl gap-10 px-6 py-10 sm:gap-16 sm:px-8 sm:py-16 md:grid-cols-2">
@@ -474,7 +496,7 @@ export default async function ProductPage({ params, searchParams }: Props) {
  </div>
  ) : productLayout === "slideshow" ? (
  // One photograph at a time. The detail shot of a seam or a label is a thing you look at, not
- // something to scroll past — and eight angles in a grid reads as clutter.
+ // something to scroll past, and eight angles in a grid reads as clutter.
  <div className="mx-auto grid max-w-6xl gap-10 px-6 py-10 sm:gap-16 sm:px-8 sm:py-16 md:grid-cols-2">
   <ProductSlideshow images={images} title={item.title} />
   <div className="md:pt-4">{details()}</div>

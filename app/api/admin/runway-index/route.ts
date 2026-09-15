@@ -5,7 +5,7 @@ import { ingestRunwayLooks, runwayIndexStats, deleteRunwayLooksByLicense, type I
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-// Owner-only. Loads a LICENSED runway corpus into the look index — vectors and
+// Owner-only. Loads a LICENSED runway corpus into the look index. Vectors and
 // metadata only, never the photographs, so the images stay wherever they're
 // licensed to live and `licenseRef` lets a whole corpus be pulled if that changes.
 //

@@ -7,7 +7,7 @@
 //              cart_update_url: '/cart/update', cart_url: '/cart',
 //              predictive_search_url: '/search/suggest' }
 //
-// A relative path resolves against whatever origin served the page — so when we serve the seller's
+// A relative path resolves against whatever origin served the page, so when we serve the seller's
 // captured theme from a VYA-controlled origin, the theme's own JavaScript sends its cart calls TO US.
 // Answer them in the shape the theme expects and the seller's real cart drawer, quantity steppers and
 // quick-add buttons drive VYA's database, with no code of ours in the page at all.
@@ -15,7 +15,7 @@
 // One implementation covers all 13 Shopify stores in the corpus and every future Shopify seller,
 // which is why this is worth doing properly rather than per-theme.
 //
-// Pure — no database, no network. The routes fetch items and hand them here.
+// Pure, no database, no network. The routes fetch items and hand them here.
 
 /** A VYA item, in the fields this module needs. */
 export type CartLineItem = {
@@ -39,7 +39,7 @@ export type ShopifyCartLine = {
  product_title: string;
  variant_title: string | null;
  quantity: number;
- /** Shopify money is an INTEGER IN MINOR UNITS (cents) — never a formatted string. Themes divide by
+ /** Shopify money is an INTEGER IN MINOR UNITS (cents), never a formatted string. Themes divide by
   *  100 themselves, so returning "24.95" here renders as £0.25. */
  price: number;
  original_price: number;
@@ -89,7 +89,7 @@ export function toCartLine(item: CartLineItem): ShopifyCartLine {
  const handle = item.handle || item.sourceVariantId || item.id;
  const price = item.priceCents;
  // `key` is what the theme sends back to /cart/change to identify a line. Shopify's format is
- // "{variant_id}:{hash}"; themes treat it as opaque, so the VYA item id is a valid — and stable —
+ // "{variant_id}:{hash}"; themes treat it as opaque, so the VYA item id is a valid, and stable,
  // choice, and it means a change/remove call needs no lookup table.
  return {
   id: item.id,
@@ -164,7 +164,7 @@ export function variantIdFromAddBody(body: unknown): string | null {
  return s ? s : null;
 }
 
-/** Shopify's error shape for "that variant can't be added" — themes render `description`. */
+/** Shopify's error shape for "that variant can't be added". Themes render `description`. */
 export function cartError(message: string, status = 422) {
  return {
   status,

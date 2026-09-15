@@ -2,8 +2,8 @@
 
 // Read an automation before switching it on.
 //
-// The flows are described in a sentence — "Nudges a shopper who added to cart but didn't check
-// out" — and then toggled. A seller turning one on is putting her name on an email she has never
+// The flows are described in a sentence. "Nudges a shopper who added to cart but didn't check
+// out", and then toggled. A seller turning one on is putting her name on an email she has never
 // seen, in her own shop's brand, to her own customers. "should be able to preview these?" is the
 // obvious question and there was no answer to it.
 //
@@ -56,7 +56,7 @@ export function AutomationPreviewButton({ flowKey, name }: { flowKey: string; na
        <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-stone-400 transition hover:text-stone-700"><X size={16} /></button>
       </div>
 
-      {/* The note is for New arrivals, which drafts rather than sends — the difference matters
+      {/* The note is for New arrivals, which drafts rather than sends. The difference matters
           before she decides whether the toggle means "emails go out without me". */}
       {state?.note && <p className="border-b border-stone-100 bg-stone-50/70 px-5 py-2.5 text-[12px] text-stone-600">{state.note}</p>}
 

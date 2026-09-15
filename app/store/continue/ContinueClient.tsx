@@ -7,7 +7,7 @@ import { destinationAfterAuth, loginHref, safeNext, STORE_LOGIN } from "@/app/st
 // The one hop every seller sign-in lands on.
 //
 // NextAuth needs a single fixed callbackUrl per provider, but where a seller belongs depends on
-// something only the server knows — whether this email already has a store. So every provider comes
+// something only the server knows. Whether this email already has a store. So every provider comes
 // here, this asks once, and sends them on: the wizard if they're new, their workspace if they're not.
 
 export default function ContinueClient() {

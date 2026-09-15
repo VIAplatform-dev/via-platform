@@ -4,7 +4,7 @@
 // between an editor tab and the save route. Version 2 (the imported-site builder, Step 2) stops
 // counting the header and footer regions and counts Squarespace's own `.page-section`s. An editor
 // tab opened before that change would send version-1 positions, which now point at different
-// sections — so the save refuses any section-addressed change that does not carry this number.
+// sections, so the save refuses any section-addressed change that does not carry this number.
 //
 // Deliberately its own module with no imports: site-capture.ts writes it into the editor and the edit
 // route checks it, and neither may depend on the other for it.

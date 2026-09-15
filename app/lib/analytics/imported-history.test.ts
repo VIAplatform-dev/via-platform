@@ -16,7 +16,7 @@ test("an ordinary sale counts, in whatever spelling the export used", () => {
 
 test("an unrecognised or missing status counts", () => {
  // A blank status on a row that has a total is far more likely an ordinary sale than a refund, and
- // dropping real revenue is the worse mistake — a seller notices money missing, not money present.
+ // dropping real revenue is the worse mistake. A seller notices money missing, not money present.
  assert.equal(countsAsSale(null), true);
  assert.equal(countsAsSale(""), true);
  assert.equal(countsAsSale("   "), true);

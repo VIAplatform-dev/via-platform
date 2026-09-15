@@ -6,7 +6,7 @@ import OrderView from "@/app/order/OrderView";
 
 export const dynamic = "force-dynamic";
 
-// Persistent, revisitable order-status page — the link buyers get in their confirmation + shipping
+// Persistent, revisitable order-status page. The link buyers get in their confirmation + shipping
 // emails. Store-branded, live status + tracking, and every action points back to the store (never a
 // third-party app). Access is via an unguessable HMAC token, so no login and no order-id enumeration.
 type Props = { params: Promise<{ token: string }> };

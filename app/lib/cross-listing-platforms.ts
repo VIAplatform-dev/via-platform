@@ -1,8 +1,8 @@
 // Which marketplaces VYA cross-lists to, and how each one is actually posted to. Pure.
 //
-// mode = how a piece actually gets posted: "api" (server auto-posts via the marketplace API — eBay only),
-// "extension" (the browser extension fills the seller's own logged-in form — Depop, Vestiaire first),
-// "soon" (not available yet — shown greyed as Coming soon). Only eBay has a usable public API.
+// mode = how a piece actually gets posted: "api" (server auto-posts via the marketplace API. EBay only),
+// "extension" (the browser extension fills the seller's own logged-in form. Depop, Vestiaire first),
+// "soon" (not available yet: shown greyed as Coming soon). Only eBay has a usable public API.
 export type PlatformMode = "api" | "extension" | "soon";
 export type Platform = { key: string; name: string; hasApi: boolean; live?: boolean; mode: PlatformMode; titleMax: number; profileUrl: (handle: string) => string };
 
@@ -10,7 +10,7 @@ export type Platform = { key: string; name: string; hasApi: boolean; live?: bool
  * The Chrome extension is submitted and waiting on Google's review.
  *
  * Until it is approved there is nothing for a seller to install, so every channel that depends on
- * it — Depop, Vestiaire — is presented as coming soon rather than as a switch that silently does
+ * it, Depop, Vestiaire: is presented as coming soon rather than as a switch that silently does
  * nothing when flipped. eBay is a real API integration and is unaffected.
  *
  * Flipped to false on 2026-09-04, when Google approved VYA Cross-Lister and the Web Store listing

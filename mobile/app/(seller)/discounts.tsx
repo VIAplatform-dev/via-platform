@@ -8,14 +8,14 @@ import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
 import { normalizeCode, describeDiscount, discountValueFromText, type DiscountKind } from "../../lib/seller/discounts";
 
-// Codes in mono so they are readable at a glance, usage counts, live/ended — and now writable.
+// Codes in mono so they are readable at a glance, usage counts, live/ended, and now writable.
 //
 // This screen could show a seller every code she had and let her change none of them, which is the
 // most annoying shape a screen can take: enough information to decide, no way to act on the
 // decision. Creating a code is four fields and it is the thing she wants to do standing in a shop
 // on a Saturday, not at a desk on a Tuesday.
 //
-// The switch on each row is the one control that acts immediately — turning a code off is the
+// The switch on each row is the one control that acts immediately. Turning a code off is the
 // emergency ("that's been posted somewhere it shouldn't be"), and making her open an editor and
 // press Save for that is making her slower at the one moment speed matters. Everything else is
 // behind Edit.
@@ -168,7 +168,7 @@ export default function DiscountsScreen() {
           label="Name it"
           value={form.label}
           onChangeText={(v) => setForm({ ...form, label: v })}
-          placeholder="Optional — for you, not the buyer"
+          placeholder="Optional, for you, not the buyer"
         />
 
         <Button

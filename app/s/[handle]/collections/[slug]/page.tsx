@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { storefrontVisibility } from "@/app/lib/storefront-visibility";
-import { viewerCanEdit } from "@/app/lib/storefront-viewer";
-import NotOpenYet from "@/app/s/NotOpenYet";
 import StorefrontView from "../../../StorefrontView";
 import StorefrontTracker from "../../../StorefrontTracker";
 
@@ -10,19 +8,18 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ handle: string; slug: string }>; searchParams: Promise<{ preview?: string; q?: string }> };
 
-// A collection page on a built-from-scratch store — shows the items assigned to the
+// A collection page on a built-from-scratch store. Shows the items assigned to the
 // collection (or the whole catalogue for "all"), using the store's own theme. Mirrors
 // what imported stores get on their /collections/{handle} pages.
 export default async function CollectionPage({ params, searchParams }: Props) {
  const { handle, slug } = await params;
  const { preview, q } = await searchParams;
 
- // Resolved whether or not it is published; who is asking decides. Same rule as the shop's
- // home page — a seller following her own menu must not fall off a 404 halfway round.
+ // Resolved whether or not it is published. An unpublished shop shows its preview.
+ // home page: a seller following her own menu must not fall off a 404 halfway round.
  const sf = await getStorefrontByHandleAny(handle).catch(() => null);
  if (!sf) return notFound();
- const visibility = storefrontVisibility(!!sf.enabled, { previewing: !!preview, hasAccess: await viewerCanEdit(sf.storeSlug) });
- if (visibility === "closed") return <NotOpenYet />;
+ const visibility = storefrontVisibility(!!sf.enabled);
  const previewing = visibility === "preview";
 
  return (

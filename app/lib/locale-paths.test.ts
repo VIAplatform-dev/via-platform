@@ -4,7 +4,7 @@ import { pagesGenuinelyMissing } from "./locale-paths.ts";
 
 test("a translated copy of a page we already have is not a missing page", () => {
  // ascensio-demo's sitemap lists 456 pages and we captured 431. All 47 of the "missing" ones are
- // /ja/… — the Japanese rendering of pages we hold in English. The seller has one shop, not two.
+ // /ja/… the Japanese rendering of pages we hold in English. The seller has one shop, not two.
  const missing = pagesGenuinelyMissing(
   ["/ja/collections/heels", "/ja/collections/menswear", "/ja/products/x"],
   new Set(["/collections/heels", "/collections/menswear", "/products/x"]),

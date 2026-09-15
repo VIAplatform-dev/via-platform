@@ -6,9 +6,9 @@
 // lives in middleware + storefront_settings.custom_domain.
 //
 // Required env (set in Vercel project settings):
-//   VERCEL_API_TOKEN   — a token from vercel.com/account/tokens
-//   VERCEL_PROJECT_ID  — this project's id (Project Settings → General)
-//   VERCEL_TEAM_ID     — optional, if the project lives under a team
+//   VERCEL_API_TOKEN: a token from vercel.com/account/tokens
+//   VERCEL_PROJECT_ID: this project's id (Project Settings → General)
+//   VERCEL_TEAM_ID: optional, if the project lives under a team
 // ───────────────────────────────────────────────────────────────────────────
 
 const API = "https://api.vercel.com";
@@ -75,7 +75,7 @@ export async function addDomain(domain: string): Promise<{ ok: boolean; error?: 
  return { ok: true };
 }
 
-/** Remove a domain from the project — and its www form, which addDomain paired with it. */
+/** Remove a domain from the project, and its www form, which addDomain paired with it. */
 export async function removeDomain(domain: string): Promise<{ ok: boolean }> {
  const { projectId } = cfg();
  if (!domainsConfigured()) return { ok: false };
@@ -92,7 +92,7 @@ export async function removeDomain(domain: string): Promise<{ ok: boolean }> {
 /**
  * Two-part public suffixes, where the registrable domain has THREE labels.
  * Counting dots alone reads vintagestores.co.uk as a subdomain and hands a UK
- * seller a CNAME named "vintagestores" instead of an apex A record — pointing
+ * seller a CNAME named "vintagestores" instead of an apex A record. Pointing
  * their whole site at nothing. Not the full Public Suffix List (that's a large
  * dataset to vendor); these are the ones a store is realistically on.
  */
@@ -117,7 +117,7 @@ export function isApexDomain(domain: string): boolean {
 function recommendedRecords(domain: string): DnsRecord[] {
  // An apex needs BOTH: the A record for vintagestores.com, and a CNAME so
  // www.vintagestores.com resolves too. Plenty of people type www, and shared
- // links carry it — a storefront that 404s on the www form looks broken to the
+ // links carry it: a storefront that 404s on the www form looks broken to the
  // shopper, who has no idea the two are different.
  return isApexDomain(domain)
  ? [
@@ -188,7 +188,7 @@ export async function getDomainPrice(domain: string, years = 1): Promise<{ price
  *
  * .com leads because that is what a customer types and what a seller means when
  * they say "I want vintagestore.com". The rest are the ones that still read as a
- * shop rather than a tech company — a resale store on .io looks like a startup.
+ * shop rather than a tech company. A resale store on .io looks like a startup.
  */
 export const SUGGESTED_TLDS = ["com", "co", "shop", "store", "studio", "boutique", "style", "online"] as const;
 
@@ -255,7 +255,7 @@ export async function buyDomain(domain: string, expectedPriceDollars: number, co
  });
  const d: any = await res.json().catch(() => ({}));
  if (res.ok) return { ok: true, orderId: d?.orderId };
- return { ok: false, error: d?.message || d?.error?.message || "Purchase failed — try again." };
+ return { ok: false, error: d?.message || d?.error?.message || "Purchase failed. Try again." };
 }
 
 /** Trigger Vercel to (re)check ownership verification. */
@@ -270,7 +270,7 @@ export async function verifyDomain(domain: string): Promise<{ verified: boolean 
  return { verified: Boolean(data?.verified) };
 }
 
-/** Turn auto-renew off — used when a seller's card fails, so VYA isn't billed for a domain it can't recover. */
+/** Turn auto-renew off: used when a seller's card fails, so VYA isn't billed for a domain it can't recover. */
 export async function setAutoRenew(domain: string, renew: boolean): Promise<{ ok: boolean }> {
  if (!domainsConfigured()) return { ok: false };
  const res = await fetch(`${API}${withTeam(`/v3/domains/${encodeURIComponent(domain)}`)}`, {
@@ -303,7 +303,7 @@ export async function requestTransferOut(domain: string): Promise<{ ok: boolean;
 // ── DNS records ────────────────────────────────────────────────────────────
 // Only for domains registered THROUGH us: those sit on Vercel's nameservers, so
 // Vercel is the zone and we can edit it. A domain the seller connected from
-// their own registrar keeps its DNS there, and we must not pretend otherwise —
+// their own registrar keeps its DNS there, and we must not pretend otherwise,
 // records added here would simply never resolve.
 
 export type DomainInfo = {
@@ -333,7 +333,7 @@ export type ZoneRecord = { id: string; type: string; name: string; value: string
 
 /**
  * The records that keep the storefront reachable. A seller deleting these takes
- * their own shop offline, so they're returned flagged and refused on delete —
+ * their own shop offline, so they're returned flagged and refused on delete,
  * everything else in the zone is theirs to change.
  */
 function isStorefrontRecord(r: { type: string; name: string; value: string }): boolean {
@@ -381,14 +381,14 @@ export async function deleteDnsRecord(domain: string, recordId: string): Promise
  const records = await listDnsRecords(domain);
  const target = records.find((r) => r.id === recordId);
  if (!target) return { ok: false, error: "That record no longer exists." };
- if (target.locked) return { ok: false, error: "That record points your domain at your storefront — removing it would take your shop offline." };
+ if (target.locked) return { ok: false, error: "That record points your domain at your storefront. Removing it would take your shop offline." };
  const res = await fetch(`${API}${withTeam(`/v2/domains/${encodeURIComponent(domain)}/records/${recordId}`)}`, { method: "DELETE", headers: authHeaders() });
  return res.ok ? { ok: true } : { ok: false, error: "Couldn’t remove that record." };
 }
 
 /**
  * One-click MX presets. A vintage seller wanting hello@theirshop.com should not
- * have to hand-enter five MX rows with priorities — that is where mistakes and
+ * have to hand-enter five MX rows with priorities. That is where mistakes and
  * silently-lost email come from.
  *
  * Only providers with a FIXED set of records belong here. Microsoft 365 is

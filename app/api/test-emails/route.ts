@@ -10,7 +10,7 @@ import {
 
 const BASE_URL = getBaseUrl();
 
-// Only callable with CRON_SECRET — not exposed publicly
+// Only callable with CRON_SECRET, not exposed publicly
 export async function GET(request: Request) {
  const authHeader = request.headers.get("authorization");
  const cronSecret = process.env.CRON_SECRET;
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
  const results: Record<string, string> = {};
 
  if (!userId) {
- results["warning"] = `No user found for ${to} — winback emails only`;
+ results["warning"] = `No user found for ${to}: winback emails only`;
  }
 
  try {
@@ -188,7 +188,7 @@ export async function GET(request: Request) {
  try {
  if (!flow || flow === "viewed") {
  if (viewedItems.length === 0) {
- results["viewed-item-reminder"] = "skipped — no click history found";
+ results["viewed-item-reminder"] = "skipped, no click history found";
  } else {
  await sendViewedItemReminderEmail(to, viewedItems);
  results["viewed-item-reminder"] = `sent (${viewedItems.length} items)`;
@@ -201,7 +201,7 @@ export async function GET(request: Request) {
  try {
  if (!flow || flow === "digest") {
  if (digestStores.length === 0) {
- results["store-digest"] = "skipped — no hearted stores found";
+ results["store-digest"] = "skipped, no hearted stores found";
  } else {
  await sendStoreDigestEmail(to, digestStores, BASE_URL);
  results["store-digest"] = `sent (${digestStores.length} stores)`;
@@ -214,7 +214,7 @@ export async function GET(request: Request) {
  try {
  if (!flow || flow === "lastchance") {
  if (lastChanceItems.length === 0) {
- results["last-chance"] = "skipped — no saved favorites found";
+ results["last-chance"] = "skipped, no saved favorites found";
  } else {
  await sendLastChanceEmail(to, lastChanceItems);
  results["last-chance"] = `sent (${lastChanceItems.length} items)`;

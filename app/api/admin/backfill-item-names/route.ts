@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 
 // One-shot backfill: many Collabs-sourced conversions stored a generic line-item
 // name ("Item via Shopify Collabs") because Collabs didn't itemize the order. When
-// we matched the buyer's click, that click knows the real piece — copy it into the
+// we matched the buyer's click, that click knows the real piece. Copy it into the
 // stored items so dashboards and product aggregations show the actual product.
 const GENERIC = "Item via Shopify Collabs";
 

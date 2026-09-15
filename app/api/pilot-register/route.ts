@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Spam guard: the pilot form was flooded by bots injecting casino/link spam into the name
     // fields. Reject any submission whose name contains a URL, a messaging-app handle, or obvious
-    // spam markers, or that is absurdly long — real names never do. Blocks the flood without
+    // spam markers, or that is absurdly long. Real names never do. Blocks the flood without
     // affecting genuine signups. (Longer-term: a captcha / rate-limit on this public endpoint.)
     const nameBlob = `${firstName ?? ""} ${lastName ?? ""}`;
     const SPAM = /https?:\/\/|www\.|bit\.ly|t\.me\/|wa\.me\/|telegram|whatsapp|\bcasino\b|\bbonus\b|\bspin[s]?\b|\bfree\s*money\b|[✨🎰🎁💰🔥]|[a-z0-9-]+\.(com|net|ru|xyz|top|shop|link|online|site|club|vip)\b/i;
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: existingStatus, alreadyRegistered: true, referralCode: existingCode });
     }
 
-    // Check access code — a valid access code grants immediate approval (skips the
+    // Check access code: a valid access code grants immediate approval (skips the
     // waitlist). Uses the shared list so site-access and waitlist-skip never drift.
     const hasValidCode = isPromoCode || isValidAccessCode(accessCode);
     const status = hasValidCode ? "approved" : "pending";

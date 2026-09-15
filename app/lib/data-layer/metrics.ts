@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — metric math (pure functions, no I/O).
+// Data Layer: metric math (pure functions, no I/O).
 //
 // Every number a seller sees comes from here, so it's all unit-tested. A wrong
 // sourcing metric makes a seller lose money, so the rules are explicit and the
@@ -21,7 +21,7 @@ export function rawDemand(c: EngagementCounts, w: DemandWeights): number {
 /**
  * Percentile rank (0–100) of each value within the set: the share of OTHER
  * segments it beats. Lowest → 0, highest → 100, ties share a rank. This is the
- * Demand Index scale — "82" means hotter than 82% of the field, which is stable
+ * Demand Index scale: "82" means hotter than 82% of the field, which is stable
  * even as absolute volumes grow. A lone segment scores 100.
  */
 export function percentileRanks(values: number[]): number[] {
@@ -88,16 +88,16 @@ export function priceMomentumPct(curPrices: number[], priorPrices: number[]): nu
 }
 
 // A segment's direction of travel, from LEADING intent (saves+clicks) vs LAGGING sales (orders).
-// Intent moves before money, so the gap between them forecasts what demand does next — the thing a
+// Intent moves before money, so the gap between them forecasts what demand does next. The thing a
 // backward "rising/falling" trend can't see.
 export type Trajectory = "accelerating" | "steady" | "peaking" | "cooling";
 export type TrajectoryBands = { accel: number; cool: number };
 
 /**
- * accelerating — interest is surging and outrunning sales (demand building before it converts): source ahead.
- * peaking      — sales are up but interest has stopped growing (clearing the backlog): sell now, don't over-source.
- * cooling      — interest AND sales are both clearly falling: ease off.
- * steady       — no decisive divergence.
+ * accelerating. Interest is surging and outrunning sales (demand building before it converts): source ahead.
+ * peaking. Sales are up but interest has stopped growing (clearing the backlog): sell now, don't over-source.
+ * cooling. Interest AND sales are both clearly falling: ease off.
+ * steady, no decisive divergence.
  * Zero prior base is treated as full growth from nothing (any signal now is a rise).
  */
 export function classifyTrajectory(cur: EngagementCounts, prior: EngagementCounts, band: TrajectoryBands): Trajectory {
@@ -131,7 +131,7 @@ export function supplyGapScore(demandIndex: number, supplyPercentile: number): n
 
 // "Source Now" score (0–100): how strong a sourcing opportunity a segment is RIGHT NOW.
 // It rewards demand and a supply gap equally (buyers want it AND few stores carry it), then
-// scales by momentum — a rising segment is the window, a falling one is closing. Pure blend of
+// scales by momentum: a rising segment is the window, a falling one is closing. Pure blend of
 // signals we measure with confidence (demand index, trend, supply gap); price is context, not score.
 export function sourceNowScore(demandIndex: number, trend: Trend, supplyGap: number): number {
  const momentum = trend === "rising" ? 1.15 : trend === "falling" ? 0.7 : 1;
@@ -144,7 +144,7 @@ export type SourcingVerdict = { rating: VerdictRating; headline: string; detail:
 
 /**
  * Turn a segment's signals into a plain-language "should I buy this?" answer.
- * Drives the demand-search result card. Pure + tested — a wrong call costs a
+ * Drives the demand-search result card. Pure + tested. A wrong call costs a
  * seller money, so the rules are explicit and the thresholds come from config.
  */
 export function sourcingVerdict(
@@ -160,13 +160,13 @@ export function sourcingVerdict(
   return {
   rating: "source",
   headline: "Source it",
-  detail: `Strong demand${trendNote}, and supply is thin — this is what shoppers want and few stores have it.`,
+  detail: `Strong demand${trendNote}, and supply is thin. This is what shoppers want and few stores have it.`,
   };
  }
  return {
  rating: "buy-sharp",
  headline: "Buy only at a sharp price",
- detail: `In demand${trendNote}, but already well-stocked across stores — you'll be competing, so margin depends on buying low.`,
+ detail: `In demand${trendNote}, but already well-stocked across stores. You'll be competing, so margin depends on buying low.`,
  };
  }
  if (m.demandIndex >= t.warmDemand) {
@@ -176,13 +176,13 @@ export function sourcingVerdict(
  detail: `Moderate demand${trendNote}. Worth it for standout pieces or at the right price, not as a staple.`,
  };
  }
- // Soft demand — but if the few pieces listed sell through fast (and we have
+ // Soft demand, but if the few pieces listed sell through fast (and we have
  // enough sales to trust that rate), it's a niche worth a selective look.
  if (m.sellThroughPct != null && m.sellThroughPct >= t.strongSellThrough) {
  return {
  rating: "selective",
  headline: "Niche but it moves",
- detail: `Lower overall demand${trendNote}, but listed pieces sell through fast — worth it for the right find.`,
+ detail: `Lower overall demand${trendNote}, but listed pieces sell through fast. Worth it for the right find.`,
  };
  }
  return {
@@ -204,13 +204,13 @@ export type BlendedVerdict = SourcingVerdict & { basis: "vya" | "vya+ebay" | "eb
 export function blendedVerdict(vya: VyaSignal, ebay: EbaySignal, t: BlendThresholds, google?: GoogleSignal): BlendedVerdict {
  const haveEbay = !!ebay && (ebay.medianPrice != null || ebay.activeCount != null || ebay.soldPer30d != null);
  if (!vya && !haveEbay) {
- // No VYA and no eBay — but Google Search is a LEADING signal, so use it rather than shrug. It's
+ // No VYA and no eBay, but Google Search is a LEADING signal, so use it rather than shrug. It's
  // unconfirmed (interest ≠ resale demand), so the calls stay soft.
  const g = google && google.momentumPct != null ? google.momentumPct : null;
  if (g != null) {
- if (g >= 20 || google?.breakout) return { rating: "selective", headline: "Worth a watch", detail: `Google search is climbing (+${g}%) — a leading signal, but no VYA or eBay confirmation yet. Source cautiously.`, basis: "google" };
- if (g <= -20) return { rating: "pass", headline: "Cooling", detail: `Google search is falling (${g}%) with no VYA or eBay signal — not a sourcing moment.`, basis: "google" };
- return { rating: "pass", headline: "Quiet", detail: `Flat search interest (${g >= 0 ? "+" : ""}${g}%) and no VYA or eBay signal — little to act on.`, basis: "google" };
+ if (g >= 20 || google?.breakout) return { rating: "selective", headline: "Worth a watch", detail: `Google search is climbing (+${g}%): a leading signal, but no VYA or eBay confirmation yet. Source cautiously.`, basis: "google" };
+ if (g <= -20) return { rating: "pass", headline: "Cooling", detail: `Google search is falling (${g}%) with no VYA or eBay signal, not a sourcing moment.`, basis: "google" };
+ return { rating: "pass", headline: "Quiet", detail: `Flat search interest (${g >= 0 ? "+" : ""}${g}%) and no VYA or eBay signal. Little to act on.`, basis: "google" };
  }
  return { rating: "pass", headline: "Not enough data", detail: "Not enough market signal on this yet to make a confident call.", basis: "none" };
  }
@@ -220,7 +220,7 @@ export function blendedVerdict(vya: VyaSignal, ebay: EbaySignal, t: BlendThresho
  if (vya) {
  const base = sourcingVerdict(vya, t);
  if (base.rating === "source" && saturated) {
- return { rating: "buy-sharp", headline: "Buy at a sharp price", detail: `${base.detail.replace(/\.$/, "")} — but it's heavily listed on eBay too, so buy low.`, basis: "vya+ebay" };
+ return { rating: "buy-sharp", headline: "Buy at a sharp price", detail: `${base.detail.replace(/\.$/, "")}, but it's heavily listed on eBay too, so buy low.`, basis: "vya+ebay" };
  }
  return { ...base, basis: haveEbay ? "vya+ebay" : "vya" };
  }
@@ -229,7 +229,7 @@ export function blendedVerdict(vya: VyaSignal, ebay: EbaySignal, t: BlendThresho
  if (ebay && ebay.soldPer30d != null) {
  const moves = ebay.soldPer30d >= t.ebaySellsWellPer30d;
  if (moves && !saturated) return { rating: "source", headline: "Source it", detail: `Sells well on eBay (~${ebay.soldPer30d}/mo) and isn't over-listed.`, basis: "ebay-sold" };
- if (moves && saturated) return { rating: "buy-sharp", headline: "Buy at a sharp price", detail: `Sells on eBay but it's heavily listed — margin depends on buying low.`, basis: "ebay-sold" };
+ if (moves && saturated) return { rating: "buy-sharp", headline: "Buy at a sharp price", detail: `Sells on eBay but it's heavily listed. Margin depends on buying low.`, basis: "ebay-sold" };
  return { rating: "pass", headline: "Lean pass", detail: `Slow mover on eBay (~${ebay.soldPer30d}/mo).`, basis: "ebay-sold" };
  }
 
@@ -239,7 +239,7 @@ export function blendedVerdict(vya: VyaSignal, ebay: EbaySignal, t: BlendThresho
  return {
  rating: "selective",
  headline: "Judge on your cost",
- detail: `Not enough VYA demand on this yet. On eBay it asks ${price}${listed} — worth it only if you can buy well under that.`,
+ detail: `Not enough VYA demand on this yet. On eBay it asks ${price}${listed}: worth it only if you can buy well under that.`,
  basis: "ebay-browse",
  };
 }

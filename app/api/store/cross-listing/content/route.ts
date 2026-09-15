@@ -5,7 +5,7 @@ import { crossPostContent, PLATFORMS } from "@/app/lib/cross-listing-db";
 
 export const dynamic = "force-dynamic";
 
-// GET ?itemId= — paste-ready listing content for every platform, for one item.
+// GET ?itemId= paste-ready listing content for every platform, for one item.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

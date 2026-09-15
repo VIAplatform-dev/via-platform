@@ -1,4 +1,4 @@
-// The four tiles across the top of Home — which four, and in what order.
+// The four tiles across the top of Home, which four, and in what order.
 //
 // Home used to render an unbounded list: four fixed tiles (ship, offers, drafts, live listings)
 // always first, then every row from attention-core appended after them. A seller with nothing to
@@ -8,7 +8,7 @@
 // So: four slots. Whatever is genuinely waiting claims them first, in tier order; the resting four
 // fill anything left over. A quiet store still gets a full, calm row.
 //
-// Pure, and separate from attention-core's `attentionRows` on purpose — that list feeds the phone hub
+// Pure, and separate from attention-core's `attentionRows` on purpose. That list feeds the phone hub
 // and Inventory too, and those want everything, not the top four.
 
 import type { AttentionRow } from "./attention-core.ts";
@@ -22,7 +22,7 @@ export type Tile = {
  count: number;
  href: string;
  urgent?: boolean;
- /** A status tile rather than a job — rendered calm, never amber. */
+ /** A status tile rather than a job. Rendered calm, never amber. */
  good?: boolean;
 };
 
@@ -52,7 +52,7 @@ const PRESSING_ORDER: TileId[] = [
  "aging",
 ];
 
-/** What fills the slots nothing pressing claimed. Shown even at zero — this is the calm state. */
+/** What fills the slots nothing pressing claimed. Shown even at zero. This is the calm state. */
 const RESTING_ORDER: TileId[] = ["toShip", "drafts", "liveListings", "offers"];
 
 export function homeTiles(all: Tile[], limit = HOME_TILE_COUNT): Tile[] {

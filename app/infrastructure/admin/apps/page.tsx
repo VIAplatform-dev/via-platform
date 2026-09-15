@@ -1,84 +1,65 @@
-"use client";
+import { AdminPage, AdminHeader, TechCard, StatusPill } from "../ui";
+import { Mail, Megaphone, ShoppingBag, Instagram } from "lucide-react";
 
-import { useEffect, useState } from "react";
-import { Input, Field } from "@/app/store/ui";
-import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill } from "../ui";
-import { Mail, Megaphone, ShoppingBag } from "lucide-react";
+// Apps and integrations, paused.
+//
+// WHY THIS PAGE STILL EXISTS. The connections are on hold, so nothing here connects to anything and
+// the forms are gone. The page stays because links to it do: the command bar, old bookmarks, an
+// email a seller was sent in March. A dead link is worse than a page that says "not yet".
+//
+// THE WORK IS NOT DELETED. The Mailchimp OAuth, the Klaviyo key handling and the sync itself are
+// all still in the tree behind /admin/apps/email and app/lib/esp-*. Only the way in is closed, so
+// switching this back on is deleting this file rather than rebuilding a feature.
+//
+// NOTHING HERE IS CLICKABLE, deliberately. A greyed card that still navigates is a card a seller
+// taps twice and then emails support about.
 
-type KStatus = { connected: boolean; accountName: string | null; oauth?: boolean };
-
-const COMING: { name: string; category: string; blurb: string; icon: typeof Mail; tint: string }[] = [
- { name: "Meta", category: "Ads & social", blurb: "Sync your catalog to Instagram & Facebook Shops.", icon: Megaphone, tint: "#1877F2" },
- { name: "Google Shopping", category: "Ads", blurb: "List your pieces in Google Shopping results.", icon: ShoppingBag, tint: "#34A853" },
-];
+const SOON: { name: string; category: string; blurb: string; icon: typeof Mail }[] = [
+ { name: "Mailchimp", category: "Email marketing", blurb: "Keep your Mailchimp list in step with your customers and what they bought." },
+ { name: "Klaviyo", category: "Email marketing", blurb: "Keep your Klaviyo list in step with your customers and what they bought." },
+ { name: "Instagram Shopping", category: "Social", blurb: "Put your pieces in Instagram and Facebook Shops." },
+ { name: "Google Shopping", category: "Ads", blurb: "List your pieces in Google Shopping results." },
+].map((a, i) => ({ ...a, icon: [Mail, Mail, Instagram, ShoppingBag][i] ?? Megaphone }));
 
 export default function AppsPage() {
- // Only one thing this page needs to know: is an email tool connected. Setting it up lives on its
- // own page now, so the connect form, the key box and the sync button that used to be here are gone.
- const [k, setK] = useState<{ connected: boolean; provider?: string } | null>(null);
- const [notice, setNotice] = useState("");
-
- useEffect(() => {
-  (async () => {
-   const d = await fetch("/api/store/marketing/esp").then((r) => (r.ok ? r.json() : null)).catch(() => null);
-   if (d?.ok) setK({ connected: Boolean(d.connected), provider: d.connected?.provider });
-   const q = new URLSearchParams(window.location.search).get("klaviyo");
-   if (q === "connected") setNotice("Connected.");
-   if (q) window.history.replaceState({}, "", window.location.pathname);
-  })();
- }, []);
-
  return (
- <AdminPage className="max-w-3xl">
- <AdminHeader eyebrow="Settings · Apps & integrations" title="Apps & integrations" subtitle="Extra features you can turn on. Nothing here is required." />
+  <AdminPage className="max-w-3xl">
+   <AdminHeader
+    eyebrow="Settings · Apps & integrations"
+    title="Apps & integrations"
+    subtitle="Connecting outside tools is coming. Everything in VYA works without them."
+   />
 
- {notice && <div className="mb-4 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-4 py-2.5 text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]">{notice}</div>}
+   <div className="mb-5 rounded-xl border border-stone-200/70 bg-stone-50/70 px-4 py-3 text-[12.5px] leading-relaxed text-stone-500">
+    Your storefront, checkout, email campaigns and automations all run inside VYA. Nothing on this
+    page is needed to sell.
+   </div>
 
- <div className="mb-5 rounded-xl border border-stone-200/70 bg-stone-50/70 px-4 py-3 text-[12.5px] leading-relaxed text-stone-500">
- Everything in VYA works without these. Your storefront, checkout, email <span className="font-medium text-stone-600">Campaigns</span>, and <span className="font-medium text-stone-600">Automations</span> all run on their own — connect an app only if you want its extra power.
- </div>
+   <div className="grid gap-3 sm:grid-cols-2">
+    {SOON.map((a) => (
+     <TechCard key={a.name} className="relative flex flex-col overflow-hidden p-4">
+      {/* The card is drawn normally and dimmed as one piece, so it reads as a real thing that is
+          not ready rather than as a broken one. The pill stays sharp: it is the answer. */}
+      <div className="pointer-events-none select-none opacity-40 blur-[0.4px]">
+       <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-stone-800 text-white">
+         <a.icon size={18} />
+        </span>
+        <div>
+         <p className="text-[14px] font-semibold text-stone-900">{a.name}</p>
+         <p className="text-[11px] uppercase tracking-[0.08em] text-stone-400">{a.category}</p>
+        </div>
+       </div>
+       <p className="mt-3 text-[12.5px] leading-relaxed text-stone-500">{a.blurb}</p>
+      </div>
+      <StatusPill tone="pending" className="absolute right-3 top-3">Coming soon</StatusPill>
+     </TechCard>
+    ))}
+   </div>
 
- <div className="grid gap-3 sm:grid-cols-2">
- {/* One card for both. They're the same job — "the email tool I already use" — and a shop picks
-     between them rather than considering each on its own. Both are set up on the same page. */}
- <TechCard
- role="button"
- tabIndex={0}
- onClick={() => { window.location.href = "/admin/apps/email"; }}
- onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); window.location.href = "/admin/apps/email"; } }}
- className="flex cursor-pointer flex-col p-4 text-left transition hover:border-stone-300"
- >
- <div className="flex items-center gap-3">
- <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white" style={{ background: "#232426" }}><Mail size={18} /></span>
- <div>
- <p className="text-[14px] font-semibold text-stone-900">Klaviyo &amp; Mailchimp</p>
- <p className="text-[11px] uppercase tracking-[0.08em] text-stone-400">Email marketing</p>
- </div>
- {k?.connected && <StatusPill tone="live" dot className="ml-auto">Connected</StatusPill>}
- </div>
- <p className="mt-3 text-[12.5px] leading-relaxed text-stone-500">
- Already send your emails from one of these? Sign in and VYA keeps your customer list, pieces and
- orders there up to date. You carry on writing and sending from there.
- </p>
- <span className="mt-3 text-[12px] font-medium text-[var(--accent-ink,#0b7a5c)]">{k?.connected ? "Manage →" : "Set up →"}</span>
- </TechCard>
-
- {COMING.map((a) => (
- <TechCard key={a.name} className="flex flex-col border-stone-200/60 bg-stone-50/40 p-4 shadow-none">
- <div className="flex items-center gap-3">
- <span className="flex h-10 w-10 items-center justify-center rounded-xl text-white opacity-70" style={{ background: a.tint }}><a.icon size={18} /></span>
- <div>
- <p className="text-[14px] font-semibold text-stone-500">{a.name}</p>
- <p className="text-[11px] uppercase tracking-[0.08em] text-stone-400">{a.category}</p>
- </div>
- <StatusPill tone="neutral" className="ml-auto">Soon</StatusPill>
- </div>
- <p className="mt-3 text-[12.5px] leading-relaxed text-stone-400">{a.blurb}</p>
- </TechCard>
- ))}
- </div>
-
- <p className="mt-4 text-[12px] leading-relaxed text-stone-400">Not sure? Skip this entirely — VYA&rsquo;s own Campaigns and Automations send your email on their own.</p>
- </AdminPage>
+   <p className="mt-5 text-[12px] leading-relaxed text-stone-400">
+    We will tell you when these open up. Nothing you have set up changes in the meantime.
+   </p>
+  </AdminPage>
  );
 }

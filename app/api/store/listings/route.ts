@@ -5,7 +5,7 @@ import { getListingsByStore, createListing, sanitizeListingInput } from "@/app/l
 
 export const dynamic = "force-dynamic";
 
-// GET — all of the acting store's listings (for the editor).
+// GET: all of the acting store's listings (for the editor).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, listings });
 }
 
-// POST — create a new listing.
+// POST: create a new listing.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

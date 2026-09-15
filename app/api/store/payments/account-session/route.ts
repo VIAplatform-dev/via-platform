@@ -8,9 +8,9 @@ import { syncPayoutSchedule } from "@/app/lib/payout-schedule";
 
 export const dynamic = "force-dynamic";
 
-// POST — mint an AccountSession for embedded Connect components. This is what lets the seller
+// POST: mint an AccountSession for embedded Connect components. This is what lets the seller
 // onboard AND manage payouts entirely inside getvya.ai (no redirect to a Stripe-hosted page, no
-// Stripe dashboard) — the surfaces render as embedded components themed to VYA. Same Express /
+// Stripe dashboard): the surfaces render as embedded components themed to VYA. Same Express /
 // direct-charges / Stripe-liability model as before; only the UI surface changes. connect-js calls
 // this to (re)fetch a client secret, so it's expected to be hit more than once.
 export async function POST(request: NextRequest) {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
  // Refuse rather than overwrite. The row holds ONE account id, so connecting a store that is
  // already live-connected while the server runs test keys would replace its real account with a
  // sandbox one and take its checkout down. This is the check that makes a mis-pointed sandbox
- // annoying instead of destructive — see stripe-mode.ts.
+ // annoying instead of destructive. See stripe-mode.ts.
  const blocked = connectBlockedReason(sp);
  if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
 
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
  // Payouts wait out the store's own return window, so a refund is always drawn from money still in
  // their Stripe balance (see payout-schedule.ts). This is the path sellers ACTUALLY onboard
- // through — the embedded components — so setting it only on the redirect route would have meant
+ // through, the embedded components, so setting it only on the redirect route would have meant
  // almost no real account ever got the schedule. Best-effort: never block onboarding.
  await syncPayoutSchedule(slug).catch(() => null);
 

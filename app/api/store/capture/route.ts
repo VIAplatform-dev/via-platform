@@ -14,19 +14,19 @@ import { storeAddress } from "@/app/lib/plan-b/store-host";
 import { shouldReuseExistingCapture } from "@/app/lib/import-engine/reuse-capture";
 import { conflictingOwner } from "@/app/lib/import-engine/origin-owner";
 
-// WHERE THE SELLER'S HOSTED SITE ACTUALLY LIVES — the one address she is given for it.
+// WHERE THE SELLER'S HOSTED SITE ACTUALLY LIVES. The one address she is given for it.
 //
 // Never a relative "/site/{slug}": she is viewing this from the getvya.ai OS host, which does not
 // serve /site, so a relative link made "View your site" 404.
 //
 // Order matters. Her own connected domain wins if she has one. Otherwise it is her store host on
-// the Plan B suffix ({slug}.vyasites.com) — the origin the proxy actually serves her store from,
+// the Plan B suffix ({slug}.vyasites.com): the origin the proxy actually serves her store from,
 // and the only one where her theme's own JavaScript runs (see app/lib/plan-b/store-host.ts). The
 // marketplace path is the last resort, for a deployment with Plan B switched off.
-/** Her site's address, or null when there is none to give. The editor hides "View live" on null —
+/** Her site's address, or null when there is none to give. The editor hides "View live" on null,
  *  see storeAddress for why a marketplace path is not an acceptable stand-in. */
 async function siteViewUrl(slug: string): Promise<string | null> {
- const sf = await getStorefrontBySlug(slug).catch(() => null); /* allow-swallow: cosmetic — storeAddress falls back to the store origin */
+ const sf = await getStorefrontBySlug(slug).catch(() => null); /* allow-swallow: cosmetic: storeAddress falls back to the store origin */
  return storeAddress(slug, sf?.customDomain);
 }
 
@@ -51,44 +51,44 @@ function jobView(job: ImportJob) {
  };
 }
 
-// GET — capture status for the acting store, plus the latest import job so the portal can show
+// GET: capture status for the acting store, plus the latest import job so the portal can show
 // progress while a crawl is still running (and resume it if the invocation died).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- const paths = await listCapturePaths(slug).catch(() => [] as string[]); /* allow-swallow: status read — a DB blip shows "not captured yet", never a failed import */
+ const paths = await listCapturePaths(slug).catch(() => [] as string[]); /* allow-swallow: status read: a DB blip shows "not captured yet", never a failed import */
  const origin = paths.length ? await getCaptureOrigin(slug).catch(() => null) : null; /* allow-swallow: display-only */
  const job = await getLatestJob(slug).catch(() => null); /* allow-swallow: the job record is additive; its absence must not break the capture status */
  // isAdmin gates the owner-only "reset to simple design + wipe inventory" action.
  // `url` is the ABSOLUTE public view URL (for "View your site"); `slug` lets the editor build a
  // SAME-ORIGIN /site/{slug} preview so it works on localhost / getvya.ai, not just prod.
  // Which of those pages the site itself leads to. A crawl finds every URL that ANSWERS, and a
- // Shopify store answers on far more than it shows — so the strip listed retired collections
+ // Shopify store answers on far more than it shows, so the strip listed retired collections
  // looking exactly as live as the homepage. Read from the two pages that carry the site's own
  // navigation rather than all of them: eighty megabytes of HTML to decorate a row of thumbnails
  // would cost more than the label is worth.
  const navSources = paths.length
   ? (await Promise.all(
      ["/", "/collections"].filter((p) => paths.includes(p)).map((p) =>
-      getCapturePage(slug, p).catch(() => null) /* allow-swallow: this page is read only to label the strip — a read that fails must leave the labels off, never fail the capture status the editor depends on */
+      getCapturePage(slug, p).catch(() => null) /* allow-swallow: this page is read only to label the strip. A read that fails must leave the labels off, never fail the capture status the editor depends on */
      ),
     )).filter((h): h is string => typeof h === "string" && h.length > 0)
   : [];
- /* allow-swallow: the labels are decoration — a page we cannot read must leave the strip unlabelled, never mark a live shop dead */
+ /* allow-swallow: the labels are decoration. A page we cannot read must leave the strip unlabelled, never mark a live shop dead */
  const unlinked: string[] = navSources.length ? partitionByReachability(paths, navSources, origin).unlinked : [];
 
  return NextResponse.json({
   captured: paths.length,
   url: paths.length ? await siteViewUrl(slug) : null,
   slug, origin, pages: paths,
-  // ONE product page, as the template for all of them. A captured store has hundreds — one per
-  // piece — and describeHostedStore() keeps every one of them out of the page list, correctly: a
+  // ONE product page, as the template for all of them. A captured store has hundreds. One per
+  // piece, and describeHostedStore() keeps every one of them out of the page list, correctly: a
   // strip of 300 product thumbnails is not a page list. But that left the product page as the one
   // page of her site she could not open at all. This is the page she edits to change the design of
   // all of them; a save on it propagates by old-value match (see /api/store/capture/edit).
   productTemplate: paths.find((x) => /^\/products\//.test(x)) ?? null,
   productCount: paths.filter((x) => /^\/products\//.test(x)).length,
-  // Pages nothing on the site links to. Still reachable by URL — see app/lib/capture-links.ts for
+  // Pages nothing on the site links to. Still reachable by URL. See app/lib/capture-links.ts for
   // why the editor says "Not linked" rather than "Archived".
   unlinked,
   isAdmin: isOwner(request, slug),
@@ -105,14 +105,14 @@ async function execute(slug: string, job: ImportJob, replaceBlocks: boolean) {
  }
 
  const url = await siteViewUrl(slug);
- // Out of time with pages still queued. Nothing is lost — the browser resumes immediately, and the
+ // Out of time with pages still queued. Nothing is lost: the browser resumes immediately, and the
  // sweeper cron picks it up if the seller closes the tab.
  if (r.status === "paused") {
   return NextResponse.json({
    ok: true, jobId: job.id, status: "paused", resumable: true,
    pages: r.counts.pages, items: r.counts.products, report: r.report, warnings: r.warnings,
    remaining: r.crawl?.queue.length ?? 0, steps: r.steps, url,
-   note: `Still copying your site — ${r.counts.pages} pages so far.`,
+   note: `Still copying your site. ${r.counts.pages} pages so far.`,
   });
  }
 
@@ -121,11 +121,11 @@ async function execute(slug: string, job: ImportJob, replaceBlocks: boolean) {
   return NextResponse.json({
    ok: true, jobId: job.id, status: "done", mode: "brand", pages: 0, items: 0, url,
    report: r.report, warnings: r.warnings, steps: r.steps,
-   note: `We couldn't copy this site's pages — it builds them in the browser. We've set up your VYA storefront using your ${found} instead. Add your inventory by uploading a CSV or connecting your store.`,
+   note: `We couldn't copy this site's pages. It builds them in the browser. We've set up your VYA storefront using your ${found} instead. Add your inventory by uploading a CSV or connecting your store.`,
   });
  }
 
- // Password-protected? The crawl either reads nothing or only grabs the lock screen — don't host
+ // Password-protected? The crawl either reads nothing or only grabs the lock screen. Don't host
  // that. Products still import (a connected store's API works behind a password).
  if (r.locked) {
   const base = "Your storefront looks password-protected, so we couldn’t capture its design. Remove the password (Shopify: Online Store → Preferences) and re-run to bring your exact site over.";
@@ -142,13 +142,13 @@ async function execute(slug: string, job: ImportJob, replaceBlocks: boolean) {
  });
 }
 
-// POST { url } — capture the seller's entire existing site and host every page on VYA.
-// POST { resume: true } — continue an interrupted import where it stopped.
+// POST { url }: capture the seller's entire existing site and host every page on VYA.
+// POST { resume: true }: continue an interrupted import where it stopped.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => null); /* allow-swallow: a malformed body is answered with 400 immediately below */
- // When the seller explicitly (re)imports their site — e.g. from onboarding — the block storefront
+ // When the seller explicitly (re)imports their site: e.g. from onboarding. The block storefront
  // should BECOME that site, replacing any stale/starter blocks. Otherwise we only seed empty ones.
  const replaceBlocks = body?.replaceBlocks === true;
 
@@ -168,9 +168,9 @@ export async function POST(request: NextRequest) {
   // The rule, and why it exists, is in app/lib/import-engine/reuse-capture.ts. In short: a second
   // import would wipe a hosted site and every edit on top of it, so a seller's import is idempotent
   // and answers with the site she already has, shaped exactly like a finished import.
-  const existing = await listCapturePaths(slug).catch(() => []); /* allow-swallow: a read blip must not turn into a destructive re-crawl — treated as "nothing captured", and the active-job check below still guards a double-click */
+  const existing = await listCapturePaths(slug).catch(() => []); /* allow-swallow: a read blip must not turn into a destructive re-crawl. Treated as "nothing captured", and the active-job check below still guards a double-click */
   if (shouldReuseExistingCapture({ captured: existing.length, isOwner: isOwner(request, slug), force: body?.force === true })) {
-   const prior = await getLatestJob(slug).catch(() => null); /* allow-swallow: additive — the counts below fall back to the captured pages */
+   const prior = await getLatestJob(slug).catch(() => null); /* allow-swallow: additive: the counts below fall back to the captured pages */
    const counts = prior?.counts ?? { pages: existing.length, products: 0, collections: 0 };
    return NextResponse.json({
     ok: true, status: "done", jobId: prior?.id ?? null,
@@ -186,28 +186,28 @@ export async function POST(request: NextRequest) {
 
   // ── A shop that belongs to ANOTHER store is never imported here ────────────────────────────
   // The reuse guard above asks "does this STORE already have a site?" and lets the owner through,
-  // because re-importing is the repair path. It has no idea which store is selected — so one wrong
+  // because re-importing is the repair path. It has no idea which store is selected, so one wrong
   // pick in the switcher crawls somebody else's shop into a seller's account, writing their
   // products into her inventory and deleting whatever she had first. That is not a hypothetical:
   // a job row reading `gianna-marie-raucher | https://tesselizabethvintage.com/` cost 142 products,
   // 23 collections and 42 pages to undo. Exact host match only, so re-importing your own shop and
   // importing one nobody holds both pass untouched. `force` is the deliberate override.
   const owner = isOwner(request, slug);
-  const claims = await listCaptureOrigins().catch(() => [] as { slug: string; origin: string }[]); /* allow-swallow: this guard only ever REFUSES work — a read blip must not block an import the seller is entitled to run */
+  const claims = await listCaptureOrigins().catch(() => [] as { slug: string; origin: string }[]); /* allow-swallow: this guard only ever REFUSES work. A read blip must not block an import the seller is entitled to run */
   const heldBy = conflictingOwner(url, slug, claims, body?.force === true);
   if (heldBy) {
    // The other store is named only for the owner. A seller learning another store's slug from an
    // error message is a leak, and she can do nothing with it either way.
    return NextResponse.json({
     error: owner
-     ? `That site is already imported for “${heldBy}”. Switch to that store to re-import it — or send force:true to import it here anyway and take it over.`
+     ? `That site is already imported for “${heldBy}”. Switch to that store to re-import it, or send force:true to import it here anyway and take it over.`
      : "That site belongs to another store on VYA. Check the address, or get in touch if it's yours.",
     conflict: { url, heldBy: owner ? heldBy : null },
    }, { status: 409 });
   }
 
   // One import per store at a time. A second request (an impatient double-click, or a re-import
-  // while the sweeper is resuming) would otherwise run a parallel crawl over the same slug —
+  // while the sweeper is resuming) would otherwise run a parallel crawl over the same slug,
   // two crawlers writing the same pages, and the first one's deleteCaptures wiping the second's work.
   const active = await getActiveJob(slug);
   if (active) {
@@ -221,9 +221,9 @@ export async function POST(request: NextRequest) {
 
   // Keep whatever storefront she has before this import replaces it. An import deletes the
   // captured pages and can overwrite the built design, and until storefront versions existed that
-  // was final — re-importing a site, or importing over a design she'd built here, destroyed the
+  // was final: re-importing a site, or importing over a design she'd built here, destroyed the
   // old one with no way back. Best-effort: a snapshot that fails must not block the import.
-  await snapshotAsDraft(slug).catch(() => null); /* allow-swallow: keeping a copy is a courtesy — if it fails the seller still gets the import she asked for, and the failure is hers to see in the drafts list, not a reason to refuse the import */
+  await snapshotAsDraft(slug).catch(() => null); /* allow-swallow: keeping a copy is a courtesy, if it fails the seller still gets the import she asked for, and the failure is hers to see in the drafts list, not a reason to refuse the import */
 
   const job = await createJob(slug, url);
   return await execute(slug, job, replaceBlocks);
@@ -233,16 +233,16 @@ export async function POST(request: NextRequest) {
  }
 }
 
-// DELETE — discard the captured site so the storefront falls back to the simple
+// DELETE: discard the captured site so the storefront falls back to the simple
 // template / section builder.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- // Owner/admin only — this is a destructive reset, not a per-seller feature.
+ // Owner/admin only: this is a destructive reset, not a per-seller feature.
  if (!isOwner(request, slug)) return NextResponse.json({ error: "Owner only" }, { status: 403 });
  try {
   // `keepAdded: false`: this is the owner's full reset ("use the simple design instead"), which means
-  // the whole hosted site — including pages she built here. A re-import, which is the other caller,
+  // the whole hosted site, including pages she built here. A re-import, which is the other caller,
   // spares those by default. See deleteCaptures.
   await deleteCaptures(slug, { keepAdded: false });
   await (await import("@/app/lib/site-builder/pages-db")).clearStoreBuilderRows(slug);
@@ -251,7 +251,7 @@ export async function DELETE(request: NextRequest) {
   const itemsDeleted = seller ? await deleteAllItems(seller.id) : 0;
   return NextResponse.json({ ok: true, itemsDeleted });
  } catch (e) {
-  // A reset that half-worked must say so — the old code reported ok:true regardless, so a failed
+  // A reset that half-worked must say so. The old code reported ok:true regardless, so a failed
   // wipe looked identical to a successful one.
   return NextResponse.json({ error: describeError(e, "Reset failed.") }, { status: 500 });
  }

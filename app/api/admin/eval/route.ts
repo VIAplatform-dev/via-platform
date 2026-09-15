@@ -5,7 +5,7 @@ import { runEval, saveEvalRun, getRecentEvalRuns } from "@/app/lib/eval-intake";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // the exam runs the AI on each sampled photo
 
-// GET — recent exam runs (nightly history + any manual runs).
+// GET: recent exam runs (nightly history + any manual runs).
 export async function GET(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  try {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
  }
 }
 
-// POST { sample?, withReverseImage?, withPrice?, goldenOnly? } — grade the current intake
+// POST { sample?, withReverseImage?, withPrice?, goldenOnly? }: grade the current intake
 // AI against the labeled dataset (admin only). Costs tokens/searches per sampled photo,
 // so keep the sample small. goldenOnly → run against the hand-verified benchmark.
 export async function POST(request: NextRequest) {

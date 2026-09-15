@@ -21,7 +21,7 @@ const DAWN_TWO = `<html><body><div id="main-cart-items"><div class="js-contents"
 <div class="totals"><p class="totals__total-value">$948.00</p></div></body></html>`;
 
 /** Horizon's cart. Different element names for everything, and a table HEADER that also matches
- *  any class-based row selector — the trap that broke lamash. */
+ *  any class-based row selector. The trap that broke lamash. */
 const HORIZON_TWO = `<html><body><div class="cart-items__wrapper"><table class="cart-items__table">
  <thead><tr role="row" class="cart-items__table-row"><th scope="col">Product image</th><th scope="col">Product information</th></tr></thead>
  <tbody>
@@ -113,7 +113,7 @@ test("scores its own confidence", () => {
  assert.ok(t.confidence <= 1);
 });
 
-// A miss must be a null, not a bad template — a bad template is what renders a header row as a
+// A miss must be a null, not a bad template. A bad template is what renders a header row as a
 // product. The caller falls back to VYA's own cart markup, which is a working page.
 test("returns null rather than a guess when the items are not on the page", () => {
  assert.equal(deriveCartTemplate({ twoItemHtml: "<html><body><p>nothing here</p></body></html>", items: [A, B] }), null);
@@ -141,8 +141,8 @@ test("the derived row is standalone markup that can be cloned per line", () => {
 // ── Fields that describe the template's product and nothing else ─────────────────────────────────
 // Found on a real Dawn store: the row carried the VENDOR ("Prada") beside the title, so every cart
 // line rendered "PradaMonogram Pochette". We have no vendor to substitute, so the honest thing is to
-// find such fields generically — any leaf whose text DIFFERS between the two known rows and is not
-// already a slot — and drop them, rather than show the wrong brand on every line.
+// find such fields generically. Any leaf whose text DIFFERS between the two known rows and is not
+// already a slot, and drop them, rather than show the wrong brand on every line.
 const WITH_VENDOR = `<html><body><table><tbody>
  <tr class="cart-item"><td><img src="https://cdn/109.jpg"></td>
   <td class="d"><p class="vendor">Prada</p><a href="/products/pochette" class="nm">Monogram Pochette</a><span class="sku">SKU-111</span></td>
@@ -157,7 +157,7 @@ test("marks per-product fields we cannot restate", () => {
  assert.ok(t.stalePaths.length > 0, "the vendor and SKU differ between the two rows, so they describe one product");
 });
 
-test("does not mark the title or the price as stale — those have slots", () => {
+test("does not mark the title or the price as stale. Those have slots", () => {
  const t = derive(WITH_VENDOR)!;
  const key = (p: number[]) => p.join(".");
  const stale = new Set(t.stalePaths.map(key));

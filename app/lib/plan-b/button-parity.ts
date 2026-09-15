@@ -1,13 +1,13 @@
 /**
  * Make the buttons in a product's buy group the same size as each other.
  *
- * blummier's "Enquire" renders at 25.6px beside an "Add to cart" at 13px — same classes, same
+ * blummier's "Enquire" renders at 25.6px beside an "Add to cart" at 13px. Same classes, same
  * parent, and on her own site the two match. Something in her stylesheet reaches the `<button>`
  * there and not on our copy; rather than hardcode a size per store, the group is made to agree with
  * itself in the browser, where the real computed sizes are known.
  *
  * Deliberately conservative. It only acts when the sizes actually disagree by a wide margin, and it
- * takes the SMALLEST size in the group — growing every button to match the odd one out would make
+ * takes the SMALLEST size in the group. Growing every button to match the odd one out would make
  * the page worse. A theme that already agrees with itself is never touched.
  */
 const SCRIPT = `<script data-vya-button-parity="1">(function(){

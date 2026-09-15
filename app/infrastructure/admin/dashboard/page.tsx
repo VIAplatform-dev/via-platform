@@ -8,15 +8,15 @@ import { AdminPage, AdminHeader, TechCard, TechEmpty, MetricCard, AreaChart, Don
 import { PeriodPicker, type PeriodValue } from "./PeriodPicker";
 
 // The store analytics suite. Everything on this page comes from one endpoint and
-// one resolved period, so every number on screen is measuring the same window —
+// one resolved period, so every number on screen is measuring the same window,
 // including the two comparisons (prior period and year-over-year) that turn a
 // figure into a direction.
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 const moneyExact = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const pct = (n: number | null | undefined) => (n == null ? "—" : `${n % 1 === 0 ? n : n.toFixed(1)}%`);
-const num = (n: number | null | undefined) => (n == null ? "—" : n.toLocaleString());
-const shortDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—");
+const pct = (n: number | null | undefined) => (n == null ? "-" : `${n % 1 === 0 ? n : n.toFixed(1)}%`);
+const num = (n: number | null | undefined) => (n == null ? "-" : n.toLocaleString());
+const shortDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "-");
 const longDate = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
 
 const TABS = [
@@ -129,7 +129,7 @@ function ProductTable({ rows, columns }: {
         <TD key={c} right>
          {c === "revenue" ? money(r.revenueCents)
           : c === "daysLive" ? num(r.daysLive)
-          : c === "daysToSell" ? (r.daysToSell == null ? "—" : r.daysToSell)
+          : c === "daysToSell" ? (r.daysToSell == null ? "-" : r.daysToSell)
           : num(r[c])}
         </TD>
        ))}
@@ -143,7 +143,7 @@ function ProductTable({ rows, columns }: {
 
 /**
  * The P&L. Reads as a statement rather than a grid, and every operating-cost line
- * — including the empty ones — is the control that fills it. Adding a cost where
+ * including the empty ones. Is the control that fills it. Adding a cost where
  * you noticed it was missing is the whole idea.
  */
 function ProfitAndLoss({ margin, period, onAdded }: {
@@ -208,7 +208,7 @@ function ProfitAndLoss({ margin, period, onAdded }: {
      </tr>
 
      {/* Selling costs: what sat between gross and net and was never shown. Each line only when it
-         happened — a cash-only store with no labels and no consignors sees none of these. */}
+         happened. A cash-only store with no labels and no consignors sees none of these. */}
      {(cur.feeCents > 0 || cur.cardFeeCents > 0 || cur.labelCostCents > 0 || cur.consignorCutCents > 0) && (
       <>
        <tr>
@@ -283,9 +283,9 @@ function ProfitAndLoss({ margin, period, onAdded }: {
      <tr>
       <td className="border-t-2 border-stone-900 pt-3.5 text-[15px] font-semibold text-stone-900">Net profit</td>
       <td className="border-t-2 border-stone-900 pt-3.5 text-right text-[15px] font-semibold">
-       {margin.netProfitCents == null ? <span className="text-stone-300">—</span> : (
+       {margin.netProfitCents == null ? <span className="text-stone-300">-</span> : (
         <span className={margin.netProfitCents < 0 ? "text-rose-600" : undefined}>
-         {/* Sign before the symbol — "−$82", never "$-82". The formatter puts a minus after the
+         {/* Sign before the symbol. "−$82", never "$-82". The formatter puts a minus after the
              currency sign, which reads as a typo on the one line where the minus is the point. */}
          {margin.netProfitCents < 0 ? "−" : ""}{money(Math.abs(margin.netProfitCents))} <span className="ml-1 text-[12px] font-normal text-stone-400">{pct(margin.netMarginPct)}</span>
         </span>
@@ -298,12 +298,12 @@ function ProfitAndLoss({ margin, period, onAdded }: {
    <ImportCosts onImported={onAdded} />
 
    <p className="mt-4 text-[11px] leading-relaxed text-stone-400">
-    You can also just tell VYA — &ldquo;spent 84 on poly mailers&rdquo; — and it files the cost for you.
+    You can also just tell VYA, &ldquo;spent 84 on poly mailers&rdquo; and it files the cost for you.
     {cur.coveragePct < 100 && cur.totalSales > 0 && (
      <> Revenue, cost of goods and selling costs cover the {pct(cur.coveragePct)} of sales with a cost recorded; operating costs are counted in full.{margin.profit.missingCostNote ? ` ${margin.profit.missingCostNote}` : ""}</>
     )}
     {/* On a tax-inclusive store the listed price already contains VAT, which is never the seller's
-        money. Say what was taken out — and, where no tax was recorded, say that too rather than
+        money. Say what was taken out, and, where no tax was recorded, say that too rather than
         letting a gross figure pass for revenue. */}
     {cur.taxCents > 0 && <> Revenue excludes {moneyExact(cur.taxCents)} of tax collected.</>}
     {cur.salesWithoutTax > 0 && (
@@ -331,7 +331,7 @@ const FIELD_LABEL: Record<string, string> = { date: "Date", label: "Description"
  * Two steps on purpose: the parser is guessing at somebody else's columns, so it shows what it read
  * and lets her correct the mapping BEFORE anything is written. Rows it couldn't read are listed with
  * the reason and the row number rather than dropped, because a silently short import is worse than
- * an obvious one — she'd never know which costs were missing from her P&L.
+ * an obvious one: she'd never know which costs were missing from her P&L.
  */
 function ImportCosts({ onImported }: { onImported: () => void }) {
  const [open, setOpen] = useState(false);
@@ -431,7 +431,7 @@ function ImportCosts({ onImported }: { onImported: () => void }) {
         {preview.counts.skipped > 0 && <> &middot; {preview.counts.skipped} total row{preview.counts.skipped === 1 ? "" : "s"} skipped</>}
        </p>
 
-       {/* Column mapping — only worth showing when there's more than one column to choose from. */}
+       {/* Column mapping, only worth showing when there's more than one column to choose from. */}
        {preview.headers.length > 1 && (
         <div className="mt-3 flex flex-wrap gap-3">
          {(["date", "label", "amount", "category"] as const).map((f) => (
@@ -494,7 +494,7 @@ type Rate = { id: string; label: string; amountCents: number; category: string; 
 
 /**
  * The two setup cards from approach two: what one order costs to pack, and what
- * goes out every month regardless. Filled once, then counted automatically —
+ * goes out every month regardless. Filled once, then counted automatically,
  * which is what stops a P&L from becoming a bookkeeping chore.
  */
 function RecurringCosts({ margin, onChanged }: { margin: NonNullable<AnalyticsSuite["margin"]>; onChanged: () => void }) {
@@ -582,7 +582,7 @@ function RecurringCosts({ margin, onChanged }: { margin: NonNullable<AnalyticsSu
   <div className="grid gap-4 sm:grid-cols-2">
    <TechCard className="p-5">
     <CardTitle hint="counted against every sale in the period">What it costs to pack one order</CardTitle>
-    {rows(perOrder, "Nothing yet — add a mailer, tissue, a dust bag.")}
+    {rows(perOrder, "Nothing yet: add a mailer, tissue, a dust bag.")}
     <div className="mt-2.5 flex items-center justify-between border-t border-stone-200 pt-2.5 text-[13px]">
      <span className="font-semibold text-stone-900">Per order</span>
      <span className="font-semibold tabular-nums">${(rec.perOrder.rateCents / 100).toFixed(2)}</span>
@@ -598,7 +598,7 @@ function RecurringCosts({ margin, onChanged }: { margin: NonNullable<AnalyticsSu
 
    <TechCard className="p-5">
     <CardTitle hint="charged to each period automatically">Every month, regardless</CardTitle>
-    {rows(monthly, "Nothing yet — studio rent, insurance, subscriptions.")}
+    {rows(monthly, "Nothing yet: studio rent, insurance, subscriptions.")}
     <div className="mt-2.5 flex items-center justify-between border-t border-stone-200 pt-2.5 text-[13px]">
      <span className="font-semibold text-stone-900">Per month</span>
      <span className="font-semibold tabular-nums">${(rec.monthly.rateCents / 100).toFixed(2)}</span>
@@ -671,7 +671,7 @@ function Analytics() {
    <AdminHeader
     eyebrow="Business · Analytics"
     title="Analytics"
-    subtitle={data ? `${data.period.label} — sales, profit, customers, demand and what makes a piece sell.` : "Your store's business, end to end."}
+    subtitle={data ? `${data.period.label}: sales, profit, customers, demand and what makes a piece sell.` : "Your store's business, end to end."}
     actions={<PeriodPicker value={period} onChange={setPeriod} />}
    />
 
@@ -680,8 +680,8 @@ function Analytics() {
    ) : data ? (
     <>
      {/* A store with no sales yet gets the WHOLE page at zero, not a blank card where the page
-         should be. `nothing` only ever becomes true when `data` has already arrived — it is a store
-         whose every figure is 0, not a store we failed to load — so the real layout renders
+         should be. `nothing` only ever becomes true when `data` has already arrived. It is a store
+         whose every figure is 0, not a store we failed to load, so the real layout renders
          perfectly well. Replacing it with one empty state meant a seller's first look at Analytics
          taught her nothing about what she was going to get, on the screen most likely to sell her
          on staying. The tabs, the cards and the charts are all here; they are simply empty. */}
@@ -689,7 +689,7 @@ function Analytics() {
       <TechCard className="mb-4 flex items-start gap-3 p-4">
        <BarChart3 size={20} strokeWidth={1.5} className="mt-0.5 shrink-0 text-stone-400" />
        <div>
-        <p className="text-[13px] font-semibold text-stone-900">Nothing to measure yet — here’s what will be</p>
+        <p className="text-[13px] font-semibold text-stone-900">Nothing to measure yet. Here’s what will be</p>
         <p className="mt-1 text-[12.5px] leading-relaxed text-stone-500">
          Every figure below is zero until your first listing and your first sale. Nothing needs setting
          up: revenue, profit, repeat customers, where your traffic comes from and which pieces move
@@ -708,7 +708,7 @@ function Analytics() {
          
          It was a strip that ran off both screen edges: half a word at each end, no way to see what
          the eight were without dragging, and a tab you had already chosen could scroll out of sight.
-         On a phone the whole set becomes one select — every report named, the current one shown,
+         On a phone the whole set becomes one select. Every report named, the current one shown,
          nothing hidden past an edge. The strip returns from `md` up, where all eight genuinely fit. */}
      <div className="mb-6 md:hidden">
       <label htmlFor="report-tab" className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400">Report</label>
@@ -736,14 +736,14 @@ function Analytics() {
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Revenue" value={money(sales.current.gmvCents)} delta={sales.vsPrior?.gmvPct} yoy={sales.vsYoy?.gmvPct} data={sales.series.length >= 2 ? sales.series.map((s) => s.cents) : undefined} />
         <Kpi label="Sales" value={num(sales.current.orders)} delta={sales.vsPrior?.ordersPct} yoy={sales.vsYoy?.ordersPct} />
-        <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "—"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
+        <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "-"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
         <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} hint="how many of your pieces sold" />
        </div>
 
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Avg. item price" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "—"} hint="what you ask" />
-        <Kpi label="Avg. sold price" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "—"} hint="what it goes for" />
-        <Kpi label="Days to sell" value={catalog.medianDaysToSell == null ? "—" : `${catalog.medianDaysToSell}`} delta={catalog.vsPrior?.daysToSellPct} hint="median" />
+        <Kpi label="Avg. item price" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "-"} hint="what you ask" />
+        <Kpi label="Avg. sold price" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "-"} hint="what it goes for" />
+        <Kpi label="Days to sell" value={catalog.medianDaysToSell == null ? "-" : `${catalog.medianDaysToSell}`} delta={catalog.vsPrior?.daysToSellPct} hint="median" />
         <Kpi label="Inventory value" value={money(catalog.inventoryValueCents)} hint={`${num(catalog.activeListings)} active listings`} />
        </div>
 
@@ -773,8 +773,8 @@ function Analytics() {
         <TechCard className="p-5">
          <CardTitle>Best stretch</CardTitle>
          <div className="space-y-2 text-[13px]">
-          <div className="flex justify-between"><span className="text-stone-500">Best day</span><span className="font-medium tabular-nums text-stone-900">{sales.bestDay ? `${longDate(sales.bestDay.day)} · ${money(sales.bestDay.cents)}` : "—"}</span></div>
-          <div className="flex justify-between"><span className="text-stone-500">Best week</span><span className="font-medium tabular-nums text-stone-900">{sales.bestWeek ? `${longDate(sales.bestWeek.weekStart)} · ${money(sales.bestWeek.cents)}` : "—"}</span></div>
+          <div className="flex justify-between"><span className="text-stone-500">Best day</span><span className="font-medium tabular-nums text-stone-900">{sales.bestDay ? `${longDate(sales.bestDay.day)} · ${money(sales.bestDay.cents)}` : "-"}</span></div>
+          <div className="flex justify-between"><span className="text-stone-500">Best week</span><span className="font-medium tabular-nums text-stone-900">{sales.bestWeek ? `${longDate(sales.bestWeek.weekStart)} · ${money(sales.bestWeek.cents)}` : "-"}</span></div>
           <div className="flex justify-between"><span className="text-stone-500">Sessions</span><span className="font-medium tabular-nums text-stone-900">{num(engagement.sessions)}</span></div>
           <div className="flex justify-between"><span className="text-stone-500">Session → sale</span><span className="font-medium tabular-nums text-stone-900">{pct(engagement.rates.sessionToOrderPct)}</span></div>
          </div>
@@ -800,7 +800,7 @@ function Analytics() {
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Revenue" value={money(sales.current.gmvCents)} delta={sales.vsPrior?.gmvPct} yoy={sales.vsYoy?.gmvPct} />
         <Kpi label="Sales" value={num(sales.current.orders)} delta={sales.vsPrior?.ordersPct} yoy={sales.vsYoy?.ordersPct} />
-        <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "—"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
+        <Kpi label="Avg. order" value={sales.current.orders ? money(sales.current.aovCents) : "-"} delta={sales.vsPrior?.aovPct} yoy={sales.vsYoy?.aovPct} />
         <Kpi label="Items sold" value={num(sales.current.unitsSold)} />
        </div>
 
@@ -830,7 +830,7 @@ function Analytics() {
         <TechCard className="p-4">
          <p className="text-[12px] text-stone-600">
           <StatusPill tone="info">Held for tax</StatusPill>{" "}
-          {money(sales.taxCollectedCents)} of sales tax was collected from buyers this period. It isn&apos;t revenue —
+          {money(sales.taxCollectedCents)} of sales tax was collected from buyers this period. It isn&apos;t revenue,
           it&apos;s held on their behalf until you file, so it&apos;s excluded from the totals above.
          </p>
         </TechCard>
@@ -841,7 +841,7 @@ function Analytics() {
          <p className="text-[12px] text-stone-600">
           <StatusPill tone="down">Returns</StatusPill>{" "}
           {num(sales.returns.orders)} refunded {sales.returns.orders === 1 ? "order" : "orders"} worth {money(sales.returns.valueCents)} in this period
-          — a {pct(sales.returns.ratePct)} return rate. Refunds are already excluded from the revenue above.
+. A {pct(sales.returns.ratePct)} return rate. Refunds are already excluded from the revenue above.
          </p>
         </TechCard>
        )}
@@ -879,9 +879,9 @@ function Analytics() {
       <div className="space-y-6">
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Customers" value={num(customers.totalContacts)} hint={`${num(customers.buyersAllTime)} have bought`} />
-        <Kpi label="Avg. lifetime spend" value={customers.buyersAllTime ? money(customers.avgLifetimeSpendCents) : "—"} hint="per buyer, all time" />
-        <Kpi label="Repeat rate" value={customers.buyersAllTime ? pct(customers.repeatPurchaseRatePct) : "—"} hint="buyers with 2+ orders" />
-        <Kpi label="Orders per customer" value={customers.buyersAllTime ? customers.avgOrdersPerCustomer.toFixed(2) : "—"} />
+        <Kpi label="Avg. lifetime spend" value={customers.buyersAllTime ? money(customers.avgLifetimeSpendCents) : "-"} hint="per buyer, all time" />
+        <Kpi label="Repeat rate" value={customers.buyersAllTime ? pct(customers.repeatPurchaseRatePct) : "-"} hint="buyers with 2+ orders" />
+        <Kpi label="Orders per customer" value={customers.buyersAllTime ? customers.avgOrdersPerCustomer.toFixed(2) : "-"} />
        </div>
 
        {customers.identifiedRevenuePct < 100 && (
@@ -960,8 +960,8 @@ function Analytics() {
      {tab === "catalog" && catalog && (
       <div className="space-y-6">
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi label="Avg. listed" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "—"} hint={`median ${money(catalog.medianListedPriceCents)}`} />
-        <Kpi label="Avg. sold" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "—"} hint={catalog.soldInPeriod ? `median ${money(catalog.medianSoldPriceCents)}` : undefined} delta={catalog.vsPrior?.avgSoldPricePct} />
+        <Kpi label="Avg. listed" value={catalog.activeListings ? money(catalog.avgListedPriceCents) : "-"} hint={`median ${money(catalog.medianListedPriceCents)}`} />
+        <Kpi label="Avg. sold" value={catalog.soldInPeriod ? money(catalog.avgSoldPriceCents) : "-"} hint={catalog.soldInPeriod ? `median ${money(catalog.medianSoldPriceCents)}` : undefined} delta={catalog.vsPrior?.avgSoldPricePct} />
         <Kpi label="Realisation" value={pct(catalog.realisationPct)} hint="what pieces sold for, against what you asked" />
         <Kpi label="Sell-through" value={pct(catalog.sellThroughPct)} delta={catalog.vsPrior?.sellThroughPct} />
        </div>
@@ -970,7 +970,7 @@ function Analytics() {
         <Kpi label="Active listings" value={num(catalog.activeListings)} />
         <Kpi label="Inventory value" value={money(catalog.inventoryValueCents)} />
         <Kpi label="Listed this period" value={num(catalog.listedInPeriod)} />
-        <Kpi label="Days to sell" value={catalog.medianDaysToSell == null ? "—" : `${catalog.medianDaysToSell}`} hint={catalog.avgDaysToSell == null ? "median" : `median · ${catalog.avgDaysToSell} avg`} />
+        <Kpi label="Days to sell" value={catalog.medianDaysToSell == null ? "-" : `${catalog.medianDaysToSell}`} hint={catalog.avgDaysToSell == null ? "median" : `median · ${catalog.avgDaysToSell} avg`} />
        </div>
 
        <TechCard className="p-5">
@@ -1006,7 +1006,7 @@ function Analytics() {
               <TD right>{num(r.listed)}</TD>
               <TD right>{num(r.sold)}</TD>
               <TD right>{pct(r.sellThroughPct)}</TD>
-              <TD right>{r.sold ? money(r.avgSoldPriceCents) : "—"}</TD>
+              <TD right>{r.sold ? money(r.avgSoldPriceCents) : "-"}</TD>
               <TD right>{money(r.revenueCents)}</TD>
              </tr>
             ))}
@@ -1048,7 +1048,7 @@ function Analytics() {
        </div>
 
        <TechCard className="p-5">
-        <CardTitle hint="Listed for at least two weeks and getting the fewest views a day. These are the ones to re-shoot, retitle or reprice">Getting the least attention</CardTitle>
+        <CardTitle hint="Listed two weeks or more with the fewest views a day. Re-shoot, retitle or reprice these">Getting the least attention</CardTitle>
         <ProductTable rows={products.worstPerformers} columns={["views", "daysLive"]} />
        </TechCard>
 
@@ -1067,7 +1067,7 @@ function Analytics() {
        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Sessions" value={num(engagement.sessions)} delta={engagement.vsPrior?.sessionsPct} />
         <Kpi label="Session → sale" value={pct(engagement.rates.sessionToOrderPct)} />
-        <Kpi label="Pages per session" value={engagement.pagesPerSession || "—"} hint={`${num(engagement.pageviews)} page views`} />
+        <Kpi label="Pages per session" value={engagement.pagesPerSession || "-"} hint={`${num(engagement.pageviews)} page views`} />
         <Kpi label="Bounce rate" value={pct(engagement.bounceRatePct)} hint="left after one page" />
        </div>
 
@@ -1093,7 +1093,7 @@ function Analytics() {
           if (!direct || direct.sharePct < 25) return null;
           return (
            <p className="mt-3 border-t border-stone-100 pt-3 text-[11px] leading-relaxed text-stone-500">
-            <span className="font-medium text-stone-700">{pct(direct.sharePct)} is direct</span> — that&apos;s visits that arrived with no source attached, not a channel.
+            <span className="font-medium text-stone-700">{pct(direct.sharePct)} is direct</span>. That&apos;s visits that arrived with no source attached, not a channel.
             Tapping a link inside Instagram or TikTok often sends nothing we can read.{" "}
             <a href="/admin/marketing/share-links" className="font-medium text-[var(--accent-ink,#0b7a5c)] underline underline-offset-2">Use tagged share links</a>{" "}
             and every post gets credited properly.
@@ -1130,7 +1130,7 @@ function Analytics() {
          </div>
         ) : (
          <p className="py-4 text-[12px] text-stone-500">
-          None of this period&apos;s {num(engagement.totalOrders)} sales could be traced back to a visit yet — channel revenue fills in as
+          None of this period&apos;s {num(engagement.totalOrders)} sales could be traced back to a visit yet. Channel revenue fills in as
           shoppers browse and buy in the same tracked session. Sessions and sources above are recorded regardless.
          </p>
         )}
@@ -1190,7 +1190,7 @@ function Analytics() {
         <TechCard className="p-4">
          <p className="text-[12px] text-stone-600">
           <StatusPill tone="info">New</StatusPill>{" "}
-          Device and location are now recorded on every visit. They&apos;ll appear here once shoppers arrive — earlier visits didn&apos;t capture them.
+          Device and location are now recorded on every visit. They&apos;ll appear here once shoppers arrive. Earlier visits didn&apos;t capture them.
          </p>
         </TechCard>
        )}
@@ -1218,8 +1218,8 @@ function Analytics() {
         <p className="text-[12px] text-stone-600">
          <StatusPill tone="info">Whole catalog</StatusPill>{" "}
          This tab compares your own listings against each other across the {num(quality.catalogSize)} pieces that have been live
-         long enough to judge — it ignores the date filter, because &ldquo;do measurements help?&rdquo; needs every listing it can get.
-         {quality.excludedImports > 0 && <> {num(quality.excludedImports)} imported {quality.excludedImports === 1 ? "piece that arrived" : "pieces that arrived"} already sold {quality.excludedImports === 1 ? "is" : "are"} left out — they never sat on a shelf here, so they can&apos;t tell you anything.</>}{" "}
+         long enough to judge. It ignores the date filter, because &ldquo;do measurements help?&rdquo; needs every listing it can get.
+         {quality.excludedImports > 0 && <> {num(quality.excludedImports)} imported {quality.excludedImports === 1 ? "piece that arrived" : "pieces that arrived"} already sold {quality.excludedImports === 1 ? "is" : "are"} left out: they never sat on a shelf here, so they can&apos;t tell you anything.</>}{" "}
          These are associations, not proof: a piece you measured carefully was probably photographed carefully too.
         </p>
        </TechCard>
@@ -1241,14 +1241,14 @@ function Analytics() {
                 <span className="block font-medium text-stone-800">{sg.label}</span>
                 <span className="block text-[11px] text-stone-400">{sg.action}</span>
                </TD>
-               <TD right>{sg.verdict === "not-enough-data" ? "—" : <>{pct(sg.with.sellThroughPct)}<span className="block text-[11px] text-stone-400">{num(sg.with.items)} listings</span></>}</TD>
-               <TD right>{sg.verdict === "not-enough-data" ? "—" : <>{pct(sg.without.sellThroughPct)}<span className="block text-[11px] text-stone-400">{num(sg.without.items)} listings</span></>}</TD>
+               <TD right>{sg.verdict === "not-enough-data" ? "-" : <>{pct(sg.with.sellThroughPct)}<span className="block text-[11px] text-stone-400">{num(sg.with.items)} listings</span></>}</TD>
+               <TD right>{sg.verdict === "not-enough-data" ? "-" : <>{pct(sg.without.sellThroughPct)}<span className="block text-[11px] text-stone-400">{num(sg.without.items)} listings</span></>}</TD>
                <TD right>
                 {sg.verdict === "not-enough-data" ? <span className="text-stone-300">too few</span>
                  : sg.verdict === "no-clear-effect" ? <StatusPill tone="neutral">no clear effect</StatusPill>
                  : <StatusPill tone={sg.verdict === "helps" ? "live" : "down"}>{sg.liftPct != null && sg.liftPct > 0 ? "+" : ""}{sg.liftPct}%</StatusPill>}
                </TD>
-               <TD right>{sg.daysDeltaPct == null || sg.verdict === "not-enough-data" ? "—" : <span className={sg.daysDeltaPct < 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-stone-500"}>{sg.daysDeltaPct > 0 ? "+" : ""}{sg.daysDeltaPct}%</span>}</TD>
+               <TD right>{sg.daysDeltaPct == null || sg.verdict === "not-enough-data" ? "-" : <span className={sg.daysDeltaPct < 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-stone-500"}>{sg.daysDeltaPct > 0 ? "+" : ""}{sg.daysDeltaPct}%</span>}</TD>
                <TD right>{sg.verdict === "helps" && sg.activeMissing > 0 ? <span className="font-semibold text-amber-600">{num(sg.activeMissing)}</span> : num(sg.activeMissing)}</TD>
               </tr>
              ))}
@@ -1309,7 +1309,7 @@ function Analytics() {
 
        {!margin.available ? (
         <TechEmpty icon={<BarChart3 size={28} strokeWidth={1.5} />} title="Add what your pieces cost"
-         body={`The statement above is ready for your running costs. To fill in cost of goods and gross margin too, add what you paid for a piece — ${num(margin.activeWithoutCost)} of your ${num(margin.activeTotal)} live listings don't have it yet.`} />
+         body={`The statement above is ready for your running costs. To fill in cost of goods and gross margin too, add what you paid for a piece. ${num(margin.activeWithoutCost)} of your ${num(margin.activeTotal)} live listings don't have it yet.`} />
        ) : (
         <>
          {margin.current.coveragePct < 100 && (

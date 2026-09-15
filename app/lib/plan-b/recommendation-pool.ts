@@ -1,9 +1,9 @@
 import { unavailableLabel } from "../unavailable-label.ts";
-// Which items belong in a product's "You may also like" strip — see the recommendations route for
+// Which items belong in a product's "You may also like" strip. See the recommendations route for
 // why this exists and why it reads the anchor product off a Referer header rather than the
 // Shopify numeric id the theme actually sends.
 //
-// Pure — no database, no network. The route resolves the seller's items and the referer; this picks
+// Pure, no database, no network. The route resolves the seller's items and the referer; this picks
 // which of them to show.
 
 export type RecommendationItem = { id: string; sourceId?: string | null; category?: string | null };
@@ -18,7 +18,7 @@ export function refererProductHandle(referer: string | null | undefined): string
 /**
  * The recommendation pool for a product page, scoped to the anchor's own category when possible.
  *
- * Falls back to "everything except the anchor" — never to empty — when there's no referer, no
+ * Falls back to "everything except the anchor", never to empty, when there's no referer, no
  * matching item, or nothing else shares its category. An empty response is what turns this section
  * into an infinite fetch-retry loop on some themes (see the route); a mis-scoped-but-real one is
  * merely a worse recommendation, never a crash.
@@ -44,22 +44,22 @@ function money(cents: number | null, currency: string | null): string {
 export type RecommendationCard = {
  id: string; title: string; priceCents: number | null; currency: string | null; image: string | null;
  sourceId?: string | null; available?: boolean;
- /** Why it cannot be bought — decides the wording. See app/lib/unavailable-label.ts. */
+ /** Why it cannot be bought. Decides the wording. See app/lib/unavailable-label.ts. */
  unavailableReason?: string | null;
 };
 
 /**
- * The recommendation grid, WITH a real, working "Add to cart" button per card — a form posting to
+ * The recommendation grid, WITH a real, working "Add to cart" button per card. A form posting to
  * Shopify's own bridge route (see plan-b/cart/add) with the id `findItemByVariantId` already knows
  * how to resolve (the source handle, falling back to the VYA item id).
  *
  * The form is marked `data-vya-rec-add` rather than left to submit natively: a plain native submit
- * navigates the WHOLE PAGE to the bridge's raw JSON response — the item really gets added, but the
+ * navigates the WHOLE PAGE to the bridge's raw JSON response. The item really gets added, but the
  * shopper is dropped on a blank page of `{"id":...}` text instead of staying put. What honours that
  * marker is recommendationAddScript(), which is injected into the PAGE and not into this fragment;
  * see its own comment for why a script shipped inside the fragment could never have worked.
  *
- * This is Shopify's own bridge route, so it's only correct on a Plan B store origin — which is the
+ * This is Shopify's own bridge route, so it's only correct on a Plan B store origin, which is the
  * only place this endpoint is ever reached from (it's resolved by store host). A generic reusable
  * grid renderer that also serves Plan A's fallback grids can't hardcode this action: Plan A has no
  * `/cart/add` bridge at its origin, only VYA's own `/api/storefront/cart`. Kept separate from that
@@ -88,12 +88,12 @@ export function recommendationCardsHtml(items: RecommendationCard[], hrefFor: (i
  *
  * IT LIVES ON THE PAGE, NOT IN THE FRAGMENT, and that is the whole point. Both theme conventions
  * take our response and assign it with `innerHTML` (`$fetchedFragment` returns the matched element's
- * innerHTML; product-recommendations.js assigns its own) — and **a <script> inserted by innerHTML
+ * innerHTML; product-recommendations.js assigns its own), and **a <script> inserted by innerHTML
  * never executes**, per the HTML spec. Shipped inside the strip, as it was, this handler was dead
  * markup: every "Add to cart" in the recommendations fell through to a native submit and navigated
  * the shopper to the bridge's raw JSON. Injected into the served product page (see the product
  * route) it is real, ordinary page script, and being delegated from `document` it catches forms
- * that arrive long afterwards — which is exactly what a lazily-fetched strip is.
+ * that arrive long afterwards, which is exactly what a lazily-fetched strip is.
  *
  * Shared with the theme-templated strip (see recommendation-template.ts), whose cards are the
  * SELLER'S own quick-buy forms: same `/cart/add` action, same need not to navigate away.

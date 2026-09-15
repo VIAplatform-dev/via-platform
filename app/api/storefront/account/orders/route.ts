@@ -6,7 +6,7 @@ import { listOrdersForShopper } from "@/app/lib/db/orders";
 import { shopperOrderView } from "@/app/lib/shopper-orders";
 
 /**
- * GET — the signed-in shopper's own orders at THIS store.
+ * GET: the signed-in shopper's own orders at THIS store.
  *
  * Both halves of the key come from things the caller cannot choose: the store from the host, the
  * shopper from a signed cookie that is valid for this store only. Nothing in the request names
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
  const cookie = request.cookies.get(SHOPPER_COOKIE)?.value || "";
  const session = secret && cookie ? readShopperToken(cookie, store.slug, secret) : null;
- // Not signed in is not an error — the panel asks for orders before it knows.
+ // Not signed in is not an error. The panel asks for orders before it knows.
  if (!session) return NextResponse.json({ signedIn: false, orders: [] });
 
  const seller = await getSellerBySlug(store.slug).catch(() => null);

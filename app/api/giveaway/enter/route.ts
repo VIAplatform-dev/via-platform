@@ -26,7 +26,7 @@ export async function POST(request: Request) {
  const referralLink = `${baseUrl}/waitlist?ref=${referralCode}`;
 
  if (!isExisting) {
- // New entry — send confirmation email
+ // New entry: send confirmation email
  try {
  await sendGiveawayConfirmation(normalizedEmail, referralCode);
  } catch (err) {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
  }
  }
  } else if (normalizedRefCode) {
- // Existing entry — but they came through a referral link.
+ // Existing entry, but they came through a referral link.
  // If they haven't been counted as a referral yet, process it now.
  try {
  const existingEntry = await getEntryByEmail(normalizedEmail);

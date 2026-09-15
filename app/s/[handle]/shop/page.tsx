@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { storefrontVisibility } from "@/app/lib/storefront-visibility";
-import { viewerCanEdit } from "@/app/lib/storefront-viewer";
-import NotOpenYet from "@/app/s/NotOpenYet";
 import StorefrontView from "../../StorefrontView";
 import StorefrontTracker from "../../StorefrontTracker";
 
@@ -10,17 +8,15 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ handle: string }>; searchParams: Promise<{ preview?: string; category?: string; q?: string }> };
 
-// The Shop page — products live here, on their own page, matching real sites.
+// The Shop page: products live here, on their own page, matching real sites.
 export default async function ShopPage({ params, searchParams }: Props) {
  const { handle } = await params;
  const { preview, category, q } = await searchParams;
 
- // Resolved whether or not it is published; who is asking decides. Same rule as the shop's home
- // page — a seller walking her own menu must not fall off a 404 halfway round it.
+ // Resolved whether or not it is published. An unpublished shop shows its preview.
  const sf = await getStorefrontByHandleAny(handle).catch(() => null);
  if (!sf) return notFound();
- const visibility = storefrontVisibility(!!sf.enabled, { previewing: !!preview, hasAccess: await viewerCanEdit(sf.storeSlug) });
- if (visibility === "closed") return <NotOpenYet />;
+ const visibility = storefrontVisibility(!!sf.enabled);
  const previewing = visibility === "preview";
 
  return (

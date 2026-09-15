@@ -7,11 +7,11 @@ import { saveMenuRow, siteBuilderTablesReady } from "@/app/lib/site-builder/page
 
 export const dynamic = "force-dynamic";
 
-// PUT { menu: "main", items, signature } — her order for the menu on her header.
+// PUT { menu: "main", items, signature }. Her order for the menu on her header.
 //
 // The signature is the href sequence the order was learned from. If her header has changed since
 // (a re-crawl brought a different menu over), this answers 409 with the menu as it stands now rather
-// than writing an order that names items her site no longer has — see menus.ts.
+// than writing an order that names items her site no longer has. See menus.ts.
 export async function PUT(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,7 +31,7 @@ export async function PUT(request: NextRequest) {
  const signature = typeof body?.signature === "string" ? body.signature : "";
  if (detected && signature && signature !== detected.signature) {
   return NextResponse.json({
-   error: "Your menu has changed since you last edited it — here it is as it stands now.",
+   error: "Your menu has changed since you last edited it. Here it is as it stands now.",
    drifted: true, menu: detected,
   }, { status: 409 });
  }

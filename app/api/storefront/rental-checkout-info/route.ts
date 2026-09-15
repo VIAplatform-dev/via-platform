@@ -5,7 +5,7 @@ import { getBooking, rentalContext, ownerOfItem } from "@/app/lib/rentals/rental
 
 export const dynamic = "force-dynamic";
 
-// GET ?rental=BOOKING_ID — what the checkout page needs to take payment for a rental.
+// GET ?rental=BOOKING_ID: what the checkout page needs to take payment for a rental.
 //
 // A rental checkout is NOT a sale: the piece isn't reserved by item status and never becomes sold.
 // The dates are already held by the booking row (the exclusion constraint did that when the hold was
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
  const { settings } = await rentalContext(booking.itemId, owner.storeSlug);
  const seller = await getSellerById(item.sellerId);
 
- // The price was fixed when the dates were taken — or countered by the store on an approval.
+ // The price was fixed when the dates were taken, or countered by the store on an approval.
  const rentCents = booking.priceCents ?? 0;
  const waiverCents = settings.security === "waiver" ? Math.round((rentCents * settings.waiverPct) / 100) : 0;
 
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
    totalCents: rentCents + waiverCents,
    depositCents: settings.security === "deposit" ? settings.depositCents : null,
    fulfilment: settings.fulfilment,
-   // Whether this store takes codes on rentals at all — the checkout only offers the box when it does.
+   // Whether this store takes codes on rentals at all. The checkout only offers the box when it does.
    discountsAllowed: settings.discountApplies !== "none",
    termsText: settings.termsText,
   },

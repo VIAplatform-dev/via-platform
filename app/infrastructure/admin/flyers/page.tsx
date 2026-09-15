@@ -8,7 +8,7 @@ import { getFlyerReport } from "@/app/lib/flyer-stats";
 //
 // The number that matters is not scans and not signups but the gap between them. A flyer with 300
 // scans and 4 signups is a poster people notice and a page that fails them; one with 20 scans and
-// 12 signups is the opposite problem — the offer works, nobody is seeing it. Both are actionable,
+// 12 signups is the opposite problem. The offer works, nobody is seeing it. Both are actionable,
 // and neither column tells you on its own, which is why they sit next to each other.
 
 export const dynamic = "force-dynamic";
@@ -34,7 +34,7 @@ export default async function FlyersPage() {
     <TechCard className="p-4">
      <p className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Converted</p>
      <p className="mt-1 text-2xl font-medium">
-      {totalScans === 0 ? "—" : `${Math.min(100, Math.round((totalSignups / totalScans) * 100))}%`}
+      {totalScans === 0 ? "-" : `${Math.min(100, Math.round((totalSignups / totalScans) * 100))}%`}
      </p>
     </TechCard>
    </div>
@@ -49,7 +49,7 @@ export default async function FlyersPage() {
       <dl className="mt-3 grid grid-cols-3 gap-2 text-[13px]">
        <div><dt className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Scans</dt><dd className="mt-0.5 font-medium">{r.scans}</dd></div>
        <div><dt className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Signups</dt><dd className="mt-0.5 font-medium">{r.signups}</dd></div>
-       <div><dt className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Converted</dt><dd className="mt-0.5 font-medium">{r.conversion === null ? "—" : `${r.conversion}%`}</dd></div>
+       <div><dt className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Converted</dt><dd className="mt-0.5 font-medium">{r.conversion === null ? "-" : `${r.conversion}%`}</dd></div>
       </dl>
       <p className="mt-2 text-[12px] text-stone-500">Last scan {r.lastScan ? new Date(r.lastScan).toLocaleDateString() : "never"}</p>
      </TechCard>
@@ -77,8 +77,8 @@ export default async function FlyersPage() {
         <TD><code className="text-[12px] text-stone-500">/{r.slug}</code></TD>
         <TD>{r.scans}</TD>
         <TD>{r.signups}</TD>
-        {/* A flyer nobody has scanned shows a dash, not 0% — it has not failed, it has not run. */}
-        <TD>{r.conversion === null ? "—" : `${r.conversion}%`}</TD>
+        {/* A flyer nobody has scanned shows a dash, not 0% it has not failed, it has not run. */}
+        <TD>{r.conversion === null ? "-" : `${r.conversion}%`}</TD>
         <TD>{r.lastScan ? new Date(r.lastScan).toLocaleDateString() : "never"}</TD>
        </tr>
       ))}
@@ -87,7 +87,7 @@ export default async function FlyersPage() {
    </TechCard>
 
    <p className="mt-4 text-[12px] leading-relaxed text-stone-500">
-    A scan is counted once per arrival, before anyone signs in — the refresh straight after signup
+    A scan is counted once per arrival, before anyone signs in. The refresh straight after signup
     carries the access cookie and is not counted again. Bot user agents are excluded, so these are
     people. Signups are lifetime; scans are all-time.
    </p>

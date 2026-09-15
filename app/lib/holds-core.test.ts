@@ -5,7 +5,7 @@ import { holdRef, parseHoldRef, holdUntil, holdsDueSoon, describeHold, holdPill,
 const NOW = new Date("2026-09-07T10:00:00.000Z");
 
 test("a hold is a reservation whose owner tag names the customer", () => {
- // Reuses the reservations table exactly as checkout does — the tag is what tells a hold apart
+ // Reuses the reservations table exactly as checkout does. The tag is what tells a hold apart
  // from a buyer mid-checkout ('checkout') or an accepted offer ('offer-<token>').
  assert.equal(holdRef("Ana Ribeiro"), "hold:Ana Ribeiro");
  assert.deepEqual(parseHoldRef("hold:Ana Ribeiro"), { name: "Ana Ribeiro" });
@@ -19,7 +19,7 @@ test("anything that is not a hold parses as null", () => {
 });
 
 test("a blank name still makes a valid, findable hold", () => {
- // She often holds "for the woman in the green coat" — a name is optional, the hold is not.
+ // She often holds "for the woman in the green coat". A name is optional, the hold is not.
  assert.equal(holdRef("  "), "hold:");
  assert.deepEqual(parseHoldRef("hold:"), { name: "" });
 });
@@ -54,7 +54,7 @@ test("a hold reads as a sentence she would say", () => {
  assert.equal(describeHold({ name: "Jo", expiresAt: "2026-09-08T09:00:00.000Z" }, NOW), "Held for Jo · until tomorrow");
 });
 
-test("the status pill leads with the state, then who, then the clock — and a buyer's reservation is not a hold", () => {
+test("the status pill leads with the state, then who, then the clock, and a buyer's reservation is not a hold", () => {
  // Web Inventory and the phone print the same words, so "On hold" always means a person and
  // "Reserved" always means a checkout in progress.
  assert.equal(holdPill({ name: "Ana", expiresAt: "2026-09-10T18:00:00.000Z" }, NOW), "On hold · Ana · 3 days left");

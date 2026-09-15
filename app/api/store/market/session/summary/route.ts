@@ -7,7 +7,7 @@ import { listBringList } from "@/app/lib/market/inventory-db";
 
 export const dynamic = "force-dynamic";
 
-// GET ?session= — end-of-day summary for one market (open or closed): totals, cash vs card, what
+// GET ?session= end-of-day summary for one market (open or closed): totals, cash vs card, what
 // sold, what's left of the bring list ("pack it up").
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);

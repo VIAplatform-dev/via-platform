@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// POST /api/admin/reseed-brands — idempotently upsert every alias from BRAND_SEED
+// POST /api/admin/reseed-brands. Idempotently upsert every alias from BRAND_SEED
 // into brand_aliases (adds new brands/aliases, refreshes existing rows, wipes
 // nothing). Run after brandData gains brands; then re-run build-events so events
 // re-resolve, then check /api/admin/brand-coverage.

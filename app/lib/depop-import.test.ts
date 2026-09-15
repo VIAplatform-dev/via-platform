@@ -21,7 +21,7 @@ test("a Depop listing becomes a VYA draft, with everything she already typed", (
  assert.equal(it?.status, "draft");
 });
 
-test("sold pieces come over as sold — her history, not her stock", () => {
+test("sold pieces come over as sold. Her history, not her stock", () => {
  assert.equal(toItem(raw({ status: "sold" }), 12)?.status, "sold");
  // Anything else is a draft; Depop has no third state we act on.
  assert.equal(toItem(raw({ status: "reserved" }), 12)?.status, "draft");

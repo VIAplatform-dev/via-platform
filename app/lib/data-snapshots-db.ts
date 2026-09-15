@@ -9,7 +9,7 @@ import {
 } from "./data-products-db";
 
 // ---------------------------------------------------------------------------
-// Data Layer snapshots — the scalable backbone of VYA's B2B data products.
+// Data Layer snapshots. The scalable backbone of VYA's B2B data products.
 //
 // Every load of /admin/data re-runs a dozen heavy aggregate queries (heat
 // indices across views/favorites/searches/sales, demand, GMV). That doesn't
@@ -18,7 +18,7 @@ import {
 //
 // This module computes the whole data layer ONCE per day in a cron and stores
 // it as a single dated JSONB row. The dashboard then reads the latest row
-// instantly, and — crucially — every day we keep one more snapshot, so the
+// instantly, and, crucially: every day we keep one more snapshot, so the
 // data layer accumulates a real TIME SERIES. That history is what powers
 // trend lines, week-over-week momentum, and the syndicated resale report.
 // ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ function db() {
 }
 
 // The full payload we freeze each day. Kept as a loose record so adding a new
-// data product later doesn't require a migration — just write more into it.
+// data product later doesn't require a migration, just write more into it.
 export type DataSnapshotPayload = {
  brandHeat: Awaited<ReturnType<typeof getBrandHeatIndex>>;
  categoryHeat: Awaited<ReturnType<typeof getCategoryHeat>>;
@@ -60,7 +60,7 @@ async function ensureTable(sql: ReturnType<typeof db>) {
  `;
 }
 
-// Compute the entire data layer and upsert today's row. Idempotent — running it
+// Compute the entire data layer and upsert today's row. Idempotent: running it
 // twice in a day just refreshes that day's snapshot.
 export async function computeAndStoreSnapshot(periodDays = 30): Promise<DataSnapshot> {
  const sql = db();
@@ -93,7 +93,7 @@ export async function computeAndStoreSnapshot(periodDays = 30): Promise<DataSnap
  return { date: rows[0].date, generatedAt, periodDays, payload };
 }
 
-// Read the most recent stored snapshot (fast — single indexed row). Returns
+// Read the most recent stored snapshot (fast: single indexed row). Returns
 // null if no snapshot has been generated yet.
 export async function getLatestSnapshot(): Promise<DataSnapshot | null> {
  const sql = db();

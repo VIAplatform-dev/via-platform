@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return false;
 }
 
-// POST [?store=slug] — one-time backfill: clean HTML out of item descriptions that were imported
+// POST [?store=slug]: one-time backfill: clean HTML out of item descriptions that were imported
 // before cleanDescription ran at import time. Turns raw "<p>…</p><ul><li>…</li></ul>" into the same
 // tidy plain text new imports now get. Idempotent (only writes rows that actually change). Optional
 // ?store= limits it to one store; omit to sweep every store.

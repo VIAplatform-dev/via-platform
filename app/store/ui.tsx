@@ -3,7 +3,7 @@
 // looks like one cohesive piece of software (Shopify/Stripe-style) instead of
 // ad-hoc Tailwind. Palette: warm-neutral "stone" greys + a single restrained
 // wine accent (#5D0F17). System sans, hairline borders, dense + calm.
-// The consumer surfaces (storefronts, marketplace) keep the boutique look —
+// The consumer surfaces (storefronts, marketplace) keep the boutique look,
 // this is ONLY for /store/* admin.
 // ─────────────────────────────────────────────────────────────────────────────
 import React from "react";

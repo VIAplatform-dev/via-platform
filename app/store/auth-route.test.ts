@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { destinationAfterAuth, loginHref, safeNext } from "./auth-route.ts";
 
-// The seller sign-in has exactly one job — put the right person in the right place — and getting it
+// The seller sign-in has exactly one job, put the right person in the right place, and getting it
 // wrong is what "it keeps telling me to log in when I'm already logged in" actually is. The branches
 // below are the four answers whoami can give, plus the redirect that carries someone back to where
 // they were headed.
@@ -33,7 +33,7 @@ test("a seller with a store is returned to where she was headed", async () => {
 });
 
 test("a brand-new signup goes to onboarding, not to `next`", async () => {
- // Setting the shop up comes first — `next` would drop her into an empty workspace.
+ // Setting the shop up comes first. `next` would drop her into an empty workspace.
  const s = stubWhoAmI([{ status: 200, body: { admin: false, needsOnboarding: true } }]);
  assert.equal(await destinationAfterAuth("/admin/orders"), "/onboarding");
  s.restore();
@@ -47,7 +47,7 @@ test("the owner lands in the workspace like any store", async () => {
 
 test("the localhost dev shortcut is not treated as a sign-in", async () => {
  // whoami answers "owner" from NODE_ENV alone on `next dev`, but the proxy won't honour it. Acting
- // on it sent the browser into the workspace, straight back out, and round again — the sign-in page
+ // on it sent the browser into the workspace, straight back out, and round again. The sign-in page
  // reloading forever. The form must simply render.
  const s = stubWhoAmI([{ status: 200, body: { admin: true, slug: "via-admin", dev: true } }]);
  assert.equal(await destinationAfterAuth("/admin/home"), "/store/login");
@@ -104,7 +104,7 @@ test("loginHref carries the destination and swaps between sign-in and sign-up", 
  assert.equal(loginHref("https://evil.example"), "/store/login");
 });
 
-test("a `next` pointing at onboarding is refused — it is a router, not a destination", () => {
+test("a `next` pointing at onboarding is refused. It is a router, not a destination", () => {
  // This was an infinite loop in production: /admin/onboarding bounced the owner to /store/login,
  // which honoured ?next=/admin/onboarding and sent her straight back. Anyone who genuinely needs
  // onboarding is routed there by destinationAfterAuth itself, so the parameter is never needed.

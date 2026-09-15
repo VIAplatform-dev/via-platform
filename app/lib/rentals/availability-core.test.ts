@@ -108,7 +108,7 @@ test("a rental is refused when its BAND clashes, even if the rented days don't",
  const taken = blockedBand(span("2026-09-20", 5), S);
  assert.deepEqual(taken, { start: "2026-09-19", end: "2026-09-28" });
 
- // Nobody is wearing it on the 26th, but it's in a garment bag — refused.
+ // Nobody is wearing it on the 26th, but it's in a garment bag. Refused.
  assert.deepEqual(quote(span("2026-09-26", 5), S, TIERS, TODAY, [taken]), { ok: false, reason: "unavailable" });
 
  // The 29th LOOKS free: the previous renter is long gone and cleaning ends on the 28th. It isn't.
@@ -116,7 +116,7 @@ test("a rental is refused when its BAND clashes, even if the rented days don't",
  // is the case that silently double-books a one-of-one garment if you only compare rented days.
  assert.deepEqual(quote(span("2026-09-29", 5), S, TIERS, TODAY, [taken]), { ok: false, reason: "unavailable" });
 
- // The 30th is genuinely clear — its band opens on the 29th.
+ // The 30th is genuinely clear. Its band opens on the 29th.
  assert.equal(quote(span("2026-09-30", 5), S, TIERS, TODAY, [taken]).ok, true);
 });
 
@@ -182,7 +182,7 @@ test("a max below the min is widened rather than left unbookable", () => {
 test("incoherent combinations are reported, not silently accepted", () => {
  const w = settingsWarnings(resolveSettings({ security: "deposit", depositCents: 20000, maxDays: 28 }));
  assert.ok(w.includes("deposit-outlives-authorisation")); // 7-day auth vs 28-day rental
- // Appointments moved out of rental settings entirely — a shop that only sells still takes them —
+ // Appointments moved out of rental settings entirely, a shop that only sells still takes them,
  // so a pickup-only store no longer warns about them here.
  const p = settingsWarnings(resolveSettings({ fulfilment: "pickup", prepaidLabel: true }));
  assert.deepEqual(p, ["pickup-with-prepaid-label"]);

@@ -10,14 +10,14 @@ test("a collection the seller has filed shows what they filed", () => {
  assert.equal(r.renderEmpty, false);
 });
 
-test("nothing filed, but the captured page knows what was on it — use that", () => {
+test("nothing filed, but the captured page knows what was on it. Use that", () => {
  // A hand-curated collection ("collection-1", six pieces someone dragged in) has no pattern behind
  // it, but the page we copied still lists exactly which products belonged there.
  const r = chooseCollectionItems({ assigned: [], fromCapturedGrid: [a, b] });
  assert.deepEqual(r.items, [a, b]);
 });
 
-test("an empty collection renders EMPTY — never the whole shop", () => {
+test("an empty collection renders EMPTY, never the whole shop", () => {
  // blummier had 47 collections in this state, ange-archive 4. Every one of them served the seller's
  // entire catalogue: click "Alaïa" and get all 164 pieces, click "Blumarine" and get the same 164.
  // Those collections are empty on the sellers' own sites too, so empty is the 1:1 answer.
@@ -35,7 +35,7 @@ test("a collection whose pieces we no longer hold renders empty too", () => {
 });
 
 test("the shop-all page is not a collection and keeps showing everything", () => {
- // /collections/all means the whole catalogue by definition — the one page where "everything" is
+ // /collections/all means the whole catalogue by definition. The one page where "everything" is
  // the correct answer.
  const r = chooseCollectionItems({ assigned: [a, b, c], fromCapturedGrid: [], isShopAll: true });
  assert.deepEqual(r.items, [a, b, c]);
@@ -50,7 +50,7 @@ test("shop-all with no inventory does not blank the store", () => {
 });
 
 test("a collection we have synced and found empty is shown empty, not refilled from the capture", () => {
- // shop-vintage-charm had FIFTEEN collections reading exactly `6/0` — six products on our copy,
+ // shop-vintage-charm had FIFTEEN collections reading exactly `6/0`. Six products on our copy,
  // none on hers. Athleisure, All Mini, Occasions Cards: empty on her site today, and on ours still
  // showing the six pieces that happened to be in them on the day we photographed the page.
  //
@@ -62,7 +62,7 @@ test("a collection we have synced and found empty is shown empty, not refilled f
 });
 
 test("a collection we have never read still falls back to the capture", () => {
- // The fallback is not wrong — it is the best answer available when nothing has been synced. What
+ // The fallback is not wrong. It is the best answer available when nothing has been synced. What
  // was wrong was using it when we DID know better.
  const got = chooseCollectionItems({ assigned: [], fromCapturedGrid: ["a", "b"], membershipKnown: false });
  assert.deepEqual(got.items, ["a", "b"]);

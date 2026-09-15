@@ -1,7 +1,7 @@
 // Shared plumbing for the Shopify-shaped cart routes: who is this store, whose cart is this, and
 // how do we answer in the theme's own dialect.
 //
-// The cart itself is VYA's existing storefront cart (`storefront-cart-db` + the `via_cart` cookie) —
+// The cart itself is VYA's existing storefront cart (`storefront-cart-db` + the `via_cart` cookie),
 // deliberately NOT a second cart. A shopper who adds through the theme's drawer and then goes to
 // VYA's checkout must be looking at the same bag.
 import { NextRequest, NextResponse } from "next/server";
@@ -15,7 +15,7 @@ import { buildCart, type CartLineItem, type ShopifyCart } from "./cart-json";
 export const CART_COOKIE = "via_cart";
 
 /**
- * The store this request is for, derived from the HOST — not from a header or a query parameter.
+ * The store this request is for, derived from the HOST, not from a header or a query parameter.
  *
  * The host is what actually routed the request, so it can't be re-pointed by a script running on the
  * page. A spoofable `x-store` header would let the seller's own JavaScript address another seller's
@@ -50,7 +50,7 @@ export function withCartCookie(res: NextResponse, token: string, isNew: boolean)
  *
  * and the mini-cart's Checkout button (which throws without it) on this cookie. Miss it and a
  * shopper's bag looks empty on every page they open afterwards, however much is really in it.
- * Deliberately NOT httpOnly — the seller's own script is what reads it.
+ * Deliberately NOT httpOnly: the seller's own script is what reads it.
  */
 export function withSqsCartFlag(res: NextResponse, hasCart: boolean): NextResponse {
  if (hasCart) res.cookies.set("hasCart", "true", { maxAge: 60 * 60 * 24 * 30, path: "/", httpOnly: false, sameSite: "lax" });
@@ -59,12 +59,12 @@ export function withSqsCartFlag(res: NextResponse, hasCart: boolean): NextRespon
 }
 
 /** Load the visitor's cart and render it in Shopify's shape. Sold/removed pieces drop out on their
- *  own — one-of-one inventory means availability is the status, not a count. */
+ *  own: one-of-one inventory means availability is the status, not a count. */
 export async function currentCart(token: string, sellerId?: string | null): Promise<ShopifyCart> {
  return buildCart(await cartLines(token, sellerId), token);
 }
 
-/** The visitor's cart as plain VYA pieces, before any platform's dialect is applied — Shopify's
+/** The visitor's cart as plain VYA pieces, before any platform's dialect is applied. Shopify's
  *  above, Squarespace's in sqs-cart-json.ts. Both drop sold and removed pieces here, so every
  *  surface counts the same bag. */
 export async function cartLines(token: string, sellerId?: string | null): Promise<CartLineItem[]> {
@@ -108,7 +108,7 @@ export function cartResponse(cart: ShopifyCart, status = 200): NextResponse {
  return NextResponse.json(cart, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-/** Shopify's error shape — themes render `description` in the drawer. */
+/** Shopify's error shape: themes render `description` in the drawer. */
 export function errorResponse(description: string, status = 422): NextResponse {
  return NextResponse.json({ status, message: "Cart Error", description }, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -117,7 +117,7 @@ export function errorResponse(description: string, status = 422): NextResponse {
  * Read a theme's request body whichever way it was sent.
  *
  * Themes post Add-to-cart as JSON *or* as a classic form encoding depending on the theme and on
- * whether their JS ran — both must work, or Add-to-cart silently does nothing.
+ * whether their JS ran. Both must work, or Add-to-cart silently does nothing.
  */
 export async function readBody(request: NextRequest): Promise<Record<string, unknown>> {
  const type = (request.headers.get("content-type") || "").toLowerCase();

@@ -16,7 +16,7 @@ import { getPriceDropCandidates, recordPriceDropNotificationsSent } from "@/app/
 import { sendPriceDropEmails } from "@/app/lib/email";
 
 // Strip "reach out to <email>" / contact-request boilerplate that sellers put in
-// their product descriptions — on VYA, buyers contact through the store, not the
+// their product descriptions, on VYA, buyers contact through the store, not the
 // seller's email, so these lines shouldn't surface on listings.
 function stripContactLines(desc: string | null | undefined): string | undefined {
  if (!desc) return desc ?? undefined;
@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
  const { count: productCount, inserted, updated, priceDrops } = await syncProducts(storeSlug, storeName, products);
 
  // Learn from the import: every synced listing becomes a labeled training example
- // immediately (idempotent — ON CONFLICT DO NOTHING), so a store pulling their Shopify
+ // immediately (idempotent, ON CONFLICT DO NOTHING), so a store pulling their Shopify
  // over feeds the reference dataset right away. They're also usable as VYA comps at once
  // (getVyaComps reads the products table live); photo embedding follows via the
  // embed-reference-index cron. Never let a training-capture hiccup break the sync.

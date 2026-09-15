@@ -6,7 +6,7 @@ import { useAuth } from "../../lib/auth";
 import { colors, fonts, spacing } from "../../lib/theme";
 
 // Your conversations with stores. A thread is opened against a specific piece, which is why the
-// item title sits under the store name — "is this still available" is meaningless without it.
+// item title sits under the store name. "is this still available" is meaningless without it.
 
 type ConversationSummary = {
   id: number;

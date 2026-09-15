@@ -13,7 +13,7 @@ function resend() {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// GET — current sender + domain status (DNS records, verified), plus sensible defaults to
+// GET: current sender + domain status (DNS records, verified), plus sensible defaults to
 // pre-fill: the email the store signed into VYA with (reply-to), and the storefront's own
 // custom domain (domain authentication) so they don't have to retype what VYA already knows.
 export async function GET(request: NextRequest) {
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, sender, settings, accountEmail, storefrontDomain });
 }
 
-// PATCH { fromName?, replyTo?, sendingEmail? } — the store's display name + reply-to,
+// PATCH { fromName?, replyTo?, sendingEmail? }: the store's display name + reply-to,
 // and (once the domain is verified) which address to send from.
 export async function PATCH(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest) {
  // reply-to is on a domain she has already authenticated, it becomes the sending address too, so
  // the two agree without her finding a third box.
  //
- // Where it is NOT — a gmail address, or a domain she hasn't authenticated — the sending address
+ // Where it is NOT, a gmail address, or a domain she hasn't authenticated. The sending address
  // cannot follow it. Mail from an address we aren't authorised to send as fails SPF and DKIM and
  // lands in spam, which costs her the campaign rather than annoying her. That case is explained
  // on the page instead of being silently half-applied.
@@ -69,8 +69,8 @@ export async function PATCH(request: NextRequest) {
  return NextResponse.json({ ok: true, sender: await resolveStoreSender(slug), settings: await getEmailSettings(slug) });
 }
 
-// POST { domain } — start authenticating a domain (creates it in Resend, returns the
-// DNS records to add). POST { action: "verify" } — re-check verification.
+// POST { domain }: start authenticating a domain (creates it in Resend, returns the
+// DNS records to add). POST { action: "verify" }: re-check verification.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

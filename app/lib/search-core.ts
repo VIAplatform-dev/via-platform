@@ -1,8 +1,8 @@
 // What the global search reads off an item, and the one word it prints for its state. Pure.
 //
 // The haystack used to be title/brand/category/size, which meant "Kempton" (where it came from),
-// "scuffed toe" (a flaw) and "one loose button" (the condition note) — all things a seller
-// remembers a piece BY — found nothing. And a held piece's sub line said "reserved", the same word
+// "scuffed toe" (a flaw) and "one loose button" (the condition note): all things a seller
+// remembers a piece BY. Found nothing. And a held piece's sub line said "reserved", the same word
 // as a buyer mid-checkout, so the ⌘K answer to "is the green Fendi still held for Ana" was wrong.
 
 export type SearchableItem = {

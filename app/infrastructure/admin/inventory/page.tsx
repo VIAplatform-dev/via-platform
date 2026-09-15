@@ -21,7 +21,7 @@ import { ITEM_STATUSES, STATUS_TONE, CATEGORY_GROUPS, OTHER_FAMILY, toCategorySl
 /**
  * Which store these calls act on.
  *
- * Without a ?store= the API resolves to whatever store the SESSION belongs to — so opening this page
+ * Without a ?store= the API resolves to whatever store the SESSION belongs to, so opening this page
  * to look at another seller's inventory silently read and edited your own store instead, and an item
  * "added to inventory" never reached the storefront being looked at.
  */
@@ -36,7 +36,7 @@ type Item = {
  sku: number; // per-store sequence by creation order (1 = the store's first item)
  title: string;
  priceCents: number;
- costCents: number | null; // seller's cost (COGS) if recorded — powers the margin column
+ costCents: number | null; // seller's cost (COGS) if recorded. Powers the margin column
  currency: string;
  images: string[];
  brand: string | null;
@@ -48,14 +48,14 @@ type Item = {
  category: string | null;
  description: string | null;
  status: ItemStatus;
- publishAt?: string | null; // set on a scheduled draft — auto-publishes at this time
+ publishAt?: string | null; // set on a scheduled draft. Auto-publishes at this time
  weightOz: number | null;
  lengthIn: number | null;
  widthIn: number | null;
  heightIn: number | null;
  collections?: string[];
  source?: string; // manual | imported | ai | market (quick-listed at a market)
- createdAt?: string; // when it went on the rail — powers the Days column
+ createdAt?: string; // when it went on the rail. Powers the Days column
  flaws?: string[] | null; // specific visible flaws, printed under Condition on the product page
  measurementsJson?: Measurement[] | null; // structured, per category (measurements-core.ts)
  conditionNote?: string | null; // beyond the grade
@@ -75,9 +75,9 @@ export default function ItemsPage() {
  const pathname = usePathname();
  const searchParams = useSearchParams();
  const deepLinkId = searchParams.get("item"); // ?item=<id> from global search → open its editor
- // ?missing=photo|price — Market Mode's "Before you sell" list deep-links straight to the items that
+ // ?missing=photo|price: Market Mode's "Before you sell" list deep-links straight to the items that
  // need fixing. Seeded from the URL once; the seller can clear it like any other filter.
- // photo | price | details | cost | confidence — the last two are Home's "no cost" and "AI prices to
+ // photo | price | details | cost | confidence: the last two are Home's "no cost" and "AI prices to
  // check" rows; `confidence` asks /api/store/attention which live pieces intake was unsure about.
  type MissingTag = "photo" | "price" | "details" | "cost" | "confidence";
  const MISSING_TAGS: MissingTag[] = ["photo", "price", "details", "cost", "confidence"];
@@ -94,7 +94,7 @@ export default function ItemsPage() {
  }, [missingTag]);
  const [quickOnly, setQuickOnly] = useState(searchParams.get("source") === "market");
  // Option J: without a ship-from address no draft can go live, and this is the page where that
- // bites — so it says so here, and every draft's pill says "blocked" (setup-gate-core.ts).
+ // bites, so it says so here, and every draft's pill says "blocked" (setup-gate-core.ts).
  const [gate, setGate] = useState<ShipFromGate | null>(null);
  useEffect(() => {
   let live = true;
@@ -103,7 +103,7 @@ export default function ItemsPage() {
    .catch(() => {});
   return () => { live = false; };
  }, []);
- // ?status=active — so the Active listings card has somewhere to go. Drafts and Sold already have
+ // ?status=active, so the Active listings card has somewhere to go. Drafts and Sold already have
  // routes of their own; without this, the one card in the middle would be the odd one out.
  const statusParam = searchParams.get("status");
  // List vs thumbnail grid (?layout=grid deep-links; the choice is remembered per device).
@@ -120,10 +120,10 @@ export default function ItemsPage() {
  const [items, setItems] = useState<Item[]>([]);
  const [importOpen, setImportOpen] = useState(false);
  const [q, setQ] = useState(""); // client-side search over title/category
- // Tag filters — the same tags the editor assigns. null = no filter on that axis.
+ // Tag filters. The same tags the editor assigns. null = no filter on that axis.
  const [filterOpen, setFilterOpen] = useState(false);
  const [statusTag, setStatusTag] = useState<ItemStatus | null>((ITEM_STATUSES as readonly string[]).includes(statusParam || "") ? (statusParam as ItemStatus) : null);
- // Sorting. Filters answer "which pieces"; sorting answers "which first" — and for a seller the
+ // Sorting. Filters answer "which pieces"; sorting answers "which first", and for a seller the
  // useful order is almost always by money, which the table could show but never order by.
  type SortKey = "recent" | "revenue" | "cost" | "margin" | "title" | "age";
  // ?sort=oldest (Home's "listed over 90 days" tile) lands on the pieces that have sat longest.
@@ -133,14 +133,14 @@ export default function ItemsPage() {
  const [famTag, setFamTag] = useState<string | null>(null);   // family alone = the whole family
  const [catTag, setCatTag] = useState<string | null>(null);      // a category inside it
  const [page, setPage] = useState(1); // client-side pagination of the rendered rows
- // Where each item is posted — real cross-listing status per platform, keyed by itemId.
+ // Where each item is posted. Real cross-listing status per platform, keyed by itemId.
  const [channels, setChannels] = useState<Record<string, { key: string; status: string }[]>>({});
  const [platformNames, setPlatformNames] = useState<Record<string, string>>({});
  const [busyId, setBusyId] = useState<string | null>(null);
  // In-page confirmations (never browser dialogs): the row × becomes "Remove? Remove · Keep"; the bulk bar
  // and owner reset do the same two-step in place.
  const [confirmRow, setConfirmRow] = useState<string | null>(null);
- const [confirmSoldRow, setConfirmSoldRow] = useState<string | null>(null); // "Mark sold" — one stray tap shouldn't need a bug report to undo
+ const [confirmSoldRow, setConfirmSoldRow] = useState<string | null>(null); // "Mark sold": one stray tap shouldn't need a bug report to undo
  const [confirmBulk, setConfirmBulk] = useState(false);
  const [confirmReset, setConfirmReset] = useState(false);
  const [soldNotice, setSoldNotice] = useState<string | null>(null);
@@ -162,11 +162,11 @@ export default function ItemsPage() {
  const units = useStoreUnits(withStore);
  const [editFlaws, setEditFlaws] = useState<string[]>([]); // one per row in the editor
  const [newFlaw, setNewFlaw] = useState("");
- // Bulk "Set cost" — an in-page dialog, never a browser prompt.
+ // Bulk "Set cost": an in-page dialog, never a browser prompt.
  const [costOpen, setCostOpen] = useState(false);
  const [costForm, setCostForm] = useState<{ mode: "each" | "total"; amount: string }>({ mode: "each", amount: "" });
  const [bulkErr, setBulkErr] = useState<string | null>(null);
- // Bulk reprice — a flat/% fill to start from, then each piece is still its own editable price:
+ // Bulk reprice: a flat/% fill to start from, then each piece is still its own editable price:
  // a flat value used to land on every selected item identically, with no way to give one of them
  // a different number without leaving the bulk action and opening it alone.
  const [repriceOpen, setRepriceOpen] = useState(false);
@@ -174,7 +174,7 @@ export default function ItemsPage() {
  const [repriceFill, setRepriceFill] = useState("");
  const [repriceErr, setRepriceErr] = useState<string | null>(null);
  const [editImages, setEditImages] = useState<string[]>([]); // photo list being edited (reorder/remove/add)
- const [cropping, setCropping] = useState<string | null>(null); // cover photo mid-reposition — the card's crop, not a full editor
+ const [cropping, setCropping] = useState<string | null>(null); // cover photo mid-reposition: the card's crop, not a full editor
  const [uploading, setUploading] = useState(false);
  const [savingEdit, setSavingEdit] = useState(false);
  // Collections: the store's collections + the ones selected for the item being edited.
@@ -218,7 +218,7 @@ export default function ItemsPage() {
  (async () => { await load(); })();
  fetch(withStore("/api/store/collections")).then((r) => (r.ok ? r.json() : null)).then((c) => c && setCols(c.collections || [])).catch(() => {});
  // Cross-listing board → which channels each item is ACTUALLY published on. "Posted on" should
- // only reflect a real, completed listing — not a started-but-unpublished ('pending') or failed one.
+ // only reflect a real, completed listing, not a started-but-unpublished ('pending') or failed one.
  fetch(withStore("/api/store/cross-listing")).then((r) => (r.ok ? r.json() : null)).then((r) => {
  if (!r) return;
  const names: Record<string, string> = {};
@@ -245,7 +245,7 @@ export default function ItemsPage() {
 
  // A new search or sub-tab resets to the first page.
  useEffect(() => { setPage(1); }, [q, statusFilter, statusTag, famTag, catTag, colTag, missingTag]);
- // The Drafts / Sold sub-tabs already pin a status — don't let a stale tag filter fight them.
+ // The Drafts / Sold sub-tabs already pin a status. Don't let a stale tag filter fight them.
  useEffect(() => { setStatusTag(null); }, [statusFilter]);
 
  async function act(id: string, action: "sold" | "remove" | "publish" | "release") {
@@ -257,11 +257,11 @@ export default function ItemsPage() {
  headers: { "Content-Type": "application/json" },
  body: JSON.stringify({ action }),
  }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
- if (action === "release" && !r) setSoldNotice("Couldn’t release that hold — a buyer may be mid-checkout on it.");
+ if (action === "release" && !r) setSoldNotice("Couldn’t release that hold. A buyer may be mid-checkout on it.");
  // On a sale, tell the seller which no-API channels they must pull the item from by hand.
  if (action === "sold") {
  const manual = (r?.pull || []).filter((p: { hasApi: boolean }) => !p.hasApi).map((p: { name: string }) => p.name);
- setSoldNotice(manual.length ? `Marked sold and pulled from your channels. Remove it on ${manual.join(" & ")} yourself — they have no API.` : "Marked sold and pulled from every connected channel.");
+ setSoldNotice(manual.length ? `Marked sold and pulled from your channels. Remove it on ${manual.join(" & ")} yourself. They have no API.` : "Marked sold and pulled from every connected channel.");
  setTimeout(() => setSoldNotice(null), 9000);
  }
  await load();
@@ -286,7 +286,7 @@ export default function ItemsPage() {
  if (editing?.id === holdFor.id) setEditing(null);
  await load();
  }
- /** The status pill everywhere on this page — the one place "On hold" vs "Reserved" is decided. */
+ /** The status pill everywhere on this page. The one place "On hold" vs "Reserved" is decided. */
  const pill = (it: { id: string; status: ItemStatus }) => (
  it.status === "draft" && gate
  ? <StatusPill tone="pending" title={gate.message}>Draft · blocked</StatusPill>
@@ -303,7 +303,7 @@ export default function ItemsPage() {
  const selectedItems = items.filter((i) => selected.has(i.id));
  const draftsSelected = selectedItems.filter((i) => i.status === "draft").length;
 
- // Reprice the selection — the analytics tab points a seller at aging stock to reprice, and a
+ // Reprice the selection: the analytics tab points a seller at aging stock to reprice, and a
  // flat/% number is the fast start, but each piece still gets its own editable field: a batch of
  // three doesn't always want the same price, and this used to be the only way to touch any of them.
  function openReprice() {
@@ -315,7 +315,7 @@ export default function ItemsPage() {
   })));
   setRepriceOpen(true);
  }
- // Fills every row from the fill box — flat or %, computed off each item's own current price so
+ // Fills every row from the fill box. Flat or %, computed off each item's own current price so
  // applying it twice doesn't compound. A row already hand-edited is fair game to overwrite too;
  // that's what "fill" means, and the seller can retype it after.
  function fillReprice() {
@@ -331,14 +331,14 @@ export default function ItemsPage() {
   }));
  }
  async function saveReprice() {
-  // An empty field parses to 0 via Number(""), so it's checked for separately — otherwise a row
+  // An empty field parses to 0 via Number(""), so it's checked for separately. Otherwise a row
   // left blank would silently save that piece at $0 instead of catching the seller's attention.
   const bad = repriceRows.find((r) => !r.value.trim() || !Number.isFinite(Number(r.value)) || Number(r.value) < 0);
   if (bad) { setRepriceErr("Every price needs to be a number, 0 or more."); return; }
   const parsed = repriceRows.map((r) => ({ id: r.id, cents: Math.round(Number(r.value) * 100) }));
   setRepriceErr(null);
   setBulkBusy(true);
-  // One request per item — the existing PATCH already validates ownership per id.
+  // One request per item. The existing PATCH already validates ownership per id.
   for (const p of parsed) {
    await fetch(withStore(`/api/store/items/${p.id}`), {
     method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -366,7 +366,7 @@ export default function ItemsPage() {
  setBulkBusy(false);
  }
  // Re-tag the selected items' categories from their photos. The model only ever answers with a
- // slug from the taxonomy or nothing — items it can't place keep whatever they had.
+ // slug from the taxonomy or nothing. Items it can't place keep whatever they had.
  async function tagWithAi() {
  const ids = [...selected];
  if (!ids.length) return;
@@ -377,7 +377,7 @@ export default function ItemsPage() {
  body: JSON.stringify({ ids }),
  }).then((x) => x.json()).catch(() => null);
  setBulkBusy(false);
- if (!r?.ok) { setAiNotice(r?.error || "Couldn’t tag those — try again."); return; }
+ if (!r?.ok) { setAiNotice(r?.error || "Couldn’t tag those: try again."); return; }
  setAiNotice(
  `Tagged ${r.tagged} item${r.tagged === 1 ? "" : "s"}` +
  (r.skipped ? ` · ${r.skipped} left alone (couldn’t tell from the photo)` : "") +
@@ -416,7 +416,7 @@ export default function ItemsPage() {
  setBulkBusy(false);
  }
 
- // ── Edit a single item (any status, including drafts) — full listing edit ──
+ // ── Edit a single item (any status, including drafts). Full listing edit ──
  const cents2str = (c: number | null) => (c == null ? "" : (c / 100).toFixed(0));
  const num2str = (n: number | null) => (n == null ? "" : String(n));
  function openEdit(it: Item) {
@@ -464,7 +464,7 @@ export default function ItemsPage() {
  size: editForm.size, ...(editForm.category ? { category: editForm.category } : {}), description: editForm.description, status: editForm.status,
  weightOz: n(editForm.weightOz), lengthIn: n(editForm.lengthIn), widthIn: n(editForm.widthIn), heightIn: n(editForm.heightIn),
  images: editImages, collections: colsForSave,
- // Whatever is still in the "add a flaw" box counts — same rule as the collection box below.
+ // Whatever is still in the "add a flaw" box counts. Same rule as the collection box below.
  flaws: newFlaw.trim() ? [...editFlaws, newFlaw.trim()] : editFlaws,
  // Structure: the grade sits in `condition`, her words in the note, the template's numbers as a
  // list (empties omitted). A list clears the old free-text column server-side.
@@ -507,8 +507,8 @@ export default function ItemsPage() {
  const base = items
  .filter((i) => (statusFilter ? i.status === statusFilter : true))
  .filter((i) => (term ? `${i.title} ${i.brand || ""} ${i.category || ""} ${i.size || ""} sku-${1000 + i.sku} ${(i.collections || []).join(" ")} ${i.status}`.toLowerCase().includes(term) : true));
- // An item matches the category filter if it's the exact tag, or — when only a family is
- // picked — anything inside that family (so "Bags" catches Totes, Clutches and Crossbody too).
+ // An item matches the category filter if it's the exact tag, or, when only a family is
+ // picked. Anything inside that family (so "Bags" catches Totes, Clutches and Crossbody too).
  const inCategory = (i: Item) => {
  const s = slugOf.get(i.id);
  if (catTag) return s === catTag;
@@ -531,7 +531,7 @@ export default function ItemsPage() {
  famCounts[f] = (famCounts[f] || 0) + 1;
  }
  }
- // Every subcategory of a present family is offered, not just the ones currently in use —
+ // Every subcategory of a present family is offered, not just the ones currently in use,
  // so a filter exists to click the moment an item is retagged into it.
  const filterGroups: { label: string; values: string[] }[] = [
  ...CATEGORY_GROUPS.filter((g) => famsPresent.has(g.label)).map((g) => ({ label: g.label, values: [...g.slugs] as string[] })),
@@ -544,7 +544,7 @@ export default function ItemsPage() {
 
  // A real filter button.
  //
- // Status, category and collection have always been filterable — from dropdowns hidden inside the
+ // Status, category and collection have always been filterable, from dropdowns hidden inside the
  // table's column headers, which nobody opens and which vanish entirely in the thumbnail view. So
  // the feature existed and the seller could not find it. One button, everything in it, a count of
  // what is on, and one way to clear.
@@ -653,7 +653,7 @@ export default function ItemsPage() {
  .sort((a, b) => {
   if (sortKey === "recent") return 0; // the list already arrives newest-first
   const marginOf = (i: Item) => (i.priceCents > 0 && i.costCents != null ? (i.priceCents - i.costCents) / i.priceCents : -Infinity);
-  // Only a live piece is "on the rail" — a sold or drafted one has no age to sort by, so it sinks.
+  // Only a live piece is "on the rail". A sold or drafted one has no age to sort by, so it sinks.
   const ageOf = (i: Item) => (i.status === "active" ? (daysListed(i.createdAt) ?? -1) : -1);
   const v = sortKey === "title" ? a.title.localeCompare(b.title)
    : sortKey === "revenue" ? (a.priceCents || 0) - (b.priceCents || 0)
@@ -664,10 +664,10 @@ export default function ItemsPage() {
  });
  const allChecked = shown.length > 0 && shown.every((i) => selected.has(i.id));
 
- // Exports everything currently filtered, not just the rendered page — an export
+ // Exports everything currently filtered, not just the rendered page. An export
  // that silently stops at the pagination boundary is worse than none.
  // Everything the editor holds: the flaws list, where it came from and when, the lot, how long
- // it has been on the rail, the condition note and the measurements — a spreadsheet that says
+ // it has been on the rail, the condition note and the measurements. A spreadsheet that says
  // less than the page is a spreadsheet she has to go back to the page for.
  function exportCsv() {
   const rows = shown.map((i) => [
@@ -683,7 +683,7 @@ export default function ItemsPage() {
   ));
  }
 
- // Paginate the RENDERED rows — a big inventory (hundreds of image rows) is slow to paint all at
+ // Paginate the RENDERED rows. A big inventory (hundreds of image rows) is slow to paint all at
  // once. Filtering, search, counts and select-all still run over the full set; only the DOM is capped.
  const PAGE_SIZE = 40;
  const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
@@ -692,11 +692,11 @@ export default function ItemsPage() {
 
  const heading = statusFilter === "draft" ? "Drafts" : statusFilter === "sold" ? "Sold" : "Inventory";
 
- // Collections cell — every collection the item sits in, as small chips (tap = filter by it).
+ // Collections cell: every collection the item sits in, as small chips (tap = filter by it).
  const chipCls = "inline-flex items-center rounded-full px-2 py-[3px] text-[10.5px] font-medium leading-none";
  const collectionsCell = (it: Item) => {
  const cs = it.collections || [];
- if (!cs.length) return <span className="text-stone-300">—</span>;
+ if (!cs.length) return <span className="text-stone-300">-</span>;
  return (
  <div className="flex flex-wrap items-center gap-1">
  {cs.slice(0, 3).map((c) => <button key={c} type="button" onClick={() => setColTag(c)} className={cn(chipCls, "bg-stone-100 text-stone-600 hover:bg-stone-200")}>{c}</button>)}
@@ -704,7 +704,7 @@ export default function ItemsPage() {
  </div>
  );
  };
- // "Posted on" cell — Store (live on the VYA storefront) + each real cross-listed channel.
+ // "Posted on" cell: Store (live on the VYA storefront) + each real cross-listed channel.
  const postedCell = (it: Item) => {
  const chs = channels[it.id] || [];
  const live = it.status === "active" || it.status === "reserved";
@@ -743,7 +743,7 @@ export default function ItemsPage() {
  );
  };
 
- // Wider than the standard admin page — this table has 9 columns and shouldn't need to scroll.
+ // Wider than the standard admin page. This table has 9 columns and shouldn't need to scroll.
  return (
  <AdminPage className="max-w-[92rem]">
  <AdminHeader
@@ -760,7 +760,7 @@ export default function ItemsPage() {
  }
  />
 
- {/* "Are your products on Depop?" — asked once, and only of a store building from scratch. This is
+ {/* "Are your products on Depop?". Asked once, and only of a store building from scratch. This is
      the screen where an empty inventory is actually felt, so it is where the offer belongs. The card
      decides for itself whether to appear; see DepopImportPrompt. */}
  <DepopImportPrompt />
@@ -783,10 +783,10 @@ export default function ItemsPage() {
  </div>
  )}
 
- {/* Real inventory snapshot — counts from the items list (no fabricated trend/delta). */}
+ {/* Real inventory snapshot: counts from the items list (no fabricated trend/delta). */}
  {items.length > 0 && (
  <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
- {/* Clickable. A count is a question — "which four?" — and the answer was two dropdowns away in
+ {/* Clickable. A count is a question. "which four?", and the answer was two dropdowns away in
      a column header nobody opens. These are the obvious place to reach for. */}
  <MetricCard label="Active listings" value={counts.active} sub={`${money0(activeValueCents)} live value`} href="/admin/inventory?status=active" />
  <MetricCard label="Drafts" value={counts.draft} sub={counts.draft ? "Ready to publish" : "None waiting"} href="/admin/inventory/drafts" />
@@ -811,7 +811,7 @@ export default function ItemsPage() {
  </div>
  )}
 
- {/* Bulk action bar — appears when items are selected (e.g. publish a whole drop). */}
+ {/* Bulk action bar: appears when items are selected (e.g. publish a whole drop). */}
  {selected.size > 0 && (
  <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white px-4 py-2.5 text-[13px] shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
  <span className="font-medium text-stone-700">{selected.size} selected</span>
@@ -857,8 +857,8 @@ export default function ItemsPage() {
  )}
 
  {/* The toolbar (search, view, filters) lives ABOVE the results switch on purpose. It used to be
-     rendered inside each results branch, so the moment a search matched nothing the whole branch —
-     toolbar included, with the input she was typing in — was replaced by the empty state. Focus
+     rendered inside each results branch, so the moment a search matched nothing the whole branch,
+     toolbar included, with the input she was typing in. Was replaced by the empty state. Focus
      vanished mid-word and Backspace had nothing to act on. Mounted here it survives every state. */}
  <div className="mb-3">
  <ViewToggle value={layout} onChange={changeLayout} count={shown.length} q={q} onQuery={setQ} quick={{ total: quickCount, needs: detailsCount, on: quickOnly, needsOn: missingTag === "details", toggle: () => setQuickOnly((v) => !v), toggleNeeds: () => { setMissingTag((m) => (m === "details" ? null : "details")); setQuickOnly(true); } }} filter={filterMenu} />
@@ -867,7 +867,7 @@ export default function ItemsPage() {
  <TechEmpty
  icon={<Package size={28} strokeWidth={1.5} />}
  title={term || filtering ? "No matches" : statusFilter ? `No ${statusLabel(statusFilter)} items` : "No items yet"}
- body={term || filtering ? "Try a different search, or clear the filters in the table headers." : "Snap a photo and VYA drafts the listing for you — title, description, and a ghost-mannequin image."}
+ body={term || filtering ? "Try a different search, or clear the filters in the table headers." : "Snap a photo and VYA drafts the listing for you. Title, description, and a ghost-mannequin image."}
  action={term ? undefined : filtering
  ? <TechButton variant="secondary" onClick={clearFilters}>Clear filters</TechButton>
  : <TechButtonLink href={withStore("/admin/add-listing")}>Snap your first piece</TechButtonLink>}
@@ -900,8 +900,8 @@ export default function ItemsPage() {
  ) : (
  <TechCard className="overflow-hidden">
  {/* A phone gets a card per piece. The table below it is ten columns, which could only scroll
-     sideways in a 340px card; everything a row can do — select, open, publish, sell, hold,
-     remove — is on the card too. */}
+     sideways in a 340px card; everything a row can do. Select, open, publish, sell, hold,
+     remove: is on the card too. */}
  <div className="sm:hidden">
  <label className="flex items-center gap-3 border-b border-stone-100 px-4 py-2.5 text-[12px] text-stone-500">
  <input type="checkbox" checked={allChecked} onChange={toggleAll} className="h-5 w-5 cursor-pointer accent-[var(--accent,#0e9f76)]" />
@@ -941,7 +941,7 @@ export default function ItemsPage() {
  <thead>
  <tr>
  <TH className="w-9 pl-4 pr-2"><input type="checkbox" checked={allChecked} onChange={toggleAll} className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent,#0e9f76)]" aria-label="Select all" /></TH>
- {/* Category and Status get their own filterable headers — see HeaderFilter. */}
+ {/* Category and Status get their own filterable headers. See HeaderFilter. */}
  <TH className="px-3"><button type="button" onClick={() => sortBy("title")} className="inline-flex items-center gap-1 transition hover:text-stone-700">Item{sortKey === "title" && <span className="text-[9px]">{sortDesc ? "▼" : "▲"}</span>}</button></TH>
  <TH className="px-3">
        {filterGroups.length > 0 ? (
@@ -1019,19 +1019,19 @@ export default function ItemsPage() {
  <TD className="px-3">
        {(() => {
  const s = slugOf.get(it.id);
- if (!s) return <span className="text-stone-300">—</span>;
- // A custom category shows in lighter grey — it sits outside the taxonomy on purpose.
+ if (!s) return <span className="text-stone-300">-</span>;
+ // A custom category shows in lighter grey. It sits outside the taxonomy on purpose.
  return isCanonicalCategory(s)
  ? <span className="whitespace-nowrap text-stone-600">{categoryValueLabel(s)}</span>
  : <span className="whitespace-nowrap text-stone-400" title="Custom category">{s}</span>;
  })()}
  </TD>
  <TD right className="px-3 font-medium text-stone-800">${(it.priceCents / 100).toFixed(0)}</TD>
- <TD right className="hidden px-3 text-stone-500 xl:table-cell">{it.costCents ? `$${(it.costCents / 100).toFixed(0)}` : "—"}</TD>
+ <TD right className="hidden px-3 text-stone-500 xl:table-cell">{it.costCents ? `$${(it.costCents / 100).toFixed(0)}` : "-"}</TD>
  <TD right className="hidden px-3 tabular-nums xl:table-cell">
  {(() => {
  const d = it.status === "active" ? daysListed(it.createdAt) : null;
- if (d === null) return <span className="text-stone-300">—</span>;
+ if (d === null) return <span className="text-stone-300">-</span>;
  // Colour only once the number is a decision: 60 days asks a question, 90 answers it.
  const tone = d >= AGING_THRESHOLDS.stale ? "font-medium text-rose-600" : d >= AGING_THRESHOLDS.attention ? "text-amber-600" : "text-stone-500";
  return <span className={tone}>{d}</span>;
@@ -1040,7 +1040,7 @@ export default function ItemsPage() {
  <TD right className="hidden px-3 xl:table-cell">
  {(() => {
  const hasCost = it.costCents != null && it.costCents > 0;
- if (!hasCost || it.priceCents <= 0) return <span className="text-stone-300">—</span>;
+ if (!hasCost || it.priceCents <= 0) return <span className="text-stone-300">-</span>;
  const m = Math.round(((it.priceCents - (it.costCents as number)) / it.priceCents) * 100);
  return <span className={cn("font-semibold tabular-nums", m >= 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-rose-500")}>{m}%</span>;
  })()}
@@ -1063,7 +1063,7 @@ export default function ItemsPage() {
  </tbody>
  </table>
  </div>
- {/* With the filters in the headers, this rail is the only place that says a filter is on —
+ {/* With the filters in the headers, this rail is the only place that says a filter is on,
  so it shows up whenever one is, not just when the rows spill onto a second page. */}
  {(totalPages > 1 || filtering) && (
  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 px-4 py-3 text-[12px] text-stone-500">
@@ -1112,7 +1112,7 @@ export default function ItemsPage() {
  </div>
  </div>
 
- {/* Photos — reorder (‹ ›), remove (✕), add (upload). First = cover. */}
+ {/* Photos: reorder (‹ ›), remove (✕), add (upload). First = cover. */}
  <SectionLabel className="mb-2">Photos <span className="text-rose-500" title="Required to publish">*</span></SectionLabel>
  <div className="mb-4 flex flex-wrap gap-2">
  {editImages.map((src, i) => (
@@ -1121,7 +1121,7 @@ export default function ItemsPage() {
  <img src={src} alt="" className="h-full w-full object-cover" />
  {i === 0 && <span className="absolute left-0 top-0 rounded-br bg-[var(--accent,#0e9f76)] px-1 text-[8px] font-bold text-white">COVER</span>}
  {i === 0 && (
- <button type="button" aria-label="Reposition cover photo" title="Reposition — this is the crop the product card shows"
+ <button type="button" aria-label="Reposition cover photo" title="Reposition. This is the crop the product card shows"
  onClick={() => setCropping(src)}
  className="absolute right-0 top-0 rounded-bl bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:opacity-100"
  >⤢</button>
@@ -1151,12 +1151,12 @@ export default function ItemsPage() {
      {/* Vestiaire requires a colour and refuses a guessed one, so it has to be somewhere a seller can type it. */}
      <Field label="Colour"><Input value={editForm.colour} onChange={(e) => setEditForm((f) => ({ ...f, colour: e.target.value }))} placeholder="e.g. Navy" /></Field>
  </div>
- <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} placeholder="As marked on the tag — IT 40, UK 12, M" /></Field>
+ <Field label="Size"><Input value={editForm.size} onChange={(e) => setEditForm((f) => ({ ...f, size: e.target.value }))} placeholder="As marked on the tag. IT 40, UK 12, M" /></Field>
  <MeasurementFields category={editForm.category ?? editing.category} values={editForm.measurements} onChange={(m) => setEditForm((f) => ({ ...f, measurements: m }))} unit={units.unit} />
  <Field label="Category" required>
  <CategoryBreadcrumb value={editForm.category} onChange={(v) => setEditForm((f) => ({ ...f, category: v }))} />
  {!editForm.category && editing.category && (
- <p className="mt-1.5 text-[11px] text-stone-400">Currently &ldquo;{editing.category}&rdquo; — not one of the tags. Pick one to replace it.</p>
+ <p className="mt-1.5 text-[11px] text-stone-400">Currently &ldquo;{editing.category}&rdquo;, not one of the tags. Pick one to replace it.</p>
  )}
  </Field>
  <div className="grid grid-cols-3 gap-3">
@@ -1165,7 +1165,7 @@ export default function ItemsPage() {
  <Field label="Margin">
  {(() => {
  const p = Number(editForm.price) || 0; const hasCost = editForm.cost.trim() !== ""; const c = Number(editForm.cost) || 0;
- if (!hasCost || p <= 0) return <div className="flex h-9 items-center text-[13px] text-stone-300">—</div>;
+ if (!hasCost || p <= 0) return <div className="flex h-9 items-center text-[13px] text-stone-300">-</div>;
  const m = Math.round(((p - c) / p) * 100);
  return <div className={cn("flex h-9 items-center text-[13px] font-semibold tabular-nums", m >= 0 ? "text-[var(--accent-ink,#0b7a5c)]" : "text-rose-500")}>{m}%</div>;
  })()}
@@ -1175,7 +1175,7 @@ export default function ItemsPage() {
  <textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} rows={4} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </Field>
  <div data-testid="flaws-editor">
- <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Flaws <span className="font-normal text-stone-400">— one per line, shown under Condition on your store</span></label>
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Flaws <span className="font-normal text-stone-400"> one per line, shown under Condition on your store</span></label>
  {editFlaws.length > 0 && (
  <ul className="mb-2 space-y-1">
  {editFlaws.map((f, i) => (
@@ -1188,11 +1188,11 @@ export default function ItemsPage() {
  )}
  <input value={newFlaw} onChange={(e) => setNewFlaw(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = newFlaw.trim(); if (v) { setEditFlaws((a) => [...a, v]); setNewFlaw(""); } } }}
- placeholder="Add a flaw — light pilling at cuffs, scuffed toe… then Enter"
+ placeholder="Add a flaw: light pilling at cuffs, scuffed toe… then Enter"
  className="w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </div>
  <Field label="Status">
- {/* Status can't be cleared — an item is always in one. */}
+ {/* Status can't be cleared. An item is always in one. */}
  <TagRow options={ITEM_STATUSES} value={editForm.status} onChange={(v) => setEditForm((f) => ({ ...f, status: v ?? f.status }))} labelFor={statusLabel} />
  </Field>
  <ShipsAsRow weightOz={editForm.weightOz} onChange={(v) => setEditForm((f) => ({ ...f, weightOz: v }))} estimate={editing.parcelEstimate ?? null} category={editForm.category ?? editing.category} weightUnit={units.weightUnit} />
@@ -1202,7 +1202,7 @@ export default function ItemsPage() {
  <Field label="Height (in)"><Input type="number" inputMode="numeric" value={editForm.heightIn} onChange={(e) => setEditForm((f) => ({ ...f, heightIn: e.target.value }))} /></Field>
  </div>
  <div>
- <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Collections <span className="font-normal text-stone-400">— where it shows on your store</span></label>
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Collections <span className="font-normal text-stone-400"> where it shows on your store</span></label>
  <div className="flex flex-wrap gap-2">
  {cols.map((c) => {
  const on = selCols.includes(c.title);
@@ -1219,17 +1219,17 @@ export default function ItemsPage() {
  ))}
  </div>
  {/* Commits on Enter, on blur, and on save. It used to commit ONLY on Enter, so typing
-     "blazer" and pressing Save Draft threw the word away — the seller had done everything
+     "blazer" and pressing Save Draft threw the word away. The seller had done everything
      that looks like entering a collection and the piece came back without one. */}
  <input value={newCol} onChange={(e) => setNewCol(e.target.value)}
  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitNewCol(); } }}
  onBlur={commitNewCol}
- placeholder="New collection — type it, then Enter (Y2K, Designer bags…)"
+ placeholder="New collection: type it, then Enter (Y2K, Designer bags…)"
  className="mt-2 w-full rounded-lg border border-stone-200 px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-stone-400" />
  </div>
  </div>
  <RentalPanel itemId={editing.id} priceCents={Math.round((Number(editForm.price) || 0) * 100)} />
- {/* The * fields are what a LIVE listing needs. A draft can be saved half-finished —
+ {/* The * fields are what a LIVE listing needs. A draft can be saved half-finished,
  the gate only bites when the item is going (or staying) active. */}
  {(() => {
  const missing = publishBlockers(editForm, editImages);
@@ -1318,7 +1318,7 @@ export default function ItemsPage() {
  </div>
  <TechButton type="button" variant="secondary" className="h-[38px] shrink-0 px-3 text-[12px]" onClick={fillReprice}>Fill</TechButton>
  </div>
- <p className="text-[11.5px] text-stone-400">A flat price or a percentage change, applied to every row below — then edit any one of them before saving.</p>
+ <p className="text-[11.5px] text-stone-400">A flat price or a percentage change, applied to every row below, then edit any one of them before saving.</p>
  <div className="max-h-[300px] space-y-1.5 overflow-y-auto pr-1" data-testid="reprice-rows">
  {repriceRows.map((r) => (
  <div key={r.id} className="flex items-center gap-2.5 rounded-xl border border-stone-200 bg-stone-50/60 p-2">
@@ -1410,7 +1410,7 @@ export default function ItemsPage() {
  <ConfirmDialog
  open={confirmReset}
  title="Delete everything in this store?"
- body={<>All <b className="text-stone-700">{items.length}</b> items — including sold — plus their orders, payouts and collections are permanently deleted. This can’t be undone.</>}
+ body={<>All <b className="text-stone-700">{items.length}</b> items, including sold, plus their orders, payouts and collections are permanently deleted. This can’t be undone.</>}
  confirmLabel="Delete everything"
  busy={loading}
  onConfirm={clearAll}
@@ -1446,7 +1446,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
  const r = await fetch(withStore("/api/store/inventory/convert"), { method: "POST" });
  const d = await r.json();
  if (!r.ok) { setMsg(d.error || "Couldn’t import your catalog."); return; }
- setMsg(d.added > 0 ? `✓ Imported ${d.added} item${d.added === 1 ? "" : "s"} from your synced catalog — they’re now editable inventory.` : "Nothing new to import — your catalog is already in your inventory.");
+ setMsg(d.added > 0 ? `✓ Imported ${d.added} item${d.added === 1 ? "" : "s"} from your synced catalog. They’re now editable inventory.` : "Nothing new to import. Your catalog is already in your inventory.");
  } catch { setMsg("Something went wrong."); } finally { setBusy(false); }
  }
 
@@ -1457,7 +1457,7 @@ function ImportModal({ onClose }: { onClose: () => void }) {
  const r = await fetch(withStore("/api/store/items/import"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv, status: goLive ? "active" : "draft" }) });
  const d = await r.json();
  if (!r.ok) { setMsg(d.error || "Couldn’t read that file."); return; }
- setMsg(`✓ Added ${d.added} of ${d.found} item${d.found === 1 ? "" : "s"}${goLive ? " — live now." : " as drafts — review and publish when ready."}`);
+ setMsg(`✓ Added ${d.added} of ${d.found} item${d.found === 1 ? "" : "s"}${goLive ? ": live now." : " as drafts. Review and publish when ready."}`);
  setCsv("");
  } catch { setMsg("Something went wrong."); } finally { setBusy(false); }
  }
@@ -1481,12 +1481,12 @@ function ImportModal({ onClose }: { onClose: () => void }) {
 
  {tab === "catalog" ? (
  <div className="space-y-3">
- <p className="text-[13px] leading-relaxed text-stone-600">If you connected Shopify (or another store), your products are already browsable on VYA but read-only. Import them here to turn them into managed inventory you can edit, reprice, and relist.</p>
+ <p className="text-[13px] leading-relaxed text-stone-600">Turn your synced products into inventory you can edit, reprice and relist.</p>
  <TechButton className="w-full" disabled={busy} onClick={importCatalog}>{busy ? "Importing…" : "Import my synced catalog"}</TechButton>
  </div>
  ) : (
  <div className="space-y-3">
- <p className="text-[13px] leading-relaxed text-stone-600">Paste or upload a CSV. We’ll map the columns automatically — a title and price are all that’s required (brand, size, condition, image URL, etc. come over too if present).</p>
+ <p className="text-[13px] leading-relaxed text-stone-600">Paste or upload a CSV. Columns are mapped automatically. Only a title and price are required; everything else comes over if it is there.</p>
  <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} />
  <button type="button" onClick={() => fileRef.current?.click()} className="w-full rounded-lg border border-dashed border-stone-300 py-2.5 text-[13px] text-stone-500 hover:border-stone-400 hover:text-stone-700">Choose a CSV file…</button>
  <textarea value={csv} onChange={(e) => setCsv(e.target.value)} rows={5} placeholder="…or paste your rows here (title, price, brand, size, condition, image URL)" className="w-full resize-none rounded-lg border border-stone-200 p-3 text-[12px] text-stone-800 outline-none focus:border-[var(--accent,#0e9f76)]" />
@@ -1511,7 +1511,7 @@ function ViewToggle({ value, onChange, count, inCard, q, onQuery, quick, filter 
  );
  return (
  // Wraps on a phone: the count + quick chips, the filter and the view switch share one row and the search
- // takes a full-width row of its own — squeezed into the leftover gap it was a 32px circle.
+ // takes a full-width row of its own. Squeezed into the leftover gap it was a 32px circle.
  <div className={cn("flex flex-wrap items-center justify-between gap-x-3 gap-y-2", inCard ? "border-b border-stone-100 px-4 py-2" : "mb-3")}>
  <span className="flex min-w-0 flex-wrap items-center gap-2 text-[12px] text-stone-400"><span><span className="font-medium text-stone-600">{count}</span> item{count === 1 ? "" : "s"}</span>
  {quick && quick.total > 0 && (

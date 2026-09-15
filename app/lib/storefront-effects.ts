@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Site effects — the motion a storefront can wear.
+// Site effects. The motion a storefront can wear.
 //
 // Why these are a CATALOGUE and not "let the seller paste JavaScript":
 // storefronts are served from vyaplatform.com/s/{handle}, the same origin as the marketplace a
@@ -30,7 +30,7 @@ export const CURSOR_EFFECTS: { value: CursorEffect; label: string; description: 
  { value: "glitter", label: "Glitter trail", description: "Specks that fall and fade behind the pointer." },
  { value: "sparkle", label: "Sparkle", description: "Four-point stars that twinkle out where the pointer goes." },
  { value: "trail", label: "Comet", description: "A smooth tail that follows the pointer and catches up." },
- { value: "ring", label: "Ring", description: "A soft circle that trails the pointer — quiet, not cute." },
+ { value: "ring", label: "Ring", description: "A soft circle that trails the pointer. Quiet, not cute." },
 ];
 
 const CURSORS = CURSOR_EFFECTS.map((e) => e.value);

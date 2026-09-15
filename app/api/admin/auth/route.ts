@@ -54,7 +54,7 @@ async function sendOtpEmail(otp: string, to: string = FALLBACK_OTP_EMAIL) {
  await resend.emails.send({
  from: "VYA Admin <hana@vyaplatform.com>",
  to,
- subject: `${otp} — VYA Admin Sign-In Code`,
+ subject: `${otp}: VYA Admin Sign-In Code`,
  html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -150,16 +150,16 @@ export async function POST(request: Request) {
  Buffer.from(validOtp.padEnd(6, " "))
  );
  if (!isMatch) {
- // Invalidate the challenge on a wrong guess so the 6-digit code can't be brute-forced —
+ // Invalidate the challenge on a wrong guess so the 6-digit code can't be brute-forced,
  // one guess per issued code. A mistyped code just means requesting a fresh one.
  cookieStore.delete("via_admin_otp");
  return NextResponse.json(
- { error: "Incorrect code — request a new one." },
+ { error: "Incorrect code: request a new one." },
  { status: 401 }
  );
  }
 
- // Valid — set auth cookie and clear OTP cookie
+ // Valid: set auth cookie and clear OTP cookie
  cookieStore.set("via_admin_token", hashPassword(expectedPassword), {
  httpOnly: true,
  secure: process.env.NODE_ENV === "production",
@@ -184,7 +184,7 @@ export async function POST(request: Request) {
  return NextResponse.json({ success: true });
  }
 
- // Step 1: password only — generate and send OTP
+ // Step 1: password only: generate and send OTP
  const otp = generateOtp();
  const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes
  const cookieStore = await cookies();

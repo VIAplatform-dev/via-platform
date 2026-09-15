@@ -1,3 +1,3 @@
-// Lives under Settings now — one place a seller looks. Re-exported rather than moved so
+// Lives under Settings now. One place a seller looks. Re-exported rather than moved so
 // existing links and bookmarks to the old path keep working.
 export { default } from "../../cross-listing/settings/page";

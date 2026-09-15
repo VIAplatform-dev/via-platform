@@ -112,7 +112,7 @@ export default function SearchAnalyticsPage() {
  ← Analytics
  </Link>
  <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Search Analytics</h1>
- <p style={{ fontSize: 13, color: GRAY, margin: "4px 0 0" }}>What people are searching — and where results fall short</p>
+ <p style={{ fontSize: 13, color: GRAY, margin: "4px 0 0" }}>What people are searching, and where results fall short</p>
  </div>
  <div style={{ display: "flex", gap: 6 }}>
  {(["7d", "30d", "all"] as DateRange[]).map((r) => (
@@ -137,9 +137,9 @@ export default function SearchAnalyticsPage() {
  </div>
  </section>
 
- {/* Zero Results — most actionable */}
+ {/* Zero Results. Most actionable */}
  <section>
- <SectionTitle>Searches with Zero Results — add inventory or fix keywords</SectionTitle>
+ <SectionTitle>Searches with Zero Results. Add inventory or fix keywords</SectionTitle>
  <div style={{ backgroundColor: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
  {data.zeroResults.length === 0 ? (
  <p style={{ color: MUTED, fontSize: 13, padding: "20px 24px", margin: 0 }}>No zero-result searches in this period.</p>
@@ -169,7 +169,7 @@ export default function SearchAnalyticsPage() {
  {/* Low Results */}
  {data.lowResults.length > 0 && (
  <section>
- <SectionTitle>Searches with Very Few Results (1–4) — poor coverage</SectionTitle>
+ <SectionTitle>Searches with Very Few Results (1–4): poor coverage</SectionTitle>
  <div style={{ backgroundColor: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}>
  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
  <thead>
@@ -226,7 +226,7 @@ export default function SearchAnalyticsPage() {
  <td style={{ padding: "10px 20px", textAlign: "right", color: GRAY, fontWeight: 600 }}>{row.searchCount}</td>
  <td style={{ padding: "10px 20px", textAlign: "right", fontWeight: 600, color: resultsColor }}>{row.avgResults}</td>
  <td style={{ padding: "10px 20px", textAlign: "right", color: zeroRatio > 0.5 ? RED : GRAY, fontSize: 12 }}>
- {row.zeroHits > 0 ? `${row.zeroHits} (${Math.round(zeroRatio * 100)}%)` : "—"}
+ {row.zeroHits > 0 ? `${row.zeroHits} (${Math.round(zeroRatio * 100)}%)` : "-"}
  </td>
  <td style={{ padding: "10px 20px", textAlign: "right", color: MUTED, fontSize: 12 }}>{fmt(row.lastSearched)}</td>
  </tr>

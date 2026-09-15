@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Sending at a fixed EASTERN hour from a UTC-only scheduler.
 //
-// Vercel cron expressions have no timezone — the docs are explicit that "the timezone is always
+// Vercel cron expressions have no timezone. The docs are explicit that "the timezone is always
 // UTC". So a single expression cannot mean "5 PM in New York": 5 PM Eastern is 21:00 UTC while
 // daylight time is in effect and 22:00 UTC the rest of the year. Pick one and the email arrives an
 // hour early or an hour late for roughly half of every year.
@@ -11,11 +11,11 @@
 //
 // It FAILS OPEN by design: the check only applies when the request carries one of our own
 // schedules. A manual trigger, or a schedule still registered on Vercel from an older deployment,
-// sends exactly as it would have before rather than being silently suppressed — a guard that can
+// sends exactly as it would have before rather than being silently suppressed. A guard that can
 // accidentally cancel the weekly email is worse than one that occasionally lets it through early.
 // ───────────────────────────────────────────────────────────────────────────
 
-/** The two UTC slots that are 5 PM Eastern — one for daylight time, one for standard time. */
+/** The two UTC slots that are 5 PM Eastern. One for daylight time, one for standard time. */
 export const FIVE_PM_EASTERN_SLOTS = ["0 21 * * 2", "0 22 * * 2"];
 
 const TARGET_HOUR = 17; // 5 PM

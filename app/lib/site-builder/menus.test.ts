@@ -39,7 +39,7 @@ test("Squarespace: two navs, one menu, with the VYA path normalised away", () =>
  assert.deepEqual(menu.items.map((i) => i.href), ["/shop", "/our-story", "/contact"]);
 });
 
-test("her order reaches BOTH copies — the desktop menu and the one the phone opens", () => {
+test("her order reaches BOTH copies. The desktop menu and the one the phone opens", () => {
  const $ = load(DAWN_MENU_HOME);
  const menu = detectMenus($)!;
  const reordered: StoredMenu = { signature: menu.signature, items: [menu.items[1], ...menu.items.filter((_, i) => i !== 1)] };
@@ -49,7 +49,7 @@ test("her order reaches BOTH copies — the desktop menu and the one the phone o
  for (const labels of copies($)) assert.deepEqual(labels, ["About Us", "Home", "Our Shoes", "Sourcing & Styling", "Shoe Blog"], "About Us first, in every copy");
 });
 
-test("a hidden page's menu links disappear — from both copies, with no stored menu at all", () => {
+test("a hidden page's menu links disappear, from both copies, with no stored menu at all", () => {
  const $ = load(DAWN_MENU_HOME);
  const r = applyMenu($, { menu: null, hidden: new Set(["/pages/about-us"]) });
  assert.equal(r.changed, true);
@@ -65,7 +65,7 @@ test("hiding also wins over a stored order that still names the page", () => {
  for (const labels of copies($)) assert.deepEqual(labels, ["Home", "About Us", "Our Shoes", "Sourcing & Styling"]);
 });
 
-test("a page with its own header is left alone — a menu is only applied where it was learned", () => {
+test("a page with its own header is left alone. A menu is only applied where it was learned", () => {
  const $ = load(DAWN_LANDING);
  const menu = detectMenus(load(DAWN_MENU_HOME))!;
  const before = $.html();
@@ -87,7 +87,7 @@ test("an item she added is cloned from one of her own, with the active markers c
   assert.ok(!/--active/.test($(el).attr("class") || ""), $(el).attr("class"));
   assert.match($(el).attr("class") || "", /list-menu__item/, "wears the theme's own classes");
  });
- // Never cloned from the item that opens a dropdown — its markup carries a whole submenu.
+ // Never cloned from the item that opens a dropdown. Its markup carries a whole submenu.
  assert.equal($('a[href="/pages/shipping"]').closest("li").find("details").length, 0);
 });
 
@@ -103,7 +103,7 @@ test("a page she renamed wears its new name in every copy of the menu, with no s
  const r = applyMenu($, { menu: null, labels: new Map([["/pages/about-us", "About us"]]) });
  assert.equal(r.changed, true);
  for (const labels of copies($)) assert.ok(labels.includes("About us"), labels.join(","));
- // The address never changes — that is the whole reason renaming needs no redirects.
+ // The address never changes. That is the whole reason renaming needs no redirects.
  assert.equal($('a[href="/pages/about-us"]').length, 3, "two menu copies plus the link in her page");
  // The theme's own markup around the words is kept.
  assert.equal($('.list-menu--inline a[href="/pages/about-us"] span').text(), "About us");

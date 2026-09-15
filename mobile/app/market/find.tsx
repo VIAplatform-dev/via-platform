@@ -11,12 +11,12 @@ import { colors, spacing, fonts } from "../../lib/theme";
 import { formatMoney } from "../../lib/seller/home";
 import { reservedWord } from "../../lib/seller/inventory";
 
-// Find item — point the phone at the piece in the buyer's hand.
+// Find item: point the phone at the piece in the buyer's hand.
 //
 // Same route as the desktop's camera panel: POST /api/store/market/match with a JPEG data URL,
 // which answers ranked candidates from the store's own inventory with their live status. A sold
-// piece can still come back at the top ("looks like X — sold") but is never sellable from here.
-// Tapping a candidate starts a cash checkout through /api/store/market/checkout — the one path.
+// piece can still come back at the top ("looks like X: sold") but is never sellable from here.
+// Tapping a candidate starts a cash checkout through /api/store/market/checkout. The one path.
 
 type Candidate = { score: number; item: { id: string; title: string; priceCents: number; currency: string; status: string; images?: string[]; image?: string | null } };
 type Match = { level: "high" | "medium" | "none"; candidates: Candidate[]; notConfigured?: boolean; unindexed?: boolean };
@@ -32,14 +32,14 @@ export default function FindItem() {
   const [error, setError] = useState<string | null>(null);
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<{ currency: string }>("/api/store/me"), enabled: !!storeSlug });
   const currency = me.data?.currency ?? "USD";
-  // "on hold" is a person; "reserved" is a buyer mid-checkout — the same words as Inventory.
+  // "on hold" is a person; "reserved" is a buyer mid-checkout. The same words as Inventory.
   const holds = useQuery({ queryKey: ["store", "holds"], queryFn: () => apiGet<{ holds: { itemId: string }[] }>("/api/store/holds"), enabled: !!storeSlug });
   const held = new Set((holds.data?.holds ?? []).map((h) => h.itemId));
 
   async function snap() {
     setError(null);
     const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) { setError("Camera access is off for VYA — turn it on in Settings."); return; }
+    if (!perm.granted) { setError("Camera access is off for VYA. Turn it on in Settings."); return; }
     // Quality and size are capped so the data URL stays under the route's ~2 MB limit.
     const r = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5, allowsEditing: false });
     if (r.canceled || !r.assets[0]?.base64) return;
@@ -50,7 +50,7 @@ export default function FindItem() {
       const m = await apiPost<Match>("/api/store/market/match", { image: `data:image/jpeg;base64,${r.assets[0].base64}` });
       setMatch(m);
     } catch (e) {
-      setError(e instanceof ApiError && e.message ? e.message : "Couldn't read that photo — try again with more light.");
+      setError(e instanceof ApiError && e.message ? e.message : "Couldn't read that photo. Try again with more light.");
     } finally {
       setBusy(null);
     }
@@ -73,7 +73,7 @@ export default function FindItem() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* The market screen sets the bar light for its wine band; this screen is cream, so it
-          must set it back — the bar is per-screen, and a light bar on cream is invisible. */}
+          must set it back. The bar is per-screen, and a light bar on cream is invisible. */}
       <StatusBar style="dark" />
       <View style={{ flexDirection: "row", alignItems: "center", paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
         <Pressable hitSlop={12} onPress={() => router.back()}><Text style={{ fontSize: 15, color: colors.accent, fontWeight: "600" }}>Back</Text></Pressable>
@@ -86,7 +86,7 @@ export default function FindItem() {
           <Image source={{ uri: shot }} style={{ width: "100%", height: 260, borderRadius: 14, backgroundColor: colors.chip }} />
         ) : (
           <Text style={{ fontSize: 15, color: colors.textMuted, lineHeight: 22 }}>
-            Take a photo of the piece the buyer is holding. It is matched against your own inventory, so the price and whether it is still for sale come back together.
+            Photograph the piece the buyer is holding. VYA finds it in your inventory and gives you the price.
           </Text>
         )}
 
@@ -104,7 +104,7 @@ export default function FindItem() {
         {match ? (
           <View style={{ marginTop: spacing.xl }}>
             {match.notConfigured || match.unindexed ? (
-              <Text style={{ fontSize: 14, color: colors.textMuted }}>Photo matching isn&apos;t set up for this store yet — search by name on Inventory instead.</Text>
+              <Text style={{ fontSize: 14, color: colors.textMuted }}>Photo matching isn&apos;t set up for this store yet. Search by name on Inventory instead.</Text>
             ) : match.candidates.length === 0 ? (
               <Text style={{ fontSize: 14, color: colors.textMuted }}>Nothing in your inventory looks like this. Quick-list it if it is new.</Text>
             ) : (

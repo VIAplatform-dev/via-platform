@@ -11,7 +11,7 @@ test("a t-shirt and a big bag ship as the big parcel, not the t-shirt's", () => 
  assert.equal(p.weightOz, 46);   // both, on the scale
  assert.equal(p.lengthIn, 16);   // the bag's footprint
  assert.equal(p.heightIn, 9);    // stacked
- // 46oz over a 37in girth is a genuine Medium — the point isn't that adding anything reaches
+ // 46oz over a 37in girth is a genuine Medium. The point isn't that adding anything reaches
  // Large, it's that the parcel is never quoted as the smaller of the two things in it.
  assert.ok(assignTier(p).priceCents > assignTier(TEE).priceCents, "must cost more than the tee alone");
  assert.ok(assignTier(p).priceCents >= assignTier(BAG).priceCents, "never less than the bag alone");
@@ -30,7 +30,7 @@ test("weight adds up across the bag", () => {
  assert.equal(combineParcels([TEE, TEE, TEE]).weightOz, 18);
 });
 
-test("things go IN a box — length and width don't queue end to end", () => {
+test("things go IN a box. Length and width don't queue end to end", () => {
  // Two bags, so the floor doesn't mask the arithmetic: a box holding both is as long and wide as
  // one of them and twice as tall. Not 32 inches long.
  const p = combineParcels([BAG, BAG]);

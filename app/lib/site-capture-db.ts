@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { keepVersion, latestVersion, pagesWithEdits, dropVersion } from "./capture-versions-db.ts";
 
-// Storage for high-fidelity site captures — one row per page of a seller's real
+// Storage for high-fidelity site captures. One row per page of a seller's real
 // site, hosted on VYA. (store_slug, path) → the self-contained HTML.
 function sql() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -33,7 +33,7 @@ export async function saveCapturePage(slug: string, path: string, html: string, 
  ON CONFLICT (store_slug, path) DO UPDATE SET html = ${html}, source_url = ${sourceUrl}, captured_at = now()`;
 }
 
-/** Snapshot a page's CURRENT html before a caller overwrites it. Silent on failure by design — the
+/** Snapshot a page's CURRENT html before a caller overwrites it. Silent on failure by design. The
  *  save is the job and the history is the safety net; a net that can break the thing it protects is
  *  worse than no net. `keepVersion` already swallows its own errors and reports them in its result. */
 async function keepCurrent(slug: string, path: string, reason: "crawl" | "edit" | "rewrite"): Promise<void> {
@@ -43,7 +43,7 @@ async function keepCurrent(slug: string, path: string, reason: "crawl" | "edit" 
 }
 
 /** Rewrite a stored page's HTML WITHOUT claiming it was re-crawled. For post-processing passes
- *  (asset rehosting) that change where a page's references point, not what was captured — resetting
+ *  (asset rehosting) that change where a page's references point, not what was captured. Resetting
  *  `captured_at` there would make every touched page look freshly crawled. */
 export async function rewriteCapturePage(slug: string, path: string, html: string): Promise<void> {
  await ensure();
@@ -62,7 +62,7 @@ export async function listCapturePaths(slug: string): Promise<string[]> {
  const r = (await sql()`SELECT path FROM site_captures WHERE store_slug = ${slug} ORDER BY path`) as { path: string }[];
  // Hide reserved rows: the legacy `__`-prefixed ones (custom CSS, quickshop) and everything under
  // `/__vya/` (the derived cart and recommendation templates). They are markup we keep ABOUT the
- // capture, not pages of it — listed, they show up as pages of the site in the editor.
+ // capture, not pages of it. Listed, they show up as pages of the site in the editor.
  return r.map((x) => x.path).filter((p) => !p.startsWith("__") && !p.toLowerCase().startsWith("/__vya/"));
 }
 
@@ -76,8 +76,8 @@ export async function hasCaptures(slug: string): Promise<boolean> {
 // Captured pages stay editable: update one page's HTML in place, or store a blob
 // of custom CSS that's injected into every served page (site-wide restyling).
 
-// HISTORY. This table keeps one row per page and overwrites it, so every write — a seller's edit, a
-// re-crawl, or the asset-rehosting pass — used to destroy the version it replaced. The three writers
+// HISTORY. This table keeps one row per page and overwrites it, so every write. A seller's edit, a
+// re-crawl, or the asset-rehosting pass. Used to destroy the version it replaced. The three writers
 // below now snapshot the page first; capture-versions-db.ts holds the versions, gzipped, three deep.
 //
 // The seller's undo reads only her own edits out of that history. The operator's recovery view reads
@@ -91,7 +91,7 @@ export async function updateCapturePageHtml(slug: string, path: string, html: st
 }
 
 /** Put a page back to a specific stored version. Used by the operator's recovery view, and itself a
- *  write — so it keeps a version of what it replaces. Undoing a bad restore is the same operation
+ *  write, so it keeps a version of what it replaces. Undoing a bad restore is the same operation
  *  again; there is no state this can strand a page in. */
 export async function restoreCapturePageVersion(slug: string, path: string, html: string): Promise<boolean> {
  await ensure();
@@ -101,7 +101,7 @@ export async function restoreCapturePageVersion(slug: string, path: string, html
 }
 
 /** Pages of this store whose last save can still be undone, newest first. Deliberately does NOT
- *  read any page's html — the portal only needs to know which pages offer the button. */
+ *  read any page's html. The portal only needs to know which pages offer the button. */
 export async function listUndoablePages(slug: string): Promise<{ path: string; savedAt: string | null }[]> {
  await ensure();
  // Only her OWN edits. The history also holds re-imports and asset rehosting, but offering those as
@@ -111,7 +111,7 @@ export async function listUndoablePages(slug: string): Promise<{ path: string; s
  } catch { return []; /* allow-swallow: no undo offered beats a broken tab */ }
 }
 
-/** Put one page back to the version stored before its last save, and clear the slot — undo is one
+/** Put one page back to the version stored before its last save, and clear the slot. Undo is one
  *  step, so the button disappears once used. Returns false when there is nothing to undo. */
 export async function undoCapturePageEdit(slug: string, path: string): Promise<boolean> {
  await ensure();
@@ -141,7 +141,7 @@ export async function readSiteCss(slug: string): Promise<string> {
  return (await getCapturePage(slug, CSS_PATH)) ?? "";
 }
 
-/** Write the custom CSS only if it still holds exactly `base` — what the writer last read. Atomic, so an
+/** Write the custom CSS only if it still holds exactly `base`. What the writer last read. Atomic, so an
  *  editor that loaded stale (or failed) content, or that raced the VYA assistant, gets `false` instead of
  *  quietly erasing what it never saw. A missing row counts as "". */
 export async function setSiteCssIfUnchanged(slug: string, base: string, css: string): Promise<boolean> {
@@ -160,7 +160,7 @@ export async function setSiteCssIfUnchanged(slug: string, base: string, css: str
  * Drop ONE page. Used by the Pages panel's "Delete permanently", which is the second, confirmed
  * choice next to hiding a page (the reversible one).
  *
- * A version is kept first, exactly as every other write to this table does — so a page deleted by
+ * A version is kept first, exactly as every other write to this table does, so a page deleted by
  * mistake is still in the history and the operator's recovery view can put it back. Deleting a row
  * without that would be the only unrecoverable write in the file.
  */
@@ -175,7 +175,7 @@ export async function deleteCapturePage(slug: string, path: string): Promise<boo
  * Discard a store's capture.
  *
  * PAGES SHE ADDED HERE ARE SPARED (owner's decision, 2026-09-11). A re-import re-crawls her site,
- * and her site has never heard of the Shipping page she wrote in the builder — so wiping the lot
+ * and her site has never heard of the Shipping page she wrote in the builder, so wiping the lot
  * would delete work that no crawl can bring back, every time she re-syncs. Pages of the CAPTURE are
  * replaced by the crawl that follows, which is the point.
  *
@@ -189,7 +189,7 @@ export async function deleteCaptures(slug: string, opts: { keepAdded?: boolean }
   return;
  }
  /* allow-swallow: the builder's tables may not exist yet (they are created by an admin endpoint, never on
-    first request) — a store with no added pages is every store until one is added, and the delete below is
+    first request): a store with no added pages is every store until one is added, and the delete below is
     then exactly what it always was. */
  const { listAddedPaths } = await import("./site-builder/pages-db.ts");
  const added = await listAddedPaths(slug).catch(() => [] as string[]);
@@ -201,7 +201,7 @@ export async function deleteCaptures(slug: string, opts: { keepAdded?: boolean }
 }
 
 /**
- * Every store that holds captures, with the shop each one came from — one row per store.
+ * Every store that holds captures, with the shop each one came from. One row per store.
  *
  * The inverse of getCaptureOrigin: that asks "which shop is this store?", this answers "which store
  * holds this shop?", which is how an import into the wrong store gets refused before it deletes
@@ -222,7 +222,7 @@ export async function listCaptureOrigins(): Promise<{ slug: string; origin: stri
 export async function getCaptureOrigin(slug: string): Promise<string | null> {
  await ensure();
  // `<> ''` matters: reserved rows (custom CSS, cart/recommendation templates) are stored with an
- // empty source_url, and an unordered LIMIT 1 is free to hand back one of those — which parses to
+ // empty source_url, and an unordered LIMIT 1 is free to hand back one of those, which parses to
  // no origin at all and tells the caller the store has no source, mid-import.
  const r = (await sql()`SELECT source_url FROM site_captures WHERE store_slug = ${slug} AND source_url IS NOT NULL AND source_url <> '' LIMIT 1`) as { source_url: string }[];
  try { return r[0]?.source_url ? new URL(r[0].source_url).origin : null; } catch { return null; }

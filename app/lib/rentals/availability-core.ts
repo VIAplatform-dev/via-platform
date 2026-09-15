@@ -1,10 +1,10 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Rental availability — the date maths, pure and unit-tested.
+// Rental availability: the date maths, pure and unit-tested.
 //
 // The whole reason rentals are harder than sales: a piece is not available or
 // unavailable, it is available ON SOME DATES. Everything here works in plain
 // "YYYY-MM-DD" days with both ends inclusive, and never touches a Date's local
-// timezone — a rental that starts on the 14th starts on the 14th in Sydney too.
+// timezone: a rental that starts on the 14th starts on the 14th in Sydney too.
 // ───────────────────────────────────────────────────────────────────────────
 
 import type { RentalSettings } from "./settings-core";
@@ -64,7 +64,7 @@ export type Tier = { days: number; cents: number };
 /**
  * Price for a length: the cheapest tier that covers it. Four days on a
  * 4/7/28-day ladder pays the 4-day rate; five days pays the 7-day rate. Longer
- * than every tier is not a cheap rental, it's not for rent — null, not a guess.
+ * than every tier is not a cheap rental, it's not for rent. Null, not a guess.
  */
 export function priceForDays(days: number, tiers: Tier[]): number | null {
  if (!Number.isFinite(days) || days < 1) return null;
@@ -93,7 +93,7 @@ export type Quote =
  *
  * Order matters: the cheapest checks first, availability last, so a request
  * that was never going to be legal doesn't get compared against every booking.
- * The same function answers the product page and re-validates at payment —
+ * The same function answers the product page and re-validates at payment,
  * a quote the customer saw is never trusted on the way back in.
  */
 export function quote(
@@ -128,7 +128,7 @@ export function quote(
 /**
  * The gaps left in the bookable window once existing bookings are subtracted.
  * Feeds a date picker: these are the days that are free, not the days a rental
- * could legally start — a five-day gap on a seven-day minimum is still free,
+ * could legally start: a five-day gap on a seven-day minimum is still free,
  * and it is the picker's job to say so.
  */
 export function freeSpans(takenBands: Span[], s: RentalSettings, today: Day): Span[] {
@@ -172,7 +172,7 @@ export function fromDateRange(range: string | null | undefined): Span | null {
 /**
  * Per-day pricing, in the ladder the rest of the system already speaks.
  *
- * Sellers asked for a flat daily rate — the way Pickle prices — rather than naming three or four
+ * Sellers asked for a flat daily rate, the way Pickle prices. Rather than naming three or four
  * lengths and a price for each. Rather than teach the booking engine a second pricing model, a
  * daily rate becomes one tier per allowed day: `priceForDays` picks the tier where days <= t.days,
  * so a five-day booking lands on the five-day tier at exactly five times the rate. Same maths,

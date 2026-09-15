@@ -5,7 +5,7 @@ import { isEmbeddingConfigured } from "@/app/lib/embeddings";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-// Chips away at the reference index — embeds a batch of catalog photos each run so specific-piece
+// Chips away at the reference index. Embeds a batch of catalog photos each run so specific-piece
 // matching (resolveSpecificPiece) has coverage, and keeps up with new listings over time. Once
 // everything embeddable is done it no-ops cheaply (a query returns nothing, no Voyage calls).
 // Batch kept ≤150 so it finishes inside the 5-minute function limit even at ~1.5s/image.
@@ -13,7 +13,7 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
  const url = new URL(request.url);
- // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ // Header only: a query-string secret leaks into Vercel/CDN access logs and Referer headers.
  const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  if (!isEmbeddingConfigured()) {

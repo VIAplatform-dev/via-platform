@@ -9,7 +9,7 @@ import { getStoreEmailBrand } from "@/app/lib/email";
 
 export const dynamic = "force-dynamic";
 
-// GET — the starting points, already filled in with this shop's own details.
+// GET: the starting points, already filled in with this shop's own details.
 //
 // Filled HERE rather than in the browser because the tokens need the store's newest piece and how
 // many it has, and a picker that shows "{count} new pieces just landed" is asking the seller to

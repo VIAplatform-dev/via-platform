@@ -157,7 +157,7 @@ export async function markStoreRead(id: number, storeSlug: string): Promise<void
  await sql`UPDATE storefront_conversations SET store_read_at = now() WHERE id = ${id} AND store_slug = ${storeSlug}`;
 }
 
-/** All of a buyer's conversations with ONE store (by email). Store-scoped — a buyer of Store A
+/** All of a buyer's conversations with ONE store (by email). Store-scoped: a buyer of Store A
  *  is invisible to Store B; this only ever returns threads for (this store, this email). */
 export async function getConversationsForBuyer(storeSlug: string, email: string): Promise<ConversationSummary[]> {
  await ensureTables();
@@ -172,7 +172,7 @@ export async function getConversationsForBuyer(storeSlug: string, email: string)
  return rows.map((r: any) => ({ ...mapConv(r), lastMessage: r.last_message ?? null, storeUnread: 0 }));
 }
 
-/** A single conversation scoped to (store, buyer email) — authorizes a buyer's reply. */
+/** A single conversation scoped to (store, buyer email): authorizes a buyer's reply. */
 export async function getConversationForBuyer(id: number, storeSlug: string, email: string): Promise<Conversation | null> {
  await ensureTables();
  const sql = neon(getDatabaseUrl());

@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 
 // Per-store marketing settings. For now: a seller-set promo code that auto-applies
 // when a buyer clicks through to the seller's store (routed to /discount/{code} in
-// /api/track). Seller-editable in the portal — no hardcoding per store.
+// /api/track). Seller-editable in the portal, no hardcoding per store.
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;

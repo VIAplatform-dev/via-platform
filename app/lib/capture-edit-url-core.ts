@@ -1,8 +1,8 @@
-// The in-page storefront editor's save URLs, made store-aware. Pure — no I/O.
+// The in-page storefront editor's save URLs, made store-aware. Pure, no I/O.
 //
 // The editor script (site-capture.ts, EDITOR_JS) runs INSIDE the captured page at
 // /site/<slug>/…?edit=1 and posts to /api/store/capture/edit and /api/store/assets. Those routes
-// resolve the acting store from the session — or, for an admin, from ?store=. Without the param an
+// resolve the acting store from the session, or, for an admin, from ?store=. Without the param an
 // admin fixing a seller's page saved into via-admin. The slug is right there in the page's own path,
 // so the script derives it and appends it; for a seller the server ignores ?store= (only admins may
 // switch), so this is safe for everyone.

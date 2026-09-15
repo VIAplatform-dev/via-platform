@@ -3,7 +3,7 @@
  *
  * No password: a vintage shopper buying one dress will not create one, and a password they reuse is
  * a liability we would rather not hold. They type their email, we send a link, clicking it signs them
- * in — to that store only.
+ * in, to that store only.
  *
  * Two properties matter, and both are about the fact that this token travels through email:
  *

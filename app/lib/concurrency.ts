@@ -1,6 +1,6 @@
 // A tiny in-process semaphore so bursts of AI work don't all fire at once and trip
 // Anthropic's per-minute rate limits. Excess callers queue and run as slots free up.
-// Per server instance (not cross-instance) — pair with a tier bump for hard ceilings.
+// Per server instance (not cross-instance): pair with a tier bump for hard ceilings.
 
 class Semaphore {
  private active = 0;

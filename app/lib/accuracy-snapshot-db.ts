@@ -6,7 +6,7 @@ import { neon } from "@neondatabase/serverless";
 // per-field `accepted` map (training_examples). A field the seller KEPT = the AI got
 // it right; one they CHANGED or the AI ABSTAINED on = a miss.
 //
-// computeListingAccuracyMetrics() is the ONE source of truth — the live admin endpoint
+// computeListingAccuracyMetrics() is the ONE source of truth. The live admin endpoint
 // and the daily snapshot both call it, so they can never drift. snapshotAccuracy() stores
 // a rolling-30d + all-time reading each day so we can watch the number climb toward the
 // 95% onboarding bar (the same gate price-eval uses), on a baseline that starts clean today.
@@ -18,7 +18,7 @@ function db() {
  return neon(url);
 }
 
-export const ACCURACY_GATE = 95; // % — the factual-kept bar to clear before onboarding stores.
+export const ACCURACY_GATE = 95; // percent: the factual-kept bar to clear before onboarding stores.
 
 const pct = (kept: number, total: number) => (total > 0 ? Math.round((kept / total) * 1000) / 10 : null);
 const field = (kept: number, filled: number, abstained: number) => {
@@ -34,7 +34,7 @@ const field = (kept: number, filled: number, abstained: number) => {
 export type ListingAccuracyMetrics = Awaited<ReturnType<typeof computeListingAccuracyMetrics>>;
 
 /** The full listing-accuracy picture for a window (null = all-time), optionally AS OF a past date
- *  (for backfilling the historical trend). Pure SQL read — cheap, no API cost. */
+ *  (for backfilling the historical trend). Pure SQL read: cheap, no API cost. */
 export async function computeListingAccuracyMetrics(days: number | null, asOf?: Date) {
  const end = asOf ?? new Date();
  const endIso = end.toISOString();
@@ -119,7 +119,7 @@ async function ensure() {
 }
 
 /** Take today's snapshot: rolling-30d (recent quality) + all-time. Idempotent per day (re-run refreshes).
- *  Cheap — pure SQL, no API cost — so it's safe to run daily. */
+ *  Cheap, pure SQL, no API cost, so it's safe to run daily. */
 export async function snapshotAccuracy(): Promise<{ date: string; rolling30d: ListingAccuracyMetrics; allTime: ListingAccuracyMetrics }> {
  await ensure();
  const [rolling30d, allTime] = await Promise.all([computeListingAccuracyMetrics(30), computeListingAccuracyMetrics(null)]);
@@ -134,7 +134,7 @@ export async function snapshotAccuracy(): Promise<{ date: string; rolling30d: Li
 }
 
 /** Reconstruct the historical trend from timestamped training data: compute the metric AS OF each of
- *  the last `weeks` week-ending dates and upsert them as snapshots — so the chart shows where accuracy
+ *  the last `weeks` week-ending dates and upsert them as snapshots, so the chart shows where accuracy
  *  has ALREADY been (across every previous test/listing), without waiting for the daily cron. Idempotent. */
 export async function backfillAccuracyTrend(weeks = 16): Promise<{ backfilled: number; from: string; to: string }> {
  await ensure();
@@ -145,7 +145,7 @@ export async function backfillAccuracyTrend(weeks = 16): Promise<{ backfilled: n
  let backfilled = 0;
  for (const d of dates) {
   const [rolling30d, allTime] = await Promise.all([computeListingAccuracyMetrics(30, d), computeListingAccuracyMetrics(null, d)]);
-  if (!allTime.totalAiListings) continue; // no listings existed yet as of this date — skip the empty point
+  if (!allTime.totalAiListings) continue; // no listings existed yet as of this date. Skip the empty point
   const iso = d.toISOString().slice(0, 10);
   await db()`
    INSERT INTO accuracy_snapshots (snapshot_date, generated_at, payload)
@@ -165,7 +165,7 @@ export type AccuracyTrendPoint = {
  priceWithin10Pct: number | null; abstentionRatePct: number | null;
 };
 
-/** The accuracy trend over the last N days — one point per stored snapshot, headline numbers surfaced
+/** The accuracy trend over the last N days. One point per stored snapshot, headline numbers surfaced
  *  for a chart. rolling-30d is the "recent quality" line (watch this climb toward 95%); *All is all-time. */
 export async function getAccuracyTrend(days = 90): Promise<{ gate: number; latest: AccuracyTrendPoint | null; deltaVsFirstPct: number | null; points: AccuracyTrendPoint[] }> {
  await ensure();

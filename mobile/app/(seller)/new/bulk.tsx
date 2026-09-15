@@ -12,10 +12,10 @@ import { splitCostAcross, batchCostLine } from "../../../lib/seller/cost-split";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../../lib/api";
 
-// Add many — a rail's worth of pieces in one pass.
+// List multiple items. A rail's worth of pieces in one pass.
 //
 // BRAND AND COST ARE EDITABLE PER ROW BEFORE ANYTHING RUNS. She knows what she bought, and typing
-// it is faster than correcting a guess — forty brands into a list beats forty corrections. Those
+// it is faster than correcting a guess. Forty brands into a list beats forty corrections. Those
 // two fields are also exactly what the pricer wants most, so a row she fills gets a better number
 // than one she doesn't.
 //
@@ -42,7 +42,7 @@ export default function BulkScreen() {
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<{ currency: string }>("/api/store/me") });
   const currency = me.data?.currency ?? "USD";
 
-  /** What each row carries at publish: its cost — typed on the row, or its share of the batch. */
+  /** What each row carries at publish: its cost: typed on the row, or its share of the batch. */
   function batchCosts(): Record<string, { cost?: number }> {
     const totalCents = lotTotal.trim() ? Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) : 0;
     const share = totalCents > 0 ? splitCostAcross(totalCents, rows.map((r) => r.id)) : {};
@@ -68,7 +68,7 @@ export default function BulkScreen() {
     setStatus("grouping");
     setPhotoCount(r.assets.length);
     try {
-      // Upload first — grouping is done server-side on the hosted URLs.
+      // Upload first: grouping is done server-side on the hosted URLs.
       const urls: string[] = [];
       for (const a of r.assets) {
         urls.push(await uploadPhoto(a.uri));
@@ -126,7 +126,7 @@ export default function BulkScreen() {
         const p = await priceListing(r.photos, d.fields, {
           searchQuery: d.searchQuery, reverseComps: d.reverseComps, reverseTitles: d.reverseTitles,
         });
-        // The drafted fields never carried the cost she typed — it reached the pricer and stopped
+        // The drafted fields never carried the cost she typed. It reached the pricer and stopped
         // there. The lot fields put it (or its share of the batch) on the piece itself.
         await publishListing({ ...d.fields, priceCents: p.priceCents, imageUrls: r.photos, ...lot[r.id] }, "draft");
       }
@@ -153,7 +153,7 @@ export default function BulkScreen() {
         <Pressable hitSlop={12} onPress={() => router.back()}>
           <Text style={{ fontSize: 15, color: colors.text }}>Back</Text>
         </Pressable>
-        <Text style={{ flex: 1, textAlign: "center", fontSize: 15, color: colors.text, fontWeight: "600" }}>Add many</Text>
+        <Text style={{ flex: 1, textAlign: "center", fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>List multiple items</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -185,7 +185,7 @@ export default function BulkScreen() {
             </View>
             {batchCostLine(rows.length, Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) || 0, currency) ? (
               <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs }}>
-                {batchCostLine(rows.length, Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) || 0, currency)} — a cost typed on a row wins.
+                {batchCostLine(rows.length, Math.round(Number(lotTotal.replace(/[^0-9.]/g, "")) * 100) || 0, currency)}: a cost typed on a row wins.
               </Text>
             ) : null}
           </View>

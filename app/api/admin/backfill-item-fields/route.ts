@@ -15,9 +15,9 @@ function isAuthorized(request: NextRequest): boolean {
  return !!tok && tok === crypto.createHash("sha256").update(pw).digest("hex");
 }
 
-// POST [?store=slug] — one-time backfill: sort the title + description of already-imported items into the
+// POST [?store=slug]: one-time backfill: sort the title + description of already-imported items into the
 // structured brand / era / condition / category / material fields (for pieces transferred in before the
-// import started inferring them). Only fills BLANK fields — never overwrites what's set. Idempotent.
+// import started inferring them). Only fills BLANK fields, never overwrites what's set. Idempotent.
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
  const store = new URL(request.url).searchParams.get("store")?.trim() || null;
 
  try {
- // Items missing at least one structured field (and worth inferring — has a title).
+ // Items missing at least one structured field (and worth inferring. Has a title).
  const rows = (store
  ? await sql`
    SELECT i.id::text AS id, i.title, i.description, i.brand, i.era, i.material, i.condition, i.category

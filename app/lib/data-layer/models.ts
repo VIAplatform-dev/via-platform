@@ -1,9 +1,9 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Model / line detection — the deepest sourcing granularity ("Dior · Saddle").
+// Model / line detection. The deepest sourcing granularity ("Dior · Saddle").
 //
 // A brand × category ("Dior · bags") is actionable; the exact model ("Dior Saddle") is sharper still
 // and prices tightest of all. We detect the model from the title against a seeded vocabulary of each
-// house's recognizable lines — the same alias-map approach as brands/eras, so it's deterministic and
+// house's recognizable lines. The same alias-map approach as brands/eras, so it's deterministic and
 // cheap (no per-event LLM). Seeded here for the top houses; add rows as coverage gaps show up.
 // Keyed by the CANONICAL brand (as resolveBrand returns it), lowercased.
 // ───────────────────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ function wordIn(text: string, kw: string): boolean {
 }
 
 /**
- * The recognizable model/line named in a title, for a known brand — or null. Deterministic: returns
+ * The recognizable model/line named in a title, for a known brand, or null. Deterministic: returns
  * the FIRST model (in seed order) whose keyword appears word-bounded in the title.
  */
 export function inferModel(title: string | null | undefined, brand: string | null | undefined): string | null {

@@ -5,11 +5,11 @@ import { apiPost } from "./api";
 // Telling the backend what someone looked at, and for how long.
 //
 // WHY THIS MATTERS MORE THAN IT LOOKS. /api/public/for-you already ranks on a weighted blend of
-// clicks, favourites and views — a real per-person model that has been there all along. The app
+// clicks, favourites and views. A real per-person model that has been there all along. The app
 // never sent any of it, so "Curated for You" ran on favourites alone, and on nothing at all for a
 // new user. This is the missing half.
 //
-// Product ids on the analytics side are COMPOSITE — "store-slug-123" — because views and clicks
+// Product ids on the analytics side are COMPOSITE, "store-slug-123", because views and clicks
 // span stores whose own ids collide. Sending the bare int records a row that joins to nothing.
 
 export function compositeId(storeSlug: string, id: number | string): string {
@@ -29,7 +29,7 @@ export function trackView(storeSlug: string, id: number | string, dwellMs?: numb
  * Record a view on open and its dwell time on leave.
  *
  * Two calls, deliberately: the view is written immediately so it survives the app being killed,
- * and the dwell attaches to that same row when the screen is left. Backgrounding STOPS the clock —
+ * and the dwell attaches to that same row when the screen is left. Backgrounding STOPS the clock,
  * a phone in a pocket on a product page is not interest, and counting it would let one abandoned
  * screen outweigh a hundred genuine looks.
  */

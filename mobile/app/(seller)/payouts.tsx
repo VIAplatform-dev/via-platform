@@ -10,7 +10,7 @@ import { Button, Notice, Loading } from "../../components/seller/Form";
 import { useConnect, STRIPE_UNAVAILABLE } from "../../lib/seller/connect";
 import { stripeNative } from "../../lib/seller/stripe-native";
 
-// "When do I get paid" — answered in the first line, and actionable without leaving VYA.
+// "When do I get paid". Answered in the first line, and actionable without leaving VYA.
 //
 // This screen used to end every sentence with "on the desktop", then briefly opened Stripe in a
 // browser sheet. Both are gone. Stripe's onboarding and its payout management now render as NATIVE
@@ -18,7 +18,7 @@ import { stripeNative } from "../../lib/seller/stripe-native";
 // one sign-in step Stripe will not let anybody replace).
 //
 // ConnectPayouts is what removed "bank details are changed on the desktop": it is Stripe's own
-// payouts surface — balance, schedule, the account money lands in — drawn inside our navigation. We
+// payouts surface, balance, schedule, the account money lands in. Drawn inside our navigation. We
 // could not have rebuilt it, and we no longer have to send her anywhere to see it.
 //
 // THE PAYOUT DELAY IS STILL NOT EDITABLE HERE, and that is deliberate. It follows her return window
@@ -51,7 +51,7 @@ export default function PayoutsScreen() {
 
   // Stripe's onboarding is a full-screen modal it presents itself; this only says whether to mount it.
   const [onboarding, setOnboarding] = useState(false);
-  // Its payouts surface is an inline view, so it is opt-in rather than always on screen — she comes
+  // Its payouts surface is an inline view, so it is opt-in rather than always on screen. She comes
   // here far more often to read the status line than to change a bank account.
   const [managing, setManaging] = useState(false);
 
@@ -78,10 +78,10 @@ export default function PayoutsScreen() {
           </View>
 
           {!p.configured ? (
-            <Notice>Payments aren&apos;t switched on for this store yet — that one really is ours to fix. Get in touch from Help.</Notice>
+            <Notice>Payments aren&apos;t switched on for this store yet. That one really is ours to fix. Get in touch from Help.</Notice>
           ) : connect.unavailable ? (
-            // Expo Go. The status above still reads true — it comes from our own API, not from Stripe's
-            // SDK — so she can see whether payouts are live even here; she just can't change them.
+            // Expo Go. The status above still reads true. It comes from our own API, not from Stripe's
+            // SDK, so she can see whether payouts are live even here; she just can't change them.
             <Notice>{STRIPE_UNAVAILABLE}</Notice>
           ) : connect.error ? (
             <Notice>{connect.error}</Notice>
@@ -135,7 +135,7 @@ export default function PayoutsScreen() {
             <Row label="Taking payments" value={p.chargesEnabled ? "Yes" : "No"} />
             <Row label="Payout delay" value={`${p.payoutDelayDays} days`} />
             {/* Tappable, because the honest answer to "why is it this many days" is her returns
-                policy — and the way to change it is to change that. */}
+                policy, and the way to change it is to change that. */}
             <Pressable onPress={() => router.push("/(seller)/policy")}>
               <Row label="Return window" value={`${p.returnWindowDays} days`} chevron />
             </Pressable>

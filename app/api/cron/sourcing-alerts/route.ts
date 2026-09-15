@@ -9,11 +9,11 @@ import { storeContactEmails } from "@/app/lib/stores";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-// Weekly: email each Pro store the sourcing opportunities that just entered the window — brands /
+// Weekly: email each Pro store the sourcing opportunities that just entered the window. Brands /
 // categories / eras where VYA buyers' demand is rising and few stores carry them. Picks are market-
 // wide (the same signal for everyone), but deduped PER STORE so a segment that stays hot for weeks
 // isn't re-sent. Gated to Pro + the store's "sourcing_alerts" toggle (default on).
-//   ?slug=<store>  → test-send to one store (ignores dedup, records nothing) — still requires the
+//   ?slug=<store>  → test-send to one store (ignores dedup, records nothing). Still requires the
 //   Authorization header; the secret is never accepted via query string (it leaks into logs/Referer).
 export async function GET(request: Request) {
  const { searchParams } = new URL(request.url);

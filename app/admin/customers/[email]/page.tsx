@@ -136,7 +136,7 @@ type Data = {
 };
 
 function fmtDate(ts: string | null) {
- if (!ts) return "—";
+ if (!ts) return "-";
  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -213,7 +213,7 @@ export default function CustomerProfilePage() {
  {loading && <div style={{ color: MUTED, fontSize: 13 }}>Loading...</div>}
 
  {!loading && !data && (
- <div style={{ color: "#b91c1c", fontSize: 13 }}>Failed to load customer — the page may still be deploying. Try refreshing.</div>
+ <div style={{ color: "#b91c1c", fontSize: 13 }}>Failed to load customer. The page may still be deploying. Try refreshing.</div>
  )}
 
  {!loading && data && p && s && (
@@ -222,7 +222,7 @@ export default function CustomerProfilePage() {
  <div style={{ background: "#fff", border: `1px solid ${BORDER}`, padding: "24px 28px", borderRadius: 8, marginBottom: 24 }}>
  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
  <div>
- <h1 style={{ fontSize: 20, fontWeight: 600, color: DARK, margin: 0 }}>{p.name || "—"}</h1>
+ <h1 style={{ fontSize: 20, fontWeight: 600, color: DARK, margin: 0 }}>{p.name || "-"}</h1>
  <p style={{ fontSize: 13, color: GRAY, margin: "4px 0 0" }}>{p.email}</p>
  {p.phone && <p style={{ fontSize: 12, color: MUTED, margin: "2px 0 0" }}>{p.phone}</p>}
  {(() => {
@@ -318,7 +318,7 @@ export default function CustomerProfilePage() {
  {/* ── Where they came from, every time ──────────────────────────────
      The summary bar is the answer to "which channels keep bringing them
      back" and is what you actually read. The visit-by-visit list is the
-     evidence behind it, collapsed by default — expanded it is 100+ rows
+     evidence behind it, collapsed by default. Expanded it is 100+ rows
      and drowns the rest of the page. ── */}
  {data.visitSources.length > 0 && (
  <>
@@ -474,7 +474,7 @@ export default function CustomerProfilePage() {
  <span style={{ fontSize: 16, color: MUTED }}>{expandedSessions.has(i) ? "−" : "+"}</span>
  </button>
 
- {/* Page journey strip — always visible when there are page views */}
+ {/* Page journey strip: always visible when there are page views */}
  {sess.events.filter((e) => e.type === "page").length > 0 && (
  <div style={{ borderTop: `1px solid #f4f4f5`, padding: "6px 16px", display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4, background: "#fafafa" }}>
  {sess.events
@@ -586,7 +586,7 @@ export default function CustomerProfilePage() {
 
  {!p.hasAccount && (
  <div style={{ marginTop: 32, background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 8, padding: "24px", textAlign: "center", color: MUTED, fontSize: 13 }}>
- This customer signed up but has never logged in — no activity data available yet.
+ This customer signed up but has never logged in, no activity data available yet.
  </div>
  )}
  </>

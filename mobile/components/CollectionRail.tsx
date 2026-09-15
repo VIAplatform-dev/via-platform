@@ -4,7 +4,7 @@ import { Link } from "expo-router";
 import { imageUrl, IMG } from "../lib/imageUrl";
 import { colors, fonts, spacing } from "../lib/theme";
 
-// The horizontally-scrolling collection cards. Text sits ON the photograph — "CURATED BY …" small
+// The horizontally-scrolling collection cards. Text sits ON the photograph. "CURATED BY …" small
 // and letter-spaced, the collection name large in serif, and a underlined DISCOVER beneath. A scrim
 // is not used; the shipped cards rely on the photographs being pale, and adding one would flatten
 // them. Where a cover is dark the text still reads because it is white at full weight.

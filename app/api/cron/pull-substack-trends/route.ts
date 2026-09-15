@@ -10,7 +10,7 @@ export const maxDuration = 300;
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
  const url = new URL(request.url);
- // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ // Header only: a query-string secret leaks into Vercel/CDN access logs and Referer headers.
  const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
  if (url.searchParams.get("discover")) return NextResponse.json({ ok: true, roster });
  // 2) Pull posts + extract (needs the LLM key).
  if (!isSubstackConfigured()) {
-  return NextResponse.json({ ok: true, roster, skipped: "ANTHROPIC_API_KEY not set — roster refreshed, extraction off." });
+  return NextResponse.json({ ok: true, roster, skipped: "ANTHROPIC_API_KEY not set: roster refreshed, extraction off." });
  }
  const result = await pullSubstack();
  return NextResponse.json({ ok: true, roster, ...result });

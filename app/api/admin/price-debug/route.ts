@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // Read-only pricing X-ray. Runs the REAL valuation for a query and returns the comps it actually
-// used, the market/median number, the source, and the rationale — so we can see WHY a price landed
+// used, the market/median number, the source, and the rationale, so we can see WHY a price landed
 // where it did (e.g. a Chanel Jumbo dragged down by cheaper look-alike flaps polluting the comp set).
 //   /api/admin/price-debug?query=Chanel Jumbo Single Flap lambskin&brand=Chanel&era=2000s&condition=very good
 function isAuthorized(request: NextRequest): boolean {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
  const d0 = (c: number | null | undefined) => (c == null ? null : Math.round(c) / 100);
 
- // ?fresh=1 — bypass estimatePrice's comp cache entirely: fetch live comps NOW (incl. eBay sold),
+ // ?fresh=1: bypass estimatePrice's comp cache entirely: fetch live comps NOW (incl. eBay sold),
  // apply the model filter, and value straight from them. Shows what the price SHOULD be with the
  // fixed comp set, independent of any poisoned cache.
  if (sp.get("fresh") === "1") {
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
 
  const d = (c: number | null | undefined) => (c == null ? null : Math.round(c) / 100);
 
- // Isolate the eBay-SOLD retrieval — the sold anchor is what's missing. Shows the exact compact query
+ // Isolate the eBay-SOLD retrieval. The sold anchor is what's missing. Shows the exact compact query
  // used and whatever eBay actually returned, so we can tell "query wrong" vs "SerpApi eBay broken".
  let ebay: unknown = { compsConfigured: isCompsConfigured() };
  if (sp.get("ebay") !== "0") {

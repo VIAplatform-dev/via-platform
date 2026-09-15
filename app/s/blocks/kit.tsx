@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 // The shared editing kit every section layout is built from.
 //
-// Why this file exists: the studio's editing affordances — click-to-type, rich inline formatting,
-// drag/scale a heading anywhere on the canvas, repeated-item editing — used to live as closures
+// Why this file exists: the studio's editing affordances. Click-to-type, rich inline formatting,
+// drag/scale a heading anywhere on the canvas, repeated-item editing. Used to live as closures
 // inside one big `blockBody` switch. That was fine for 20 layouts written in one place, but a
 // section family per file cannot reach into a closure, and re-implementing "editable text" per
 // layout is exactly how you end up with beautiful variants that quietly aren't editable.
@@ -11,7 +11,7 @@
 // gets full editing parity by USING these, not by wiring anything.
 //
 // Everything here is hook-free: the same code renders the live storefront (a server component) and
-// the editor's preview (client). `ctx.edit` is what differs — when it's off, every helper collapses
+// the editor's preview (client). `ctx.edit` is what differs, when it's off, every helper collapses
 // to plain, inert markup.
 import type { Block, BlockStyle, Overlay } from "@/app/lib/storefront-blocks";
 import { SERIF_FONTS } from "@/app/lib/storefront-templates";
@@ -22,7 +22,7 @@ import type { StorefrontWords } from "@/app/lib/storefront-words";
 export const ff = (name?: string) => (name ? `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}` : undefined);
 
 // `sold`/`held` travel with the tile so a section's card can badge it the way the classic grid does
-// (StorefrontView). The href stays the product page either way — that page refuses the sale itself.
+// (StorefrontView). The href stays the product page either way. That page refuses the sale itself.
 export type BlockProduct = { key?: string; title: string; price: string; image: string; href?: string; sold?: boolean; held?: boolean };
 export type Colors = { bg: string; text: string; accent: string };
 
@@ -69,7 +69,7 @@ export const HANDLE_POS: Record<ResizeHandle, string> = {
  e: "right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize",
 };
 
-// Drag-to-reorder for FAQ rows — within a section and between two FAQ sections, with a snap/drop line.
+// Drag-to-reorder for FAQ rows. Within a section and between two FAQ sections, with a snap/drop line.
 // State lives in the parent (studio) so a row can travel across sections; the renderer just reports the
 // drag/over/drop events and draws the indicator where the row will land.
 export type FaqDnd = {
@@ -100,28 +100,28 @@ export type Ctx = {
  bgMedia?: BlockStyle["bgMedia"];
  freeEdit?: FreeEdit;
  // Editor-only: open the store's file picker and hand back the uploaded URL. Lets an image slot on
- // the canvas BE the upload control — click the empty frame, choose a photo, done — instead of
+ // the canvas BE the upload control, click the empty frame, choose a photo, done. Instead of
  // making the merchant hunt for the matching field in the side panel.
  onPickImage?: (apply: (url: string) => void) => void;
  // Upload a dropped file and hand back its URL. Separate from onPickImage because dragging a photo
- // straight onto the slot is the gesture people actually reach for — clicking, then hunting through
+ // straight onto the slot is the gesture people actually reach for. Clicking, then hunting through
  // a file dialog for something already sitting in a folder, is the slower path.
  onDropImage?: (file: File, apply: (url: string) => void) => void;
- // The store's own labels for the shop UI — "Sold", "View all", what an empty grid says. See
+ // The store's own labels for the shop UI. "Sold", "View all", what an empty grid says. See
  // storefront-words.ts; unset falls back to DEFAULT_WORDS.
  words?: StorefrontWords;
  // Editor-only: drag an arrangement handle (spacing, card width, the hero's split). The drag math
- // needs the container's rect, which lives in the parent — this renderer only reports which prop
+ // needs the container's rect, which lives in the parent. This renderer only reports which prop
  // the handle belongs to and where the pointer went down.
  onArrangeStart?: (blockId: string, prop: string, e: React.PointerEvent) => void;
 };
 
 // An image slot inside a layout (a column's photo, a split's picture, a category tile).
 //
-// Live: the photo, or nothing at all when it's unset — a placeholder box on a real storefront is a
+// Live: the photo, or nothing at all when it's unset. A placeholder box on a real storefront is a
 // bug, not a hint.
 //
-// Editor: always a frame. An EMPTY slot is one big target — click anywhere in it to pick a file.
+// Editor: always a frame. An EMPTY slot is one big target. Click anywhere in it to pick a file.
 // A FILLED slot is not, because a photo you can't touch without the file dialog opening is a photo
 // you can't compose with: dragging it pans the crop, and replacing it is the explicit "Replace"
 // button that appears on hover. Panning writes `objectPosition` through `onPos`; a slot that doesn't
@@ -153,7 +153,7 @@ export function ImageSlot({ kit, src, alt, onPick, pos, onPos, zoom, ratio = "as
  const open = pick ? (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); pick(onPick); } : undefined;
  // Pan the crop by dragging the photo. Hook-free like the rest of this file (it also renders on the
  // server): the drag writes straight to the node's style for feedback and commits the final value
- // once, on release — so an in-flight drag never round-trips through React.
+ // once, on release, so an in-flight drag never round-trips through React.
  const pannable = !!(src && onPos);
  const startPan = pannable ? (e: React.PointerEvent) => {
   if (e.button !== 0) return;
@@ -173,7 +173,7 @@ export function ImageSlot({ kit, src, alt, onPick, pos, onPos, zoom, ratio = "as
    moved = true;
    frame.style.cursor = "grabbing";
    // Drag right and the picture should follow your finger, which means revealing what is to its
-   // LEFT — object-position counts the other way, so the delta is subtracted.
+   // LEFT: object-position counts the other way, so the delta is subtracted.
    nx = clamp(sx - (dx / Math.max(1, box.width)) * 100);
    ny = clamp(sy - (dy / Math.max(1, box.height)) * 100);
    img.style.objectPosition = `${nx}% ${ny}%`;
@@ -210,7 +210,7 @@ export function ImageSlot({ kit, src, alt, onPick, pos, onPos, zoom, ratio = "as
    {src
     ? <img src={src} alt={alt || ""} loading="lazy" draggable={false} className="h-full w-full select-none object-cover" style={{ ...(pos ? { objectPosition: pos } : {}), ...zoomStyle }} />
     : <span className="text-[10px] uppercase tracking-[0.2em] opacity-40">{open ? `Add ${label.toLowerCase()}` : label}</span>}
-   {/* A PLACEHOLDER is ours, not the seller's — so it says so, permanently rather than on hover. The
+   {/* A PLACEHOLDER is ours, not the seller's, so it says so, permanently rather than on hover. The
        badge used to sit on a 45% white sheet across the whole photo; that (with the grayscale filter
        in Blocks.tsx) meant the editor showed a washed-out grey version of a picture the live site
        renders in full colour, which is what made the canvas stop reading as a preview. The pill is
@@ -248,7 +248,7 @@ export function ImageSlot({ kit, src, alt, onPick, pos, onPos, zoom, ratio = "as
 
 // ── inline rich text (the editor writes it on the canvas, the live storefront renders it) ──
 // Store owners format their own copy, and it renders on their own public storefront, so this is
-// self-authored content — but the storefront is public, so we still keep a tight allowlist and
+// self-authored content, but the storefront is public, so we still keep a tight allowlist and
 // sanitize at both ends: a DOM walker at capture time, a script/attr strip at render time.
 function escHtml(s: string) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 function escAttr(s: string) { return escHtml(s).replace(/"/g, "&quot;"); }
@@ -293,7 +293,7 @@ export function inlineHtml(v?: string): { __html: string } | null {
 }
 /**
  * The single piece a Spotlight features, when it's been pointed at a collection. Returns the props
- * with the collection's LEAD item filled into anything the seller left blank — so curating the
+ * with the collection's LEAD item filled into anything the seller left blank, so curating the
  * collection is enough and they never retype a title, price, or photo they already entered once.
  *
  * A value the seller typed always wins. And with no collection chosen, nothing changes at all:
@@ -311,10 +311,10 @@ export function spotlightProps(ctx: Ctx, props: Record<string, string>): Record<
   image: props.image || lead.image,
  };
 }
-// Decode HTML entities for plain-text rendering — so a stored "Shipping &amp; Returns" shows "Shipping &
+// Decode HTML entities for plain-text rendering, so a stored "Shipping &amp; Returns" shows "Shipping &
 // Returns", not the literal entity. (Only used on the no-markup branch; React re-escapes on output, so safe.)
 // Which products a section shows. A named collection wins; an unnamed one (or a name that no longer
-// matches a collection — renamed, deleted) falls back to the store's newest items, because a shopper
+// matches a collection: renamed, deleted) falls back to the store's newest items, because a shopper
 // must never meet a blank section on a live storefront.
 export function productsFor(ctx: Ctx, props: Record<string, string>): BlockProduct[] {
  const slug = (props.collection || "").trim();
@@ -322,7 +322,7 @@ export function productsFor(ctx: Ctx, props: Record<string, string>): BlockProdu
  const hit = ctx.collections?.find((c) => c.slug === slug);
  return hit && hit.products.length ? hit.products : ctx.products;
 }
-// Decode HTML entities for plain-text rendering — so a stored "Shipping &amp; Returns" shows "Shipping &
+// Decode HTML entities for plain-text rendering, so a stored "Shipping &amp; Returns" shows "Shipping &
 export function decodeEntities(s: string): string {
  return s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&#0?38;/g, "&");
 }
@@ -333,7 +333,7 @@ export function decodeEntities(s: string): string {
 // transform (`style.free[key]`) positions it absolutely (centre-anchored) at x/y % of the section canvas
 // (`.vya-free-canvas`) and applies a continuous `fontPx`. On the live storefront it's a plain element.
 //
-// Every layout that wants a draggable built-in field renders one of these — that is the whole contract.
+// Every layout that wants a draggable built-in field renders one of these. That is the whole contract.
 export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href, fullWidth }: {
  b: Block; ctx: Ctx; fieldKey: string; tag: "h2" | "h3" | "p" | "a" | "span"; value: string;
  className: string; style?: React.CSSProperties; href?: string;
@@ -345,26 +345,26 @@ export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href
  const fr = b.style?.free?.[fieldKey];
  const fe = ctx.freeEdit;
  // fontPx applies whether or not the element is positioned; x/y (both) pull it out of flow to float.
- // For a button (tag="a"), padding scales proportionally with it too — same ratio the free-form
- // overlay button already uses — so the WHOLE button grows/shrinks together (Google-Docs style),
+ // For a button (tag="a"), padding scales proportionally with it too. Same ratio the free-form
+ // overlay button already uses, so the WHOLE button grows/shrinks together (Google-Docs style),
  // instead of the label growing inside a fixed-size box (which reads as a crop, not a resize).
  const positioned = fr?.x != null && fr?.y != null;
  const merged = {
   ...(style || {}),
   ...(fr?.fontPx ? { fontSize: `${fr.fontPx}px`, ...(tag === "a" ? { padding: `${Math.round(fr.fontPx * 0.62)}px ${Math.round(fr.fontPx * 1.6)}px` } : {}) } : {}),
   // A field's flow margins (a button's `mt-9` spacing from the subtext above it) are meaningless once
-  // it's been dragged to an absolute position — but they'd still inflate its box, which is what draws
+  // it's been dragged to an absolute position, but they'd still inflate its box, which is what draws
   // the selection ring and what the drag clamp measures. So a positioned field carries no margin: the
   // ring hugs the element, and dragging isn't restricted by empty space that isn't part of it.
   ...(positioned ? { margin: 0 } : {}),
   ...(fullWidth ? { width: "100%" } : {}),
   // An explicit width (dragged from a side handle) beats whatever max-width the layout gave the
-  // field — that's the point of setting one. A POSITIONED field takes its width on the wrapper
+  // field: that's the point of setting one. A POSITIONED field takes its width on the wrapper
   // instead (see posStyle): the wrapper is the box that's placed, so sizing the child against it
   // would be circular.
   //
   // BUTTONS ARE EXEMPT. A button resizes by corner-drag (fontPx scales the whole pill), never by
-  // side-width — a percentage width squeezes the pill narrower than its label, and with the wide
+  // side-width: a percentage width squeezes the pill narrower than its label, and with the wide
   // letter-spacing the label then stacks vertically ("SHOP / THE / EDIT"). So a button never takes
   // fr.w, and always stays on one line. It hugs its label, full stop.
   ...(fr?.w && !positioned && tag !== "a" ? { width: `${fr.w}%`, maxWidth: "none" } : {}),
@@ -377,7 +377,7 @@ export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href
  const safe = value ?? "";
  const htmlContent = inlineHtml(safe) ? { dangerouslySetInnerHTML: inlineHtml(safe)! } : { children: decodeEntities(safe) };
  // A field that's been dragged somewhere is absolutely positioned, which takes it out of normal flow
- // — and everything below it slides up into the space it left, so moving a heading appeared to drag
+ // and everything below it slides up into the space it left, so moving a heading appeared to drag
  // the subtext along with it. This invisible stand-in keeps that space, so each field stays its own
  // thing and moving one moves exactly one. It carries no `data-field`, because the editor finds a
  // field by that attribute to anchor its toolbar and must never find this instead.
@@ -385,25 +385,25 @@ export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href
   ? <El aria-hidden="true" className={`vya-free-spacer invisible ${className}`} style={merged} {...htmlContent} />
   : null;
 
- // The selection ring is drawn on the WRAPPER, so the wrapper has to BE the field's box — otherwise
+ // The selection ring is drawn on the WRAPPER, so the wrapper has to BE the field's box. Otherwise
  // the ring frames one thing and the merchant sees the text somewhere else inside it.
  //
  // TWO families of class decide that box: flow margins (a button's mt-9 gap from the subtext) and,
- // just as much, the field's measure and placement — `max-w-3xl mx-auto` on a hero heading. Only the
+ // just as much, the field's measure and placement. `max-w-3xl mx-auto` on a hero heading. Only the
  // margins used to move. The width cap stayed on the element while the wrapper ran full width, so a
  // centred hero heading drew a full-width ring around a 768px box pinned to its LEFT, with the text
- // centred inside THAT — landing left of the page's centre and looking, in the merchant's words,
+ // centred inside THAT: landing left of the page's centre and looking, in the merchant's words,
  // "kind of left-aligned but not fully". Moving `mx-auto` up couldn't fix it either: auto margins on
  // a full-width block are a no-op.
  //
- // The live storefront was never wrong, which is the tell — live renders no wrapper (see the branch
+ // The live storefront was never wrong, which is the tell. Live renders no wrapper (see the branch
  // above) and keeps every class on the element. Moving the width cap up too makes the wrapper the
  // real box, and makes the editor agree with the site it is previewing.
  const boxCls = (className.match(/(?:^|\s)(!?-?m[trblxy]?-[^\s]+|max-w-[^\s]+)/g) || []).map((s) => s.trim()).join(" ");
  const innerClassName = className.replace(/(?:^|\s)(?:!?-?m[trblxy]?-[^\s]+|max-w-[^\s]+)/g, " ").replace(/\s+/g, " ").trim();
 
  // A SIDE-handle drag sizes the box and rewraps the text inside it (one long line becomes three, or
- // three become one) — the Figma gesture. In the editor that width therefore belongs on the wrapper,
+ // three become one): the Figma gesture. In the editor that width therefore belongs on the wrapper,
  // with the element filling it; `maxWidth:none` so dragging WIDER than the layout's own measure isn't
  // silently ignored by the very max-w that measure came from.
  const sizedBox = fr?.w != null && !positioned && tag !== "a";
@@ -415,7 +415,7 @@ export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href
   const node = <El className={className} data-field={fieldKey} style={merged} {...(tag === "a" ? { href } : {})} {...htmlContent} />;
   // `vya-free-pos` on the LIVE wrapper too, not just the editor's. The narrow-screen rule that
   // re-centres a dragged field is keyed to it, and the published storefront is the surface that
-  // actually matters — a rule that only matched in the studio would leave every real phone with the
+  // actually matters. A rule that only matched in the studio would leave every real phone with the
   // headline jammed against the left margin while the editor looked perfect.
   return positioned ? <>{spacer}<div className="vya-free-el vya-free-pos" style={posStyle}>{node}</div></> : node;
  }
@@ -433,13 +433,13 @@ export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href
   {spacer}
   <div
    // The selection wrapper exists only in the editor, so its display has to reproduce what the field
-   // would do WITHOUT it — otherwise the canvas stops matching the live site. A button hugs its
+   // would do WITHOUT it. Otherwise the canvas stops matching the live site. A button hugs its
    // label; running text is a block. Wrapping text in an inline-block was making heading, subtext,
    // and button flow onto one line in any layout whose container is a plain block rather than a flex
    // column (a hero with no photo, split, spotlight, text).
    // inline-FLEX, not inline-block: an inline-block wrapper adds a line box under its content
    // (room for descenders), so the selection ring sat visibly lower than the button it framed.
-   // boxCls moves the field's flow margin AND its measure onto the wrapper (not positioned ones —
+   // boxCls moves the field's flow margin AND its measure onto the wrapper (not positioned ones,
    // those are absolute and margin would nudge them) so the ring IS the box being edited.
    className={`vya-free touch-none ${positioned ? "vya-free-pos inline-flex" : `${boxCls} ${fullWidth ? "relative flex w-full" : tag === "a" ? "relative inline-flex" : "relative block"}`} ${editing ? "cursor-text" : "cursor-move"} ${selected ? "shadow-[0_0_0_2px_#5D0F17]" : "hover:shadow-[0_0_0_2px_rgba(93,15,23,0.5)]"}`}
    // In the editor THIS is the field's box, so the alignment CSS has to be able to place it: the
@@ -450,7 +450,7 @@ export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href
     e.preventDefault(); e.stopPropagation();
     if (editing) return;
     fe.onSelect(b.id, fieldKey);
-    // A button field ALSO gets its own dedicated "Edit button" panel (fill/shape/outline/hover/…) —
+    // A button field ALSO gets its own dedicated "Edit button" panel (fill/shape/outline/hover/…),
     // free positioning above is generic to every field, but button-specific appearance isn't, so both
     // fire together here rather than one replacing the other.
     if (fieldKey === "cta" || fieldKey.startsWith("cta")) ctx.onFieldFocus?.(b.id, fieldKey);
@@ -469,18 +469,18 @@ export function FreeField({ b, ctx, fieldKey, tag, value, className, style, href
 }
 
 /**
- * A section's PHOTO as a first-class object — the counterpart to FreeField.
+ * A section's PHOTO as a first-class object. The counterpart to FreeField.
  *
  * A photo used to be whatever hole the layout left for it: you could pan the crop inside that hole
  * and nothing else. Not move it, not resize it, not delete it without hunting through a dropdown. So
- * a photo gets the same contract the text already has — select it, drag it anywhere in the section,
+ * a photo gets the same contract the text already has. Select it, drag it anywhere in the section,
  * pull a corner to resize it, press ⌫ to remove it.
  *
  * It reuses `style.free.image` and the studio's existing free-transform handlers rather than growing
  * a parallel mechanism: x/y position it (centre-anchored, % of the SECTION), w/h size it.
  *
  * Two drags, deliberately kept apart, because they mean different things and both are wanted:
- *   • dragging the PHOTO pans the crop (which part of the picture shows) — as it always has,
+ *   • dragging the PHOTO pans the crop (which part of the picture shows), as it always has,
  *   • dragging the MOVE grip moves the frame (where the picture sits).
  * Corner and side handles resize the frame. Untouched, it renders exactly as the layout laid it out,
  * so every storefront saved before this looks identical.
@@ -505,22 +505,22 @@ export function PhotoFrame({ kit, className = "", style, children }: {
   // `height: 50%` looks right and is a trap: a percentage height resolves against the parent's
   // height, and when that parent's height is itself content-driven (a hero-stack strip inside a
   // flex column) the percentage computes to `auto`. The frame's only child is absolutely positioned,
-  // so `auto` measured zero — the box collapsed and the photo VANISHED the moment it was made
+  // so `auto` measured zero. The box collapsed and the photo VANISHED the moment it was made
   // smaller. An aspect ratio needs no parent height at all: width is definite, so height is too.
   // It also stays correct on a phone, where a fixed height would not.
   ...(fr?.h != null ? { aspectRatio: `100 / ${fr.h}`, height: "auto", minHeight: 0, flex: "none" } : {}),
  };
  // Free positioning takes the frame OUT of flow, which means the space it occupied disappears and
- // everything below slides up — on a hero that reads as "half the section vanished". This invisible
+ // everything below slides up, on a hero that reads as "half the section vanished". This invisible
  // stand-in holds the slot open, so moving the photo moves exactly the photo. Same device FreeField
  // uses for a dragged heading, and the reason a section keeps its shape while you rearrange it.
  const spacer = positioned ? <div aria-hidden="true" className={`vya-free-spacer invisible ${className}`} style={{ ...(style || {}) }} /> : null;
  // The classes go on the LIVE element too, not just the editor's. The mobile fallback keyed to
- // `.vya-photo-framed` is for the published storefront above all — a shopper on a phone is the whole
+ // `.vya-photo-framed` is for the published storefront above all. A shopper on a phone is the whole
  // reason it exists, and rendering it only in the studio would mean the editor looked fine while the
  // real site overlapped.
  const cls = `vya-photo ${framed ? "vya-photo-framed" : ""} ${className}`;
- // Same contract as ImageSlot, for the full-bleed photos that aren't slots — a hero's picture, a
+ // Same contract as ImageSlot, for the full-bleed photos that aren't slots. A hero's picture, a
  // split's panel. Without it those would be the one place a placeholder looked like a real choice.
  const note = isPlaceholderImage(b.props?.image) ? (
   <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
@@ -529,7 +529,7 @@ export function PhotoFrame({ kit, className = "", style, children }: {
  ) : null;
  if (!ctx.edit || !fe) return <>{spacer}<div className={cls} style={boxStyle}>{children}</div></>;
  const selected = ctx.selectedId === b.id && fe.selectedKey === key;
- // All eight. Sides crop the width, TOP AND BOTTOM crop the height, corners do both — the top edge
+ // All eight. Sides crop the width, TOP AND BOTTOM crop the height, corners do both. The top edge
  // should pull in exactly the way the sides already do, and there is no reason for it to be the one
  // edge that can't. (It was dropped for a round because it sat where the move grip sat and stole its
  // clicks; the grip has moved to the middle instead, where no handle can ever reach it.)
@@ -551,7 +551,7 @@ export function PhotoFrame({ kit, className = "", style, children }: {
   >
    {children}
    {note}
-   {/* Nobody guesses that dragging a photo pans the crop. On hover the picture says so itself —
+   {/* Nobody guesses that dragging a photo pans the crop. On hover the picture says so itself,
        and names the other gesture too, so the difference between "move the frame" and "move the
        picture inside the frame" is legible without anyone having to be told. Pointer-events off, so
        the hint can never eat the drag it is describing. */}
@@ -565,7 +565,7 @@ export function PhotoFrame({ kit, className = "", style, children }: {
      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); fe.onDragStart(b.id, key, e); }}
      onClick={(e) => e.stopPropagation()}
      // Dead centre. Every edge and corner belongs to a resize handle, so the middle is the only place
-     // a grip can live without something else claiming its clicks — and it's the easiest thing on the
+     // a grip can live without something else claiming its clicks, and it's the easiest thing on the
      // frame to hit, which matters most for the gesture people reach for first.
      className="absolute left-1/2 top-1/2 z-40 flex -translate-x-1/2 -translate-y-1/2 cursor-move touch-none items-center gap-1.5 rounded-full border border-white/70 bg-[#5D0F17] px-3.5 py-2 text-[11px] font-semibold uppercase tracking-wide text-white shadow-lg"
     >
@@ -597,7 +597,7 @@ export type EditKit = {
  txt: (v: string | undefined, key: string) => Record<string, unknown>;
  /** Plain multi-line text, where line breaks matter more than inline styling. */
  txtPlain: (v: string | undefined, key: string) => Record<string, unknown>;
- /** One field of a repeated item — commits through the caller, which rebuilds the list. */
+ /** One field of a repeated item. Commits through the caller, which rebuilds the list. */
  txtItem: (v: string | undefined, onCommit: (val: string) => void) => Record<string, unknown>;
  /** Repeated content as real objects (see storefront-items.ts). */
  items: (schema: ItemSchema) => Item[];
@@ -626,10 +626,10 @@ export function makeKit(b: Block, ctx: Ctx): EditKit {
   const content = inlineHtml(v) ? { dangerouslySetInnerHTML: inlineHtml(v)! } : { children: decodeEntities(v ?? "") };
   if (!ctx.edit) return content;
   // On blur: serialize to safe inline HTML, but if the result carries NO markup, store the raw text
-  // instead — else "Shipping & Returns" saves as the escaped entity and renders literally. Rich
+  // instead: else "Shipping & Returns" saves as the escaped entity and renders literally. Rich
   // formatting (bold/italic/spans) still round-trips as HTML.
   // `data-field` lets the editor find THIS exact element (not just "a .vya-heading somewhere on the
-  // page" — several field kinds share a class, e.g. a "quote" also renders as .vya-heading) to anchor
+  // page": several field kinds share a class, e.g. a "quote" also renders as .vya-heading) to anchor
   // its floating toolbar beside the field you're actually in, rather than the whole section.
   return { ...editBase, "data-field": key, onFocus: onFieldFocus(key), onBlur: (e: React.FocusEvent<HTMLElement>) => { const html = serializeInline(e.currentTarget); ctx.onEditField?.(b.id, key, html.indexOf("<") === -1 ? (e.currentTarget.textContent || "").trim() : html); }, ...content };
  };
@@ -639,7 +639,7 @@ export function makeKit(b: Block, ctx: Ctx): EditKit {
  };
  // A repeated list-item field (a testimonial quote, a column heading, a category tile, …) edited straight
  // on the canvas like any other text: click it, type, done. On blur the caller rebuilds the section's items
- // blob — so no one ever hand-edits a "A | B | C" textarea again.
+ // blob, so no one ever hand-edits a "A | B | C" textarea again.
  const txtItem: EditKit["txtItem"] = (v, onCommit) => {
   if (!ctx.edit) return { children: v ?? "" };
   // preventDefault so clicking a card whose text sits INSIDE a link (category tile, blog post) edits the
@@ -662,7 +662,7 @@ export function makeKit(b: Block, ctx: Ctx): EditKit {
 }
 
 // An empty-state line for a section whose content the seller hasn't filled in yet. Shown only in the
-// editor — a half-built section must never render as a stray placeholder on the live storefront.
+// editor: a half-built section must never render as a stray placeholder on the live storefront.
 export function emptyHint(ctx: Ctx, label: string) {
  return ctx.edit ? <div className="px-6 py-10 text-center text-[11px] uppercase tracking-[0.25em] opacity-40">{label}</div> : null;
 }
@@ -671,7 +671,7 @@ export function emptyHint(ctx: Ctx, label: string) {
 export type { Block, BlockStyle, Overlay, Item, ItemSchema };
 
 // Where a shop-by-category tile actually goes, in order:
-//   1. an explicit link the seller set on the tile (t.href) — a specific collection or any page,
+//   1. an explicit link the seller set on the tile (t.href): a specific collection or any page,
 //   2. else a label that names one of the store's real collections → that collection's page,
 //   3. else the label as a shop category filter, which the shop page matches tolerantly.
 // Accepts the whole tile (for its href) or a bare label string, so older call sites still work.
@@ -693,7 +693,7 @@ export function tileHref(ctx: Ctx, tileOrLabel: string | { label?: string; href?
 // A hero/split photo is a full-bleed background with the text laid OVER it, so it can't be an
 // ImageSlot (that's for framed, standalone images). This gives any such <img> the same "drag to
 // reposition" feel: it reads the stored focal point and, in the editor, lets you drag the exposed
-// image to pan the crop — writing objectPosition back as `imagePos`. Hook-free like the rest of this
+// image to pan the crop. Writing objectPosition back as `imagePos`. Hook-free like the rest of this
 // file so it also renders on the server. Spread onto the <img>: <img {...panBgImg(ctx, b)} … />.
 // Takes the two fields it actually reads rather than a whole Ctx, so the SECTION renderer in
 // Blocks.tsx (which has `edit`/`onEditField` in hand but never builds a Ctx of its own) can give a
@@ -737,7 +737,7 @@ export function panBgImg(ctx: { edit?: boolean; onEditField?: (id: string, key: 
 
 // ── arrangement handles ─────────────────────────────────────────────────────────────────────────
 /**
- * The drag handle for a structural measurement — the gutter between items, how wide a card sits in
+ * The drag handle for a structural measurement. The gutter between items, how wide a card sits in
  * a rail, where a split hero divides.
  *
  * These are the direct-manipulation half of the Arrangement sliders (see arrangeControls). A seller

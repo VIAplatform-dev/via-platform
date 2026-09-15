@@ -29,7 +29,7 @@ async function sendInviteEmail(email: string, token: string) {
  <div style="max-width:480px;margin:0 auto;padding:40px 16px;">
  <div style="background:#fff;padding:40px 32px;text-align:center;">
  <p style="font-size:13px;color:#5D0F17;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 24px;">VYA Admin</p>
- <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0 0 24px;">You've been given access to the VYA admin. Set your password to get started — then you'll sign in with your email, your password, and a one-time code sent to this address.</p>
+ <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0 0 24px;">You've been given access to the VYA admin. Set your password to get started, then you'll sign in with your email, your password, and a one-time code sent to this address.</p>
  <a href="${link}" style="display:inline-block;background:#5D0F17;color:#FFFDF8;text-decoration:none;padding:14px 28px;font-size:14px;letter-spacing:0.05em;">Set your password</a>
  <p style="font-size:12px;color:rgba(93,15,23,0.5);margin:24px 0 0;">This link expires in 7 days. If you didn't expect this, ignore it.</p>
  </div></div></body></html>`,
@@ -40,7 +40,7 @@ export async function GET() {
  if (!(await requireAdmin())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const admins = await listAdmins().catch(() => []);
  // Who SHOULD have access, from admin-emails.ts. Sent alongside rather than merged in: a row in
- // this table is a real account with a real password, and a name from a code constant is not — the
+ // this table is a real account with a real password, and a name from a code constant is not. The
  // page shows the difference and offers to close it, rather than implying the four are already set
  // up. `expected` does not grant anything on its own; only an accepted invite does.
  return NextResponse.json({ ok: true, admins, expected: ADMIN_EMAILS });

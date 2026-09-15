@@ -18,9 +18,9 @@ function isAuthorized(request: NextRequest): boolean {
 const canon = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const parseCommission = (v: string) => { const n = parseFloat((v || "").replace(/[^0-9.]/g, "")); return isNaN(n) ? 0 : n; };
 
-// GET — Collabs coverage: for every partnership, compare the order count Collabs reports (from the
+// GET: Collabs coverage: for every partnership, compare the order count Collabs reports (from the
 // cron snapshot) against the conversions we've actually recorded, per store. Surfaces sales that may be
-// sitting unrecorded ("invisible" — like Shiranka's).
+// sitting unrecorded ("invisible", like Shiranka's).
 //
 // IMPORTANT caveat: a store's gap includes orders that PREDATE our tracking. When a partnership is first
 // seen we baseline it at its current order count (those orders are already captured by the Shopify order
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
  const sum = (f: (r: (typeof byStore)[number]) => number) => byStore.reduce((s, r) => s + f(r), 0);
 
  return NextResponse.json({
-  note: "gap = Collabs-reported orders minus recorded conversions. Includes pre-tracking history (baselined; already captured by the Shopify order webhook), so it's an upper bound — small gaps on actively-tracked stores are the real signal.",
+  note: "gap = Collabs-reported orders minus recorded conversions. Includes pre-tracking history (baselined; already captured by the Shopify order webhook), so it's an upper bound. Small gaps on actively-tracked stores are the real signal.",
   totals: { collabsOrders: sum((r) => r.collabsOrders), recorded: sum((r) => r.recorded), gap: sum((r) => r.gap) },
   storesWithGap: byStore.filter((r) => r.gap > 0),
  });

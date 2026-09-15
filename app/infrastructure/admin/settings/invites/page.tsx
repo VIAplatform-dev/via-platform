@@ -6,7 +6,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill, cn } from "..
 
 // Who can open a store on VYA.
 //
-// This is VYA's own list, not a store's — the people we've told "yes, you can run a shop here".
+// This is VYA's own list, not a store's. The people we've told "yes, you can run a shop here".
 // Everyone else who reaches the signup wizard is turned away, which is what makes the pilot a pilot.
 
 type Invite = { email: string; note: string | null; reserveSlug: string | null; createdAt: string; usedAt: string | null };
@@ -58,7 +58,7 @@ export default function InvitesPage() {
    <AdminHeader
     eyebrow="Settings · VYA"
     title="Who can open a store"
-    subtitle="VYA is invite-only. Only the emails on this list can create a store — everyone else is turned away at signup."
+    subtitle="VYA is invite-only. Only the emails on this list can create a store. Everyone else is turned away at signup."
     actions={<span className="font-mono text-[11px] uppercase tracking-[0.12em] text-stone-400">{invites.length} invited</span>}
    />
 
@@ -124,7 +124,7 @@ export default function InvitesPage() {
       ))}
      </div>
      <p className="border-t border-stone-100 px-5 py-3 text-[11.5px] leading-relaxed text-stone-400">
-      Removing an invite stops someone signing up. It never touches a store they&rsquo;ve already opened —
+      Removing an invite stops someone signing up. It never touches a store they&rsquo;ve already opened,
       a shop that&rsquo;s running stays running.
      </p>
     </TechCard>

@@ -2,8 +2,8 @@
  * Which pieces belong in which of a seller's collections, read from their own store.
  *
  * This is the answer that decides what a collection page shows. When it comes back empty the page
- * has nothing to serve, and falls back to the copy we took of the seller's page — which only ever
- * knew page one — or, until recently, to the seller's entire catalogue.
+ * has nothing to serve, and falls back to the copy we took of the seller's page, which only ever
+ * knew page one, or, until recently, to the seller's entire catalogue.
  *
  * It was coming back empty a great deal, for two reasons that look alike from the outside:
  *
@@ -15,7 +15,7 @@
  *       thenicheshop                 131                86                    106
  *       blummier                      76                47                     51
  *
- *  2. THE STORE SAYS STOP AND WE DO NOT LISTEN. blummier answers 11 of her 76 with HTTP 429 — and
+ *  2. THE STORE SAYS STOP AND WE DO NOT LISTEN. blummier answers 11 of her 76 with HTTP 429, and
  *     they are every collection from "ralph-lauren" to the end of the alphabet. We read in
  *     alphabetical order, so what happens is her store puts up a wall two thirds of the way through
  *     and we bounce off it for the rest of the run. The old code waited about a second and gave up;
@@ -24,18 +24,18 @@
  *
  * Hence: read them all, pace them, honour the store's own Retry-After, and stay slower for the rest
  * of that store once it has told us off. And never, under any circumstance, record a collection we
- * could not read as "empty" — that answer blanks a page for a shopper.
+ * could not read as "empty". That answer blanks a page for a shopper.
  */
 
 export type CollectionProduct = {
  handle?: string | null;
- /** Kept so we can tell whether the SELLER lists sold pieces in this collection — see
+ /** Kept so we can tell whether the SELLER lists sold pieces in this collection. See
   *  app/lib/collection-sold-policy.ts. The pages carry it and we used to discard it. */
  variants?: { available?: boolean | null }[] | null;
 };
 /** The store asked us to slow down. `retryAfterMs` is its own Retry-After, when it sent one. */
 export type Throttled = { throttled: true; retryAfterMs?: number };
-/** One page of one collection. `null` = the read failed for some other reason — never "empty". */
+/** One page of one collection. `null` = the read failed for some other reason, never "empty". */
 export type CollectionPageResult = CollectionProduct[] | Throttled | null;
 export type CollectionPageFetch = (slug: string, page: number) => Promise<CollectionPageResult>;
 
@@ -48,11 +48,11 @@ export type MembershipRead = {
   * The pages come back ordered and we used to throw that away, so a hosted store's rails were
   * ordered from the copy we took of the collection page on capture day and never re-sorted after.
   * Rails are the most volatile part of a shop; within days they are yesterday's pieces in
-  * yesterday's order. Keeping the order costs no extra requests — it is already on the wire.
+  * yesterday's order. Keeping the order costs no extra requests. It is already on the wire.
   *
   * COMPLETE READS ONLY. A collection listed here was read to its end (or to our page ceiling, where
   * what we have is still a true prefix). One we could not finish is absent, because ordering from
-  * half a list would push everything we failed to read to the bottom of the seller's rail — the
+  * half a list would push everything we failed to read to the bottom of the seller's rail. The
   * same reason the membership merge refuses to overwrite an unread collection.
   */
  order: Map<string, string[]>;
@@ -68,7 +68,7 @@ export type MembershipRead = {
   *
   * An empty answer is only an ANSWER when it came from one of these. Without this the guard could
   * not tell "she cleared this category out" from "the read failed", and answered both by keeping
-  * months-old stock — 86 products across two stores, frozen through every repair.
+  * months-old stock: 86 products across two stores, frozen through every repair.
   */
  completed: Set<string>;
  /** Collections we could not read. Their contents must be left alone, not overwritten. */
@@ -76,8 +76,8 @@ export type MembershipRead = {
  /** Collections beyond the ceiling, never asked about. Recorded rather than silently dropped. */
  notAttempted: string[];
  /**
-  * Collections bigger than we will read in one pass. What we read is kept and used — unlike an
-  * unread collection, a truncated one is still mostly right — but the caller is told, because the
+  * Collections bigger than we will read in one pass. What we read is kept and used. Unlike an
+  * unread collection, a truncated one is still mostly right, but the caller is told, because the
   * shortfall is ours and not the seller's.
   */
  truncated: string[];
@@ -86,7 +86,7 @@ export type MembershipRead = {
 };
 
 /**
- * Pages per collection, 250 each. Six was 1,500 — under chill-boutique's catch-all collection of
+ * Pages per collection, 250 each. Six was 1,500: under chill-boutique's catch-all collection of
  * 1,789, so we filed 1,500 of it and said nothing, and the shortfall read as the seller's drift
  * rather than our own ceiling. Twenty is 5,000, and hitting it is now reported.
  */
@@ -131,7 +131,7 @@ export async function readCollectionMembership(
  const attempt = slugs.slice(0, cap);
  const notAttempted = slugs.slice(cap);
  // A DEADLINE, not a timeout. This read had no clock at all: on a 761-collection store it ran for
- // 25 minutes and returned nothing, because a throw — or an invocation killed at maxDuration —
+ // 25 minutes and returned nothing, because a throw, or an invocation killed at maxDuration,
  // loses everything already read. Stopping AT a deadline keeps that work and marks the remainder
  // unread, which is what protects their existing membership from being overwritten as "empty".
  const clock = opts.clock ?? Date.now;
@@ -140,7 +140,7 @@ export async function readCollectionMembership(
  const outOfTime = () => budget != null && clock() - startedAt >= budget;
  const ranOut: string[] = [];
  // The standing pace, which only ever gets slower. A store that objected once will object again if
- // we go straight back to the old rate — which is exactly what lost blummier everything from R on.
+ // we go straight back to the old rate, which is exactly what lost blummier everything from R on.
  let pace = opts.delayMs ?? DELAY_MS;
  let throttleHits = 0;
 
@@ -156,7 +156,7 @@ export async function readCollectionMembership(
   const seen = new Set<string>();
   for (let page = 1; page <= maxPages; page++) {
    const prods = await readPage(slug, page);
-   if (!prods) break; // unread — `complete` stays false and the caller preserves what we hold
+   if (!prods) break; // unread: `complete` stays false and the caller preserves what we hold
    for (const p of prods) {
     // Counted before the handle check: a product with no variants is unavailable, not absent.
     const st = stock.get(slug) ?? { unavailable: 0, total: 0 };
@@ -170,7 +170,7 @@ export async function readCollectionMembership(
     if (!seen.has(key)) { seen.add(key); sequence.push(key); }
    }
    // A short page is the end of the listing, and an empty one confirmed twice is an empty
-   // collection — both are complete reads.
+   // collection: both are complete reads.
    if (prods.length < 250) { complete = true; break; }
    // As much of it as we will ever read in one pass. Usable, but ours is a floor not a total.
    if (page === maxPages) { complete = true; truncated.push(slug); }
@@ -196,7 +196,7 @@ export async function readCollectionMembership(
 
   for (let attemptNo = 0; isThrottled(result) && attemptNo < BACKOFF_MS.length; attemptNo++) {
    throttleHits++;
-   // The store's own number beats our guess — it is telling us the rate it wants.
+   // The store's own number beats our guess. It is telling us the rate it wants.
    await wait(result.retryAfterMs ?? BACKOFF_MS[attemptNo]);
    // …and slow the standing pace for everything after this, not just the retry.
    pace = Math.min(MAX_PACE_MS, Math.max(pace * 2, 1500));

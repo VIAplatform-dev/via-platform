@@ -29,7 +29,7 @@ test("outside the open session, only the last 24 hours qualify", () => {
  const r = voidEligibility({ ...base, sessionId: "old", paidAt: hoursAgo(25) }, { openSessionId: "s1", now: NOW });
  assert.equal(r.ok, false);
  assert.match(String((r as { reason: string }).reason), /24 hours/);
- // In the open session the window doesn't apply — a stall that opened yesterday can still fix today.
+ // In the open session the window doesn't apply. A stall that opened yesterday can still fix today.
  assert.equal(voidEligibility({ ...base, sessionId: "s1", paidAt: hoursAgo(30) }, { openSessionId: "s1", now: NOW }).ok, true);
  assert.equal(VOID_WINDOW_MS, 24 * 3_600_000);
 });

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
  const body = await request.json();
  // `source` is the acquisition channel the page tracker captured (instagram, tiktok,
  // a referrer). It used to be ignored entirely and every row was written as the
- // literal 'newsletter' — which records WHICH FORM they used, not where they came
+ // literal 'newsletter', which records WHICH FORM they used, not where they came
  // from, so newsletter signups had no acquisition signal at all. The form name is
  // now only the fallback, matching how /api/waitlist has always behaved.
  const { email, source } = body;

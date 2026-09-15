@@ -32,7 +32,7 @@ test("the placeholder says what she can type", () => {
 
 test("a piece is recognised whatever case the route sends", () => {
   // The route says "Inventory"; this side thinks in lowercase keys. A strict compare fails silently
-  // — every row keeps its text label and the photos simply never appear.
+  // every row keeps its text label and the photos simply never appear.
   assert.equal(isPiece("Inventory"), true);
   assert.equal(isPiece("inventory"), true);
   assert.equal(isPiece("Orders"), false);

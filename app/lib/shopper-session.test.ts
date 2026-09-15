@@ -18,7 +18,7 @@ test("a token from ONE store is worthless on another", () => {
 });
 
 test("a tampered token is rejected", () => {
- // The payload is encoded, so forging means rewriting it and keeping the old signature — which is
+ // The payload is encoded, so forging means rewriting it and keeping the old signature, which is
  // exactly what someone would try.
  const t = signShopperToken({ email: "buyer@example.com", storeSlug: "blummier" }, SECRET);
  const [payload, sig] = t.split(".");
@@ -52,7 +52,7 @@ test("rubbish is rejected without throwing", () => {
  }
 });
 
-test("the email is stored the way we look it up — lower case, trimmed", () => {
+test("the email is stored the way we look it up. Lower case, trimmed", () => {
  const t = signShopperToken({ email: "  Buyer@Example.COM ", storeSlug: "blummier" }, SECRET);
  assert.equal(readShopperToken(t, "blummier", SECRET)?.email, "buyer@example.com");
 });
@@ -61,7 +61,7 @@ test("the email is stored the way we look it up — lower case, trimmed", () => 
 // A cookie is only shared with subdomains if something says so. Nothing in this codebase sets a
 // cookie domain, which is why signing in on scottie.getvya.ai does not sign you into getvya.ai. If
 // anyone ever adds one, every store would start recognising marketplace members and every seller's
-// customers would silently become VYA's — with no error and nothing failing. This test is the alarm.
+// customers would silently become VYA's, with no error and nothing failing. This test is the alarm.
 
 test("the shopper cookie is never shared across subdomains", () => {
  const opts = shopperCookieOptions();

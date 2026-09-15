@@ -4,23 +4,23 @@ import { colors, spacing, button, radius } from "../../lib/portal-theme";
 
 // The pieces every settings screen is built from.
 //
-// These exist because nine screens moved off the desktop at once — payouts, returns, domain,
-// consignors, discounts, billing, labels, shipping, tax — and nine hand-rolled forms would drift
+// These exist because nine screens moved off the desktop at once. Payouts, returns, domain,
+// consignors, discounts, billing, labels, shipping, tax, and nine hand-rolled forms would drift
 // into nine slightly different ideas of what a label, a save button and an error look like. The
 // seller notices that even when she couldn't name it.
 //
 // The palette rule from lib/portal-theme.ts holds throughout: one burgundy ink, green ONLY for something
 // that has genuinely gone right. There is no red. A failed save says so in words on the same chip
-// ground every other notice uses — a settings screen that flashes red at a seller who mistyped a
+// ground every other notice uses. A settings screen that flashes red at a seller who mistyped a
 // postcode is a worse screen, and burgundy on cream is already legible.
 
 /**
- * A label on the left, its box on the right — the shape the piece editor and the new-listing form
+ * A label on the left, its box on the right. The shape the piece editor and the new-listing form
  * both use.
  *
  * WRAPPED IN A PRESSABLE THAT FOCUSES THE BOX. Without it only the right-hand portion of the row
- * does anything: the label is a fixed-width column, and tapping it — which is where the eye goes,
- * because it is the word naming the thing you want to change — misses the input entirely. On a
+ * does anything: the label is a fixed-width column, and tapping it, which is where the eye goes,
+ * because it is the word naming the thing you want to change. Misses the input entirely. On a
  * phone that reads as a field you are not allowed to edit.
  */
 export function InlineField({
@@ -34,7 +34,7 @@ export function InlineField({
   keyboardType?: "default" | "numeric" | "email-address" | "decimal-pad" | "phone-pad" | "url" | "numbers-and-punctuation";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   multiline?: boolean;
-  /** A unit, an OPTIONAL badge — anything that sits after the box on the same row. */
+  /** A unit, an OPTIONAL badge. Anything that sits after the box on the same row. */
   trailing?: React.ReactNode;
 }) {
   const box = useRef<TextInput>(null);
@@ -82,7 +82,7 @@ export function Field({
   multiline?: boolean;
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   editable?: boolean;
-  /** A unit drawn inside the field's right edge — "%", "days", "oz". */
+  /** A unit drawn inside the field's right edge. "%", "days", "oz". */
   suffix?: string;
 }) {
   const box = useRef<TextInput>(null);

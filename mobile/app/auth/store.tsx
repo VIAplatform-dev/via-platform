@@ -9,7 +9,7 @@ import { colors, fonts, spacing } from "../../lib/theme";
 //
 // It was the same email box as the shopper sign-in with a different label on the button, and that
 // was wrong in two ways. A store owner pressed "Sign in as a store", typed her address, and if that
-// address had no shop she was dropped into the shopper marketplace with nothing said — which is
+// address had no shop she was dropped into the shopper marketplace with nothing said, which is
 // indistinguishable from the app being broken. And a link that reads like its own door should open
 // its own door.
 //
@@ -19,8 +19,8 @@ import { colors, fonts, spacing } from "../../lib/theme";
 // STILL ONE MAGIC LINK underneath. There is no separate store credential to hold; the emailed link
 // resolves whose address it is and the callback routes on that. This is a door, not a second lock.
 //
-// CREATING a shop is deliberately not here. That is a laptop job — a wizard, a catalogue import,
-// photographs — and pretending a phone can start it is what used to send people to a browser.
+// CREATING a shop is deliberately not here. That is a laptop job. A wizard, a catalogue import,
+// photographs, and pretending a phone can start it is what used to send people to a browser.
 
 export default function StoreSignIn() {
  const { requestMagicLink } = useAuth();
@@ -69,7 +69,7 @@ export default function StoreSignIn() {
    <View style={{ flex: 1, justifyContent: "flex-end", paddingHorizontal: spacing.xl, paddingBottom: spacing.xxl + spacing.md }}>
     <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text }}>Sign in to your shop</Text>
     <Text style={{ marginTop: spacing.sm, fontSize: 15, lineHeight: 22, color: colors.textMuted }}>
-     The address your shop is registered to. We’ll email you a link — no password.
+     The address your shop is registered to. We’ll email you a link, no password.
     </Text>
 
     <TextInput
@@ -107,7 +107,7 @@ export default function StoreSignIn() {
     {/* Setting a shop up is a laptop job, and saying so here stops the "how do I start one" tap
         that used to open a browser. */}
     <Text style={{ marginTop: spacing.lg, fontSize: 13, lineHeight: 19, color: colors.textDim, textAlign: "center" }}>
-     Don’t have a shop yet? Setting one up is done on a computer — go to getvya.ai on a laptop.
+     Don’t have a shop yet? Setting one up is done on a computer. Go to getvya.ai on a laptop.
     </Text>
 
     <Pressable onPress={() => router.back()} style={{ marginTop: spacing.lg, alignItems: "center" }}>

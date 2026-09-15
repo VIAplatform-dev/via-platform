@@ -10,7 +10,7 @@ const getDatabaseUrl = () => {
  return url;
 };
 
-// Sentinel value — no week concept, picks are always live
+// Sentinel value, no week concept, picks are always live
 const FIXED_WEEK = "1970-01-01";
 
 let _initialized = false;
@@ -114,7 +114,7 @@ export async function getAllEditorsPicks(collectionSlug: string = "editors-picks
  }));
 }
 
-/** Returns picks for ALL collections in parallel — used on homepage. */
+/** Returns picks for ALL collections in parallel. Used on homepage. */
 export async function getAllCollectionPicks(): Promise<Record<string, PickWithProduct[]>> {
  await initEditorsPicks();
  const sql = neon(getDatabaseUrl());
@@ -264,7 +264,7 @@ export async function getProductsByStore(storeSlug: string, limit = 300): Promis
 
 /**
  * Dynamically returns the top `limit` most-favorited products across all stores.
- * This powers the "Everyone's Favorites" section — no manual curation required.
+ * This powers the "Everyone's Favorites" section, no manual curation required.
  * Falls back to most-clicked products if no favorites exist yet.
  */
 export async function getEveryonesFavorites(limit = 75): Promise<PickWithProduct[]> {
@@ -319,19 +319,19 @@ export async function getEveryonesFavorites(limit = 75): Promise<PickWithProduct
  }));
  } catch (error) {
  // A query failure during prerender (e.g. Neon out-of-memory under the parallel build
- // workers) must not crash the homepage — degrade to empty like the other homepage fetches.
+ // workers) must not crash the homepage. Degrade to empty like the other homepage fetches.
  console.error("Failed to fetch everyone's favorites:", error);
  return [];
  }
 }
 
 /** Collection slug for the hand-picked weekly New Arrivals email. NOT a public
- * collection — it only feeds the email. */
+ * collection: it only feeds the email. */
 export const EMAIL_PICKS_SLUG = "new-arrivals-email";
 
 /**
  * Products hand-picked for the New Arrivals email, in pick order, as full product
- * rows. Empty when nothing is curated — the email then falls back to its automatic
+ * rows. Empty when nothing is curated. The email then falls back to its automatic
  * weekly selection, so it never goes out blank. Capped at 25 (the email's max).
  */
 export async function getEmailPickProducts(): Promise<DBProduct[]> {
@@ -350,12 +350,12 @@ export async function getEmailPickProducts(): Promise<DBProduct[]> {
  return rows as unknown as DBProduct[];
 }
 
-// Admin product search — deliberately NOT its own ranking.
+// Admin product search: deliberately NOT its own ranking.
 //
 // The curator types "runway" or "ysl" the way a shopper would, so this runs the SHOPPER'S
 // search (/api/search: brand aliases, category expansion, stemming, synonyms, description
 // matches, typo fallback) and then re-reads those ids out of `products` in the shape the
-// admin grid already consumes. One ranking, one place to improve it — a second copy here
+// admin grid already consumes. One ranking, one place to improve it. A second copy here
 // would drift the moment either side changed.
 //
 // The public route returns ids in relevance order; that order is preserved on the way back.

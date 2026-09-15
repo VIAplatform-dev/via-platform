@@ -32,14 +32,14 @@ export default function SettingsScreen() {
       ) : null}
 
       {/* THE ROW SHE CAME HERE FOR. Switching to the shop lived only on Account, so a store owner
-          who opened Settings — a reasonable place to look for "which side am I on" — found nothing
+          who opened Settings, a reasonable place to look for "which side am I on". Found nothing
           and concluded her account wasn't connected to a store at all. */}
       {storeSlug ? <Row label="Switch to my store" href="/(seller)" hint={`Sell, list and manage ${storeSlug}`} /> : null}
       <Row label="Sizes" href="/account/sizes" hint="What we filter your feed by" />
       <Row label="Saved Searches" href="/account/saved-searches" />
       <Row
         label="Tell a friend"
-        onPress={() => { void Share.share({ message: "I'm on VYA — the curated vintage marketplace. Join me: https://vyaplatform.com" }); }}
+        onPress={() => { void Share.share({ message: "I'm on VYA: the curated vintage marketplace. Join me: https://vyaplatform.com" }); }}
       />
       <Row label="Terms of Service" href="/policy/terms" />
       <Row label="Privacy" href="/policy/privacy" />

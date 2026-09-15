@@ -74,14 +74,14 @@ test.describe("The same piece, every renderer", () => {
    expect(published.status(), await published.text()).toBe(200);
    expect((await published.json()).item.status).toBe("active");
 
-   // The classic page — the words every other renderer must match.
+   // The classic page: the words every other renderer must match.
    await signIn(page);
    const res = await page.goto(`/s/${handle}/p/${id}?preview=1`);
    test.skip(res?.status() === 404, "the test store has no storefront to render a product page on");
    await expect(page.getByTestId("flaws")).toContainText("small mark inside collar");
    await expect(page.getByTestId("flaws")).toContainText("one loose button");
    // The grade's meaning and the note print when the store's page shows Condition (a per-store
-   // fact setting — storefront-product-page.ts); the flaws print either way.
+   // fact setting. Storefront-product-page.ts); the flaws print either way.
    if (await page.locator("p", { hasText: /^Condition$/ }).count()) {
     await expect(page.getByTestId("condition-definition")).toContainText("Light, honest wear");
     await expect(page.getByTestId("condition-note")).toContainText("light wear at the cuffs");
@@ -92,7 +92,7 @@ test.describe("The same piece, every renderer", () => {
    // The hosted page, in the store's own theme. A store with no capture has no such page; the
    // injection is then proved by app/lib/hosted-product-details.test.ts instead.
    const hosted = await request.get(`/site/${STORE}/products/${id}`);
-   test.skip(hosted.status() === 404, `${STORE} has no hosted site on this server — hosted assertion covered by the unit tests`);
+   test.skip(hosted.status() === 404, `${STORE} has no hosted site on this server. Hosted assertion covered by the unit tests`);
    expect(hosted.status(), await hosted.text()).toBe(200);
    const html = await hosted.text();
    expect(html).toContain("data-vya-details");

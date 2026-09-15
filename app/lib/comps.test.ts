@@ -4,7 +4,7 @@ import { verifyMatchesByImage, matchesToComps, priceToCents } from "./comps.ts";
 
 // The fallback guarantees: verification only ever REMOVES matches it can prove are a different
 // item. With no query embedding or no thumbnails it can't prove anything, so it must pass the set
-// through untouched (filtered=false) — never make pricing worse than before.
+// through untouched (filtered=false), never make pricing worse than before.
 test("verifyMatchesByImage is a no-op without a query embedding", async () => {
  const matches = [{ title: "Gucci bag", priceCents: 180000, source: "realreal", thumbnail: "https://t/x.jpg" }];
  const { verified, filtered, checked } = await verifyMatchesByImage(null, matches);

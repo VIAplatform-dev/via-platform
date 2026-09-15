@@ -5,14 +5,14 @@ import {
 } from "./ebay-notify-core.ts";
 
 // The receiving end of an eBay sale notification, written against an interface so the whole path
-// — challenge, signature, store, sync, record — runs under test with nothing real behind it. The
+// challenge, signature, store, sync, record. Runs under test with nothing real behind it. The
 // route in app/api/webhooks/ebay is a thin adapter over this.
 //
 // Two rules shape every branch:
 //  1. Nothing unauthenticated reaches the database. The signature is checked before the body is
 //     even parsed (Notification API), or the SOAP signature is checked before anything else.
 //  2. Once authenticated, the answer is 2xx whatever we make of the payload. eBay retries on
-//     non-2xx and marks a destination down after enough failures — a store that stops hearing
+//     non-2xx and marks a destination down after enough failures. A store that stops hearing
 //     about sales because we 500'd on a shape we did not expect is the failure to avoid. Odd
 //     deliveries are recorded with an outcome the admin can read, not refused.
 

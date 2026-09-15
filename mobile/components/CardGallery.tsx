@@ -6,8 +6,8 @@ import { colors } from "../lib/theme";
 
 // A swipeable gallery inside a grid card.
 //
-// WHY THE TAP TARGET IS PER-IMAGE. Wrapping this whole component in a <Pressable> — which is what
-// the card used to do — makes the Pressable claim the touch, and the horizontal pan never reaches
+// WHY THE TAP TARGET IS PER-IMAGE. Wrapping this whole component in a <Pressable> which is what
+// the card used to do. Makes the Pressable claim the touch, and the horizontal pan never reaches
 // the ScrollView. The swipe silently did nothing. A Pressable INSIDE a ScrollView is different: the
 // ScrollView owns the pan, and the Pressable only fires when the finger doesn't travel. So the tap
 // target moves onto each image and the outer wrapper goes away.
@@ -26,8 +26,8 @@ function CardGallery({
     return <Pressable onPress={onPress}><View style={{ width, height, backgroundColor: colors.bgCard }} /></Pressable>;
   }
 
-  // ONE IMAGE, NO SCROLLVIEW. A paging ScrollView per card is the expensive thing in this grid —
-  // twenty cards on screen meant twenty nested scroll views — and a card with a single photograph
+  // ONE IMAGE, NO SCROLLVIEW. A paging ScrollView per card is the expensive thing in this grid,
+  // twenty cards on screen meant twenty nested scroll views, and a card with a single photograph
   // has nothing to page through. Most pieces have one image, so most cards stop paying for it.
   if (shown.length === 1) {
     return (
@@ -51,7 +51,7 @@ function CardGallery({
         {shown.map((uri, i) => (
           <Pressable key={`${uri}-${i}`} onPress={onPress}>
             {/* Only the frames you can reach are real images; the rest are correctly-sized empties,
-                so the ScrollView's content width — and therefore paging — is unchanged while the
+                so the ScrollView's content width, and therefore paging. Is unchanged while the
                 card mounts two image views instead of eight. Swiping mounts the next one. */}
             {i <= active + 1 ? (
               <Image

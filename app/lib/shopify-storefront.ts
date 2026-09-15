@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Shopify Storefront API client. When a seller connects their store (pastes a
 // Storefront API token), we pull their nav menu, pages, and collections EXACTLY
-// via GraphQL — no screenshots/vision/scraping for those parts. Read-only.
+// via GraphQL, no screenshots/vision/scraping for those parts. Read-only.
 // ───────────────────────────────────────────────────────────────────────────
 
 const API_VERSION = "2024-10";
@@ -25,7 +25,7 @@ export async function storefrontQuery(shop: string, token: string, query: string
  return json.data;
 }
 
-/** Validate a connection — returns the shop name on success. */
+/** Validate a connection: returns the shop name on success. */
 export async function verifyConnection(shop: string, token: string): Promise<{ ok: boolean; shopName?: string; error?: string }> {
  try {
  const d = await storefrontQuery(shop, token, `{ shop { name } }`);

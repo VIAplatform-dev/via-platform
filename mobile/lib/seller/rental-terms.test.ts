@@ -67,7 +67,7 @@ test("a replacement value below the rental price is refused", () => {
   // Otherwise it is cheaper to keep the piece than to return it, which nobody means to offer.
   assert.match(termsProblem({ prices: { 4: "45" }, replacement: "20" })!, /more than the rental price/i);
   assert.equal(termsProblem({ prices: { 4: "45" }, replacement: "450" }), null);
-  // No replacement value at all is allowed — it is optional.
+  // No replacement value at all is allowed. It is optional.
   assert.equal(termsProblem({ prices: { 4: "45" }, replacement: "" }), null);
 });
 

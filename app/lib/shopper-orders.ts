@@ -2,10 +2,10 @@
  * What a shopper is allowed to see of her own orders at one store.
  *
  * The account panel is served into a public page, so everything this module returns is public. The
- * seller's economics — VYA's fee, what the piece cost her, the address book — stay on the server;
+ * seller's economics, VYA's fee, what the piece cost her, the address book. Stay on the server;
  * only what the shopper already knows (what she bought, what she paid, where it is) comes back.
  *
- * Matching happens in SQL, on the signed-in email and nothing else — see listOrdersForShopper. A
+ * Matching happens in SQL, on the signed-in email and nothing else. See listOrdersForShopper. A
  * name or an item in common must never be enough to show one shopper another shopper's order.
  */
 

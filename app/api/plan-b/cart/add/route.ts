@@ -8,11 +8,11 @@ import { buildCartSectionsResponse, requestedSectionIds } from "@/app/lib/plan-b
 
 export const dynamic = "force-dynamic";
 
-// POST /cart/add.js — the seller's OWN Add-to-cart button, driving VYA's database.
+// POST /cart/add.js. The seller's OWN Add-to-cart button, driving VYA's database.
 //
 // The theme posts a Shopify variant id because that's what it was captured with; `sourceVariantId`
 // on every imported item maps it straight back to a VYA piece. Shopify answers this endpoint with
-// the ADDED LINE (not the whole cart), and themes read that response to render their drawer — so the
+// the ADDED LINE (not the whole cart), and themes read that response to render their drawer, so the
 // shape matters as much as the effect.
 export async function POST(request: NextRequest) {
  const store = await resolveStore(request);
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
  const item = await findItemByVariantId(store.sellerId, variantId);
  if (!item) return errorResponse("That item is no longer available.", 404);
  // One-of-one: a sold piece is gone, not backorderable. Say so in the theme's own error shape
- // rather than adding a line the shopper can't actually buy — and say WHY in the shelf's words: a
+ // rather than adding a line the shopper can't actually buy, and say WHY in the shelf's words: a
  // held piece is on hold, not sold (cart-refusal-core.ts).
  const refusal = hostedCartRefusal(item);
  if (refusal) return errorResponse(refusal, 422);
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
  const payload: Record<string, unknown> = { ...line, items: [line] };
 
  // The theme's own <product-form> asks for `sections` alongside the add (Dawn's cart-notification
- // and cart-drawer both do) — see cart-sections.ts for why answering it matters as much as the add
+ // and cart-drawer both do). See cart-sections.ts for why answering it matters as much as the add
  // itself: skip it and the theme's own JS throws reading `sections[id]` off nothing, and the
  // shopper never sees ANY confirmation, popup or otherwise, even though the item really was added.
  const requested = requestedSectionIds(body);

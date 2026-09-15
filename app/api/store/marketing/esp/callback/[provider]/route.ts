@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 const BASE = espBaseUrl();
 const back = (q: string) => NextResponse.redirect(new URL(`/admin/marketing/esp?${q}`, BASE));
 
-// "Connect Mailchimp" — step two. They've approved; swap the code for a token and remember it.
+// "Connect Mailchimp": step two. They've approved; swap the code for a token and remember it.
 //
 // Every failure sends the seller back to the page with a reason rather than showing a raw error:
 // they're standing in a shop, not reading a stack trace.
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ provide
  const url = new URL(request.url);
  const code = url.searchParams.get("code");
  const state = url.searchParams.get("state");
- // They send this when the seller presses Cancel. Not an error — just say nothing happened.
+ // They send this when the seller presses Cancel. Not an error, just say nothing happened.
  if (url.searchParams.get("error")) return back("error=cancelled");
  if (!code) return back("error=nocode");
 

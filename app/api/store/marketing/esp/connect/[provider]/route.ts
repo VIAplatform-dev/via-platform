@@ -8,9 +8,9 @@ export const runtime = "nodejs";
 
 const BASE = espBaseUrl();
 
-// "Connect Mailchimp" — step one. Send the seller to the provider's own sign-in.
+// "Connect Mailchimp": step one. Send the seller to the provider's own sign-in.
 //
-// The things we need on the way back — which store this was, the PKCE verifier, the state — go in a
+// The things we need on the way back, which store this was, the PKCE verifier, the state. Go in a
 // short-lived, httpOnly cookie rather than a database row: they're worthless after five minutes, and
 // a cookie means an abandoned connection cleans itself up.
 export async function GET(request: NextRequest, ctx: { params: Promise<{ provider: string }> }) {

@@ -1,6 +1,6 @@
 // What a listing can be narrowed by.
 //
-// These names are not free choices — they are the query params `parseFilters` reads in the web repo
+// These names are not free choices. They are the query params `parseFilters` reads in the web repo
 // (app/lib/publicFilters.ts), and every listing endpoint (feed, search, new-arrivals, store) runs
 // through it. A key that doesn't match is silently ignored, so the screen would filter nothing and
 // look broken rather than error.
@@ -33,7 +33,7 @@ export const SORTS: { value: Sort; label: string }[] = [
 
 export const CATEGORY_OPTIONS = ["Clothing", "Shoes", "Bags", "Accessories", "Home"];
 
-/** How many narrowings are active — the number shown on the Filter pill. */
+/** How many narrowings are active. The number shown on the Filter pill. */
 export function activeCount(f: Filters): number {
   return f.sizes.length + f.categories.length + f.stores.length +
     (f.priceMin != null ? 1 : 0) + (f.priceMax != null ? 1 : 0) +
@@ -43,7 +43,7 @@ export function activeCount(f: Filters): number {
 /**
  * Filters → query string.
  *
- * `locked` are the ones the screen itself imposes — a category page is already a category filter —
+ * `locked` are the ones the screen itself imposes, a category page is already a category filter,
  * so they are merged in rather than offered for editing. Sort is omitted when it is the default,
  * to keep URLs (and so query cache keys) stable.
  */

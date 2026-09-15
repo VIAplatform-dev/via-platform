@@ -64,8 +64,8 @@ body {
 
 /* THE GREY BAND UNDER MOBILE SAFARI.
    
-   Only `body` carried the page colour. Safari paints the strip behind its bottom toolbar — and the
-   overscroll area at either end — from the ROOT element, so with html unset it used its own default
+   Only `body` carried the page colour. Safari paints the strip behind its bottom toolbar, and the
+   overscroll area at either end, from the ROOT element, so with html unset it used its own default
    grey and every page on a phone ended in a grey band that belongs to no part of the design.
    `background` on html alone is not enough either: html inherits body's when body has one, and the
    reverse is what is needed here. */
@@ -95,8 +95,8 @@ body {
    Store OS: grids never outgrow the screen
 ================================ */
 /* A grid item's min-width defaults to `auto`, i.e. its min-content width. So `grid lg:grid-cols-3`
-   on a phone is one implicit column exactly as wide as the widest thing inside it — a bar chart, a
-   nowrap label — and the Store OS shell's `overflow-x: clip` then silently cut the page off at the
+   on a phone is one implicit column exactly as wide as the widest thing inside it. A bar chart, a
+   nowrap label, and the Store OS shell's `overflow-x: clip` then silently cut the page off at the
    right edge. `1fr` has the same floor (it means minmax(auto, 1fr)). Zeroing the floor lets every
    column shrink to the screen and its content wrap, which is what every one of these layouts meant.
    In @layer base on purpose: a component that genuinely needs a minimum (`min-w-[…]`) still wins. */
@@ -116,7 +116,7 @@ body {
    (844px wide, very much a touch device) at 14px. The real condition is the input modality, so
    ask about that directly. Desktop keeps its denser type untouched.
    Deliberately UNLAYERED: Tailwind v4 puts utilities in `@layer utilities`, and unlayered rules
-   win over layered ones regardless of specificity — which is what lets this beat `.text-sm`
+   win over layered ones regardless of specificity, which is what lets this beat `.text-sm`
    without `!important` and without editing every input in the codebase. */
 @media (hover: none) and (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
@@ -338,7 +338,7 @@ h1, h2, h3 {
    Setup is the first thing a seller ever does, so the steps move rather than
    snap. Direction carries meaning: forward slides in from the right, Back from
    the left, and handing off to the builder slides the question out of the way.
-   Short and eased — this is wayfinding, not decoration. */
+   Short and eased. This is wayfinding, not decoration. */
 @keyframes vyaStepInRight {
   from { opacity: 0; transform: translateX(22px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -387,7 +387,7 @@ h1, h2, h3 {
 }
 
 /* The lighter of the two preview transitions: a palette, a font pairing or moving to another
-   page. Opacity only, and quick — these get clicked through in sequence, so movement here reads
+   page. Opacity only, and quick. These get clicked through in sequence, so movement here reads
    as lag rather than polish. The full fade-up is reserved for a whole-template swap. */
 @keyframes vyaPreviewTone {
   from { opacity: 0.15; }

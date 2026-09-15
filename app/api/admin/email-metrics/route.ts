@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 
  const sql = neon(dbUrl);
 
- // Check table exists — if not, return empty
+ // Check table exists, if not, return empty
  const tableExists = await sql`
  SELECT 1 FROM information_schema.tables
  WHERE table_name = 'email_events'
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
  ORDER BY sent DESC
  `;
 
- // First-party clicks per category — every email link is utm-tagged (withUtm),
+ // First-party clicks per category. Every email link is utm-tagged (withUtm),
  // so our own landings are the reliable click signal. Resend click-tracking is
  // off, so email.clicked above is ~always 0. Fold these in by campaign.
  const fpRows = (await sql`

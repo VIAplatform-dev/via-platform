@@ -1,15 +1,15 @@
-// The storefront's own words — the handful of labels the shop UI says for itself, rather than
+// The storefront's own words. The handful of labels the shop UI says for itself, rather than
 // anything a seller typed into a section.
 //
 // "Sold", "Shop all", "View all", "Coming soon" were literals scattered through the renderer, which
-// meant every VYA storefront said them identically and a store with a voice of its own — a French
-// shop, a lowercase brand, one that says "Gone" rather than "Sold" — had no way to change a single
+// meant every VYA storefront said them identically and a store with a voice of its own. A French
+// shop, a lowercase brand, one that says "Gone" rather than "Sold". Had no way to change a single
 // one. They are small, and they appear on every page, which is exactly why they are worth owning.
 
 export type StorefrontWords = {
  /** Badge over a piece that has already gone. */
  sold: string;
- /** Badge over a piece kept back for someone — still on the shelf, not for sale today. */
+ /** Badge over a piece kept back for someone. Still on the shelf, not for sale today. */
  held: string;
  /** The link back to the whole catalogue from a category menu. */
  shopAll: string;
@@ -37,7 +37,7 @@ export const WORD_LABELS: { key: keyof StorefrontWords; label: string; hint: str
 
 /**
  * The words this store uses. A blank or missing entry falls back, so a store only overrides what it
- * actually wants to say differently — and a word added here later needs no migration.
+ * actually wants to say differently, and a word added here later needs no migration.
  */
 export function resolveWords(input: Partial<StorefrontWords> | null | undefined): StorefrontWords {
  const out = { ...DEFAULT_WORDS };

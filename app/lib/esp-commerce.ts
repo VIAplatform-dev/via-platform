@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// VYA as a CONNECTED STORE in Mailchimp — the thing that puts us on their
+// VYA as a CONNECTED STORE in Mailchimp. The thing that puts us on their
 // "Connect your store" screen beside Shopify, Wix and WooCommerce.
 //
 // Syncing contacts makes a mailing list. Syncing a STORE is a different object: Mailchimp builds
@@ -10,7 +10,7 @@
 //
 // Shapes are theirs, not ours, so this file exists to translate once and be tested:
 //  · money is a NUMBER in their JSON, not cents and not a string
-//  · every object carries an `id` WE choose, and they upsert on it — so ids must be stable across
+//  · every object carries an `id` WE choose, and they upsert on it, so ids must be stable across
 //    syncs or every run creates duplicates
 //  · a cart with a `customer` that has no `email_address` is rejected, which is the usual reason an
 //    abandoned-cart sync silently does nothing
@@ -45,7 +45,7 @@ export function mailchimpStore(s: StoreInfo) {
 
 export type CommerceCustomer = { email: string; name?: string | null; orders?: number; spentCents?: number; subscribed: boolean };
 
-/** Their customer id must be stable, so it's the lowercased email — the only thing that never changes. */
+/** Their customer id must be stable, so it's the lowercased email. The only thing that never changes. */
 export function customerId(email: string): string {
  return String(email || "").trim().toLowerCase().replace(/[^a-z0-9_.@-]/g, "-").slice(0, 60);
 }
@@ -73,7 +73,7 @@ export type CommerceProduct = {
 /**
  * A piece.
  *
- * Vintage is one-of-one, so each product gets exactly one variant with the same id — their model
+ * Vintage is one-of-one, so each product gets exactly one variant with the same id. Their model
  * requires at least one variant, and inventing sizes we don't have would put fictional options into
  * a store's product-retargeting emails.
  */
@@ -135,7 +135,7 @@ export function mailchimpCart(c: CommerceOrder) {
  };
 }
 
-/** A cart or order with no usable email is refused by them — check here rather than at the API. */
+/** A cart or order with no usable email is refused by them. Check here rather than at the API. */
 export function commerceReady(c: CommerceOrder): boolean {
  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(c.customer?.email || "").trim()) && c.lines.length > 0;
 }

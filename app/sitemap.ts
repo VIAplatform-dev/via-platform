@@ -25,7 +25,7 @@ async function getProductUrls(): Promise<MetadataRoute.Sitemap> {
  `;
  return (rows as { store_slug: string; id: number; synced_at: Date; images: string | null; image: string | null }[]).map((r) => {
   // Count the photos, then declare each as an image-sitemap entry pointing at OUR /i proxy
-  // (clean vyaplatform.com URLs) — the signal that tells Google to crawl + index the images
+  // (clean vyaplatform.com URLs). The signal that tells Google to crawl + index the images
   // under this VYA page, which is what makes reverse-image search surface us. Cap at 4/page.
   let count = 0;
   try { const parsed = JSON.parse(r.images ?? "[]"); if (Array.isArray(parsed)) count = parsed.length; } catch {}
@@ -46,7 +46,7 @@ async function getProductUrls(): Promise<MetadataRoute.Sitemap> {
 }
 
 // Live seller storefronts (the items-based /s/{handle} sites) + their in-stock product pages, so
-// Google discovers the pages we mark up with Product schema. Custom-domain stores are skipped —
+// Google discovers the pages we mark up with Product schema. Custom-domain stores are skipped,
 // their /s mirror is noindexed + canonical'd to the domain, so the domain carries their SEO.
 async function getStorefrontUrls(): Promise<MetadataRoute.Sitemap> {
  try {

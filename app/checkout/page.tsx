@@ -11,7 +11,7 @@ type Info = { items: LineItem[]; storeName: string; freeShipping: boolean; subto
 type Addr = { name: string; line1: string; line2: string; city: string; state: string; zip: string; country: string; phone: string };
 
 // 16px, not 14. Safari zooms the whole page in when you focus a field smaller than 16px and gives
-// you no way back except pinching — on the one page where every transaction is completed, from a
+// you no way back except pinching, on the one page where every transaction is completed, from a
 // phone. `sm:text-sm` keeps the denser desktop look where no zoom rule applies.
 const input = "w-full bg-white border border-black/30 px-3 py-2.5 text-base sm:text-sm text-black placeholder-black/40 outline-none focus:border-black transition rounded";
 const label = "block mb-2 text-[11px] uppercase tracking-[0.16em] text-black/55";
@@ -31,7 +31,7 @@ const appearance = {
  borderRadius: "6px",
  // Card number, expiry, CVC and every address field inherit this. At 14px iOS Safari zooms the
  // page the moment one is focused and never zooms back out, so the buyer finishes paying on a
- // page they have to pinch around — at the last step, on the surface that earns the commission.
+ // page they have to pinch around, at the last step, on the surface that earns the commission.
  // Stripe's own guidance is a 16px minimum for exactly this reason. Not media-queried on purpose:
  // changing `appearance` remounts Elements, so a resize mid-payment would blank the card field.
  fontSizeBase: "16px",
@@ -74,7 +74,7 @@ function CheckoutInner() {
  const [a, setA] = useState({ name: "", line1: "", line2: "", city: "", state: "", zip: "", country: "US", phone: "" });
  const [err, setErr] = useState<string | null>(null);
  const [shipCents, setShipCents] = useState<number | null>(null); // flat shipping once the address is known
- // Delivery or collection. This is only what she PICKED — the server re-decides it (and the price)
+ // Delivery or collection. This is only what she PICKED. The server re-decides it (and the price)
  // on every quote and again when the card is charged. See app/lib/checkout-delivery.ts.
  const [delivery, setDelivery] = useState<"ship" | "pickup">("ship");
  const [collect, setCollect] = useState<{ address: string | null; instructions: string | null } | null>(null);
@@ -84,7 +84,7 @@ function CheckoutInner() {
  // Sales tax the server calculated on the intent. Shown as its own line: a total that grows with no
  // line to explain it reads as a mistake.
  const [payTax, setPayTax] = useState(0);
- // A platform-key Stripe instance JUST for the Address Element (autocomplete) — separate from the
+ // A platform-key Stripe instance JUST for the Address Element (autocomplete): separate from the
  // connected-account instance the Payment Element uses. Loaded once the publishable key arrives.
  const [addrStripe, setAddrStripe] = useState<Promise<Stripe | null> | null>(null);
  const preparedKey = useRef<string>("");
@@ -107,7 +107,7 @@ function CheckoutInner() {
  if (!r.ok) { setLoadErr(d.error || "Couldn’t load this checkout."); return; }
  if (isRental) {
  setRental(d.rental);
- // The rental line IS the subtotal — the piece's own price isn't being charged.
+ // The rental line IS the subtotal. The piece's own price isn't being charged.
  setInfo({ items: [d.item], storeName: d.storeName, freeShipping: false, subtotalCents: d.rental.totalCents, publishableKey: d.publishableKey });
  } else setInfo(isCart ? d : { items: [d.item], storeName: d.storeName, freeShipping: d.freeShipping, subtotalCents: d.item.priceCents, publishableKey: d.publishableKey });
  } catch {
@@ -122,18 +122,18 @@ function CheckoutInner() {
  const resetPrep = () => { setShipCents(null); setClientSecret(null); setStripeP(null); preparedKey.current = ""; };
  // Load the Address Element's Stripe instance once the publishable key arrives with checkout info.
  useEffect(() => { if (info?.publishableKey && !addrStripe) setAddrStripe(loadStripe(info.publishableKey)); }, [info, addrStripe]);
- // Collection is offered only when the store actually offers it (address and all) — the same
+ // Collection is offered only when the store actually offers it (address and all): the same
  // question the server asks. Only the cart flow carries it; a single-item Buy-now is always posted.
  const pickupAvailable = !!info?.pickup?.available;
  const collecting = delivery === "pickup" && pickupAvailable;
  // Collection needs an email and nothing else. Delivery needs somewhere to send it.
  const readyToPay = email.includes("@") && (collecting || !!(a.line1 && a.city && a.state && a.zip));
  const addrKey = `${email}|${a.line1}|${a.line2}|${a.city}|${a.state}|${a.zip}|${a.country}`;
- // Re-prepare the PaymentIntent when the amount could change — address, delivery method, or (single
- // item) the applied discount / offer — so the embedded card always charges the right total.
+ // Re-prepare the PaymentIntent when the amount could change. Address, delivery method, or (single
+ // item) the applied discount / offer, so the embedded card always charges the right total.
  const prepKey = `${collecting ? "pickup" : "ship"}|${addrKey}|${discount ? `${discount.code}:${discount.offCents}:${discount.freeShipping}` : ""}|${offerToken}`;
 
- // Compute flat shipping and, for a cart, create the PaymentIntent so the card mounts inline —
+ // Compute flat shipping and, for a cart, create the PaymentIntent so the card mounts inline,
  // all on this one page, no "continue" steps. Reuses the same endpoints the old flow used.
  async function prepare() {
  if (!info) return;
@@ -148,13 +148,13 @@ function CheckoutInner() {
  if (!r.ok) { setErr(d.error || "Couldn’t calculate shipping."); preparedKey.current = ""; return; }
  ship = d.free ? 0 : (d.rates?.[0]?.costCents || 0);
  // The SERVER says which it is. If it disagrees with her (the seller switched collection off
- // while she was deciding), follow the server — and the postage comes back with it.
+ // while she was deciding), follow the server, and the postage comes back with it.
  if (d.delivery === "pickup") setCollect({ address: d.collectFrom ?? null, instructions: d.instructions ?? null });
  else { setCollect(null); if (collecting) { setDelivery("ship"); setErr("This store has stopped offering collection, you’ll need a delivery address."); preparedKey.current = ""; return; } }
  }
  setShipCents(ship);
  // Create the PaymentIntent for BOTH cart and single item, so the card mounts inline either way
- // (single item used to redirect to Stripe-hosted Checkout — now it's embedded like the cart).
+ // (single item used to redirect to Stripe-hosted Checkout. Now it's embedded like the cart).
  const buyer = { email, name: a.name, phone: a.phone };
  const shipAddr = { line1: a.line1, line2: a.line2, city: a.city, state: a.state, zip: a.zip, country: a.country };
  const r2 = await fetch(
@@ -183,7 +183,7 @@ function CheckoutInner() {
  } catch { setErr("Couldn’t prepare checkout."); preparedKey.current = ""; }
  }
 
- // Auto-prepare once the address is complete (debounced) — the card appears on the same page.
+ // Auto-prepare once the address is complete (debounced). The card appears on the same page.
  useEffect(() => {
  if (!info || !readyToPay || preparedKey.current === prepKey) return;
  setClientSecret(null); setStripeP(null); // drop a stale card while re-preparing (address/discount changed)
@@ -193,14 +193,14 @@ function CheckoutInner() {
  }, [info, readyToPay, prepKey]);
 
  // Validate a discount code for THIS store. A single item names its seller; a cart has no item, so
- // it names the store outright — which is why /api/storefront/discount takes either.
+ // it names the store outright, which is why /api/storefront/discount takes either.
  async function applyDiscount() {
  const code = discountCode.trim();
  if (!code || !info) return;
  setDcBusy(true); setDcErr(null);
  try {
  const r = await fetch("/api/storefront/discount", { method: "POST", headers: { "Content-Type": "application/json" }, // The lines and the email travel with the code, because a code can now be for particular pieces
- // or for particular customers — and this quote has to reach the same answer the payment will.
+ // or for particular customers, and this quote has to reach the same answer the payment will.
  body: JSON.stringify({
  ...(isCart ? { storeSlug } : { itemId }),
  code, subtotalCents: info.subtotalCents, email: email || null,
@@ -231,7 +231,7 @@ function CheckoutInner() {
  </header>
 
  <div className="mx-auto max-w-5xl px-6 py-10 grid gap-10 lg:grid-cols-[1fr_380px]">
- {/* LEFT — one continuous form */}
+ {/* LEFT: one continuous form */}
  <div className="order-2 lg:order-1">
  <h1 className="font-serif text-2xl mb-1">Checkout</h1>
  <p className="text-xs text-[#111111]/50 mb-8">from {info.storeName}</p>
@@ -241,7 +241,7 @@ function CheckoutInner() {
  <input className={input} value={email} onChange={(e) => { setEmail(e.target.value); resetPrep(); }} placeholder="Email (for your receipt)" inputMode="email" />
  </section>
 
- {/* Delivery or collection — only shown when this store actually offers collection. */}
+ {/* Delivery or collection, only shown when this store actually offers collection. */}
  {pickupAvailable && (
  <section className="mb-8">
  <span className={label}>How you’ll get it</span>
@@ -298,7 +298,7 @@ function CheckoutInner() {
  </section>
  </div>
 
- {/* RIGHT — sticky order summary */}
+ {/* RIGHT: sticky order summary */}
  <aside className="order-1 lg:order-2">
  <div className="lg:sticky lg:top-8 border border-[#111111]/12 bg-white">
  <div className="divide-y divide-[#111111]/10">
@@ -321,7 +321,7 @@ function CheckoutInner() {
  ))}
  </div>
  <div className="border-t border-[#111111]/10 p-4 space-y-1.5 text-sm">
- {/* Rentals only where the store said codes may be used — see Settings → Rentals. */}
+ {/* Rentals only where the store said codes may be used. See Settings → Rentals. */}
  {(!isRental || rental?.discountsAllowed) && (
  <div className="mb-2.5 flex gap-2">
  <input className={input + " flex-1"} value={discountCode} onChange={(e) => { setDiscountCode(e.target.value); setDiscount(null); setDcErr(null); }} placeholder="Discount code" />
@@ -363,7 +363,7 @@ function Lock() {
  );
 }
 
-// Stripe's Address Element — one field with Google-powered autocomplete (free alongside the Payment
+// Stripe's Address Element: one field with Google-powered autocomplete (free alongside the Payment
 // Element, no API key). Collects name + full shipping address + phone; we mirror it into the page's
 // address state so the existing shipping-quote + PaymentIntent flow is unchanged.
 function ShippingAddress({ onChange }: { onChange: (a: Addr) => void }) {

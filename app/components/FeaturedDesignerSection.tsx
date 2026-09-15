@@ -16,7 +16,7 @@ export default function FeaturedDesignerSection() {
  {/* Dark gradient overlay on left */}
  <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
 
- {/* Text overlay — bottom-left, Ralph Lauren style */}
+ {/* Text overlay: bottom-left, Ralph Lauren style */}
  <div className="absolute bottom-10 left-10 sm:bottom-14 sm:left-14 text-[#FFFDF8]">
  <p className="text-xs uppercase tracking-[0.18em] mb-2 font-sans opacity-80">
  Featured Designer

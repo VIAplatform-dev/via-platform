@@ -5,13 +5,13 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 // EXPO GO CANNOT LOAD IT. Expo Go ships a fixed set of native modules; @stripe/stripe-react-native
 // is a third-party one and is not among them, so requiring it there throws. That matters far more
 // than it sounds: the Connect provider is mounted in app/(seller)/_layout.tsx, so an unguarded
-// import took down the ENTIRE seller app in Expo Go — every screen, not just the two that use it.
+// import took down the ENTIRE seller app in Expo Go. Every screen, not just the two that use it.
 //
 // Guarded, Expo Go runs everything else: inventory, the piece editor, returns, shipping, tax,
 // consignors, discounts, customers, orders. Only Stripe's own surfaces say they need the real app,
 // which is a fair trade for being able to test the other twenty screens without waiting on a build.
 //
-// The require is deliberately NOT a static import — a static one is hoisted and runs before any
+// The require is deliberately NOT a static import. A static one is hoisted and runs before any
 // check we could make. `stripeNative` is resolved once, at module load, so component identity is
 // stable across renders and there is no conditional-hook problem downstream.
 
@@ -35,5 +35,5 @@ export const stripeAvailable = mod !== null;
 
 /** What to tell her when a Stripe screen cannot run here. Names the reason, not just the symptom. */
 export const STRIPE_UNAVAILABLE = inExpoGo
-  ? "Stripe's screens need the full VYA app — they can't run in Expo Go. Everything else here works."
+  ? "Stripe's screens need the full VYA app. They can't run in Expo Go. Everything else here works."
   : "This build doesn't include Stripe yet. It'll be there in the next one.";

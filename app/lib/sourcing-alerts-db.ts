@@ -26,7 +26,7 @@ async function ensure() {
  _ready = true;
 }
 
-// The subset of `picks` this store HASN'T been alerted about within `windowDays`. Read-only — the
+// The subset of `picks` this store HASN'T been alerted about within `windowDays`. Read-only: the
 // caller records them (via recordSent) only after the email actually goes out, so a send failure
 // doesn't silently swallow the opportunity.
 export async function unsentPicks<T extends AlertKeyable>(storeSlug: string, picks: T[], windowDays = 14): Promise<T[]> {

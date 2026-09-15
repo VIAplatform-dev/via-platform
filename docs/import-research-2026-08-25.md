@@ -1,4 +1,4 @@
-# Store-import research — how the industry does it (2026-08-25)
+# Store-import research: how the industry does it (2026-08-25)
 
 Web sweep of every product that claims to "import" / "migrate" / "clone" a website, mapped against
 VYA's constraints (1-to-1 design fidelity, checkout on VYA Stripe, live VYA inventory, no seller JS
@@ -19,12 +19,12 @@ never just a URL.
 | 1 | Catalog-only migration | Shopify Store Migration app, MigrationPro, Cart2Cart, LitExtension, Shoplazza/Shopline one-click, Etsy Pattern, Nembol | OAuth/API token or CSV → products/customers/orders. Shopify docs: "designed pages and layouts won't transfer (or at all)" | design: none | our catalog import (already solid) |
 | 2 | Theme-file transfer, same dialect | Matrixify, Duplify, Shopify "download theme zip → upload" | Copy Liquid/JSON/CSS/JS folder to a destination that runs the same Liquid runtime | 100% | **Plan C** (below) |
 | 3 | Crawl-and-freeze static export | ExFlow, SitedIn, NoCodeExport, HTTrack, SingleFile | Headless render → static files. All vendors warn forms/search/cart/JS break | look only | **Plan A** |
-| 4 | Archive replay w/ JS sandboxing | Wayback Machine, Webrecorder pywb + **wombat.js**, wabac.js / ReplayWeb.page | Serve capture *with* its JS; injected `wombat.js` overrides `location`, `fetch`, XHR, `document.domain`, storage, postMessage so the site's JS believes it's on its origin and all requests route to the replayer. Runs in a separate origin / sandboxed iframe | near 100% | **Plan B** — reuse wombat instead of hand-rolling JS URL rewriting |
+| 4 | Archive replay w/ JS sandboxing | Wayback Machine, Webrecorder pywb + **wombat.js**, wabac.js / ReplayWeb.page | Serve capture *with* its JS; injected `wombat.js` overrides `location`, `fetch`, XHR, `document.domain`, storage, postMessage so the site's JS believes it's on its origin and all requests route to the replayer. Runs in a separate origin / sandboxed iframe | near 100% | **Plan B** reuse wombat instead of hand-rolling JS URL rewriting |
 | 5 | AI reconstruction | 10Web AI Recreate, GigaPress SiteForge, Firecrawl Open Lovable, Repaint, Claude Design / v0, Webflow Importer (dead) | Crawl → classify sections → regenerate in destination's widgets. Open Lovable self-reports 70–95%. Webflow Importer shut down: "no longer working for most sites" | approximate | rejected "template with branding" path; last resort for Wix/SPA |
 | 6 | DOM-to-design capture | html.to.design, Builder.io Visual Copilot | Chrome DevTools Protocol computed-style snapshot → Figma | pixel look, zero behaviour | could harden Plan A card-template extraction |
 | 7 | Live proxy overlay | Cloudflare Workers `HTMLRewriter` mirrors, Framer Advanced Hosting page-by-page | Reverse proxy + rewrite | 100% but seller platform stays in loop | ruled out by non-negotiable #2 |
 
-## Plan C — own the theme, not the page (Shopify only; 13/16 of corpus)
+## Plan C: own the theme, not the page (Shopify only; 13/16 of corpus)
 
 Get the theme **source** and become the renderer, instead of reverse-engineering templates from
 rendered HTML.
@@ -44,15 +44,15 @@ built: Shopify storefront objects (`product`, `collection`, `cart`, `section`, `
 filters through, so pages degrade instead of crashing; the eval harness measures the gap.
 
 **Why it beats A/B on our own criteria:**
-- Fidelity is native — it *is* their theme. No per-theme shim.
+- Fidelity is native. It *is* their theme. No per-theme shim.
 - Live inventory is free: `collection.products` is a SQL query. Every page type renders from data
-  (product, collection, search, 404) — no crawling.
+  (product, collection, search, 404), no crawling.
 - Reuses Plan B work: `/cart/add.js` etc. routes and `sourceVariantId` are exactly what theme JS expects.
 - Theme JS is inspectable `assets/*.js`, decided per asset rather than stripped wholesale.
 
 **Costs:** seller must hand over a Theme Access password (one step, industry-normal). Building the
 Shopify object/filter layer ≈ 2–3 weeks for the Dawn-family subset, long tail of filters after.
-Theme JS / app embeds also call `/products/x.js`, `/search/suggest.json`, `/recommendations/products` —
+Theme JS / app embeds also call `/products/x.js`, `/search/suggest.json`, `/recommendations/products`,
 more Shopify-shaped JSON reads over VYA data.
 
 ## Cheap Plan A upgrades regardless

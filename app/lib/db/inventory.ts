@@ -17,8 +17,8 @@ import { toListItem, type ListItem } from "../item-list-shape";
 export async function createItem(item: NewItem): Promise<Item> {
  await ensurePublishAtColumn();
  const db = getDb();
- // Clean HTML out of imported descriptions at the single write path, so EVERY item — from any
- // importer (Shopify/Squarespace/connected adapters), bulk upload, or a future source — is stored
+ // Clean HTML out of imported descriptions at the single write path, so EVERY item, from any
+ // importer (Shopify/Squarespace/connected adapters), bulk upload, or a future source. Is stored
  // as tidy plain text. Plain text passes through untouched (see cleanDescription).
  const values = item.description ? { ...item, description: cleanDescription(item.description) } : item;
  const [row] = await db.insert(items).values(values).returning();
@@ -49,7 +49,7 @@ export async function ensurePublishAtColumn(): Promise<void> {
  await getDb().execute(sql`CREATE INDEX IF NOT EXISTS items_source_idx ON items (seller_id, source_platform, source_id)`);
  // The seller's per-listing cross-listing choice, kept so a SCHEDULED piece still fans
  // out to the channels they picked when the cron publishes it hours later. NULL means
- // "no explicit choice" — fall back to each channel's auto-list default.
+ // "no explicit choice": fall back to each channel's auto-list default.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS cross_list_channels text[]`);
  // Flaws as a list (see schema.ts). Additive + nullable.
  await getDb().execute(sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS flaws jsonb DEFAULT '[]'::jsonb`);
@@ -118,7 +118,7 @@ export async function listItemsBySource(sellerId: string, source: string): Promi
  return db.select().from(items).where(and(eq(items.sellerId, sellerId), eq(items.source, source)));
 }
 
-/** Refresh a source-owned item from the source. Never call this for `origin = 'user'` rows —
+/** Refresh a source-owned item from the source. Never call this for `origin = 'user'` rows,
  *  the caller checks that, because a seller's own edit must outlive any re-sync. */
 export async function updateItemFromSource(
  id: string,
@@ -147,7 +147,7 @@ export async function markItemsMissingFromSource(ids: string[]): Promise<number>
 }
 
 /** Mark an item as seller-owned so future imports leave it alone. Called from the portal's edit
- *  paths — once a human touches an imported item, the importer stops managing it. */
+ *  paths. Once a human touches an imported item, the importer stops managing it. */
 export async function markItemUserEdited(id: string): Promise<void> {
  await ensurePublishAtColumn();
  await getDb().update(items).set({ origin: "user", updatedAt: new Date() }).where(eq(items.id, id));
@@ -155,7 +155,7 @@ export async function markItemUserEdited(id: string): Promise<void> {
 
 /** Full owner reset: wipe ALL of a seller's inventory, SOLD included. The payouts
  *  and orders that reference sold items are cleared first (those FKs don't cascade);
- *  reservations + collection memberships cascade on their own. Owner-only — used to
+ *  reservations + collection memberships cascade on their own. Owner-only: used to
  *  start a store's catalog (and its order history) over from scratch. */
 export async function deleteAllItems(sellerId: string): Promise<number> {
  const db = getDb();
@@ -165,7 +165,7 @@ export async function deleteAllItems(sellerId: string): Promise<number> {
  return rows.length;
 }
 
-/** Bulk publish (draft → active) a set of the seller's items in one query — for
+/** Bulk publish (draft → active) a set of the seller's items in one query, for
  *  staging a drop as drafts and pushing the whole thing live at once. Ownership-
  *  scoped; already-active items are untouched, sold/removed are never flipped. */
 export async function publishItems(sellerId: string, ids: string[]): Promise<number> {
@@ -213,7 +213,7 @@ export async function deleteItemForever(sellerId: string, itemId: string): Promi
 
 /**
  * Reserve an item for checkout. The active→reserved flip is one atomic UPDATE
- * guarded by status='active', so of N concurrent buyers exactly one wins — the
+ * guarded by status='active', so of N concurrent buyers exactly one wins. The
  * item can never be reserved (or sold) twice. Returns the reservation, or null
  * if the item wasn't available.
  */
@@ -228,7 +228,7 @@ export async function reserveItem(
  .set({ status: "reserved", updatedAt: new Date() })
  .where(and(eq(items.id, itemId), eq(items.status, "active")))
  .returning({ id: items.id });
- if (!locked) return null; // not available — already reserved or sold
+ if (!locked) return null; // not available: already reserved or sold
 
  try {
  const [res] = await db
@@ -237,7 +237,7 @@ export async function reserveItem(
  .returning();
  return res ?? null;
  } catch (e) {
- // The status flip succeeded but the reservation row didn't — revert so the item isn't stranded
+ // The status flip succeeded but the reservation row didn't. Revert so the item isn't stranded
  // as permanently 'reserved' with no reservation the sweeper can ever expire. Guarded on 'reserved'
  // so a concurrent sale isn't clobbered.
  await db.update(items).set({ status: "active", updatedAt: new Date() }).where(and(eq(items.id, itemId), eq(items.status, "reserved"))).catch(() => {});
@@ -248,7 +248,7 @@ export async function reserveItem(
 
 /**
  * Reserve an item for an IN-PERSON (Market Mode) checkout. Same atomic flip as reserveItem, but a
- * quick-listed `draft` is also sellable — the piece is physically on the table. Contends on the same
+ * quick-listed `draft` is also sellable. The piece is physically on the table. Contends on the same
  * row as online buyers, so exactly one of any concurrent online/in-person attempts wins.
  */
 export async function reserveItemForMarket(itemId: string, buyerRef: string, ttlSeconds: number): Promise<Reservation | null> {
@@ -270,7 +270,7 @@ export async function reserveItemForMarket(itemId: string, buyerRef: string, ttl
 }
 
 /** Release a Market Mode hold, restoring the status the item had before (active or draft). A
- *  quick-listed draft that doesn't sell must stay a draft — releasing it to `active` would publish
+ *  quick-listed draft that doesn't sell must stay a draft. Releasing it to `active` would publish
  *  it online without the ship-from address a live listing requires. Guarded on 'reserved'. */
 export async function releaseMarketReservation(itemId: string, restoreTo: "active" | "draft"): Promise<void> {
  const db = getDb();
@@ -280,7 +280,7 @@ export async function releaseMarketReservation(itemId: string, restoreTo: "activ
 }
 
 /** The owner tag (`buyerRef`) of the item's current live reservation, or null if none is held.
- * Lets a caller tell WHO holds a 'reserved' piece — e.g. whether it's the buyer's own accepted
+ * Lets a caller tell WHO holds a 'reserved' piece. E.g. whether it's the buyer's own accepted
  * binding offer (`offer-<token>`) vs. someone else mid-checkout. */
 export async function currentReservationRef(itemId: string): Promise<string | null> {
  const db = getDb();
@@ -304,7 +304,7 @@ export async function releaseReservation(itemId: string): Promise<void> {
 /**
  * Sweep: return to sale any item stuck 'reserved' past its checkout hold. The 10-min TTL is stamped on
  * the reservation at reserve time, but only Stripe events (success/fail/refund) and cart reclaims release
- * it — an abandoned checkout that never fires a Stripe cancel would otherwise strand the piece as
+ * it: an abandoned checkout that never fires a Stripe cancel would otherwise strand the piece as
  * 'reserved' forever. This enforces the expiry. Only touches items still 'reserved' whose live reservation
  * has expired (never a sold piece, and never a reservation that's still within its window). Returns count.
  */
@@ -344,7 +344,7 @@ export async function markSold(itemId: string): Promise<Item | null> {
 
 /** Put a sold/reserved item back up for sale (e.g. after a refund). One-of-one, so
  * it becomes available again. A void at the stall passes the status the piece had before the
- * sale — a quick-listed draft stays a draft rather than going live online without a ship-from. */
+ * sale: a quick-listed draft stays a draft rather than going live online without a ship-from. */
 export async function relistItem(itemId: string, to: "active" | "draft" = "active"): Promise<Item | null> {
  const db = getDb();
  const [row] = await db.update(items).set({ status: to, soldAt: null, updatedAt: new Date() }).where(eq(items.id, itemId)).returning();
@@ -369,20 +369,20 @@ export async function sweepExpiredReservations(): Promise<number> {
  return ids.length;
 }
 
-/** Active (buyable) items for a seller — the storefront's source of truth. */
+/** Active (buyable) items for a seller. The storefront's source of truth. */
 /**
  * What a hosted STOREFRONT should show: everything a shopper can see, not only what they can buy.
  *
- * A vintage store's sold archive is part of the browsing experience — the source site keeps sold
+ * A vintage store's sold archive is part of the browsing experience. The source site keeps sold
  * pieces on the shelf with a "Sold out" badge, and hiding them made a 52-product store look like a
  * 15-product one. Drafts and removed rows stay hidden; those are the seller's private state.
  *
- * A RESERVED piece — held for a named customer, or a buyer mid-checkout — stays on the shelf too,
+ * A RESERVED piece, held for a named customer, or a buyer mid-checkout. Stays on the shelf too,
  * badged "On hold" (unavailable-label.ts). It used to vanish the moment it was held, which read
  * to the seller as a deleted listing and to the customer it was held for as a broken promise.
  * Checkout still refuses it; the grid only shows it.
  *
- * Buyable pieces lead (held ones with them — they are still stock), then the archive, newest
+ * Buyable pieces lead (held ones with them. They are still stock), then the archive, newest
  * first within each.
  */
 export const STOREFRONT_STATUSES = ["active", "reserved", "sold"] as const;
@@ -396,7 +396,7 @@ export async function listStorefrontItems(sellerId: string): Promise<Item[]> {
 
 /**
  * The subset of a seller's storefront items whose `sourceId` (the imported handle) is in the given
- * list — live data, but scoped to a SPECIFIC set of products rather than the whole catalogue.
+ * list: live data, but scoped to a SPECIFIC set of products rather than the whole catalogue.
  *
  * Built for a captured collection page VYA has no curation data for (no assigned VYA collection,
  * no category/brand match on the handle): rather than falling back to the seller's entire
@@ -418,7 +418,7 @@ export async function listAvailableItems(sellerId: string): Promise<Item[]> {
  return db.select().from(items).where(and(eq(items.sellerId, sellerId), eq(items.status, "active")));
 }
 
-/** How many pieces are live — a count, not the rows, for a checklist that only needs to know "any?". */
+/** How many pieces are live. A count, not the rows, for a checklist that only needs to know "any?". */
 export async function countAvailableItems(sellerId: string): Promise<number> {
  const db = getDb();
  const [row] = await db.select({ n: count() }).from(items).where(and(eq(items.sellerId, sellerId), eq(items.status, "active")));
@@ -426,11 +426,11 @@ export async function countAvailableItems(sellerId: string): Promise<number> {
 }
 
 /**
- * All of a seller's items, any status, projected to what a LIST draws — see item-list-shape.ts for
+ * All of a seller's items, any status, projected to what a LIST draws. See item-list-shape.ts for
  * the measurements that made this necessary. Same rows and same order as listSellerItems; a tenth
  * of the bytes, because the columns nobody draws are never read.
  *
- * `images` still comes whole from the database — jsonb has no "first element" to select — and is
+ * `images` still comes whole from the database, jsonb has no "first element" to select, and is
  * cut down in toListItem. The three heavy text columns (description, variants, source_url) are the
  * ones that never leave Postgres.
  */
@@ -449,7 +449,7 @@ export async function listSellerItemsForList(sellerId: string): Promise<ListItem
  return rows.map(toListItem);
 }
 
-/** All of a seller's items, any status — for the manage view. `sku` is a per-store sequence by
+/** All of a seller's items, any status, for the manage view. `sku` is a per-store sequence by
  *  creation order (1 = the store's first item), so every piece has a stable, meaningful ID. */
 export async function listSellerItems(sellerId: string): Promise<(Item & { sku: number })[]> {
  await ensurePublishAtColumn();
@@ -465,7 +465,7 @@ export async function listSellerItems(sellerId: string): Promise<(Item & { sku: 
 }
 
 /**
- * Write a cost onto each of a batch of pieces — already divided by app/lib/cost-split.ts, this only
+ * Write a cost onto each of a batch of pieces. Already divided by app/lib/cost-split.ts, this only
  * records. Seller-scoped, so ids from another store are skipped; a piece with no entry in `costs`
  * keeps the cost it has. Returns how many rows changed.
  *
@@ -487,7 +487,7 @@ export async function setItemCosts(sellerId: string, ids: string[], costs: Recor
  return n;
 }
 
-/** Prices for a set of the seller's items — the weights a proportional cost split uses. */
+/** Prices for a set of the seller's items. The weights a proportional cost split uses. */
 export async function priceWeights(sellerId: string, ids: string[]): Promise<Record<string, number>> {
  if (!ids.length) return {};
  const db = getDb();

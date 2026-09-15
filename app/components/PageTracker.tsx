@@ -14,7 +14,7 @@ export default function PageTracker({ pageType, pageSlug }: Props) {
  const { data: session } = useSession();
 
  useEffect(() => {
- // Fire-and-forget — don't block the UI
+ // Fire-and-forget: don't block the UI
  const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
  const payload = JSON.stringify({ pageType, pageSlug: pageSlug ?? null, userId });
  if (navigator.sendBeacon) {

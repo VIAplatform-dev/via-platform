@@ -7,7 +7,7 @@ import { setOrderCash } from "@/app/lib/db/orders";
 
 export const dynamic = "force-dynamic";
 
-// POST { lines, clientKey, tenderedCents?, at? } — a cash sale in ONE call: reserve + finalize. This is
+// POST { lines, clientKey, tenderedCents?, at? }: a cash sale in ONE call: reserve + finalize. This is
 // what the phone replays after being offline; `clientKey` makes a replay a no-op, so a sale that made
 // it through before the connection dropped is never recorded twice.
 export async function POST(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
  //
  // A cash sale that has already happened must be recordable. So: start a FRESH checkout and
  // finalize that. startCheckout re-validates every line, so a piece that genuinely sold elsewhere
- // still refuses — this recovers the stale-row case without weakening the double-sell guard.
+ // still refuses. This recovers the stale-row case without weakening the double-sell guard.
  const DEAD = ["expired", "canceled", "failed"];
  if (f.status === "not_claimable" && f.checkout && DEAD.includes(f.checkout.status)) {
   const retry = await startCheckout({
@@ -58,8 +58,8 @@ export async function POST(request: NextRequest) {
  if (f.status === "not_claimable") {
   return NextResponse.json({
    error: f.checkout
-    ? `Couldn’t record the sale — this checkout is ${f.checkout.status}. Start it again from the item.`
-    : "Couldn’t record the sale — that checkout no longer exists. Start it again from the item.",
+    ? `Couldn’t record the sale. This checkout is ${f.checkout.status}. Start it again from the item.`
+    : "Couldn’t record the sale. That checkout no longer exists. Start it again from the item.",
    code: "not_claimable", status: f.checkout?.status ?? null,
   }, { status: 409 });
  }

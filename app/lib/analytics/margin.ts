@@ -5,11 +5,11 @@ import { expenseTotals, applyRecurring, categoryLabel, type CategoryTotal, type 
 import { netProfit, netMarginPct, profitLines, missingCostNote, type ProfitInputs, type ProfitLine } from "./profit-core";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — profit & margin.
+// Analytics: profit & margin.
 //
 // The one big reporting category VYA couldn't match Shopify on, because it
 // depends on a number only the seller knows: what they paid. `items.cost_cents`
-// has always existed and the intake form has always had the field — it was just
+// has always existed and the intake form has always had the field. It was just
 // never required, so almost nothing carries it.
 //
 // That shapes the whole module. Every figure here is computed over the COVERED
@@ -20,12 +20,12 @@ import { netProfit, netMarginPct, profitLines, missingCostNote, type ProfitInput
 // ───────────────────────────────────────────────────────────────────────────
 
 export type MarginTotals = {
- /** Sales in the window whose item carries a cost — the only ones profit can be computed on. */
+ /** Sales in the window whose item carries a cost. The only ones profit can be computed on. */
  coveredSales: number;
  totalSales: number;
  coveragePct: number;
  revenueCents: number; // revenue of the covered slice only, NET of tax collected
- /** Tax collected on those sales — the government's share, excluded from revenue above. */
+ /** Tax collected on those sales. The government's share, excluded from revenue above. */
  taxCents: number;
  /** Covered sales with no tax figure recorded, so the caller can caveat rather than imply precision. */
  salesWithoutTax: number;
@@ -36,17 +36,17 @@ export type MarginTotals = {
   */
  /** VYA's application fee, as charged on each order. */
  feeCents: number;
- /** Card processing, ESTIMATED at 2.9% + 30¢ per checkout sale — Stripe's actual fee isn't stored. */
+ /** Card processing, ESTIMATED at 2.9% + 30¢ per checkout sale. Stripe's actual fee isn't stored. */
  cardFeeCents: number;
  /** Shipping labels bought through VYA, as charged. */
  labelCostCents: number;
- /** The consignor's share of consigned sales — never the store's money. */
+ /** The consignor's share of consigned sales, never the store's money. */
  consignorCutCents: number;
  /** Sales that went through checkout (the ones a card fee applies to). */
  orderSales: number;
  grossProfitCents: number;
  grossMarginPct: number | null;
- /** Profit per dollar of cost — the resale question, "what did my buying return?" */
+ /** Profit per dollar of cost. The resale question, "what did my buying return?" */
  roiPct: number | null;
  avgProfitPerSaleCents: number;
 };
@@ -83,7 +83,7 @@ export type OperatingCosts = {
 };
 
 export type MarginMetrics = {
- /** False when nothing in the window has a cost — the UI shows the prompt, not zeros. */
+ /** False when nothing in the window has a cost. The UI shows the prompt, not zeros. */
  available: boolean;
  current: MarginTotals;
  prior: MarginTotals | null;
@@ -92,7 +92,7 @@ export type MarginMetrics = {
  byCategory: MarginRow[];
  bestMargin: MarginItem[];
  worstMargin: MarginItem[];
- /** Live listings with no cost recorded — what to fill in to widen coverage. */
+ /** Live listings with no cost recorded. What to fill in to widen coverage. */
  activeWithoutCost: number;
  activeTotal: number;
  /** Money tied up in unsold stock at what it cost, not at list price. */
@@ -101,7 +101,7 @@ export type MarginMetrics = {
  operating: OperatingCosts;
  /**
   * Gross profit minus operating costs. Null when no cost of goods is known at
-  * all — subtracting real expenses from an unknown gross would print a loss the
+  * all: subtracting real expenses from an unknown gross would print a loss the
   * store isn't actually making.
   */
  netProfitCents: number | null;
@@ -134,7 +134,7 @@ const EMPTY: MarginMetrics = {
 
 async function totalsFor(sellerId: string, w: Window): Promise<MarginTotals> {
  // Per-sale costs join back to the order (sale_id is 'order:<id>' for checkout sales) and to the
- // consignment record by product. Item-origin sales — marked sold by hand, never through checkout —
+ // consignment record by product. Item-origin sales, marked sold by hand, never through checkout,
  // have no order and therefore no fee, label or card charge on record, which is true rather than
  // a gap: nothing was charged.
  const rows = await sqlRows()`
@@ -247,7 +247,7 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
      COALESCE(SUM(cost_cents) FILTER (WHERE cost_cents > 0), 0)::bigint AS inventory_cost_cents
     FROM items WHERE seller_id = ${sellerId}::uuid AND status = 'active'
    `,
-   // Operating costs are keyed by store slug, not seller id — they're the store's
+   // Operating costs are keyed by store slug, not seller id. They're the store's
    // running costs, not any one piece's.
    expenseTotals(slug, current.startISO, current.endISO, period.tz).catch(() => ({ totalCents: 0, byCategory: [] as CategoryTotal[] })),
    // Sales per day, so a per-order rate can be prorated from the day it started.
@@ -301,7 +301,7 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
   const active = activeRows[0] ?? {};
 
   return {
-   // "Available" means there is something to show — either a margin, or costs the
+   // "Available" means there is something to show. Either a margin, or costs the
    // seller has already logged. A store with expenses but no COGS still gets a page.
    available: cur.coveredSales > 0 || operating.totalCents > 0,
    current: cur,
@@ -313,7 +313,7 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
    byBrand: rowsFrom(brandRows),
    byCategory: rowsFrom(catRows),
    bestMargin: byProfit.slice(0, 8),
-   // The tail, worst first — pieces that lost money or barely broke even. Excludes
+   // The tail, worst first. Pieces that lost money or barely broke even. Excludes
    // anything already shown as a best seller, so a short list can't print twice.
    worstMargin: (() => {
     const bestIds = new Set(byProfit.slice(0, 8).map((i) => i.itemId));
@@ -323,8 +323,8 @@ export async function getMarginMetrics(sellerId: string, slug: string, period: R
    activeTotal: int(active.active),
    inventoryCostCents: int(active.inventory_cost_cents),
    operating,
-   // ONE definition of net, shared with Home. Gross minus every cost the store actually bore —
-   // fees, card, labels, the consignor's cut, expenses — and allowed to be negative. Null when
+   // ONE definition of net, shared with Home. Gross minus every cost the store actually bore,
+   // fees, card, labels, the consignor's cut, expenses, and allowed to be negative. Null when
    // nothing sold has a cost on record, because a net figure with an unknown gross is invented.
    ...(() => {
     const inputs: ProfitInputs = {

@@ -3,7 +3,7 @@
 // Kept apart from VYA's own records on purpose. An imported figure is her word for what happened
 // before (or alongside) VYA; a VYA figure is something the platform actually did. Mixing them into
 // one table would make it impossible to say which is which, undo one import, or warn her that a
-// month now holds both — which is how a P&L quietly doubles.
+// month now holds both, which is how a P&L quietly doubles.
 //
 // Costs could almost live in store_expenses (its `source` already allows "import"), but revenue has
 // no home there and splitting one upload across two tables makes "undo this import" unanswerable.

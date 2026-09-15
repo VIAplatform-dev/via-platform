@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { storeNameFromTitle, storefrontFromBrand, type BrandProfile } from "./storefront-from-brand.ts";
 
-// The fallback for stores that cannot be captured at all — Wix, single-page apps, and sites with
+// The fallback for stores that cannot be captured at all. Wix, single-page apps, and sites with
 // no readable product feed. Their layout is unreachable, but their brand isn't: colours, fonts,
 // logo, name and menu labels live in <head> and in CSS custom properties, which a JS-rendered page
 // still serves. These tests pin that the seller gets something recognisably theirs rather than the
@@ -83,7 +83,12 @@ test("a store with no readable brand still gets a usable storefront", () => {
 
 test("reads the store name whichever side of the separator it's on", () => {
  assert.equal(storeNameFromTitle("Home | The Vintage Boutique, LLC"), "The Vintage Boutique, LLC");
- assert.equal(storeNameFromTitle("The Objects of Affection — Vintage"), "The Objects of Affection");
+  // A real shop's real title. The separator has to BE an em dash, because that is the character the
+ // parser exists to split on, and written as an escape so the no-em-dashes guard stays strict: the
+ // sweep rewrote this fixture to a full stop, the parser correctly stopped splitting it, and the
+ // file could not be loaded by the runner at the time so nothing caught it.
+ const EM = "\u2014";
+ assert.equal(storeNameFromTitle(`The Objects of Affection ${EM} Vintage`), "The Objects of Affection");
  assert.equal(storeNameFromTitle("Shop All | Ange Archive"), "Ange Archive");
  assert.equal(storeNameFromTitle("Blummier"), "Blummier");
 });

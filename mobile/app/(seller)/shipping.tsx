@@ -10,15 +10,15 @@ import { ZONE_LABELS, ZONE_IDS, type ZoneId, type Zones, zonesWith, shipsAbroad,
 
 // Where parcels leave from, who pays for them, and where she'll send them.
 //
-// Two of Home's six setup steps land here — "Add the address you ship from" and "Switch shipping
-// on" — and neither had a phone screen, so the checklist opened the website twice before a seller
+// Two of Home's six setup steps land here. "Add the address you ship from" and "Switch shipping
+// on", and neither had a phone screen, so the checklist opened the website twice before a seller
 // had listed anything. Everything on this screen is the subset that answers a question a seller
 // actually asks standing up: what's my address, who pays postage, do I ship abroad, can people
 // collect. Per-zone tier PRICES are left at the standard rates; they're a table, and a table on a
 // phone is how you mis-price Australia at 3am.
 //
 // SAVED ON ONE BUTTON, and the whole object goes at once. The server merges by key, so a screen
-// that saved field-by-field would be fine — but "ship from" is an address, and half an address
+// that saved field-by-field would be fine, but "ship from" is an address, and half an address
 // saved is an address that fails at the post office rather than one that is obviously incomplete.
 
 type ShipFrom = { name?: string | null; street1?: string | null; street2?: string | null; city?: string | null; state?: string | null; zip?: string | null; country?: string | null; phone?: string | null };
@@ -34,15 +34,15 @@ type Settings = {
   dutyDowngraded: boolean;
   carrierConnected: boolean;
   zones: Zones;
+  /** Working days before a parcel goes out. Null = she has not said. */
+  dispatchDays?: number | null;
+  /** Destinations nobody may ship to, named. From the server, so it matches what checkout does. */
+  barred?: { label: string; places: string[] }[];
+  /** What each zone covers, in country names. From the server, so it matches the web and checkout. */
+  zoneCoverage?: Partial<Record<ZoneId, string>>;
   labelPrinter: "sheet" | "thermal";
   expeditedOffered: boolean;
-  pricing: "live" | "flat";
 };
-
-const PRICING = [
-  { key: "live" as const, label: "Real cost + markup" },
-  { key: "flat" as const, label: "My own flat rate" },
-];
 
 const PRINTERS = [
   { key: "thermal" as const, label: "Label printer" },
@@ -106,12 +106,12 @@ export default function ShippingScreen() {
         shipFrom: s.shipFrom ?? {},
         dutyMode: s.dutyMode,
         zones: s.zones,
+        dispatchDays: s.dispatchDays ?? null,
         labelPrinter: s.labelPrinter,
         expeditedOffered: s.expeditedOffered,
-        pricing: s.pricing,
         // Flattened on purpose: the route reads pickup.street1, not pickup.address.street1, and
         // reshapes it itself. Sending the shape GET returns would save a collection point with no
-        // address, which the route then refuses — correctly, and confusingly.
+        // address, which the route then refuses. Correctly, and confusingly.
         pickup: pickup.enabled
           ? { enabled: true, street1: pickup.street1, city: pickup.city, instructions: pickup.instructions || null }
           : { enabled: false },
@@ -148,12 +148,12 @@ export default function ShippingScreen() {
             onChangeText={(v) => editFrom({ country: v.toUpperCase().slice(0, 2) })}
             autoCapitalize="characters"
             placeholder="US"
-            hint="Two letters — US, GB, FR. This also decides whether you measure in inches or cm."
+            hint="Two letters. US, GB, FR. This also decides whether you measure in inches or cm."
           />
-          <Field label="Phone" value={s.shipFrom?.phone ?? ""} onChangeText={(v) => editFrom({ phone: v })} placeholder="Optional — some carriers ask" keyboardType="phone-pad" />
+          <Field label="Phone" value={s.shipFrom?.phone ?? ""} onChangeText={(v) => editFrom({ phone: v })} placeholder="Required: USPS won't sell a label without it" keyboardType="phone-pad" />
 
           {/* WHAT SHE PRINTS ON. The carrier returns its own default unless told otherwise, and for
-              USPS that is an 8.5×11 sheet with the label in the top quarter — useless on the 4×6
+              USPS that is an 8.5×11 sheet with the label in the top quarter. Useless on the 4×6
               thermal printer a resale shop actually owns, and impossible to crop on a phone. */}
           <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>LABELS</Text>
           <ChoiceRow
@@ -164,34 +164,36 @@ export default function ShippingScreen() {
             hint={
               (s.labelPrinter ?? "sheet") === "thermal"
                 ? "Labels come out 4×6, ready to peel and stick."
-                : "Labels come out full page — you'll cut them out."
+                : "Labels come out full page. You'll cut them out."
             }
           />
 
-          {/* HER SITE, HER POLICY — the way it would be on Shopify. Live quotes what the parcel
-              actually costs on the route and adds VYA's markup, so a nearer buyer pays less and
-              nothing is ever sold below cost. Flat is one predictable number she sets per region,
-              and she carries the difference when a parcel goes further than she priced for. */}
-          <ChoiceRow
-            label="Shipping price"
-            options={PRICING}
-            value={s.pricing ?? "live"}
-            onChange={(v) => edit({ pricing: v })}
-            hint={
-              (s.pricing ?? "live") === "live"
-                ? "Buyers see the real cost for their address, so nearby orders are cheaper."
-                : "One price per region, set by you below. You cover anything a far parcel costs over it."
-            }
-          />
+          {/* WHAT POSTAGE COSTS IS NOT HER SETTING.
+              
+              A "Shipping price" choice lived here, between VYA pricing the parcel and the store
+              pricing it per region. It never made sense: VYA buys every label and the buyer's
+              postage goes to VYA in the application fee, so a seller setting the number was
+              setting VYA's revenue on a cost she never pays. Said plainly instead.
+              
+              The warning is the part she can act on. The quote AND the label are both built from
+              the size on the piece, so an understated parcel is re-rated after it ships. */}
+          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.xl, lineHeight: 19 }}>
+            VYA works out the postage on every order and buys the label. Your buyer sees one price
+            for their address at checkout, and it never comes out of your payout.
+          </Text>
+          <Text style={{ fontSize: 13, color: colors.text, marginTop: spacing.sm, lineHeight: 19 }}>
+            Measure your pieces. A parcel bigger than the size on the piece is re-rated by the
+            carrier after it ships, and that correction is charged back to you.
+          </Text>
 
           {/* A promise about HER, not the carrier. A shop that reaches the Post Office twice a week
-              cannot keep a two-day promise however fast the label is — and a missed one costs more
+              cannot keep a two-day promise however fast the label is, and a missed one costs more
               than the sale did. Off unless she says otherwise. */}
           <ToggleRow
             label="Offer faster shipping"
             value={s.expeditedOffered ?? false}
             onValueChange={(v) => edit({ expeditedOffered: v })}
-            hint="Buyers see a quicker option and pay more for it. Only turn this on if you can post the same or next day."
+            hint="Offer a faster delivery option at a higher price. Only if you can post same or next day."
           />
 
           <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>POSTAGE</Text>
@@ -212,14 +214,40 @@ export default function ShippingScreen() {
             />
           ) : null}
 
+          {/* The one thing no carrier can answer: how long the parcel sits with her first. */}
+          <Field
+            label="Orders go out within"
+            value={s.dispatchDays != null ? String(s.dispatchDays) : ""}
+            onChangeText={(v) => edit({ dispatchDays: v.replace(/[^0-9]/g, "").slice(0, 2) === "" ? null : Number(v.replace(/[^0-9]/g, "").slice(0, 2)) })}
+            placeholder="2"
+            keyboardType="numeric"
+            suffix="working days"
+            hint={s.dispatchDays ? "Shown to buyers and used in your shipping policy." : "Leave blank and we won't promise a time for you."}
+          />
+
           <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>WHERE YOU SHIP</Text>
           {ZONE_IDS.map((z: ZoneId) => (
             <ToggleRow
               key={z}
               label={ZONE_LABELS[z]}
+              // What is IN it. "Europe" and "Rest of world" are not answers to "can my customer in
+              // Israel buy from me", and that is the question a seller is actually asking here.
+              hint={s.zoneCoverage?.[z]}
               value={Boolean(s.zones?.[z]?.enabled)}
               onValueChange={(on) => edit({ zones: zonesWith(s.zones, z, on) })}
             />
+          ))}
+          {/* NAMED, like the desktop. "A few destinations are never available" answers nothing;
+              the seller wants to know which, and her alternative is a customer telling her. The
+              list comes from the server so the phone cannot fall behind what checkout enforces. */}
+          <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 18 }}>
+            Some places are never available, whichever regions you tick. Not your call or ours:
+          </Text>
+          {(s.barred ?? []).map((group) => (
+            <Text key={group.label} style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, lineHeight: 18 }}>
+              <Text style={{ color: colors.textDim }}>{group.label}: </Text>
+              {group.places.join(", ")}
+            </Text>
           ))}
 
           {shipsAbroad(s.zones) ? (
@@ -233,7 +261,7 @@ export default function ShippingScreen() {
               />
               {s.dutyDowngraded ? (
                 <Notice>
-                  You&apos;ve asked to cover duty, but that needs your own carrier account — buyers are
+                  You&apos;ve asked to cover duty, but that needs your own carrier account. Buyers are
                   being charged at the door for now.
                 </Notice>
               ) : null}
@@ -267,7 +295,7 @@ export default function ShippingScreen() {
           {saved ? <Notice tone="good">Saved.</Notice> : null}
 
           <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
-            Parcels are priced by size tier at the standard rates.
+            VYA prices each parcel for its size and where it is going.
           </Text>
         </>
       )}

@@ -7,7 +7,7 @@ import { payoutScheduleFor, payoutScheduleNotice } from "@/app/lib/payout-schedu
 
 export const dynamic = "force-dynamic";
 
-// GET — the acting store's payment-acceptance status, refreshed live from Stripe
+// GET: the acting store's payment-acceptance status, refreshed live from Stripe
 // so onboarding progress shows immediately.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
  }
  }
 
- // How long payouts wait, and why — derived from the store's OWN returns policy so the seller can
+ // How long payouts wait, and why. Derived from the store's OWN returns policy so the seller can
  // see the connection between the two (see payout-schedule.ts).
  const schedule = payoutScheduleFor(await getRefundPolicy(slug).catch(() => null));
  return NextResponse.json({

@@ -4,8 +4,8 @@ import { getOrCreateSeller } from "@/app/lib/db/sellers";
 import { stores, storeContactEmails } from "@/app/lib/stores";
 import type { Seller } from "@/app/lib/db/schema";
 
-// The acting store for a Market Mode request — web session, admin preview (?store=) or the mobile
-// JWT — plus its `sellers` row (created lazily, like the intake publish route does).
+// The acting store for a Market Mode request. Web session, admin preview (?store=) or the mobile
+// JWT, plus its `sellers` row (created lazily, like the intake publish route does).
 export async function actingSeller(request: NextRequest): Promise<{ slug: string; seller: Seller } | null> {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return null;

@@ -1,6 +1,6 @@
 // Which order the section editor lists a captured section's fields in.
 //
-// A captured page gives up its text, its images and its links as three separate runs — every
+// A captured page gives up its text, its images and its links as three separate runs. Every
 // paragraph first, then every image, then every href. So the words of a link and the address it
 // points at ended up dozens of fields apart, and since every link's text field is labelled the same
 // ("Link text"), checking where one of twenty pointed meant matching them by eye.
@@ -16,7 +16,7 @@ export type OrderableField =
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 /**
- * Display order, as {field, i} pairs — `i` is the field's ORIGINAL index and must be carried
+ * Display order, as {field, i} pairs. `i` is the field's ORIGINAL index and must be carried
  * through, because every edit addresses the real element in the page by it. Reordering the array
  * without the index would write a link's href onto a paragraph.
  */
@@ -38,7 +38,7 @@ export function orderFieldsForPanel<T extends OrderableField>(fields: T[]): { f:
   if (hit) { used.add(hit.i); out.push(hit); }
  }
 
- // A link whose words were never found still has to be editable — appended, never dropped.
+ // A link whose words were never found still has to be editable. Appended, never dropped.
  for (const l of links) if (!used.has(l.i)) out.push(l);
  return out;
 }
@@ -46,20 +46,20 @@ export function orderFieldsForPanel<T extends OrderableField>(fields: T[]): { f:
 /**
  * Just the thing you clicked, and everything else.
  *
- * Clicking one product title opened an "Edit section" panel listing every field in the section —
+ * Clicking one product title opened an "Edit section" panel listing every field in the section,
  * on a collection grid that is forty boxes, every one of them labelled "Text", including the same
  * caption twice because a tile carries both a label and an overlay. You came to change one title
  * and had to find it.
  *
  * So: when a specific element was clicked, its fields come first and the rest of the section is
- * put behind a disclosure. Nothing is removed — a seller who wants the whole section can still
+ * put behind a disclosure. Nothing is removed. A seller who wants the whole section can still
  * open it, and clicking the section chrome rather than an element shows everything as before.
  */
 export function splitFocusedFields<T extends OrderableField>(
  ordered: { f: T; i: number }[],
  focusEid: number | null,
  /** The clicked IMAGE, when she clicked a picture rather than words. A collection tile is a picture,
-  *  so clicking one listed every photo in the row — five "Image / Replace" rows, none of them
+  *  so clicking one listed every photo in the row. Five "Image / Replace" rows, none of them
   *  telling her which tile she had hold of. */
  focusImgId: number | null = null,
 ): { focused: { f: T; i: number }[]; rest: { f: T; i: number }[] } {

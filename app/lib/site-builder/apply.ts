@@ -57,7 +57,7 @@ export async function applySiteBuilder(html: string, ctx: SiteBuilderContext): P
   }
  }
 
- // Her menu order, on every copy of the menu this page carries — and, with or without an order of her
+ // Her menu order, on every copy of the menu this page carries, and, with or without an order of her
  // own, no link left pointing at a page she has hidden.
  if (ctx.menu || ctx.hiddenPaths?.size || ctx.menuLabels?.size) {
   if (applyMenu($, { menu: ctx.menu, hidden: ctx.hiddenPaths, labels: ctx.menuLabels }).changed) touched = true;

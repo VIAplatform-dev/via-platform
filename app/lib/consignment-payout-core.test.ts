@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { canTransition, ledgerEffect, planOffPlatformPayout, payoutStatusLabel, payoutStatusForIntent } from "./consignment-payout-core.ts";
 
 // Every one of these is somebody's money. The two failures that matter are paying a consignor for a
-// debit that later bounced, and taking money off her balance for a payment she never received —
+// debit that later bounced, and taking money off her balance for a payment she never received,
 // so most of what follows is about those.
 
 test("nothing is paid before the debit clears", () => {
@@ -14,7 +14,7 @@ test("nothing is paid before the debit clears", () => {
 });
 
 test("a cleared payout is final", () => {
- // A cleared ACH that reverses weeks later is a NEW debit to chase, not an edit to this row —
+ // A cleared ACH that reverses weeks later is a NEW debit to chase, not an edit to this row,
  // rewriting history here would silently re-credit a consignor who has been paid.
  for (const to of ["awaiting_funds", "failed", "canceled"] as const) {
   assert.equal(canTransition("paid", to), false, to);
@@ -25,14 +25,14 @@ test("starting a payout HOLDS the money so it can't be paid twice", () => {
  assert.equal(ledgerEffect(null, "awaiting_funds"), "hold");
 });
 
-test("a bounced debit gives the money back — this is the one that must not be forgotten", () => {
+test("a bounced debit gives the money back. This is the one that must not be forgotten", () => {
  // recordPayout debits her ledger the moment the row exists. If the ACH fails and nothing releases
  // it, she is owed $50 that no longer appears anywhere. She would have to notice herself.
  assert.equal(ledgerEffect("awaiting_funds", "failed"), "release");
  assert.equal(ledgerEffect("awaiting_funds", "canceled"), "release");
 });
 
-test("clearing doesn't touch the balance again — the hold BECAME the payment", () => {
+test("clearing doesn't touch the balance again. The hold BECAME the payment", () => {
  // Debiting twice would take $100 off her balance for a $50 payout.
  assert.equal(ledgerEffect("awaiting_funds", "paid"), "none");
 });
@@ -91,7 +91,7 @@ test("nonsense figures never produce a payment", () => {
 });
 
 test("statuses read as English, because sellers don't read enums", () => {
- assert.equal(payoutStatusLabel("awaiting_funds"), "On its way — clearing");
+ assert.equal(payoutStatusLabel("awaiting_funds"), "On its way: clearing");
  assert.equal(payoutStatusLabel("failed"), "Didn’t go through");
 });
 
@@ -104,7 +104,7 @@ test("an ACH still clearing is not a reason to pay anyone", () => {
 
 test("Stripe's word for a bounced ACH is requires_payment_method, not failed", () => {
  // There is no "failed" PaymentIntent status. Matching on the wrong string would leave the hold
- // on her balance forever — money she is owed that no longer appears anywhere.
+ // on her balance forever. Money she is owed that no longer appears anywhere.
  assert.equal(payoutStatusForIntent("requires_payment_method"), "failed");
  assert.equal(payoutStatusForIntent("canceled"), "canceled");
 });

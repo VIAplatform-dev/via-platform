@@ -5,7 +5,7 @@ import { listOpenCarts, createCart } from "@/app/lib/market/carts-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — every cart still open at this market, oldest first.
+// GET: every cart still open at this market, oldest first.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ sessionId: session.id, carts });
 }
 
-// POST — start a fresh cart for the next customer.
+// POST: start a fresh cart for the next customer.
 export async function POST(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -8,7 +8,7 @@ import { getConversationsByStore } from "@/app/lib/messaging-db";
 
 export const dynamic = "force-dynamic";
 
-// GET ?email= — one customer's 360: profile + their orders, offers and conversations with this store.
+// GET ?email= one customer's 360: profile + their orders, offers and conversations with this store.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, profile, orders, offers, conversations, allTags: allTags.map((t) => t.tag) });
 }
 
-// PATCH { email, notes?, tags? } — the seller's memory of one customer. Only the fields sent change;
+// PATCH { email, notes?, tags? }: the seller's memory of one customer. Only the fields sent change;
 // `tags` (an array, even empty) replaces the set, `notes` (a string, "" clears) replaces the note.
 export async function PATCH(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

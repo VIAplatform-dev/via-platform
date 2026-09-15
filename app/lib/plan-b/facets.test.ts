@@ -50,7 +50,7 @@ test("availability=1 drops sold one-of-ones", () => {
  assert.equal(r.total, 4);
 });
 
-test("size filter — the one that matters most on one-of-one vintage", () => {
+test("size filter: the one that matters most on one-of-one vintage", () => {
  assert.deepEqual(applyFacets(CATALOGUE, P("filter.v.option.size=US+4"), { perPage: 50 }).items.map((i) => i.title), ["Alaia Dress"]);
 });
 
@@ -107,7 +107,7 @@ test("hasFacetParams only fires on real facet activity", () => {
  assert.equal(hasFacetParams(P("filter.p.vendor=Dior")), true);
 });
 
-test("paginate:false hands the caller the whole filtered set — the theme owns page size", () => {
+test("paginate:false hands the caller the whole filtered set. The theme owns page size", () => {
  // The captured-page route paginates from the theme's OWN rendered card count, which this module
  // can't know. Paginating here too emptied page 2 of every collection.
  const r = applyFacets(CATALOGUE, P("page=2"), { perPage: 0, paginate: false });
@@ -121,7 +121,7 @@ test("paginate:false still filters and sorts", () => {
 });
 
 // ── Shopify's newer taxonomy/metaobject facets (Venus Vintage's theme, and every store on a similar
-// theme) submit an opaque id, not a label — see facet-labels.ts. Ticking a brand or size checkbox
+// theme) submit an opaque id, not a label. See facet-labels.ts. Ticking a brand or size checkbox
 // changed nothing until these were recognised AND resolved. ─────────────────────────────────────────
 
 test("a Metaobject-backed brand filter resolves its id through the page's own labels", () => {
@@ -137,13 +137,13 @@ test("a Standard-Taxonomy size filter resolves its id through the page's own lab
 });
 
 test("without a label map, a taxonomy id matches nothing rather than throwing", () => {
- // No labels supplied (e.g. the page had no filter form to read one from) — the id is used as-is,
+ // No labels supplied (e.g. the page had no filter form to read one from). The id is used as-is,
  // which correctly matches no item's plain-text size rather than crashing the request.
  const r = applyFacets(CATALOGUE, P("filter.v.t.shopify.size=gid%3A%2F%2Fshopify%2FTaxonomyValue%2F2885"), { perPage: 50 });
  assert.equal(r.total, 0);
 });
 
-test("the classic and taxonomy brand parameters both apply — OR, not either-or", () => {
+test("the classic and taxonomy brand parameters both apply, OR, not either-or", () => {
  const labels = new Map([["gid://shopify/Metaobject/1", "Alaia"]]);
  const r = applyFacets(CATALOGUE, P("filter.p.vendor=Chanel&filter.p.m.custom.brand=gid%3A%2F%2Fshopify%2FMetaobject%2F1"), { perPage: 50, labels });
  assert.equal(r.total, 3, "2 Chanel + 1 Alaia");

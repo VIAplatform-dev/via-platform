@@ -1,5 +1,5 @@
 // Edge-Runtime-safe verification of the email `u=` recipient token. The middleware
-// runs in the Edge Runtime, which has no Node `crypto`/`Buffer` — so it cannot use
+// runs in the Edge Runtime, which has no Node `crypto`/`Buffer`, so it cannot use
 // recipientToken.ts (Node). This reimplements verification with the Web Crypto API
 // (crypto.subtle), producing the SAME HMAC-SHA256 signature, so tokens minted by
 // makeRecipientToken (Node, in email building) verify correctly here.

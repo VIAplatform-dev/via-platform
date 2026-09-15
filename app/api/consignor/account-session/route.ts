@@ -6,7 +6,7 @@ import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// POST { consignorId } — mint an AccountSession so the consignor adds their bank + manages payouts
+// POST { consignorId }: mint an AccountSession so the consignor adds their bank + manages payouts
 // via EMBEDDED components inside the VYA consignor portal (no redirect to Stripe). Same Express /
 // transfers-only model as the redirect flow; only the surface changes. connect-js calls this to
 // (re)fetch a client secret, so it's expected to be hit more than once.
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
  try {
  let accountId = consignor.stripeAccountId;
- // Create the Express (transfers-only) account on first use — same shape as the redirect flow.
+ // Create the Express (transfers-only) account on first use. Same shape as the redirect flow.
  if (!accountId) {
  const acct = await stripePost("accounts", {
  type: "express",

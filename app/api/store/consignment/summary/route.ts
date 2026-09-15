@@ -4,7 +4,7 @@ import { getConsignmentSummary } from "@/app/lib/consignment-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — the consignment dashboard rollup: balances, 8-week sales volume, recent payout activity.
+// GET: the consignment dashboard rollup: balances, 8-week sales volume, recent payout activity.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,11 +1,11 @@
 import { neon } from "@neondatabase/serverless";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Collections capture — a store's OWN collections (e.g. "1990s", "Chanel", "Bags")
+// Collections capture: a store's OWN collections (e.g. "1990s", "Chanel", "Bags")
 // are the richest seller-labeled signal we get: era, brand, and category as the
 // seller themselves filed each piece. We sync collection membership per product
 // (from the public /collections.json + /collections/{handle}/products.json), store
-// it, and DERIVE a canonical era from it — so the intake accuracy loop and pricing
+// it, and DERIVE a canonical era from it, so the intake accuracy loop and pricing
 // comps learn from real labels instead of the AI re-guessing. Internal data only;
 // buyer-facing "auto-fill VYA collections" is a separate curation pass.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,12 +16,12 @@ function db() {
  return neon(url);
 }
 
-// Collections that carry no product meaning — navigation, catch-alls, price bands,
+// Collections that carry no product meaning. Navigation, catch-alls, price bands,
 // internal drop codes. We never want these as era/brand/category signal.
 const JUNK_COLLECTION_RE =
  /^(home\s*page|frontpage|shop\s*all|all|all\s*products|latest\s*drop|new\s*(arrivals?|in)|new\s*releases?|featured|best\s*sellers?|sale|on\s*sale|tier\s*\d+|coming\s*soon|available|sold|sold\s*archive|permanent\s*collection|sourcing|special\s*pricing|rental|frontpage)$/i;
 const MONTHS_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b/i;
-// Collections that carry no product meaning — navigation, catch-alls, price bands, presale/drop batches,
+// Collections that carry no product meaning. Navigation, catch-alls, price bands, presale/drop batches,
 // Shopify demo data, and numbered dupes. Never a real era/brand/category, and never worth importing.
 export function isJunkCollection(title: string): boolean {
  const t = (title || "").trim();
@@ -41,7 +41,7 @@ export function isJunkCollection(title: string): boolean {
 }
 
 // Derive a canonical era from the collection titles a piece belongs to. Stores file by
-// decade ("1990s", "2000s") or Y2K — the strongest era ground truth we get.
+// decade ("1990s", "2000s") or Y2K. The strongest era ground truth we get.
 export function eraFromCollections(titles: string[]): string | null {
  const j = titles.join(" ").toLowerCase();
  if (/\b(1970s|1970|70s)\b/.test(j)) return "1970s";
@@ -67,7 +67,7 @@ async function getJson(url: string): Promise<any | null> {
 
 /**
  * Sync one Shopify store's collection membership into products.collections + products.era.
- * Idempotent — safe to run on every pass. Returns counts for logging.
+ * Idempotent: safe to run on every pass. Returns counts for logging.
  */
 export async function syncStoreCollections(
  storeSlug: string,

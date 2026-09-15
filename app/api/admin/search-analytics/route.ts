@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
  WHERE ${cutoff}::timestamptz IS NULL OR timestamp >= ${cutoff}::timestamptz
  `,
 
- // Queries that returned 0 results — most actionable
+ // Queries that returned 0 results. Most actionable
  sql`
  SELECT
  query,
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
  LIMIT 50
  `,
 
- // Searches with very low results (1–4) — likely poor coverage
+ // Searches with very low results (1–4): likely poor coverage
  sql`
  SELECT
  query,

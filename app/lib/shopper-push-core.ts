@@ -11,7 +11,7 @@ import type { PushPayload } from "./push";
 //  · It names the PIECE, not the category. "Your Chanel flap" is a reason to open the app;
 //    "1 new item" is a reason to turn notifications off.
 //  · It never says more than it knows. Where a count or a name could be missing, the builder
-//    returns null and nothing is sent — silence beats a push that reads "undefined".
+//    returns null and nothing is sent. Silence beats a push that reads "undefined".
 //  · `data.type` is what the app routes on when it is tapped (see routeForPush in app/_layout).
 //    A notification that opens the home screen has wasted the tap.
 
@@ -27,7 +27,7 @@ function firstName(items: PushItem[]): string | null {
   return null;
 }
 
-/** "X", "X and 1 more", "X and 4 more" — names the piece, then admits there are others. */
+/** "X", "X and 1 more", "X and 4 more". Names the piece, then admits there are others. */
 function nameAndMore(items: PushItem[]): string | null {
   const name = firstName(items);
   if (!name) return null;
@@ -65,7 +65,7 @@ export function trendingPush(items: PushItem[]): PushPayload | null {
   if (!what) return null;
   return {
     title: "Trending right now",
-    body: `${what} — other people are looking too.`,
+    body: `${what}: other people are looking too.`,
     data: { type: "trending", productId: items[0]?.id ?? null },
   };
 }
@@ -87,7 +87,7 @@ export function lastChancePush(items: PushItem[]): PushPayload | null {
   if (!what) return null;
   return {
     title: "Last chance",
-    body: `${what} — one of one, and it won't come back.`,
+    body: `${what}: one of one, and it won't come back.`,
     data: { type: "last_chance", productId: items[0]?.id ?? null },
   };
 }
@@ -103,7 +103,7 @@ export function abandonedCartPush(items: PushItem[]): PushPayload | null {
   };
 }
 
-/** We haven't seen you. Tone shifts with how long — a fortnight is a nudge, a month is a pitch. */
+/** We haven't seen you. Tone shifts with how long. A fortnight is a nudge, a month is a pitch. */
 export function winbackPush(tier: "14d" | "30d"): PushPayload {
   return tier === "14d"
     ? { title: "New since you last looked", body: "Fresh pieces from your stores are up on VYA.", data: { type: "winback" } }
@@ -126,7 +126,7 @@ export function favoritePush(items: PushItem[]): PushPayload | null {
   if (!what) return null;
   return {
     title: "Something you saved",
-    body: `${what} — worth another look.`,
+    body: `${what}: worth another look.`,
     data: { type: "favorite", productId: items[0]?.id ?? null },
   };
 }

@@ -11,23 +11,23 @@ import {
   type DomainOption, type Registrant,
 } from "../../lib/seller/domains";
 
-// Her own domain — the "Connect your own domain" step on Home, which used to open the website.
+// Her own domain: the "Connect your own domain" step on Home, which used to open the website.
 //
 // THE HARD PART OF THIS SCREEN IS NOT THE FORM, IT IS THE WAIT. Connecting is one call; what follows
 // is DNS, which happens at her registrar, on somebody else's schedule, and can take an hour. A screen
 // that says "connected" and stops is the one that generates the support message, so the records she
-// has to add are listed here with tap-to-copy — a phone is a bad place to retype `cname.vercel-dns.com`
-// by hand — and "Check again" asks the server rather than making her guess whether it worked yet.
+// has to add are listed here with tap-to-copy. A phone is a bad place to retype `cname.vercel-dns.com`
+// by hand, and "Check again" asks the server rather than making her guess whether it worked yet.
 //
 // SHE CAN ALSO BUY ONE HERE, which is the part that has no DNS problem at all: VYA registers it
 // through Vercel and points it at her storefront in the same call, so there is nothing to copy into
-// a registrar and nothing to wait for. That is why buying is offered first and connecting second —
+// a registrar and nothing to wait for. That is why buying is offered first and connecting second,
 // the easy path should be the visible one.
 //
 // The registrant contact is ICANN's requirement, not ours, and it is nine boxes. They are prefilled
 // from her ship-from address, which she has already typed on the Shipping screen, so for most
 // sellers this is a review rather than a form. What is still missing is named BEFORE the button
-// works — a registrar refuses the whole purchase over one blank box, and finding that out after a
+// works. A registrar refuses the whole purchase over one blank box, and finding that out after a
 // card charge is the worst version of this flow.
 //
 // Records are only shown when they are hers to add. When VYA runs the nameservers the server sends
@@ -35,7 +35,7 @@ import {
 // DNS is broken" at the exact moment everything is fine.
 //
 // The values are `selectable`, which is long-press-to-copy on both platforms and costs nothing. A
-// Copy button would read better, but every clipboard API here is a native module — a new dependency
+// Copy button would read better, but every clipboard API here is a native module. A new dependency
 // and a rebuild for one button, on a screen used once per store. Not worth it.
 
 type DnsRecord = { type: string; name: string; value: string };
@@ -51,7 +51,7 @@ export default function DomainScreen() {
     enabled: !!storeSlug,
   });
 
-  // Prefilled from the address she has already given for parcels — most of the registrant contact
+  // Prefilled from the address she has already given for parcels. Most of the registrant contact
   // is the same information, and retyping it on a phone is how this flow gets abandoned.
   const shipping = useQuery({
     queryKey: ["store", "shipping"],
@@ -155,7 +155,7 @@ export default function DomainScreen() {
       ) : !d ? (
         <Loading />
       ) : !d.configured ? (
-        <Notice>Custom domains aren&apos;t switched on for this store yet — that one is ours to fix. Get in touch from Help.</Notice>
+        <Notice>Custom domains aren&apos;t switched on for this store yet. That one is ours to fix. Get in touch from Help.</Notice>
       ) : !d.domain ? (
         <>
           <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl }}>
@@ -175,7 +175,7 @@ export default function DomainScreen() {
               </Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 19 }}>
                 {priceLine(picked, currency)}, charged to the card on your VYA account. Whoever owns a
-                domain has to be named publicly — that&apos;s the registrar&apos;s rule, not ours.
+                domain has to be named publicly. That&apos;s the registrar&apos;s rule, not ours.
               </Text>
               {REGISTRANT_FIELDS.map((f) => (
                 <Field
@@ -190,7 +190,7 @@ export default function DomainScreen() {
               ))}
               {describeMissing(contact) ? <Notice>{describeMissing(contact)}</Notice> : null}
               <Button
-                label={`Buy ${picked.domain} — ${priceLine(picked, currency)}`}
+                label={`Buy ${picked.domain}: ${priceLine(picked, currency)}`}
                 busyLabel="Registering…"
                 busy={busy === "buy"}
                 disabled={Boolean(describeMissing(contact))}
@@ -208,7 +208,7 @@ export default function DomainScreen() {
                 onChangeText={setTyped}
                 placeholder="yourbrand"
                 autoCapitalize="none"
-                hint="We'll register it and point it at your storefront — nothing to set up afterwards."
+                hint="We'll register it and point it at your storefront. Nothing to set up afterwards."
               />
               <Button
                 label="See what's free"
@@ -308,7 +308,7 @@ export default function DomainScreen() {
             onPress={() => void run("remove")}
           />
           <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 18 }}>
-            Your storefront stays up at {storeSlug}.vyasites.com either way — disconnecting only stops
+            Your storefront stays up at {storeSlug}.vyasites.com either way: disconnecting only stops
             it answering on {d.domain}.
           </Text>
         </>

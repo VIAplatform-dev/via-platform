@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   ]);
 
   if (!cookie || !csrfToken) {
-    return NextResponse.json({ error: "No Collabs credentials stored — update them in the Collabs admin page first" }, { status: 400 });
+    return NextResponse.json({ error: "No Collabs credentials stored. Update them in the Collabs admin page first" }, { status: 400 });
   }
 
   // Find the Collabs partnership for this store by matching store name
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     }, { status: 404 });
   }
 
-  // Fetch commission records — try full tier (with order total + all line items) first
+  // Fetch commission records. Try full tier (with order total + all line items) first
   const headers = {
     "content-type": "application/json",
     "cookie": cookie,

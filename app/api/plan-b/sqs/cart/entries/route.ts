@@ -12,12 +12,12 @@ function sqsError(message: string, status = 422): NextResponse {
  return NextResponse.json({ message }, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-// POST /api/commerce/shopping-cart/entries — the seller's OWN "Add to cart" button (often renamed;
+// POST /api/commerce/shopping-cart/entries. The seller's OWN "Add to cart" button (often renamed;
 // on this store it reads "MAKE IT YOURS"), driving VYA's database.
 //
 // The page hands back the VYA item id because the serve path rewrote the product's identity into it
 // (see plan-b/sqs-product.ts). Squarespace's bundle reads `shoppingCart` off the response to update
-// its model — which is what flips the button to "Added!" and re-syncs the header cart pill — and
+// its model, which is what flips the button to "Added!" and re-syncs the header cart pill, and
 // `newlyAdded` for its own analytics event.
 export async function POST(request: NextRequest) {
  const store = await resolveStore(request);
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
 
  const item = await findItemByVariantId(store.sellerId, itemId);
  if (!item) return sqsError("That item is no longer available.", 404);
- // One-of-one: a sold piece is gone, not backorderable — and a held one is on hold, not sold.
+ // One-of-one: a sold piece is gone, not backorderable, and a held one is on hold, not sold.
  const refusal = hostedCartRefusal(item);
  if (refusal) return sqsError(refusal);
 

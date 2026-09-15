@@ -1,4 +1,4 @@
-// Pure consignment business logic — no DB, so it's fully unit-testable.
+// Pure consignment business logic, no DB, so it's fully unit-testable.
 // The DB layer (consignment-db.ts) fetches rows and calls into these.
 
 export type SplitRule = {
@@ -39,7 +39,7 @@ export function resolveSplitPct(opts: {
  return clampPct(opts.storeDefaultPct);
 }
 
-/** The consignor's payout for a sale — their split of the sale price, in cents. */
+/** The consignor's payout for a sale. Their split of the sale price, in cents. */
 export function consignorCutCents(soldPriceCents: number, splitPct: number): number {
  return Math.round(soldPriceCents * (clampPct(splitPct) / 100));
 }

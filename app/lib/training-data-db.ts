@@ -2,12 +2,12 @@ import { neon } from "@neondatabase/serverless";
 import { embedImageResult, isEmbeddingConfigured } from "./embeddings";
 import { inferBrandFromTitle } from "./market-data-db";
 
-// The VYA training dataset — one clean, append-only "golden record" per example, so
+// The VYA training dataset. One clean, append-only "golden record" per example, so
 // that when we're ready to train our own model it starts from pristine data, not a
 // mess we have to reconstruct. Two sources feed it:
-//   • 'intake'      — new AI-assisted listings: photo + the AI's guess + the seller's
+//   • 'intake': new AI-assisted listings: photo + the AI's guess + the seller's
 //                     final answer + which fields were accepted (the richest signal).
-//   • 'items' /     — everything ALREADY on the platform (VYA inventory + marketplace
+//   • 'items' / everything ALREADY on the platform (VYA inventory + marketplace
 //     'marketplace'   products): photo → human-written brand/era/price/title. A
 //                     finished listing IS a labeled example.
 // Stable UNIQUE(source, item_ref) makes both capture and backfill idempotent.
@@ -43,16 +43,16 @@ async function ensureTable() {
   )
  `;
  await sql`CREATE INDEX IF NOT EXISTS idx_training_source ON training_examples (source, created_at DESC)`;
- // Golden set: a small, hand-verified subset that IS the benchmark — the real exam, so
+ // Golden set: a small, hand-verified subset that IS the benchmark. The real exam, so
  // accuracy isn't measured against noisy auto-labels. Self-healing add for existing tables.
  await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS golden BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
  await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS golden_at TIMESTAMPTZ`.catch(() => {});
  await sql`CREATE INDEX IF NOT EXISTS idx_training_golden ON training_examples (golden) WHERE golden`.catch(() => {});
  // Reference index: a photo embedding per labeled example, so a new upload can be matched to the
- // SPECIFIC known piece (title carries the model/line) and priced off it — not just brand-guessed.
+ // SPECIFIC known piece (title carries the model/line) and priced off it, not just brand-guessed.
  // Populated in batches by embedPendingTrainingExamples (Voyage cost, so it's a run-when-ready job).
  await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS embedding TEXT`.catch(() => {});
- // Celebrity provenance ("worn by") captured at intake — a resale-value + identification signal.
+ // Celebrity provenance ("worn by") captured at intake. A resale-value + identification signal.
  await sql`ALTER TABLE training_examples ADD COLUMN IF NOT EXISTS ai_celebrity TEXT`.catch(() => {});
  ensured = true;
 }
@@ -78,7 +78,7 @@ const AI_FIELDS = ["brand", "era", "material", "condition", "category", "title",
 /** Record one AI-assisted listing as a golden training example (upsert on republish). */
 export async function recordIntakeExample(x: IntakeExample): Promise<void> {
  await ensureTable();
- // Which AI predictions the seller kept vs. changed — the label quality signal.
+ // Which AI predictions the seller kept vs. changed. The label quality signal.
  const accepted: Record<string, boolean> = {};
  for (const f of AI_FIELDS) {
  const aiv = x.ai[f];
@@ -140,7 +140,7 @@ export async function backfillFromProducts(): Promise<number> {
 }
 
 /** Backfill SOLD/removed pieces into the dataset. A sold item is a real photo of something that
- *  actually moved at a real price — the best kind of comp — but it's deleted from the live catalog
+ *  actually moved at a real price, the best kind of comp, but it's deleted from the live catalog
  *  when it sells, so the item/product backfills can't see it. This keeps every sold piece in the
  *  identification library (and its price in the answer key). Idempotent; keyed by the sold row id. */
 export async function backfillFromSold(): Promise<number> {
@@ -179,7 +179,7 @@ export async function getTrainingStats(): Promise<TrainingStats> {
 }
 
 // ── Golden set: the hand-verified benchmark ───────────────────────────────────
-// "Golden" means a human confirmed the brand + sold price are correct — so it's the
+// "Golden" means a human confirmed the brand + sold price are correct, so it's the
 // answer key we actually trust. The exam runs against these instead of noisy auto-labels.
 
 export type GoldenExample = {
@@ -202,7 +202,7 @@ export async function markGolden(ids: number[], on = true): Promise<number> {
 /**
  * Seed the golden answer key from the most-trusted existing rows (no manual review). Promotes up to
  * `limit` not-yet-golden examples, ranked by: trust tier (high › medium › other), then LABEL RICHNESS
- * (how many of era/material/condition/category are filled — so the benchmark can grade every field,
+ * (how many of era/material/condition/category are filled, so the benchmark can grade every field,
  * not just brand), then seller-confirmed sources (intake/items/sold over marketplace), then recency.
  * Requires a brand label + a usable photo. Returns how many were promoted + the new golden count.
  */
@@ -261,7 +261,7 @@ export async function getGoldenForReview(limit = 40): Promise<GoldenReviewRow[]>
 // label AND the AI's proposal, so it's an answer key AND a direct read on model accuracy. ──
 
 export type LabelCandidate = { productId: number; storeSlug: string; storeName: string | null; title: string; image: string; priceCents: number | null; titleBrand: string | null };
-/** A diverse set of real item photos to label — spread across stores, skipping ones already labeled. */
+/** A diverse set of real item photos to label. Spread across stores, skipping ones already labeled. */
 export async function getLabelingCandidates(limit = 20): Promise<LabelCandidate[]> {
  await ensureTable();
  const n = Math.max(1, Math.min(50, Math.round(Number(limit)) || 20));
@@ -277,7 +277,7 @@ export async function getLabelingCandidates(limit = 20): Promise<LabelCandidate[
   title: String(r.title || ""), image: String(r.image || ""),
   priceCents: r.price != null ? Math.round(Number(r.price) * 100) : null,
   // The store's TITLE usually names the real brand ("Dior 2851") even when the AI blind-guesses wrong
-  // from the photo — pre-fill the TRUTH field with it so obvious cases don't need manual correction.
+  // from the photo: pre-fill the TRUTH field with it so obvious cases don't need manual correction.
   titleBrand: inferBrandFromTitle(String(r.title || "")),
  }));
 }
@@ -327,7 +327,7 @@ export async function getGoldenStats(): Promise<GoldenStats> {
  };
 }
 
-/** Best auto-labeled rows to REVIEW for promotion — the trustworthiest candidates first:
+/** Best auto-labeled rows to REVIEW for promotion. The trustworthiest candidates first:
  *  high-trust, a usable photo, a brand + a real price, and (for intake rows) the seller KEPT
  *  the AI's brand. A human still confirms before these become golden. */
 export async function getGoldenCandidates(limit = 60, category?: string): Promise<GoldenExample[]> {
@@ -357,7 +357,7 @@ export async function getGoldenCandidates(limit = 60, category?: string): Promis
 
 // ── Reference index: embed the labeled catalog so uploads match a SPECIFIC piece ──
 // Turns training_examples (brand + title + era + price for thousands of pieces) into a visual
-// reference by adding a photo embedding to each. Batched + idempotent — one Voyage call per
+// reference by adding a photo embedding to each. Batched + idempotent: one Voyage call per
 // unembedded row, newest first, prioritizing rows with a brand + title (the useful references).
 
 export type ReferenceIndexStats = { embedded: number; embeddable: number; remaining: number; withBrandTitle: number; badImage?: number; rateLimited?: number };
@@ -365,7 +365,7 @@ export type ReferenceIndexStats = { embedded: number; embeddable: number; remain
 /**
  * Embed a batch of un-embedded training examples. Gated on Voyage; safe to re-run (only fills gaps).
  * Rate-limit-aware: a throttled image is LEFT unembedded (retried next run), only a genuinely bad
- * URL is marked '[]' (permanently skipped) — so throttling can't poison the index. Runs sequentially
+ * URL is marked '[]' (permanently skipped), so throttling can't poison the index. Runs sequentially
  * so it self-paces against Voyage's rate limit; keep the batch modest (default 60, like the sold cron).
  */
 export async function embedPendingTrainingExamples(limit = 60): Promise<ReferenceIndexStats> {
@@ -392,7 +392,7 @@ export async function embedPendingTrainingExamples(limit = 60): Promise<Referenc
  await db()`UPDATE training_examples SET embedding = ${JSON.stringify(embedding)} WHERE id = ${r.id}`.catch(() => {});
  embedded++; saved = true; break;
  }
- if (status !== "bad_image") { throttled = true; break; } // rate-limited/transient — retry the whole row next run
+ if (status !== "bad_image") { throttled = true; break; } // rate-limited/transient: retry the whole row next run
  // bad_image → fall through and try the next frame
  }
  if (saved) continue;
@@ -437,7 +437,7 @@ export type LibraryHealth = {
 
 // One read to answer "what are the dead-image rows?" AND "is the library actually growing?".
 // deadImage = rows we tried and could not embed (all photos unreachable, marked '[]'). Growth uses
-// created_at (new labeled examples flowing in) — proof the library keeps compounding on its own.
+// created_at (new labeled examples flowing in). Proof the library keeps compounding on its own.
 export async function getLibraryHealth(): Promise<LibraryHealth> {
  await ensureTable();
  type Row = Record<string, string | number | null>;

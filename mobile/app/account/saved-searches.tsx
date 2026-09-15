@@ -5,7 +5,7 @@ import { apiDelete, apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { colors, fonts, spacing } from "../../lib/theme";
 
-// Saved Searches. Each one is a set of filters plus an unread count — the number of pieces that
+// Saved Searches. Each one is a set of filters plus an unread count. The number of pieces that
 // have landed since it was last opened, which is the entire point of saving a search on a
 // marketplace where stock is one-of-one and gone within days.
 

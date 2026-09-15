@@ -5,7 +5,7 @@ import { listAvailableAtMarket, listSoldAtMarket } from "@/app/lib/market/invent
 
 export const dynamic = "force-dynamic";
 
-// GET ?view=available|sold — what's at this market.
+// GET ?view=available|sold: what's at this market.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

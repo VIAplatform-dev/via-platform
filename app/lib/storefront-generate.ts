@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // One-click "build my storefront with VYA" for sellers with no existing site.
-// Claude designs a complete boutique storefront — template, colors, fonts, homepage
-// sections, and About / FAQ / Shipping pages — from the store's products + brand.
+// Claude designs a complete boutique storefront. Template, colors, fonts, homepage
+// sections, and About / FAQ / Shipping pages, from the store's products + brand.
 import { getStorefrontBySlug, setStorefrontTheme, upsertStorefront } from "./storefront-db";
 import { getListingsByStore } from "./listings-db";
 import { STOREFRONT_TEMPLATES, getTemplate, templateShopBlocks, templatePages, HEADING_FONTS, BODY_FONTS } from "./storefront-templates";
@@ -33,9 +33,9 @@ export async function generateStarterStorefront(slug: string): Promise<{ ok: boo
  const listings = await getListingsByStore(slug, true).catch(() => []);
  const products = listings.slice(0, 24).map((l) => ({ title: l.title, price: l.price, category: l.category, desc: (l.description || "").slice(0, 120) }));
 
- const sys = "You are a world-class boutique storefront designer for VYA, a curated vintage-fashion platform. You design complete, tasteful storefronts and write real, evocative copy — never placeholders. Output STRICT JSON only, no markdown.";
+ const sys = "You are a world-class boutique storefront designer for VYA, a curated vintage-fashion platform. You design complete, tasteful storefronts and write real, evocative copy, never placeholders. Output STRICT JSON only, no markdown.";
  const prompt = `Design a complete storefront for "${storeName}", a curated vintage / secondhand fashion store.
-${products.length ? `Their products (${products.length} shown):\n${JSON.stringify(products)}` : "They haven't added products yet — write copy that suits a vintage boutique."}
+${products.length ? `Their products (${products.length} shown):\n${JSON.stringify(products)}` : "They haven't added products yet. Write copy that suits a vintage boutique."}
 
 Return ONLY a JSON object (no markdown fences) shaped exactly like:
 {
@@ -46,12 +46,12 @@ Return ONLY a JSON object (no markdown fences) shaped exactly like:
  "pages": [ { "title": "About", "blocks": [...] }, { "title": "FAQ", "blocks": [...] }, { "title": "Shipping & Returns", "blocks": [...] } ]
 }
 A block is { "type": ..., "props": {...}, "style"?: { "bg": "accent" | "dark" | "#hex" } }. Block types + props:
-- announcement { text } — a thin top bar (e.g. a shipping or new-arrivals note)
-- hero { heading, subtext, cta } — the opening banner
-- featured { heading } — a grid of the store's products (auto-filled; just give a heading)
-- text { heading, body } — a copy section (the store's story, etc.)
-- newsletter { heading, subtext } — email signup
-Homepage order: announcement, hero, featured, an about/story text section (use style.bg "dark" or "accent" for contrast), then newsletter. Write copy SPECIFIC to ${storeName} and vintage fashion — warm, editorial, not generic. For pages, write genuine About / FAQ / Shipping & Returns copy as text blocks. Choose colors + fonts that feel boutique and match the vibe.`;
+- announcement { text }: a thin top bar (e.g. a shipping or new-arrivals note)
+- hero { heading, subtext, cta }. The opening banner
+- featured { heading }: a grid of the store's products (auto-filled; just give a heading)
+- text { heading, body }: a copy section (the store's story, etc.)
+- newsletter { heading, subtext }: email signup
+Homepage order: announcement, hero, featured, an about/story text section (use style.bg "dark" or "accent" for contrast), then newsletter. Write copy SPECIFIC to ${storeName} and vintage fashion. Warm, editorial, not generic. For pages, write genuine About / FAQ / Shipping & Returns copy as text blocks. Choose colors + fonts that feel boutique and match the vibe.`;
 
  let gen: any;
  try {
@@ -60,7 +60,7 @@ Homepage order: announcement, hero, featured, an about/story text section (use s
  const m = text.match(/\{[\s\S]*\}/);
  gen = JSON.parse(m ? m[0] : text);
  } catch {
- return { ok: false, blocks: 0, pages: 0, error: "Generation failed — please try again." };
+ return { ok: false, blocks: 0, pages: 0, error: "Generation failed. Please try again." };
  }
 
  const template = getTemplate(String(gen.template)) || STOREFRONT_TEMPLATES[0];
@@ -69,13 +69,13 @@ Homepage order: announcement, hero, featured, an about/story text section (use s
  const fonts = { heading: HEADING_FONTS.includes(gen.fonts?.heading) ? gen.fonts.heading : template.fonts.heading, body: BODY_FONTS.includes(gen.fonts?.body) ? gen.fonts.body : template.fonts.body };
  const blocks = sanitizeBlocks(gen.blocks);
  const pages = sanitizePages(gen.pages);
- if (!blocks.length) return { ok: false, blocks: 0, pages: 0, error: "Generation produced nothing — please try again." };
+ if (!blocks.length) return { ok: false, blocks: 0, pages: 0, error: "Generation produced nothing. Please try again." };
 
- // A fresh generation is a CLEAN slate — don't carry over a previous import's
+ // A fresh generation is a CLEAN slate. Don't carry over a previous import's
  // logo / nav / cloned sections / hero image (that's how Ascensio's logo lingered).
  await upsertStorefront(slug, { handle: sf?.handle || slug, enabled: sf?.enabled ?? false, tagline: sf?.tagline ?? null, accentColor: colors.accent, heroImage: null, about: sf?.about ?? null });
  // The model writes the home page and the content pages; the template supplies the structural
- // decisions it has no business inventing — corner style, header arrangement, catalogue density, and
+ // decisions it has no business inventing. Corner style, header arrangement, catalogue density, and
  // the Shop page's intro. Without these a generated store lands on the platform defaults and every
  // generation looks the same regardless of which template the model picked.
  const theme: StorefrontTheme = {

@@ -116,7 +116,7 @@ const TAB_META: Record<Tab, { title: string; subtitle: string }> = {
  audience: { title: "Audience", subtitle: "The community following and saving your work." },
  listing: { title: "Listing Health", subtitle: "Listings missing details that help pieces sell." },
  messages: { title: "Messages", subtitle: "Questions from shoppers about your pieces." },
- hosted: { title: "Hosted Store", subtitle: "Your VYA-hosted copy — open it, edit any page, and check it against your own site." },
+ hosted: { title: "Hosted Store", subtitle: "Your VYA-hosted copy: open it, edit any page, and check it against your own site." },
 };
 
 const FEEDBACK_URL = "https://form.typeform.com/to/L13186Wp";
@@ -224,7 +224,7 @@ function StoreDashboardInner() {
  ]);
  if (!meRes.ok) {
  // In admin preview, a failed load means missing/invalid admin auth, not a
- // logged-out seller — don't bounce to the store login.
+ // logged-out seller: don't bounce to the store login.
  if (!previewStore) router.replace("/store/login");
  setLoadingInitial(false);
  return;
@@ -368,7 +368,7 @@ function StoreDashboardInner() {
  </div>
  );
 
- // ── Pending onboarding — clean welcome, no sourcing ──
+ // ── Pending onboarding. Clean welcome, no sourcing ──
  if (store.pendingOnboarding) {
  return (
  <div className="min-h-screen bg-[#FBF8F1] text-[#5D0F17]">
@@ -381,7 +381,7 @@ function StoreDashboardInner() {
  <p className="font-serif text-3xl text-[#5D0F17]">Welcome to VYA</p>
  <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-[#5D0F17]/55">
  Your store is being set up. Once your catalog is live, your dashboard will fill with
- audience and performance insights — views, saves, conversions, and commission.
+ audience and performance insights. Views, saves, conversions, and commission.
  </p>
  <a
  href={FEEDBACK_URL}
@@ -608,7 +608,7 @@ function StoreDashboardInner() {
  })()}
  </Panel>
 
- {/* Recent sales — each conversion with item, buyer, total, commission */}
+ {/* Recent sales. Each conversion with item, buyer, total, commission */}
  <Panel title="Recent sales">
  {(analytics.sales?.length ?? 0) > 0 ? (
  <div className="divide-y divide-[#5D0F17]/[0.06]">
@@ -619,7 +619,7 @@ function StoreDashboardInner() {
  {s.items.map((it) => (it.quantity > 1 ? `${it.name} ×${it.quantity}` : it.name)).join(", ") || "Order"}
  </span>
  <span className="truncate text-[12px] text-[#5D0F17]/50">
- {s.customerEmail ?? "—"} · {new Date(s.timestamp).toLocaleDateString()}
+ {s.customerEmail ?? "-"} · {new Date(s.timestamp).toLocaleDateString()}
  </span>
  </span>
  <span className="shrink-0 text-right text-sm">

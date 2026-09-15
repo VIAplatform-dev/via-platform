@@ -14,7 +14,7 @@ function db() {
  return neon(url);
 }
 
-// "draft" is a campaign PREPARED for the seller but not committed to — new arrivals gathers her
+// "draft" is a campaign PREPARED for the seller but not committed to. New arrivals gathers her
 // pieces and leaves one here rather than sending behind her back. She opens it, changes it, and
 // decides. Nothing schedules or sends a draft on its own.
 export type CampaignStatus = "draft" | "scheduled" | "sending" | "sent" | "failed" | "canceled";
@@ -71,7 +71,7 @@ function mapRow(r: any): Campaign {
  };
 }
 
-/** Recent campaigns for a store — scheduled (upcoming) and sent (history), newest first. */
+/** Recent campaigns for a store. Scheduled (upcoming) and sent (history), newest first. */
 export async function listCampaigns(storeSlug: string, limit = 30): Promise<Campaign[]> {
  await ensureTable();
  const rows = (await db()`
@@ -118,7 +118,7 @@ export async function recordSentCampaign(storeSlug: string, c: { subject: string
  `.catch(() => {});
 }
 
-// ── Delivery — the single path both the Sidekick and the cron use ──────────────
+// ── Delivery: the single path both the Sidekick and the cron use ──────────────
 /** The audience an email is aimed at, stored in `segment` as JSON. Empty = everyone → null. */
 export function encodeAudience(a: AudienceFilter | null | undefined): string | null {
  if (!a || audienceIsEmpty(a)) return null;
@@ -172,7 +172,7 @@ export async function sendDueCampaigns(now: Date): Promise<{ sent: number; recip
  const sql = db();
  // Claim atomically: the row-locking subquery (FOR UPDATE SKIP LOCKED) hands each due row to
  // exactly one concurrent run, and the outer status guard means an already-claimed row is never
- // re-sent — so overlapping cron invocations can't double-send to subscribers.
+ // re-sent, so overlapping cron invocations can't double-send to subscribers.
  const due = (await sql`
  UPDATE store_campaigns SET status = 'sending'
  WHERE status = 'scheduled' AND id IN (
@@ -197,7 +197,7 @@ export async function sendDueCampaigns(now: Date): Promise<{ sent: number; recip
 /**
  * Campaigns actually SENT since a date.
  *
- * Counted from what went out, never from drafts — otherwise deleting a draft would buy another
+ * Counted from what went out, never from drafts. Otherwise deleting a draft would buy another
  * send. Scheduled-but-unsent ones are excluded for the same reason: nothing has reached anyone yet.
  */
 export async function countCampaignsSent(storeSlug: string, since: Date): Promise<number> {

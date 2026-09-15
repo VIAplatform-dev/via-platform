@@ -8,11 +8,11 @@ import { colors, spacing } from "../../lib/portal-theme";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { formatMoney } from "../../lib/seller/home";
 
-// Inbox — every buyer thread in one list.
+// Inbox: every buyer thread in one list.
 //
 // The mockups draw channel chips (VYA · Depop · eBay). They are NOT here, and deliberately:
 // `storefront_conversations` has no channel column and nothing ingests messages from Depop or
-// eBay — the cross-listing routes push listings out, they don't pull conversations in. Chips that
+// eBay: the cross-listing routes push listings out, they don't pull conversations in. Chips that
 // filter one real source and two empty ones would be a promise the backend can't keep. When
 // message ingestion exists, the chips go here and this comment goes away.
 
@@ -69,8 +69,8 @@ export default function InboxScreen() {
     queryFn: () => apiGet<{ conversations: Conversation[] }>("/api/store/inbox"),
     enabled: !!storeSlug,
   });
-  // Offers were only ever on the web. They are the half of the inbox that expires — a message can
-  // wait a day, an offer cannot — so they belong beside the messages rather than a screen away.
+  // Offers were only ever on the web. They are the half of the inbox that expires. A message can
+  // wait a day, an offer cannot, so they belong beside the messages rather than a screen away.
   const offers = useQuery({
     queryKey: ["store", "offers"],
     queryFn: () => apiGet<{ offers: Offer[]; pending?: number }>("/api/store/offers"),
@@ -81,7 +81,7 @@ export default function InboxScreen() {
 
   const threads = q.data?.conversations ?? [];
   const unanswered = threads.filter((c) => c.storeUnread > 0).length;
-  // Waiting on HER — the buyer moved last and it has not expired. That is the number worth a badge.
+  // Waiting on HER: the buyer moved last and it has not expired. That is the number worth a badge.
   const openOffers = (offers.data?.offers ?? []).filter((o) => o.status === "pending" && o.lastActor === "buyer");
 
   return (
@@ -158,7 +158,7 @@ export default function InboxScreen() {
                   <Text style={{ fontSize: 12, color: colors.textDim }}>{ago(c.lastMessageAt)}</Text>
                 </View>
                 <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>
-                  {c.lastMessage ?? c.itemTitle ?? "—"}
+                  {c.lastMessage ?? c.itemTitle ?? "-"}
                 </Text>
               </View>
               {c.storeUnread > 0 ? (

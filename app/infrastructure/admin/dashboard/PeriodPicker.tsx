@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { SegmentedControl, TechButton, cn } from "../ui";
 
 // The period control for the analytics suite. Emits exactly what
-// /api/store/analytics/suite takes — a period key plus, for a custom range, the
-// two dates — so the URL, the request and the label all stay in step.
+// /api/store/analytics/suite takes. A period key plus, for a custom range, the
+// two dates, so the URL, the request and the label all stay in step.
 //
 // Three ways in, because sellers think about time in three ways: a rolling
 // window ("last 30 days"), a calendar period they close their books on ("Q3",
@@ -23,7 +23,7 @@ const PRESETS: { label: string; period: string }[] = [
 
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-/** The last 8 quarters and 12 months, newest first — everything a store closes books on. */
+/** The last 8 quarters and 12 months, newest first. Everything a store closes books on. */
 function calendarOptions(now: Date): { value: string; label: string; group: string }[] {
  const out: { value: string; label: string; group: string }[] = [];
  const y = now.getFullYear();
@@ -50,7 +50,7 @@ export function PeriodPicker({ value, onChange, className }: { value: PeriodValu
  const [customOpen, setCustomOpen] = useState(value.period === "custom");
  const [from, setFrom] = useState(value.from ?? "");
  const [to, setTo] = useState(value.to ?? "");
- // Rebuilt only on mount — the option list doesn't need to chase the clock mid-session.
+ // Rebuilt only on mount. The option list doesn't need to chase the clock mid-session.
  const options = useMemo(() => calendarOptions(new Date()), []);
 
  const presetLabel = PRESETS.find((p) => p.period === value.period)?.label;
@@ -92,7 +92,7 @@ export function PeriodPicker({ value, onChange, className }: { value: PeriodValu
    </button>
 
    {customOpen && (
-    // Two date inputs, an arrow and Apply are ~330px — wider than a 360px phone's content. Below sm
+    // Two date inputs, an arrow and Apply are ~330px. Wider than a 360px phone's content. Below sm
     // the row takes the full width and the two dates share it.
     <div className="flex w-full items-center gap-1.5 sm:w-auto">
      <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-[30px] min-w-0 flex-1 rounded-lg border border-stone-200 px-2 text-[12px] text-stone-600 outline-none focus:border-stone-400 sm:flex-none" />

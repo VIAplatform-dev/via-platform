@@ -4,8 +4,6 @@ import type { Metadata } from "next";
 import { stores } from "@/app/lib/stores";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { storefrontVisibility } from "@/app/lib/storefront-visibility";
-import { viewerCanEdit } from "@/app/lib/storefront-viewer";
-import NotOpenYet from "@/app/s/NotOpenYet";
 import { hasCaptures } from "@/app/lib/site-capture-db";
 import { servesCapture } from "@/app/lib/storefront-versions";
 import StorefrontView from "../StorefrontView";
@@ -32,11 +30,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  const description = sf.tagline || (sf.about ? sf.about.slice(0, 160) : `Shop ${name}, vintage and one-of-a-kind pieces.`);
  const image = sf.heroImage || undefined;
  // Index a LIVE storefront so it's findable on Google. If the store connected a custom
- // domain, that domain is canonical — noindex this /s/{handle} mirror and point canonical
+ // domain, that domain is canonical. Noindex this /s/{handle} mirror and point canonical
  // at the domain, so search indexes the real domain instead of a duplicate.
  // A store's real address is its own: the domain it connected, else its {slug}.vyasites.com origin.
  // /s/{handle} is a mirror of it, so it points canonical at the real one and stays out of the index
- // — otherwise Google picks between two copies of the same shop and often picks ours.
+ // otherwise Google picks between two copies of the same shop and often picks ours.
  const hasDomain = !!sf.customDomain;
  const ownOrigin = storePublicOrigin(sf.storeSlug);
  const url = hasDomain ? `https://${sf.customDomain}` : (ownOrigin ?? `${STOREFRONT_BASE}/s/${handle}`);
@@ -55,23 +53,18 @@ export default async function StorefrontPage({ params, searchParams }: Props) {
  const { handle } = await params;
  const { preview } = await searchParams;
 
- // The shop is resolved whether or not it is published; WHO IS ASKING decides what is shown.
- // See storefront-visibility.ts — an unpublished shop used to answer its own address with Next's
- // black 404, to the person who built it.
+ // Resolved whether or not it is published. An unpublished shop serves its preview, with the
+ // not-live ribbon, rather than the black 404 it used to answer its own address with.
  const sf = await getStorefrontByHandleAny(handle).catch(() => null);
- if (!sf) return notFound(); // no such handle — that genuinely is nothing
+ if (!sf) return notFound(); // no such handle: that genuinely is nothing
 
- const visibility = storefrontVisibility(!!sf.enabled, {
-  previewing: !!preview,
-  hasAccess: await viewerCanEdit(sf.storeSlug),
- });
- if (visibility === "closed") return <NotOpenYet name={storeDisplayName(sf, handle)} />;
+ const visibility = storefrontVisibility(!!sf.enabled);
  // Everything below treats "preview" the way it always treated ?preview.
  const previewing = visibility === "preview";
 
  // Which storefront is live is the seller's choice now, not a consequence of what she happens to
  // have. This used to be "any captured pages? then serve those", which meant a store that had ever
- // imported its site could never publish a design built here — the captures always won. The
+ // imported its site could never publish a design built here. The captures always won. The
  // published version decides; the capture check is only the fallback for stores that predate
  // versions and so have no published row yet. See storefront-versions.ts.
  if (!previewing && servesCapture(sf.serveMode, await hasCaptures(sf.storeSlug).catch(() => false))) {

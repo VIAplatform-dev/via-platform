@@ -2,8 +2,8 @@ import Constants from "expo-constants";
 
 // The VYA API client.
 //
-// ONE THING MAKES THIS DIFFERENT from an ordinary fetch wrapper: every route on the API — including
-// the ones named "public" — is behind the pilot approval gate (app/lib/approval.ts in the web repo).
+// ONE THING MAKES THIS DIFFERENT from an ordinary fetch wrapper: every route on the API, including
+// the ones named "public". Is behind the pilot approval gate (app/lib/approval.ts in the web repo).
 // For the app, a valid login IS approval: `isApprovedRequest` accepts any request carrying a
 // verified `Authorization: Bearer <jwt>`. So the token goes on EVERY request, not just the ones
 // that are obviously per-user. Omit it and the feed comes back as a 403, not an empty list.
@@ -65,6 +65,6 @@ export const apiPost = <T>(path: string, body?: unknown) => request<T>("POST", p
 export const apiPut = <T>(path: string, body?: unknown) => request<T>("PUT", path, body ?? {});
 export const apiPatch = <T>(path: string, body?: unknown) => request<T>("PATCH", path, body ?? {});
 // A DELETE MAY CARRY A BODY. Most of ours name the row in the path, but /api/store/discounts takes
-// { id } in the body — so the parameter is optional rather than absent, and callers that don't send
+// { id } in the body, so the parameter is optional rather than absent, and callers that don't send
 // one are unchanged (request only sets Content-Type when there is something to send).
 export const apiDelete = <T>(path: string, body?: unknown) => request<T>("DELETE", path, body);

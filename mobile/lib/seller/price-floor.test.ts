@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { floorFor, floorMissFor, describeFloorMiss } from "./price-floor.ts";
 
-test("the floor is cost plus the markup — the same numbers the server gets", () => {
+test("the floor is cost plus the markup. The same numbers the server gets", () => {
   // Lifted from app/lib/price-floor-core.test.ts. If these ever diverge, a piece raised on the phone
   // and the same piece raised on the web end up at different prices.
   assert.equal(floorFor(10_000, 3000), 13_000);
@@ -21,13 +21,13 @@ test("a piece at or above its floor is not a miss", () => {
   assert.equal(floorMissFor(40_000, 10_000, 3000), null);
 });
 
-test("no cost is not a miss — a floor over an unknown cost is not a floor", () => {
+test("no cost is not a miss. A floor over an unknown cost is not a floor", () => {
   assert.equal(floorMissFor(500, null, 3000), null);
   assert.equal(floorMissFor(500, undefined, 3000), null);
   assert.equal(floorMissFor(500, 0, 3000), null);
 });
 
-test("an unpriced draft is not a miss — it has not been priced wrongly yet", () => {
+test("an unpriced draft is not a miss. It has not been priced wrongly yet", () => {
   assert.equal(floorMissFor(0, 10_000, 3000), null);
   assert.equal(floorMissFor(null, 10_000, 3000), null);
 });
@@ -40,7 +40,7 @@ test("a markup that hasn't loaded yet stays silent rather than flooring at cost"
   assert.equal(floorMissFor(9_000, 10_000, Number.NaN), null);
 });
 
-test("a zero markup still floors at cost — selling under cost is the thing being caught", () => {
+test("a zero markup still floors at cost. Selling under cost is the thing being caught", () => {
   const m = floorMissFor(9_000, 10_000, 0);
   assert.equal(m?.floorCents, 10_000);
   assert.equal(m?.shortCents, 1_000);
@@ -56,10 +56,10 @@ test("the sentence names her markup, what she paid and where the floor lands", (
   const m = floorMissFor(4_000, 5_000, 3000)!;
   assert.equal(
     describeFloorMiss(m, 3000, "USD"),
-    "Below your pricing floor — your 30% minimum over the $50 you paid works out at $65.",
+    "Below your pricing floor. Your 30% minimum over the $50 you paid works out at $65.",
   );
   assert.equal(
     describeFloorMiss(m, 3000, "GBP"),
-    "Below your pricing floor — your 30% minimum over the £50 you paid works out at £65.",
+    "Below your pricing floor. Your 30% minimum over the £50 you paid works out at £65.",
   );
 });

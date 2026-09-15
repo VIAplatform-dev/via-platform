@@ -2,14 +2,14 @@
 //
 // Some storefronts can't be captured at all: Wix and single-page apps build their pages in the
 // browser, so the server sends us almost nothing, and a few sites publish no product feed we can
-// read. Until now those sellers hit a dead end — an honest decline, and a blank starter storefront
+// read. Until now those sellers hit a dead end. An honest decline, and a blank starter storefront
 // that looked like everybody else's.
 //
 // This builds a VYA storefront from the seller's BRAND instead of their markup. Colours, fonts,
 // logo, store name and nav labels survive in the HTML even when the layout doesn't, because they
 // live in <head>, in CSS custom properties, and in the fonts the page loads. That's enough to make
-// the starter storefront recognisably theirs, and it works on 100% of sites — including the ones
-// where capture is impossible — because it never parses their layout.
+// the starter storefront recognisably theirs, and it works on 100% of sites, including the ones
+// where capture is impossible, because it never parses their layout.
 //
 // Inventory for these stores comes from the CSV upload (parse-items.ts) or a platform connection.
 
@@ -26,7 +26,7 @@ export type BrandProfile = {
  colors: StorefrontTheme["colors"];
  fonts: StorefrontTheme["fonts"];
  logo: string | null;
- /** Top-level menu labels — enough to rebuild their navigation even with no captured pages. */
+ /** Top-level menu labels. Enough to rebuild their navigation even with no captured pages. */
  nav: { label: string; href: string }[];
  tagline: string | null;
  socials: StorefrontTheme["socials"];
@@ -34,7 +34,7 @@ export type BrandProfile = {
  found: string[];
 };
 
-/** Nav labels a storefront shouldn't inherit — account/cart plumbing, not the seller's menu. */
+/** Nav labels a storefront shouldn't inherit. Account/cart plumbing, not the seller's menu. */
 const NAV_SKIP = /^(cart|bag|account|log ?in|sign ?in|register|checkout|search|wishlist|menu|skip to content|0)$/i;
 
 /** Read a store's brand out of its homepage, however that homepage is built. */
@@ -52,7 +52,7 @@ export async function readBrand(rawUrl: string): Promise<BrandProfile | null> {
 
  const found: string[] = [];
  // extractTheme reads the theme's real CSS custom properties and the web fonts it loads, so it
- // works on a JS-rendered page too — those live in <head>, not in the markup the app builds later.
+ // works on a JS-rendered page too. Those live in <head>, not in the markup the app builds later.
  const theme = extractTheme(html.slice(0, 120000), u.origin, null);
  if (theme.colors?.bg || theme.colors?.text || theme.colors?.accent) found.push("colours");
  if (theme.fonts?.heading) found.push("fonts");
@@ -67,7 +67,7 @@ export async function readBrand(rawUrl: string): Promise<BrandProfile | null> {
  if (tagline) found.push("tagline");
 
  // Navigation: the labels a shopper would recognise. Taken from real nav elements only, and
- // de-duplicated — a header usually repeats itself for mobile.
+ // de-duplicated. A header usually repeats itself for mobile.
  const nav: { label: string; href: string }[] = [];
  const seen = new Set<string>();
  $("nav a[href], header a[href], [class*='menu'] a[href]").each((_, el) => {
@@ -127,7 +127,7 @@ export function storefrontFromBrand(brand: BrandProfile): StorefrontTheme {
   ...(brand.logo ? { logo: brand.logo } : {}),
   ...(Object.keys(brand.socials || {}).length ? { socials: brand.socials } : {}),
   ...(brand.tagline ? { footerAbout: brand.tagline } : {}),
-  // Their menu labels, pointed at VYA collections — the hrefs on their old site don't exist here.
+  // Their menu labels, pointed at VYA collections. The hrefs on their old site don't exist here.
   ...(brand.nav.length
    ? { navLinks: brand.nav.map((n) => ({ label: n.label, href: `/collections/${slugify(n.label)}`, place: "header" as const })) }
    : {}),
@@ -137,10 +137,10 @@ export function storefrontFromBrand(brand: BrandProfile): StorefrontTheme {
 
 /** The store's name out of a <title>.
  *
- *  Titles are separator-joined but the order isn't consistent: Shopify writes "Store — tagline"
+ *  Titles are separator-joined but the order isn't consistent: Shopify writes "Store: tagline"
  *  (name first) while plenty of sites write "Home | Store" (name last). Taking the first segment
  *  blindly named one store "Home". So: drop any segment that's just a page label, and prefer what
- *  remains — falling back to the longest segment when every part looks like a name.
+ *  remains. Falling back to the longest segment when every part looks like a name.
  */
 export function storeNameFromTitle(title: string): string | null {
  const parts = (title || "").split(/\s*[|–—·•]\s*|\s+-\s+/).map((p) => p.trim()).filter(Boolean);

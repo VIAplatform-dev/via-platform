@@ -17,7 +17,7 @@ import { colors, spacing } from "../../lib/theme";
 
 // Home is a magazine front page, not a feed: several named sections, each a different shape.
 // New Arrivals is a two-up row (not a full grid) so Collection and Curated For You are reachable
-// without endless scrolling — the sections are the navigation.
+// without endless scrolling. The sections are the navigation.
 
 export default function HomeScreen() {
   const { user, storeSlug, loading } = useAuth();
@@ -39,20 +39,20 @@ export default function HomeScreen() {
     enabled: Boolean(user),
   });
   // The endpoint ranks on clicks, favourites and views server-side, but also takes these as query
-  // signals so the feed is personal on the FIRST session — before any view history exists.
+  // signals so the feed is personal on the FIRST session, before any view history exists.
   //
   // SEEDED ONCE, DELIBERATELY FROZEN. This string used to be live, and it is part of the query
   // key: saving a piece changed the key, which threw the whole 40-item feed away and refetched it,
   // remounting forty image galleries. Then onSettled refetched favourites, the key moved again,
-  // and it all happened twice. Tapping a heart should darken a heart — not rebuild the page under
+  // and it all happened twice. Tapping a heart should darken a heart, not rebuild the page under
   // your thumb.
   //
   // Freezing it costs nothing real: the server already ranks on the favourites it has stored, so
   // the newly saved piece is reflected the next time Home mounts. These ids only exist to give the
   // very first session something to go on.
   // Carried in a ref and read at FETCH time, deliberately not in the query key. The seed is a
-  // detail of the request, not an identity of the result — the server ranks on the favourites it
-  // has stored either way — so it has no business invalidating the cache.
+  // detail of the request, not an identity of the result. The server ranks on the favourites it
+  // has stored either way, so it has no business invalidating the cache.
   const favSeed = useRef("");
   useEffect(() => {
     if (!favSeed.current && favorites.length > 0) {
@@ -83,18 +83,18 @@ export default function HomeScreen() {
 
   if (loading) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   if (!user) return <Redirect href="/auth/login" />;
-  // A store owner gets the seller app, not the shopper one. Both live in this bundle — sellers are
-  // shoppers too, so a second binary would mean a second listing and review cycle — and `storeSlug`
+  // A store owner gets the seller app, not the shopper one. Both live in this bundle. Sellers are
+  // shoppers too, so a second binary would mean a second listing and review cycle, and `storeSlug`
   // (null for shoppers) is the whole switch. Sign-in lands on "/", so guarding here covers it.
   //
   // GUARDED BY isFocused, and this is not optional. This screen stays MOUNTED underneath the
-  // seller group once we redirect, so it keeps re-rendering — and a bare <Redirect> fires on every
+  // seller group once we redirect, so it keeps re-rendering, and a bare <Redirect> fires on every
   // render, navigating again and again. That is a visible loop: the app appears to refresh and
   // swipe forever. Only the focused screen is allowed to redirect.
   // NO redirect to the seller side from here.
   //
   // A seller is also a shopper. Sending her to the seller hub the moment she opens the marketplace
-  // meant she could never browse it at all — signing in to shop landed her on her own dashboard
+  // meant she could never browse it at all. Signing in to shop landed her on her own dashboard
   // and every attempt to leave bounced straight back. That's a cage, not a default.
   //
   // Where sign-in LANDS you is still role-based, and that's the right place for it: the login

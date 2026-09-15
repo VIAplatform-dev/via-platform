@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 // is here), and Depop's option vocabularies (condition, package size) are business logic that should
 // version with the app, not sit frozen in an extension the seller has to reinstall to update.
 //
-// Auth is the same gate as every other /api/store route (resolveStoreSlugAny) — the item must belong
+// Auth is the same gate as every other /api/store route (resolveStoreSlugAny): the item must belong
 // to the signed-in seller's store, so one seller can't pull another's inventory.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -33,7 +33,7 @@ function depopCondition(c: string | null | undefined): string {
  return "Good"; // a safe default for unlabelled vintage
 }
 
-// Garment size for Depop's size field. VYA doesn't always capture one — and for bags and most
+// Garment size for Depop's size field. VYA doesn't always capture one, and for bags and most
 // accessories there ISN'T one, so those get "One size" (Depop's option for exactly this), which fills
 // the field instead of leaving it blank. Clothing/shoes with no stored size stay empty for the seller
 // to set, because guessing a wearable size would be worse than an obvious blank.
@@ -49,14 +49,14 @@ function depopSize(size: string | null | undefined, category: string | null | un
 function depopPackageSize(weightOz: number | null | undefined): string {
  const oz = Number(weightOz) || 0;
  if (!oz) return "Small";
- if (oz <= 16) return "Small"; // up to ~1lb — a top, dress, most clothing
- if (oz <= 32) return "Medium"; // up to ~2lb — jeans, a chunky knit
- if (oz <= 80) return "Large"; // up to ~5lb — boots, a coat
+ if (oz <= 16) return "Small"; // up to ~1lb: a top, dress, most clothing
+ if (oz <= 32) return "Medium"; // up to ~2lb: jeans, a chunky knit
+ if (oz <= 80) return "Large"; // up to ~5lb: boots, a coat
  return "Extra large";
 }
 
 // Depop's colour field is a fixed list. VYA has no colour column, so recover one from the title /
-// description (most listings name it — "Navy Blue Patent…", "Black leather…"). Longer/most-specific
+// description (most listings name it. "Navy Blue Patent…", "Black leather…"). Longer/most-specific
 // terms first; map synonyms onto a Depop colour. Blank when nothing is found (seller sets it).
 const DEPOP_COLOURS: [RegExp, string][] = [
  [/black/i, "Black"],
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
    size: depopSize(item.size, item.category),
    category: item.category || "",
    packageSize: depopPackageSize(item.weightOz),
-   // 8 is DEPOP's cap, not ours — see app/lib/item-limits.ts.
+   // 8 is DEPOP's cap, not ours. See app/lib/item-limits.ts.
    photos: (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 8),
   },
  });

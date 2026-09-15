@@ -6,10 +6,10 @@ export const maxDuration = 300;
 
 // Weekly (Monday 6 AM UTC): grade the current intake AI against a sample of the labeled
 // dataset and store the scorecard, so the trend has a fresh weekly point. Dropped from
-// nightly — a frozen base model's score barely moves day to day, so nightly just burned
+// nightly: a frozen base model's score barely moves day to day, so nightly just burned
 // SerpApi quota. Run the exam ON-DEMAND (POST /api/admin/eval) after a change; this weekly
 // tick is just the background trend. Reverse-image on (matches production); price off by
-// default to protect quota — flip EVAL_NIGHTLY_PRICE=true to include it.
+// default to protect quota. Flip EVAL_NIGHTLY_PRICE=true to include it.
 export async function GET(request: Request) {
  const authHeader = request.headers.get("authorization");
  const cronSecret = process.env.CRON_SECRET;

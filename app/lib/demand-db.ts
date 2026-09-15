@@ -7,7 +7,7 @@ import {
  normalizeCategory,
 } from "./market-data-db";
 
-// "Demand Intelligence" (BETA) — the B2B data-layer flagship. It deliberately
+// "Demand Intelligence" (BETA): the B2B data-layer flagship. It deliberately
 // reuses the SAME brand/category inference and the SAME engagement signals
 // (product_views, favorites, purchases) as the admin Market Data page, so the
 // numbers reconcile. On top of that marketplace demand it overlays each store's
@@ -81,7 +81,7 @@ export async function getStoreDemandIntelligence(
  if (c) categoryInventory.set(c, (categoryInventory.get(c) ?? 0) + 1);
  }
 
- // ── Marketplace demand — same source as admin Market Data ──
+ // ── Marketplace demand: same source as admin Market Data ──
  const [marketBrands, marketCategories] = await Promise.all([
  getTopBrands(60).catch(() => []),
  getTopCategories(40).catch(() => []),
@@ -188,7 +188,7 @@ export type MarketplaceDemand = {
  openSourcing: OpenSourcing[];
 };
 
-// Marketplace-wide demand intelligence for the admin Data Layer — the same
+// Marketplace-wide demand intelligence for the admin Data Layer. The same
 // signals as the per-store board, but aggregated across ALL stores (no per-store
 // supply overlay). Reuses the canonical Market Data brand/category functions so
 // the numbers reconcile with the Market Data page.

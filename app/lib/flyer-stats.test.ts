@@ -14,7 +14,7 @@ const signups = [
 ];
 
 test("every flyer appears, including ones nobody has scanned", () => {
- // A flyer with zero scans is the most important row on this report — it is the one whose
+ // A flyer with zero scans is the most important row on this report. It is the one whose
  // lamppost nobody walks past. Dropping it would read as "no data yet" instead of "not working".
  const rows = buildFlyerReport(scans, signups);
  assert.equal(rows.length, 6);
@@ -42,7 +42,7 @@ test("conversion is signups over scans, as a whole percent", () => {
 });
 
 test("no scans means no conversion figure, not zero percent", () => {
- // 0 of 0 is not "nobody converted" — it is a number we cannot state, and printing 0% would
+ // 0 of 0 is not "nobody converted". It is a number we cannot state, and printing 0% would
  // condemn a flyer that has simply never been seen.
  assert.equal(buildFlyerReport([], [])[0].conversion, null);
 });

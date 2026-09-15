@@ -9,7 +9,7 @@ import { colors, eyebrow, fonts, spacing } from "../../lib/theme";
 
 // Asking a store about one specific piece.
 //
-// The API creates the conversation and posts the first message in ONE call, keyed on productId —
+// The API creates the conversation and posts the first message in ONE call, keyed on productId,
 // there is no "start a conversation" endpoint to call first. So this screen collects the message,
 // sends it, and replaces itself with the thread that came back. Replaces rather than pushes: going
 // "back" from the thread should return to the product, not to an empty compose box.
@@ -53,7 +53,7 @@ export default function NewMessageScreen() {
           Ask {storeName || "the store"} anything
         </Text>
         <Text style={{ marginTop: spacing.sm, fontSize: 15, lineHeight: 21, color: colors.textMuted }}>
-          Measurements, condition, shipping — stores usually reply the same day.
+          Measurements, condition, shipping. Stores usually reply the same day.
         </Text>
 
         <TextInput

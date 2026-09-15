@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as cheerio from "cheerio";
 import { bindAccountControls, hasAccountControl } from "./account-control.ts";
 
-// 20 of 23 hosted stores carry a person icon in their header — a link to /account, a
+// 20 of 23 hosted stores carry a person icon in their header. A link to /account, a
 // customer_login form, or an icon classed for it. Binding to the control a shopper already reaches
 // for beats bolting our own button onto their header, exactly as with the cart icon.
 
@@ -30,7 +30,7 @@ test("an icon labelled for accounts is found even without a useful href", () => 
 });
 
 test("a store with no account control anywhere is left alone", () => {
- // lei-vintage, montrose-edit and vintage-boutique-style — the same three that are not on Shopify.
+ // lei-vintage, montrose-edit and vintage-boutique-style. The same three that are not on Shopify.
  const html = `<header><a href="/about">About</a></header>`;
  assert.equal(hasAccountControl(html), false);
  assert.equal(bindAccountControls(html), html, "untouched, byte for byte");
@@ -63,7 +63,7 @@ test("a signed-in shopper's control says so", () => {
 test("Shopify's account web component counts as her account control", () => {
  // lamash's person icon is not in the page at all: it is inside <shopify-account>'s shadow DOM,
  // where no selector reaches it. The HOST is bindable though, and a click inside a shadow root is
- // retargeted to the host on the way out — so binding the host catches the click and our window
+ // retargeted to the host on the way out, so binding the host catches the click and our window
  // capture stops it before the component's own handler ever runs.
  const html = `<html><body><header><shopify-account></shopify-account></header></body></html>`;
  const $ = cheerio.load(bindAccountControls(html, {}));

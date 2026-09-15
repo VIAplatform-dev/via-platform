@@ -9,7 +9,7 @@ export * from "./runway-score";
 const TOP_K = 16;
 
 // ───────────────────────────────────────────────────────────────────────────
-// Runway look index — matching a seller's photo to a documented show.
+// Runway look index: matching a seller's photo to a documented show.
 //
 // The existing runway path (ai-intake `identifyRunway`) infers a season from
 // editorial CAPTIONS that reverse-image search happened to return. That works
@@ -17,7 +17,7 @@ const TOP_K = 16;
 // otherwise. This is the other half: an actual nearest-neighbour index over
 // runway looks, so a match is made on the garment rather than on words about it.
 //
-// WHAT'S STORED. Vectors and metadata — never the photographs. Once a look is
+// WHAT'S STORED. Vectors and metadata, never the photographs. Once a look is
 // embedded the pixels are dead weight for matching, and a licensed image corpus
 // should stay wherever it's licensed to live. `source_url` and `license_ref`
 // point back to the rights holder so any look can be traced and, if a licence
@@ -28,7 +28,7 @@ const TOP_K = 16;
 // different-context is exactly where image embeddings are weakest, so the
 // thresholds below are deliberately strict and this returns null far more often
 // than it returns a season. Naming a show is a falsifiable public claim that
-// raises the asking price — a wrong one is worse than none.
+// raises the asking price. A wrong one is worse than none.
 // ───────────────────────────────────────────────────────────────────────────
 
 function db() {
@@ -67,10 +67,10 @@ export async function ensureRunwayIndex(): Promise<void> {
   embedding vector(1024) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
- // One row per look per source image — re-ingesting the same image updates in place.
+ // One row per look per source image. Re-ingesting the same image updates in place.
  await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_runway_looks_source ON runway_looks (source_url) WHERE source_url IS NOT NULL`;
  await sql`CREATE INDEX IF NOT EXISTS idx_runway_looks_house ON runway_looks (house_key, year)`;
- // HNSW over cosine distance — the operator class must match the <=> used in search.
+ // HNSW over cosine distance. The operator class must match the <=> used in search.
  await sql`CREATE INDEX IF NOT EXISTS idx_runway_looks_vec ON runway_looks USING hnsw (embedding vector_cosine_ops)`;
  ensured = true;
 }
@@ -90,7 +90,7 @@ export type IngestLook = RunwayLook & { imageUrl: string };
  */
 export async function ingestRunwayLooks(looks: IngestLook[]): Promise<{ added: number; skipped: number }> {
  if (!looks.length) return { added: 0, skipped: 0 };
- if (!isEmbeddingConfigured()) throw new Error("VOYAGE_API_KEY is not set — nothing can be embedded.");
+ if (!isEmbeddingConfigured()) throw new Error("VOYAGE_API_KEY is not set. Nothing can be embedded.");
  await ensureRunwayIndex();
  const sql = db();
 
@@ -100,7 +100,7 @@ export async function ingestRunwayLooks(looks: IngestLook[]): Promise<{ added: n
  for (let i = 0; i < looks.length; i++) {
   const emb = embeddings[i];
   const l = looks[i];
-  // An unfetchable image is a skip, not a failure — big corpora always have some.
+  // An unfetchable image is a skip, not a failure. Big corpora always have some.
   if (!emb || emb.length !== RUNWAY_EMBED_DIMS || !l.house || !l.season || !l.year) { skipped++; continue; }
   await sql`
    INSERT INTO runway_looks (house, house_key, season, year, look_no, source_url, license_ref, embedding)
@@ -120,8 +120,8 @@ export const OWN_LICENSE_REF = "vya-own";
 /**
  * Remember a piece we have just identified, using the seller's own photo as the exemplar.
  *
- * This is the cheap half of the index. A licensed corpus is catwalk photography — a garment on a
- * moving model under show lighting — and matching that to a flat-lay on a bed is precisely where
+ * This is the cheap half of the index. A licensed corpus is catwalk photography. A garment on a
+ * moving model under show lighting, and matching that to a flat-lay on a bed is precisely where
  * image embeddings are weakest. A photo from OUR OWN intake is the same context the next seller
  * will shoot in, so it matches far better per image, costs nothing, and we already hold the rights.
  *
@@ -137,7 +137,7 @@ export async function rememberRunwayLook(label: string, imageUrl: string | null 
  return res.added > 0;
 }
 
-/** Remove looks by licence — the lever to pull if a corpus licence lapses. */
+/** Remove looks by licence. The lever to pull if a corpus licence lapses. */
 export async function deleteRunwayLooksByLicense(licenseRef: string): Promise<number> {
  await ensureRunwayIndex();
  const rows = (await db()`DELETE FROM runway_looks WHERE license_ref = ${licenseRef} RETURNING id`) as unknown[];
@@ -166,7 +166,7 @@ export async function searchRunwayLooks(embedding: number[], k = TOP_K, house?: 
  await ensureRunwayIndex();
  const sql = db();
  const vec = vectorLiteral(embedding);
- // Narrowing to the known house first is both faster and safer — it stops a
+ // Narrowing to the known house first is both faster and safer. It stops a
  // visually similar look from another label being offered at all.
  const rows = (house
   ? await sql`
@@ -191,7 +191,7 @@ export async function searchRunwayLooks(embedding: number[], k = TOP_K, house?: 
 
 /**
  * The match step: seller photos in, a documented season out (or null). Tries each
- * photo and keeps the strongest verdict — the piece is often clearest in a shot
+ * photo and keeps the strongest verdict. The piece is often clearest in a shot
  * that isn't the first one.
  */
 export async function matchRunwayByImage(imageUrls: string[], brand?: string | null): Promise<RunwayVerdict> {
@@ -204,7 +204,7 @@ export async function matchRunwayByImage(imageUrls: string[], brand?: string | n
   if (!emb) continue;
   const candidates = await searchRunwayLooks(emb, TOP_K, brand).catch(() => [] as RunwayCandidate[]);
   const verdict = scoreRunwayCandidates(candidates, brand);
-  if (verdict.runway) return verdict; // a confident hit ends it — no need to spend more
+  if (verdict.runway) return verdict; // a confident hit ends it, no need to spend more
   if (verdict.confidence > best.confidence) best = verdict;
  }
  return best;

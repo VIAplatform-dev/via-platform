@@ -50,7 +50,7 @@ test("a circular cause chain ends rather than hanging the logger", () => {
  const a = new Error("a") as Error & { cause?: unknown };
  const b = Object.assign(new Error("b"), { cause: a });
  a.cause = b;
- assert.match(describeError(a), /^a — b$/);
+ assert.match(describeError(a), /^a · b$/);
 });
 
 test("it is cut to the width the log has for it", () => {

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 // The last four parity gaps: provenance on Add a piece, condition/flaws/measurements in the
 // bulk-upload editor, and the in-page storefront editor saving to the store it is editing.
 //
-// Bulk runs entirely on fixtures (route interception) — the AI, the autosave and the PATCH are all
+// Bulk runs entirely on fixtures (route interception): the AI, the autosave and the PATCH are all
 // answered here, so nothing is written. The editor check only reads a captured page.
 
 const STORE = process.env.E2E_STORE || "gfdgsgfsgdfs";
@@ -35,7 +35,7 @@ test.describe("Add a piece · provenance (#18)", () => {
   await expect(prov).toContainText("Acquired on");
   const source = prov.locator("input[list=source-names]");
   await expect(source).toHaveAttribute("placeholder", /Kempton/);
-  // Her own previous names, deduped and sorted — the same list the inventory editor offers.
+  // Her own previous names, deduped and sorted. The same list the inventory editor offers.
   await expect(prov.locator("datalist#source-names option")).toHaveCount(2);
   const date = prov.locator("input[type=date]");
   await expect(date).toHaveValue("");
@@ -90,7 +90,7 @@ test.describe("Bulk upload · the editor has condition, flaws and measurements (
   const flaws = page.getByTestId("flaws-editor");
   await expect(flaws.locator("li")).toHaveCount(2);
   await expect(flaws.locator("li").first()).toContainText("light pilling at cuffs");
-  // And they were written onto the draft the moment it was made — not only kept on the card.
+  // And they were written onto the draft the moment it was made, not only kept on the card.
   const drafted = patches.find((p) => Array.isArray(p.flaws));
   expect(drafted?.flaws).toEqual(["light pilling at cuffs", "tiny mark inside"]);
   expect(drafted?.conditionNote).toBe(sentence);

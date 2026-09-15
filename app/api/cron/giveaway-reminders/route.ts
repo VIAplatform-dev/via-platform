@@ -29,7 +29,7 @@ export async function GET(request: Request) {
  console.log(`[Giveaway Reminders] Found ${candidates.length} candidates`);
 
  if (candidates.length === 0) {
- console.log("[Giveaway Reminders] No candidates — nothing to send");
+ console.log("[Giveaway Reminders] No candidates. Nothing to send");
  return NextResponse.json({ success: true, sent: 0, failed: 0, total: 0 });
  }
 
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
  }
  }
 
- console.log(`[Giveaway Reminders] Done — Sent: ${sent}, Failed: ${failed}, Total: ${candidates.length}`);
+ console.log(`[Giveaway Reminders] Done: Sent: ${sent}, Failed: ${failed}, Total: ${candidates.length}`);
 
  return NextResponse.json({
  success: true,

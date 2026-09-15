@@ -22,7 +22,7 @@ import { colors, fonts, spacing } from "../../lib/theme";
 // One piece.
 //
 // The photographs run full-bleed to the top of the screen with the controls floating on white pucks
-// over them — there is no navigation bar, because a bar would crop the image for the sake of a back
+// over them: there is no navigation bar, because a bar would crop the image for the sake of a back
 // arrow. Everything below the fold answers the three questions a vintage buyer has: does it fit, is
 // it real, and can I send it back.
 
@@ -50,7 +50,7 @@ export default function ProductScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
   // The photograph fills the width of the phone, so this is the one place that asks for a big
-  // image — but still the size it is drawn at, not the multi-megabyte original off the store's CDN.
+  // image, but still the size it is drawn at, not the multi-megabyte original off the store's CDN.
   const px = widthForLayout(width, PixelRatio.get());
   const insets = useSafeAreaInsets();
   const cart = useCart();
@@ -63,7 +63,7 @@ export default function ProductScreen() {
     enabled: Boolean(id),
   });
 
-  // Records the view on open and its dwell time on leave — see lib/track.ts.
+  // Records the view on open and its dwell time on leave. See lib/track.ts.
   useTrackedView(q.data?.storeSlug, q.data?.id);
 
   const more = useQuery({
@@ -90,7 +90,7 @@ export default function ProductScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center", padding: spacing.xxl }}>
         <Text style={{ fontFamily: fonts.serif, fontSize: 20, color: colors.text }}>This piece is gone.</Text>
-        <Text style={{ marginTop: spacing.sm, fontSize: 14, color: colors.textMuted, textAlign: "center" }}>Vintage is one-of-one — it may have sold.</Text>
+        <Text style={{ marginTop: spacing.sm, fontSize: 14, color: colors.textMuted, textAlign: "center" }}>Vintage is one-of-one. It may have sold.</Text>
       </View>
     );
   }
@@ -214,7 +214,7 @@ export default function ProductScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Floating over the photograph rather than above it — a nav bar here would crop the image. */}
+      {/* Floating over the photograph rather than above it. A nav bar here would crop the image. */}
       <View style={{ position: "absolute", top: insets.top + spacing.sm, left: spacing.lg, right: spacing.lg, flexDirection: "row", justifyContent: "space-between" }}>
         <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}>
           <FloatingPill><Feather name="chevron-left" size={24} color={colors.text} /></FloatingPill>
@@ -231,7 +231,7 @@ export default function ProductScreen() {
               ) : null}
             </Pressable>
           </Link>
-          <Pressable hitSlop={6} onPress={() => { void Share.share({ message: `${p.title} — ${p.priceFormatted} at ${p.storeName} on VYA\n${API_BASE_URL}/products/${p.id}` }); }}>
+          <Pressable hitSlop={6} onPress={() => { void Share.share({ message: `${p.title}: ${p.priceFormatted} at ${p.storeName} on VYA\n${API_BASE_URL}/products/${p.id}` }); }}>
             <Feather name="share" size={21} color={colors.text} />
           </Pressable>
         </FloatingPill>

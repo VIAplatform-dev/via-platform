@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// POST /api/admin/build-market-metrics — run the metric job on demand.
+// POST /api/admin/build-market-metrics. Run the metric job on demand.
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  try {

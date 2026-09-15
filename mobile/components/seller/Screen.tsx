@@ -7,7 +7,7 @@ import { colors, spacing, fonts } from "../../lib/portal-theme";
 // The frame every seller screen sits in.
 //
 // It exists because these screens draw their own headers rather than using the shopper app's
-// AppHeader, and the top inset is the thing that is silently wrong when each screen owns it —
+// AppHeader, and the top inset is the thing that is silently wrong when each screen owns it,
 // content slides under the status bar and the notch, which is easy to miss on a simulator and
 // impossible to miss on a phone.
 
@@ -21,7 +21,7 @@ export function SellerScreen({
 }: {
   title: string;
   subtitle?: string;
-  /** A back chevron and a centred title — the shape used by everything reached from the drawer. */
+  /** A back chevron and a centred title. The shape used by everything reached from the drawer. */
   back?: boolean;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -43,8 +43,8 @@ export function SellerScreen({
       //
       // A ScrollView defaults to keyboardShouldPersistTaps="never", which means that while the
       // keyboard is up the FIRST tap anywhere is spent dismissing it and never reaches the child.
-      // So on every screen in this frame — the piece editor, returns, shipping, consignors, the lot
-      // — moving from one field to the next took two taps, and so did Save, which sits under the
+      // So on every screen in this frame. The piece editor, returns, shipping, consignors, the lot
+      // moving from one field to the next took two taps, and so did Save, which sits under the
       // keyboard. It reads exactly like a screen that has stopped responding, which is what was
       // reported: "I can't edit these fields."
       //
@@ -77,7 +77,7 @@ export function SellerScreen({
   );
 }
 
-/** The filter row. Selected is near-black on cream, as the mockups draw it — not burgundy, which
+/** The filter row. Selected is near-black on cream, as the mockups draw it, not burgundy, which
  *  would compete with the ink everything else is written in. */
 export function Chips<T extends string>({
   options,

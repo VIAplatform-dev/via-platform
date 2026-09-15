@@ -6,14 +6,14 @@
 //
 // The rule this replaces was a single SQL `LIMIT 1`. store_users is UNIQUE(store_slug, email), so a
 // person can genuinely work at two shops, and she was dropped into whichever one the ORDER BY chose
-// — nothing on screen named it, and there was no way to move.
+// nothing on screen named it, and there was no way to move.
 
 export type StoreChoice = {
  /** The shop to act as, or null when she belongs to none. */
  slug: string | null;
  /** Why, so the workspace can tell "I picked for you" from "you picked". */
  reason: "asked" | "remembered" | "only-one" | "fallback" | "none";
- /** True when she has more than one and has not chosen — the workspace should ask. */
+ /** True when she has more than one and has not chosen. The workspace should ask. */
  shouldAsk: boolean;
 };
 
@@ -24,7 +24,7 @@ export type StoreChoice = {
  */
 export function chooseStore(asked: string | null | undefined, remembered: string | null | undefined, memberOf: string[]): StoreChoice {
  const mine = new Set(memberOf.filter(Boolean));
- // Asking for a shop that isn't hers is not an error to shout about — it is a stale link or a
+ // Asking for a shop that isn't hers is not an error to shout about. It is a stale link or a
  // bookmark from a job she has left. She falls back to her own shop rather than being locked out.
  if (asked && mine.has(asked)) return { slug: asked, reason: "asked", shouldAsk: false };
  if (remembered && mine.has(remembered)) return { slug: remembered, reason: "remembered", shouldAsk: false };

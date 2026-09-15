@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { stores } from "./stores";
 
-// A self-onboarded store's OS identity — the source of truth for stores that sign up on
+// A self-onboarded store's OS identity. The source of truth for stores that sign up on
 // getvya.ai (as opposed to the curated marketplace stores hardcoded in stores.ts). Holds
 // what the onboarding wizard collects so the workspace can tailor setup. Login lives in
 // store_users; subscription/trial in store_plans. Kept intentionally small + additive.
@@ -70,7 +70,7 @@ export async function generateUniqueSlug(name: string): Promise<string> {
   if (RESERVED.has(candidate) || staticSlugs.has(candidate)) continue;
   const rows = await sql`SELECT 1 FROM store_accounts WHERE slug = ${candidate} LIMIT 1`;
   if (rows.length) continue;
-  // A SELLER row can exist without a store account — that's what a site imported ahead of someone
+  // A SELLER row can exist without a store account. That's what a site imported ahead of someone
   // signing up looks like, and it owns the inventory and the captured pages. Checking only
   // store_accounts meant a brand-new store could take that slug and inherit a stranger's shop:
   // getOrCreateSeller finds the existing row, and 142 pieces she never imported appear in her

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
 // Prototype: convert an on-model product photo into a ghost-mannequin cover image
-// using Photoroom's Image Editing API (the same effect sprl.shop uses — body removed,
+// using Photoroom's Image Editing API (the same effect sprl.shop uses. Body removed,
 // garment shape reconstructed, clean background). This is a throwaway evaluation tool
 // so we can judge quality before wiring it into the product pipeline.
 //
@@ -37,7 +37,7 @@ function isSafePublicHttpUrl(raw: string): boolean {
  if (u.protocol !== "https:") return false;
  const host = u.hostname.toLowerCase();
  if (host === "localhost" || host.endsWith(".localhost") || host === "metadata.google.internal") return false;
- if (host.includes(":")) return false; // IPv6 literal (::1, fc00::/7, etc.) — reject
+ if (host.includes(":")) return false; // IPv6 literal (::1, fc00::/7, etc.): reject
  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
  if (v4) {
   const a = Number(v4[1]), b = Number(v4[2]);
@@ -73,7 +73,7 @@ async function generate(srcBlob: Blob, prompt: string | null, size: string | nul
 
 export async function GET(request: NextRequest) {
  if (!isAdminAuthenticated(request)) {
-  return new NextResponse("Unauthorized — open this while signed into the admin.", { status: 401 });
+  return new NextResponse("Unauthorized. Open this while signed into the admin.", { status: 401 });
  }
 
  const { searchParams } = new URL(request.url);
@@ -130,7 +130,7 @@ function shell(body: string): string {
 
 function formPage(): string {
  return shell(`<h1>Ghost Mannequin prototype</h1>
-<p>Paste a product image URL (a garment shown <strong>on a model</strong>). It'll be converted into a ghost-mannequin cover via Photoroom — body removed, garment shape kept, clean background.</p>
+<p>Paste a product image URL (a garment shown <strong>on a model</strong>). It'll be converted into a ghost-mannequin cover via Photoroom. Body removed, garment shape kept, clean background.</p>
 <label for="u">On-model image URL</label>
 <input id="u" placeholder="https://….jpg">
 <label for="p">Optional style prompt</label>
@@ -147,7 +147,7 @@ function comparePage(url: string, prompt: string | null, size: string | null): s
  return shell(`<h1>Ghost Mannequin</h1>
 <div class="row">
  <div class="col"><h2>Original (on model)</h2><img src="${esc(url)}" alt="original"></div>
- <div class="col"><h2>Generated (ghost mannequin)</h2><img src="${esc(rawSrc)}" alt="generated" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<p class=err>Generation failed — check PHOTOROOM_API_KEY and the server logs.</p>')"></div>
+ <div class="col"><h2>Generated (ghost mannequin)</h2><img src="${esc(rawSrc)}" alt="generated" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<p class=err>Generation failed. Check PHOTOROOM_API_KEY and the server logs.</p>')"></div>
 </div>
 <p style="margin-top:18px"><a href="?">← try another image</a></p>`);
 }

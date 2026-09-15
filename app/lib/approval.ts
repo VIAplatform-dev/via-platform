@@ -7,11 +7,11 @@ import crypto from "crypto";
 // Unified "is this requester an APPROVED pilot user?" gate for catalog/content
 // endpoints. Must handle BOTH client types because web and mobile authenticate
 // differently and both hit /api/public/*:
-//   • Web: the `via_access=1` cookie (set by pilot-check on approval) — fast path —
+//   • Web: the `via_access=1` cookie (set by pilot-check on approval), fast path,
 //     else fall back to the NextAuth session email → pilot status.
 //   • Mobile: Authorization: Bearer <jwt> → email in the JWT → pilot status.
 //   • Admin: the via_admin_token cookie (full bypass).
-// Fails CLOSED — anonymous or pending users get false. This is what stops waitlisted
+// Fails CLOSED: anonymous or pending users get false. This is what stops waitlisted
 // users from browsing the catalog on either platform.
 
 function parseCookies(request: Request): Record<string, string> {
@@ -40,7 +40,7 @@ export async function isApprovedRequest(request: Request): Promise<boolean> {
  // Web fast path: approval cookie set by /api/pilot-check
  if (cookies["via_access"] === "1") return true;
 
- // Mobile: any valid app login (a verified JWT) gets full access — the app is past
+ // Mobile: any valid app login (a verified JWT) gets full access. The app is past
  // the waitlist, so logging in is enough. (Web still honors the waitlist via the
  // cookie / session-email paths.)
  const authz = request.headers.get("authorization") ?? "";

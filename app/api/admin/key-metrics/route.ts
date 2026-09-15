@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   await sql`ALTER TABLE conversions ADD COLUMN IF NOT EXISTS returned BOOLEAN DEFAULT FALSE`.catch(() => {});
   await sql`ALTER TABLE conversions ADD COLUMN IF NOT EXISTS returned_at TIMESTAMPTZ`.catch(() => {});
 
-  // VYA launch date — March 19, 2026
+  // VYA launch date: March 19, 2026
   const LAUNCH = new Date(Date.UTC(2026, 2, 19)); // 2026-03-19 00:00 UTC
 
   const monthParam = request.nextUrl.searchParams.get("month");
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   let isMonth = false;
 
   if (allTimeParam) {
-    // All Time — from launch to now; WAU = rolling last 7 days
+    // All Time, from launch to now; WAU = rolling last 7 days
     pStart = LAUNCH;
     pEnd = now;
     prevPStart = LAUNCH; prevPEnd = LAUNCH; // no meaningful prev
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     returningUsersRows,
     favoritesVolumeRows,
   ] = await Promise.all([
-    // GMV — all time + period windows
+    // GMV: all time + period windows
     sql`
       SELECT
         COALESCE(SUM(order_total), 0)::float                                                                                AS total_gmv,
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
     `,
 
     // WAU / MAU
-    // mau_rolling_30d is always the 30-day window ending at shortEnd — used for stickiness
+    // mau_rolling_30d is always the 30-day window ending at shortEnd. Used for stickiness
     // in every mode so the denominator is consistent (not "since launch" for all-time).
     sql`
       SELECT
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
       ) a
     `,
 
-    // Save-to-purchase — scoped to the selected period
+    // Save-to-purchase: scoped to the selected period
     sql`
       SELECT COUNT(DISTINCT user_id::text)::int AS total_savers FROM (
         SELECT user_id FROM product_favorites WHERE user_id IS NOT NULL
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
         )
     `,
 
-    // Revenue / orders / buyers — scoped to the selected period AND all-time for context.
+    // Revenue / orders / buyers. Scoped to the selected period AND all-time for context.
     // Adds order counts so we can compute true AOV (revenue / orders), not just
     // revenue / unique buyers.
     sql`
@@ -221,7 +221,7 @@ export async function GET(request: NextRequest) {
         AND (returned IS NULL OR returned = false)
     `,
 
-    // GMV by week sparkline — always last 10 weeks for context
+    // GMV by week sparkline. Always last 10 weeks for context
     sql`
       SELECT
         DATE_TRUNC('week', timestamp)::date::text  AS week,
@@ -242,7 +242,7 @@ export async function GET(request: NextRequest) {
       FROM users
     `,
     sql`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE status = 'approved')::int AS approved FROM pilot_access`,
-    // Total commission — per-store tiered rates, excluding returned orders
+    // Total commission, per-store tiered rates, excluding returned orders
     sql`
       SELECT COALESCE(SUM(
         CASE
@@ -274,7 +274,7 @@ export async function GET(request: NextRequest) {
       ORDER BY 1 ASC
     `,
 
-    // Activity breakdown — for the selected period
+    // Activity breakdown, for the selected period
     sql`
       SELECT
         (SELECT COUNT(*)::int FROM users)                                                                                                                   AS registered,
@@ -284,7 +284,7 @@ export async function GET(request: NextRequest) {
         (SELECT COUNT(DISTINCT user_id::text)::int FROM conversions WHERE user_id IS NOT NULL AND order_total > 0 AND (returned IS NULL OR returned = false) AND timestamp >= ${pStart} AND timestamp < ${pEnd}) AS buyers
     `,
 
-    // Buyer retention — scoped to selected period
+    // Buyer retention: scoped to selected period
     sql`
       WITH period_buyers AS (
         SELECT
@@ -368,7 +368,7 @@ export async function GET(request: NextRequest) {
       FROM buyer_flags
     `,
 
-    // Email stats — from email_events table (created by Resend webhook)
+    // Email stats, from email_events table (created by Resend webhook)
     sql`
       SELECT
         COUNT(*) FILTER (WHERE event_type = 'email.opened'    AND created_at >= ${shortStart}     AND created_at < ${shortEnd})::int      AS opens_7d,
@@ -387,7 +387,7 @@ export async function GET(request: NextRequest) {
       WHERE category NOT IN ('magic_link', 'internal_alert')
     `.catch(() => [{ opens_7d: 0, clicks_7d: 0, delivered_7d: 0, opens_prev_7d: 0, clicks_prev_7d: 0, delivered_prev_7d: 0, opens_period: 0, clicks_period: 0, delivered_period: 0, opens_all: 0, clicks_all: 0, delivered_all: 0 }]),
 
-    // First-party email clicks — counted from our own utm-tagged landings
+    // First-party email clicks. Counted from our own utm-tagged landings
     // (every email link carries utm_source=email via withUtm), NOT from Resend's
     // email.clicked webhook. Resend click-tracking is off, so email.clicked is
     // always 0; this is the reliable click signal. One row per email landing.
@@ -401,7 +401,7 @@ export async function GET(request: NextRequest) {
       WHERE lower(utm_source) = 'email' OR lower(utm_medium) = 'email'
     `.catch(() => [{ clicks_7d: 0, clicks_prev_7d: 0, clicks_period: 0, clicks_all: 0 }]),
 
-    // Returning users — scoped to the selected period
+    // Returning users. Scoped to the selected period
     sql`
       SELECT
         COUNT(DISTINCT user_id) FILTER (WHERE visit_days_period >= 2)::int AS returning_30d,
@@ -429,7 +429,7 @@ export async function GET(request: NextRequest) {
       ) sub
     `,
 
-    // Product favorites volume — how many favorites were added per period
+    // Product favorites volume: how many favorites were added per period
     sql`
       SELECT
         COUNT(*) FILTER (WHERE created_at >= ${pStart}         AND created_at < ${pEnd})::int         AS period,
@@ -488,7 +488,7 @@ export async function GET(request: NextRequest) {
   const ru = registeredUsersRows[0] as { total: number; period_new: number; prev_period_new: number; week_new: number; prev_week_new: number };
 
   // ── Email-attributed sales: orders whose originating click was utm_source='email'
-  // (every VYA email link is utm-tagged). Resilient — never breaks the page.
+  // (every VYA email link is utm-tagged). Resilient, never breaks the page.
   const emailSalesRows = (await sql`
     SELECT
       COUNT(*) FILTER (WHERE c.timestamp >= ${pStart} AND c.timestamp < ${pEnd})::int AS orders_period,

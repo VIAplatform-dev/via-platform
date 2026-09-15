@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { MessageCircle, Check } from "lucide-react";
 import { AdminHeader, TechCard, StatusPill, Toggle, cn } from "../../ui";
 
-// Messages & offers — the two ways a shopper can start a conversation.
+// Messages & offers. The two ways a shopper can start a conversation.
 //
 // These switches used to live ONLY inside the Inbox page, which was fine until the Inbox itself
 // started disappearing from the sidebar when both were off: a store could turn them off and have
@@ -50,7 +50,7 @@ export default function InboxSettingsPage() {
    .catch(() => {});
  }, []);
 
- // Saved on change, like the panel in the Inbox — these are single switches, not a form.
+ // Saved on change, like the panel in the Inbox. These are single switches, not a form.
  async function set(patch: Partial<Settings>) {
   if (!s) return;
   setS({ ...s, ...patch });
@@ -100,13 +100,13 @@ export default function InboxSettingsPage() {
      {/* COMING SOON MEANS THE SWITCH IS OFF, NOT THAT THE LABEL SAYS SO.
          
          Texting isn't live. The row still offered a working toggle and saved the preference, so a
-         seller switched it on, read "your preference is saved", and reasonably expected texts —
+         seller switched it on, read "your preference is saved", and reasonably expected texts,
          which is a promise nothing behind this screen can keep. Until it ships it is an
          announcement, not a setting. */}
      <Row
       label="Text me new messages"
       hint={s.smsAvailable === false
-       ? "Coming soon — we'll let you know when texting goes live."
+       ? "Coming soon: we'll let you know when texting goes live."
        : "A text the moment a shopper writes, so you can answer fast."}
      >
       {s.smsAvailable === false ? (
@@ -134,15 +134,19 @@ export default function InboxSettingsPage() {
      </Row>
      {s.offersEnabled && (
       <>
+       {/* THE LABEL NAMES THE SETTING, NOT ONE OF ITS STATES. It read "Accepting an offer is
+           final", which is what happens when the switch is ON, so with it OFF the row said one
+           thing and its own hint said the opposite. A toggle label has to be true in both
+           positions; the hint is where the two answers live. */}
        <Row
-        label="Accepting an offer is final"
+        label="Offers are binding"
         hint={s.offersBinding
-         ? "Accepting reserves the piece and they check out at the agreed price."
-         : "Accepting is a soft yes — the piece stays on sale until they pay."}
+         ? "Buyers add a card when they offer. Accepting takes the money and the piece is sold."
+         : "Buyers just name a price. Accepting emails them a link, and the piece stays on sale until they pay."}
        >
         <Toggle on={s.offersBinding} onClick={() => set({ offersBinding: !s.offersBinding })} />
        </Row>
-       <Row label="Lowest offer you'll take" hint="As a percentage of the asking price. Anything lower is turned away when a shopper tries to send it — she is told the minimum rather than getting silence. 0 lets every offer through.">
+       <Row label="Lowest offer you'll take" hint="Offers below this percentage of the asking price are declined, and the shopper is told your minimum. 0 lets every offer through.">
         <span className="flex items-center gap-1.5">
          <input
           inputMode="decimal"

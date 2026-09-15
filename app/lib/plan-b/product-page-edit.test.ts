@@ -7,7 +7,7 @@ import { productEditView, PIECE_CLICK_JS, type EditPiece } from "./product-page-
 // The editor's "Product page (all N)" opens ONE captured product page to change the design of every
 // product page. It has to agree with the save about which element is "#N", let her change the words
 // every product page shares, and refuse to hand her a text box for the piece's own name, price and
-// description — those belong to Inventory, and whatever she typed there would lie.
+// description: those belong to Inventory, and whatever she typed there would lie.
 
 const productPage = (o: { title: string; price: string; desc: string; img: string; titleTag?: string }) => `<html><head></head><body>
 <header><a href="/">Shop</a><h1 class="logo">Sourced</h1></header>
@@ -45,7 +45,7 @@ const eidOf = (html: string, text: string) => {
  return hit.length === 1 ? Number(hit.attr("data-vya-eid")) : NaN;
 };
 // What the editor sends: the number, the new words, and the words it replaces. The save would rescue a
-// wrong number by finding those words elsewhere, which would hide a numbering fault — so these tests
+// wrong number by finding those words elsewhere, which would hide a numbering fault, so these tests
 // also insist the edit landed AT the number sent.
 const saveText = (stored: string, view: string, from: string, to: string) => {
  const eid = eidOf(view, from);
@@ -59,7 +59,7 @@ const saveText = (stored: string, view: string, from: string, to: string) => {
 
 test("shared wording below the buy button saves onto the element she clicked", () => {
  // The view swaps the theme's Add-to-cart for VYA's (replacing a numbered span with new links) and
- // rewrites the price — neither may move the numbers of anything below them.
+ // rewrites the price: neither may move the numbers of anything below them.
  const r = saveText(DRESS, editor(DRESS), "Free shipping over $100", "Free shipping on everything");
  const $ = cheerio.load(r.html);
  assert.equal($(".shipping-note").text(), "Free shipping on everything");

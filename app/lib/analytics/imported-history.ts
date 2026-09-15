@@ -7,10 +7,10 @@
  *
  * MIXED, BUT KNOWABLE. The total also reports how much of itself came from an import, so the
  * dashboard can say so in a line of small type. Silently absorbing a seller's pre-VYA revenue into
- * "your VYA revenue" would let the platform take credit for two years of somebody else's work —
+ * "your VYA revenue" would let the platform take credit for two years of somebody else's work,
  * and would make it impossible for her to tell whether any of this is going well.
  *
- * WHAT IT CANNOT JOIN. An imported order carries a title as free text and nothing else — no brand,
+ * WHAT IT CANNOT JOIN. An imported order carries a title as free text and nothing else, no brand,
  * no category, no link to an item that no longer exists. So top brands and top categories stay
  * VYA-only, and say so, rather than quietly under-reporting against a mixed revenue figure.
  */
@@ -23,7 +23,7 @@ const NOT_A_SALE = /refund|cancel|void|charge.?back|declin|fail|pending|unpaid|a
  * Does an imported row count towards revenue?
  *
  * Exports carry a financial status in a dozen spellings, and the ones that matter are the negatives.
- * Anything unrecognised counts — a blank status on a row with a total is far more likely to be an
+ * Anything unrecognised counts. A blank status on a row with a total is far more likely to be an
  * ordinary sale than a refund, and dropping real revenue is the worse mistake here.
  */
 export function countsAsSale(status: string | null | undefined): boolean {
@@ -45,7 +45,7 @@ export function mergeByDay(a: DayPoint[], b: DayPoint[]): DayPoint[] {
  return [...total.entries()].sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0)).map(([day, cents]) => ({ day, cents }));
 }
 
-/** A sale, with where it came from — see channels.ts. The channel travels with it so a merged list
+/** A sale, with where it came from. See channels.ts. The channel travels with it so a merged list
  *  can still say "Depop" or "Shopify" against each row. */
 export type Sale = { title: string; amountCents: number; at: string | null; channel: ChannelKey; channelLabel: string };
 

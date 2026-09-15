@@ -4,27 +4,27 @@
 // different questions, in different words, with different rules. Three differences matter enough to
 // change what the seller sees before she ever opens the site.
 //
-//  1. VESTIAIRE IS CURATED. It only accepts pieces from brands on its own list — an unbranded 90s
+//  1. VESTIAIRE IS CURATED. It only accepts pieces from brands on its own list. An unbranded 90s
 //     slip or a Zara dress is rejected, not merely unpopular. Queueing one wastes the seller's
 //     afternoon, so eligibility is checked HERE and the board can say so instead of letting her
 //     find out at the end of a form.
 //
-//  2. MATERIAL IS REQUIRED, where Depop treats it as optional. VYA often has no material — the AI
-//     is instructed to leave it blank rather than guess a fibre from a photo — so this reads the
+//  2. MATERIAL IS REQUIRED, where Depop treats it as optional. VYA often has no material. The AI
+//     is instructed to leave it blank rather than guess a fibre from a photo, so this reads the
 //     title and description for one and leaves it blank when there genuinely isn't one, rather
 //     than inventing "synthetic" to fill the box.
 //
 //  3. THE CONDITION SCALE IS ITS OWN. Vestiaire's five tiers are phrases, not adjectives, and its
 //     top tier distinguishes "with tag" from merely unworn.
 //
-// Pure — no network, no database. The route resolves the item; this decides what goes in the boxes.
+// Pure, no network, no database. The route resolves the item; this decides what goes in the boxes.
 
 export type VestiaireEligibility = { ok: true } | { ok: false; reason: string };
 
 /**
  * Vestiaire's exact condition wording.
  *
- * The extension matches loosely, so these only have to name the tier — but they are Vestiaire's
+ * The extension matches loosely, so these only have to name the tier, but they are Vestiaire's
  * phrases rather than Depop's adjectives, because the two sites don't share a scale.
  */
 export function vestiaireCondition(c: string | null | undefined): string {
@@ -175,18 +175,18 @@ export function vestiaireColour(title: string | null | undefined, description: s
 /**
  * Their Details step asks for three more things VYA has no field for: a dress LENGTH (they label it
  * Category), a PATTERN, and a size in a named system. Each is a required field, so a listing that
- * skips them can't be published — the seller gets sent back to Details from the publish button,
+ * skips them can't be published. The seller gets sent back to Details from the publish button,
  * which is the worst possible moment to learn it.
  *
  * All three are read from what the piece already says about itself. Where the words don't say,
- * these return "" and the seller fills it in — the same rule material follows. Never guess a fact
+ * these return "" and the seller fills it in. The same rule material follows. Never guess a fact
  * a buyer could hold against her.
  */
 // Their pattern list, verbatim from the form's Pattern box:
 // Plain · Zebra · Snakeskin · Leopard · Tartan · Houndstooth · Floral · Polkadot · Abstract ·
 // Gingham · Striped · Crocodile · Other
 // Anything we invent outside this list matches nothing in their dropdown and silently leaves the
-// field empty, which is a required field — so every value here is one of theirs.
+// field empty, which is a required field, so every value here is one of theirs.
 const PATTERNS: [RegExp, string][] = [
  [/leopard|cheetah/i, "Leopard"], [/zebra/i, "Zebra"],
  [/snake ?skin|snake|python/i, "Snakeskin"], [/crocodile|croc\b|alligator/i, "Crocodile"],
@@ -194,7 +194,7 @@ const PATTERNS: [RegExp, string][] = [
  [/gingham/i, "Gingham"], [/tartan|plaid/i, "Tartan"],
  [/polka|polkadot|spot(ted)? print|dotted/i, "Polkadot"],
  [/stripe/i, "Striped"],
- // Their catch-all, for a print we can name but they don't list — paisley, tie dye, camouflage.
+ // Their catch-all, for a print we can name but they don't list. Paisley, tie dye, camouflage.
  [/paisley|tie ?dye|camo(uflage)?|abstract|geometric|graphic print/i, "Abstract"],
 ];
 
@@ -210,7 +210,7 @@ export function vestiairePattern(
  return "";
 }
 
-/** Mini / Midi / Maxi — only for the pieces that have a length. */
+/** Mini / Midi / Maxi, only for the pieces that have a length. */
 export function vestiaireLength(
  category: string | null | undefined, title: string | null | undefined, description: string | null | undefined,
 ): string {
@@ -225,7 +225,7 @@ export function vestiaireLength(
 
 /**
  * Their size box is two controls: the SYSTEM (FR / UK / US / IT / International) and the value.
- * VYA stores one free-text size — "M", "US 8", "EU 40" — so the system is read off the text where
+ * VYA stores one free-text size, "M", "US 8", "EU 40", so the system is read off the text where
  * it names one, and defaults to International for letter sizes and US for bare numbers.
  */
 export function vestiaireSize(size: string | null | undefined): { system: string; value: string } {
@@ -237,7 +237,7 @@ export function vestiaireSize(size: string | null | undefined): { system: string
  if (/\bUK\b|\bBRITISH\b/.test(t)) return { system: "UK", value: num };
  if (/\bFR\b|\bFRENCH\b/.test(t)) return { system: "FR", value: num };
  if (/\bUS\b|\bUSA\b/.test(t)) return { system: "US", value: num };
- // "M", "XS", "One size" — a letter size is what they call International.
+ // "M", "XS", "One size". A letter size is what they call International.
  if (/^(XXS|XS|S|M|L|XL|XXL|XXXL)$/.test(t.replace(/[^A-Z]/g, ""))) {
   return { system: "International", value: t.replace(/[^A-Z]/g, "") };
  }
@@ -248,7 +248,7 @@ export function vestiaireSize(size: string | null | undefined): { system: string
 /**
  * Brands Vestiaire does not accept.
  *
- * Not a complete list — it can't be, Vestiaire's is curated and private. It catches the high-street
+ * Not a complete list. It can't be, Vestiaire's is curated and private. It catches the high-street
  * labels a vintage seller genuinely has in stock, so the obvious rejections are caught here rather
  * than at the end of the form. Anything unrecognised is allowed through: guessing a designer brand
  * is ineligible would block a real listing, which is the worse error.
@@ -259,12 +259,12 @@ const NOT_ACCEPTED = /^(zara|h&m|h & m|shein|primark|topshop|topman|asos|boohoo|
  * Whether this piece can be listed on Vestiaire at all.
  *
  * Checked before queueing so the board can refuse with a reason. Vestiaire rejects unbranded pieces
- * outright — which is a real constraint for vintage, where a beautiful 70s dress often has no label
+ * outright, which is a real constraint for vintage, where a beautiful 70s dress often has no label
  * anyone can name.
  */
 export function vestiaireEligibility(brand: string | null | undefined): VestiaireEligibility {
  const b = String(brand || "").trim();
- if (!b) return { ok: false, reason: "Vestiaire only takes pieces with a designer brand — add one first." };
+ if (!b) return { ok: false, reason: "Vestiaire only takes pieces with a designer brand. Add one first." };
  if (NOT_ACCEPTED.test(b)) return { ok: false, reason: `Vestiaire doesn’t accept ${b}.` };
  return { ok: true };
 }
@@ -311,7 +311,7 @@ export type VestiaireCandidate = {
  * Their manual flow is five steps and each one gates the next: Details (category, condition,
  * material, colour), Photos (at least three, 900×900 minimum), Description with measurements, then
  * price. A seller who queues a piece with one photo doesn't discover it until she's four screens in
- * and has retyped everything — so the board says it up front instead.
+ * and has retyped everything, so the board says it up front instead.
  *
  * `blocking` is what their form itself enforces. `advisory` is what gets a listing rejected by a
  * human reviewer afterwards, which is worse: it's already live in the seller's head by then.
@@ -327,11 +327,11 @@ export function vestiaireReadiness(item: VestiaireCandidate): VestiaireCheck {
  if (photos.length === 0) {
   blocking.push("No photos. Vestiaire needs at least 3.");
  } else if (photos.length < VESTIAIRE_MIN_PHOTOS) {
-  // Said as a count rather than "not enough photos" — the seller should know how far off she is.
+  // Said as a count rather than "not enough photos". The seller should know how far off she is.
   blocking.push(`Only ${photos.length} photo${photos.length === 1 ? "" : "s"}. Vestiaire needs at least ${VESTIAIRE_MIN_PHOTOS}.`);
  }
 
- if (!String(item.category || "").trim()) blocking.push("No category — Vestiaire asks for one before anything else.");
+ if (!String(item.category || "").trim()) blocking.push("No category: Vestiaire asks for one before anything else.");
  if (!String(item.condition || "").trim()) blocking.push("No condition set.");
  // vestiaireMaterial infers from the title and description; blank means nothing named a fibre
  // anywhere, and Vestiaire won't take a listing without one.
@@ -339,7 +339,7 @@ export function vestiaireReadiness(item: VestiaireCandidate): VestiaireCheck {
   blocking.push("No material. Vestiaire requires one and won't accept a guess.");
  }
  // Colour is required on their Details step exactly like material is, and it was the one field
- // that got all the way to the form before failing — the extension can only report "nothing in
+ // that got all the way to the form before failing. The extension can only report "nothing in
  // VYA" there, which is a late and useless place to learn it.
  if (!vestiaireColour(item.title, item.description, item.colour ?? null)) {
   blocking.push("No colour. Vestiaire requires one and won't accept a guess.");
@@ -347,10 +347,10 @@ export function vestiaireReadiness(item: VestiaireCandidate): VestiaireCheck {
  if (!item.priceCents || item.priceCents <= 0) blocking.push("No price.");
 
  // Not enforced by the form, but their reviewers are strict about them.
- if (!String(item.size || "").trim()) advisory.push("No size — buyers filter by it, and bags still need measurements.");
+ if (!String(item.size || "").trim()) advisory.push("No size: buyers filter by it, and bags still need measurements.");
  if (!String(item.description || "").trim()) advisory.push("No description. Vestiaire asks for flaws and alterations in detail.");
  if (photos.length >= VESTIAIRE_MIN_PHOTOS && photos.length < 5) {
-  advisory.push("Vestiaire wants the brand label and hardware shown close up — add those shots if you have them.");
+  advisory.push("Vestiaire wants the brand label and hardware shown close up. Add those shots if you have them.");
  }
 
  return { ready: blocking.length === 0, blocking, advisory };

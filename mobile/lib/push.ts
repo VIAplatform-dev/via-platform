@@ -8,9 +8,9 @@ import { apiPost } from "./api";
 // Runs once a store account is signed in (lib/auth.tsx) and again when the Notifications screen
 // opens. Idempotent: the server keeps (store, token) unique, so re-registering the same phone is
 // a no-op there. Three outcomes, and the screen says which:
-//   registered   — a token was minted and sent; a sale or a message will buzz this phone
-//   denied       — she said no to the OS prompt; iOS/Android Settings is the only way back
-//   unavailable  — this build cannot mint a token. Expo Go dropped remote push in SDK 53, so a
+//   registered. A token was minted and sent; a sale or a message will buzz this phone
+//   denied. She said no to the OS prompt; iOS/Android Settings is the only way back
+//   unavailable: this build cannot mint a token. Expo Go dropped remote push in SDK 53, so a
 //                  development session lands here every time; a store build never should.
 // Degrades silently: nothing here throws, and nothing here blocks sign-in.
 
@@ -41,7 +41,7 @@ export async function registerForPush(): Promise<PushStatus> {
     await apiPost("/api/mobile/push-token", { token, platform: Platform.OS });
     return (last = "registered");
   } catch {
-    /* allow-swallow: an Expo Go session, a simulator, or a network blip — push is a courtesy */
+    /* allow-swallow: an Expo Go session, a simulator, or a network blip. Push is a courtesy */
     return (last = "unavailable");
   }
 }

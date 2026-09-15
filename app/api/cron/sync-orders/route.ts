@@ -11,7 +11,7 @@ export const maxDuration = 300;
 // Automatic order sync for the platforms that have no webhook and were previously
 // manual-only ("press sync orders"): Square, Carroll Street (custom Stripe site),
 // and Wix. Runs every 6h (vercel.json). All paths key conversions on a stable
-// order id, so re-running is idempotent — overlapping windows never duplicate.
+// order id, so re-running is idempotent. Overlapping windows never duplicate.
 //
 // Square + Carroll reuse their existing, proven endpoints (no logic duplicated).
 // Wix had no order path at all, so it's synced inline here via the verified
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
  const sinceISO = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
  const results: Record<string, unknown> = {};
 
- // Square — reuse the existing endpoint, once per configured store.
+ // Square: reuse the existing endpoint, once per configured store.
  results.square = [];
  for (const store of SQUARE_STORES) {
  try {
@@ -126,7 +126,7 @@ export async function GET(request: Request) {
  }
  }
 
- // Carroll Street — reuse its admin endpoint (admin-bearer auth).
+ // Carroll Street: reuse its admin endpoint (admin-bearer auth).
  try {
  results.carrollStreet = await callInternal(
  "/api/admin/sync-carroll-street",
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
  results.carrollStreet = { error: String(err) };
  }
 
- // Wix — new inline sync per configured store.
+ // Wix: new inline sync per configured store.
  results.wix = [];
  for (const store of WIX_STORES) {
  (results.wix as unknown[]).push(await syncWixStore(store, sinceISO));

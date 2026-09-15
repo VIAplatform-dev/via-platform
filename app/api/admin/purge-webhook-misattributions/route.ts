@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
  * One-shot cleanup: remove conversions saved by the Shopify webhook that
  * came from the now-removed loose-matching paths (last-click fallback,
  * email match, or unmatched). Keeps only rows with source="cart-attribute"
- * — those are the orders that actually went through VYA's cart link.
+ * those are the orders that actually went through VYA's cart link.
  *
  * GET /api/admin/purge-webhook-misattributions?dryRun=1 → counts only
  * POST /api/admin/purge-webhook-misattributions          → deletes

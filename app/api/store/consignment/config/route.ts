@@ -23,7 +23,7 @@ export async function PUT(request: NextRequest) {
  const s = body.settings;
  // Whether a sale's cut is held by VYA (direct-deposit) or left with the store (in-person) is
  // decided at the sale. Don't let the store flip the DEFAULT between those two while consignors are
- // still owed — it would mismatch what's actually held. (Switching among cash/check/credit is fine.)
+ // still owed. It would mismatch what's actually held. (Switching among cash/check/credit is fine.)
  if (typeof s.defaultPayoutMethod === "string") {
  const cur = await getConsignmentSettings(slug);
  if ((cur.defaultPayoutMethod === "stripe") !== (s.defaultPayoutMethod === "stripe")) {

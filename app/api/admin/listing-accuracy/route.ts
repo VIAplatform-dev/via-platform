@@ -6,13 +6,13 @@ import { computeListingAccuracyMetrics } from "@/app/lib/accuracy-snapshot-db";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Listing accuracy from SELLER EDITS — the truest ongoing accuracy signal, measured on EVERY real
+// Listing accuracy from SELLER EDITS. The truest ongoing accuracy signal, measured on EVERY real
 // AI-assisted listing (no synthetic eval). The metric math lives in accuracy-snapshot-db so the live
 // read here and the daily snapshot can't drift. Fields are split by what a change MEANS:
-//   • FACTUAL (brand, category, material, era) — a change/abstention is a real miss → true accuracy.
-//   • PRICE — seller's final price within a ±band of the AI's market read.
-//   • STYLISTIC (title, description) — edits are often voice/preference, NOT corrections → soft signal.
-//   • SELLER-ONLY (condition, measurements) — the AI can't observe these → excluded from the score.
+//   • FACTUAL (brand, category, material, era). A change/abstention is a real miss → true accuracy.
+//   • PRICE: seller's final price within a ±band of the AI's market read.
+//   • STYLISTIC (title, description): edits are often voice/preference, NOT corrections → soft signal.
+//   • SELLER-ONLY (condition, measurements). The AI can't observe these → excluded from the score.
 //   /api/admin/listing-accuracy?window=all|30   (&examples=N to see AI-vs-seller diffs + brand-ID debug)
 function isAuthorized(request: NextRequest): boolean {
  const pw = process.env.ADMIN_PASSWORD;
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
    missExamples = ex.map((r) => {
     // When brand was null but the seller supplied one, expose WHY: did reverse-image fire, and what
     // did it find? Caveat: reverse_image is null when the client didn't forward the debug blob to
-    // publish, so `reverseImageFired: false` is NOT proof Lens was off — confirm via server logs.
+    // publish, so `reverseImageFired: false` is NOT proof Lens was off. Confirm via server logs.
     const ri = (typeof r.reverse_image === "string" ? (() => { try { return JSON.parse(r.reverse_image as string); } catch { return null; } })() : r.reverse_image) as { matches?: number; brand?: string | null; hits?: number; sampleTitles?: string[] } | null;
     const brandAbstained = (!r.ai_brand || String(r.ai_brand).trim() === "") && !!r.brand;
     return {
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
    ...metrics,
-   note: metrics.totalAiListings < 30 ? "Small sample — read these as directional, not settled, until more listings accrue." : undefined,
+   note: metrics.totalAiListings < 30 ? "Small sample: read these as directional, not settled, until more listings accrue." : undefined,
    ...(examples > 0 ? { misses: missExamples } : {}),
   });
  } catch (e) {

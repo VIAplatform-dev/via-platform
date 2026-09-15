@@ -42,7 +42,7 @@ function CartInner() {
  }, []);
 
  const loadCarts = useCallback(async () => {
- if (pending.current > 0) return; // a save is still on its way up — don't overwrite it
+ if (pending.current > 0) return; // a save is still on its way up. Don't overwrite it
  const r = await api<{ carts: ServerCart[] }>("/api/store/market/carts");
  if (!r.ok) { setReady(true); return; }
  if (pending.current > 0) return; // ...or landed while we were waiting
@@ -61,7 +61,7 @@ function CartInner() {
  return () => clearInterval(t);
  }, [loadCarts]);
 
- // Checkouts already handed to the server and waiting on payment — they outlive this tab entirely.
+ // Checkouts already handed to the server and waiting on payment. They outlive this tab entirely.
  useEffect(() => {
  const load = () => { api<{ inProgress: OpenCheckout[] }>("/api/store/market/home").then((r) => { if (r.ok) setOpen(r.data.inProgress); }); };
  load();
@@ -103,7 +103,7 @@ function CartInner() {
  setEditing(null);
  }
 
- // This cart is done with — paid off, or cleared by the seller. Drop it and fall back to the next.
+ // This cart is done with. Paid off, or cleared by the seller. Drop it and fall back to the next.
  async function finish(id: string, status: "paid" | "dropped") {
  await api(`/api/store/market/carts/${id}?status=${status}`, { method: "DELETE" });
  const rest = carts.filter((c) => c.id !== id);
@@ -127,12 +127,12 @@ function CartInner() {
  if (tender === "cash" && typeof navigator !== "undefined" && !navigator.onLine) { setBusy(null); stashOffline(clientKey); return; }
  let r: Awaited<ReturnType<typeof api<{ checkout: { id: string } }>>>;
  try { r = await api<{ checkout: { id: string } }>("/api/store/market/checkout", { method: "POST", body: JSON.stringify({ lines, clientKey, tender }) }); }
- catch { setBusy(null); if (tender === "cash") { stashOffline(clientKey); return; } setErr("No connection — card payments need signal. Take cash, or try again."); return; }
+ catch { setBusy(null); if (tender === "cash") { stashOffline(clientKey); return; } setErr("No connection: card payments need signal. Take cash, or try again."); return; }
  setBusy(null);
  if (!r.ok) {
  const holder = (r.data as unknown as { holder?: string | null }).holder;
  if (r.data.code === "in_progress" && holder) { router.push(href(`${B}/checkout/${holder}`)); return; }
- setErr(r.data.code === "payments_disabled" ? "Card payments are off — finish Stripe setup in Payments, or take cash." : r.data.error || "Couldn't start checkout"); return;
+ setErr(r.data.code === "payments_disabled" ? "Card payments are off. Finish Stripe setup in Payments, or take cash." : r.data.error || "Couldn't start checkout"); return;
  }
  const checkoutId = r.data.checkout.id;
  if (activeId) await finish(activeId, "paid");
@@ -143,7 +143,7 @@ function CartInner() {
  const active = carts.find((c) => c.id === activeId) ?? null;
  return (
  <MarketPage title={active ? `Cart ${active.number}` : "Cart"} back={`${B}/find`}>
- {/* A WARNING THAT NAMES A SCREEN NOW OPENS IT. "Card payments are off — finish Stripe setup in
+ {/* A WARNING THAT NAMES A SCREEN NOW OPENS IT. "Card payments are off. Finish Stripe setup in
      Payments" left her to go and find Payments herself, mid-sale, with a customer waiting. */}
  {err && (
   <div className="mb-3">
@@ -162,14 +162,14 @@ function CartInner() {
  <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-center">
  <p className="text-[26px] font-medium text-emerald-900" style={{ fontFamily: "var(--font-display)" }}>Saved offline</p>
  <p className="mt-1 text-[15px] text-emerald-900">Cash · {money(savedOffline.amountCents)}{savedOffline.count > 1 ? ` · ${savedOffline.count} items` : ""}</p>
- <p className="mt-3 text-[13.5px] text-emerald-900/80">No signal right now. Hand over the item — this sale is stored on your phone and records itself as soon as you’re back online.</p>
+ <p className="mt-3 text-[13.5px] text-emerald-900/80">No signal. Hand the piece over: the sale is saved on your phone and records itself when you are back online.</p>
  <a href={href(`${B}/find`)} className="mt-4 inline-block rounded-2xl bg-stone-900 px-6 py-3 text-[15px] font-semibold text-white">Next customer</a>
  </div>
  )}
 
  {!savedOffline && (
  <>
- {/* Cart switcher — one chip per customer you're serving, plus a door to a fresh one. */}
+ {/* Cart switcher: one chip per customer you're serving, plus a door to a fresh one. */}
  <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6">
  {carts.map((c) => {
  const on = c.id === activeId;
@@ -242,7 +242,7 @@ function CartInner() {
  </div>
  <button onClick={() => remove(l.itemId)} aria-label="Remove" className="ml-1 grid h-8 w-8 place-items-center rounded-full text-stone-400 hover:bg-stone-100"><X size={16} /></button>
  </div>
- {/* Per-sale discount — this checkout only; the listing keeps its price. */}
+ {/* Per-sale discount: this checkout only; the listing keeps its price. */}
  <div className="mt-2.5 flex flex-wrap gap-1.5">
  <button onClick={() => setDiscount(l.itemId, null)} className={chip(!l.discount)} style={!l.discount ? { background: "#1c1917" } : undefined}>Full price</button>
  {[10, 20, 30].map((p) => <button key={p} onClick={() => setDiscount(l.itemId, { type: "percent", value: p })} className={chip(l.discount?.type === "percent" && l.discount.value === p)} style={l.discount?.type === "percent" && l.discount.value === p ? { background: WINE } : undefined}>−{p}%</button>)}
@@ -259,13 +259,13 @@ function CartInner() {
  </div>
  </div>
 
- {/* Custom sale price — an in-page sheet (browser prompt() doesn't exist on phones). */}
+ {/* Custom sale price: an in-page sheet (browser prompt() doesn't exist on phones). */}
  {saleFor && (() => { const l = cart.find((x) => x.itemId === saleFor); if (!l) return null; const cents = Math.round(Number(saleDraft) * 100); const valid = Number.isFinite(cents) && cents >= 0 && cents <= l.listCents; return (
  <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center" onClick={() => setSaleFor(null)}>
  <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 pb-[calc(20px+env(safe-area-inset-bottom))] md:rounded-3xl" onClick={(e) => e.stopPropagation()}>
  <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Sale price · this customer only</p>
  <p className="mt-1 truncate text-[15px] font-medium text-stone-900">{l.title}</p>
- <p className="text-[12.5px] text-stone-500">Listed at {money(l.listCents)} — the listing keeps its price.</p>
+ <p className="text-[12.5px] text-stone-500">Listed at {money(l.listCents)}: the listing keeps its price.</p>
  <div className="mt-3 flex items-center gap-2 rounded-2xl border border-stone-300 px-3 focus-within:border-stone-900"><span className="text-[26px] font-semibold text-stone-400">$</span><input autoFocus inputMode="decimal" value={saleDraft} onChange={(e) => setSaleDraft(e.target.value)} className="min-h-[60px] w-full bg-transparent text-[30px] font-semibold outline-none" placeholder="0" /></div>
  {!valid && saleDraft.trim() && <p className="mt-1.5 text-[12.5px] text-red-700">{cents > l.listCents ? "That’s above the list price." : "Enter a valid amount."}</p>}
  <div className="mt-3 flex flex-wrap gap-1.5">

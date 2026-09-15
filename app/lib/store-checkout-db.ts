@@ -1,9 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 
-// Per-store checkout payment methods. `card` is ALWAYS on — and card automatically brings Apple Pay,
+// Per-store checkout payment methods. `card` is ALWAYS on, and card automatically brings Apple Pay,
 // Google Pay, and Link, so wallets need no separate toggle. The extras (Cash App Pay + the buy-now-
 // pay-later options) are opt-in per store, OFF by default, so a store that doesn't want Affirm/Klarna
-// simply never sees them. Self-healing table (CREATE IF NOT EXISTS) — no migration step needed.
+// simply never sees them. Self-healing table (CREATE IF NOT EXISTS), no migration step needed.
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;

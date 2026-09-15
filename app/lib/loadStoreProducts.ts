@@ -13,7 +13,7 @@ export { inferCategoryFromTitle };
 export const inferItemTypeFromTitle = (title: string): string | null => {
  const t = title.toLowerCase();
  const types = [
- // Shoes — checked before generic clothing words
+ // Shoes: checked before generic clothing words
  "ballet flat", "ballet flats", "ballerina flat",
  "loafer", "mule", "clog", "slingback", "mary jane", "moccasin",
  "boot", "bootie", "heel", "pump", "sandal", "sneaker", "trainer",
@@ -72,7 +72,7 @@ export const inferBrandFromTitle = (title: string): string | null => {
 
 /**
  * Like inferBrandFromTitle but returns the first matched keyword string
- * (e.g. "dolce & gabbana", "chanel") — suitable for SQL ILIKE searches.
+ * (e.g. "dolce & gabbana", "chanel"). Suitable for SQL ILIKE searches.
  */
 export const inferBrandKeywordFromTitle = (title: string): string | null => {
  const t = title.toLowerCase();

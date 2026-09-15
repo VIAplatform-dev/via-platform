@@ -52,7 +52,7 @@ export const stores = [
  name: "Bag Crush",
  location: "California",
  description:
- "Bag Crush was born from a love of iconic design and the thrill of the find. Passionate about making designer bags more accessible, the mission is to empower fashion lovers to shop smart, sustainably, and stylishly through curated resale. With authenticity, transparency, and a little bit of obsession — redefining what it means to crush on a bag.",
+ "Bag Crush was born from a love of iconic design and the thrill of the find. Passionate about making designer bags more accessible, the mission is to empower fashion lovers to shop smart, sustainably, and stylishly through curated resale. With authenticity, transparency, and a little bit of obsession. Redefining what it means to crush on a bag.",
  website: "https://mybagcrush.com",
  contactEmail: "info@shopbagcrush.com",
  dataSource: "bag-crush",
@@ -74,7 +74,7 @@ export const stores = [
  name: "Bloda's Choice",
  location: "New York, NY",
  description:
- "Anna Bloda — NYC-based photographer, model, and vintage collector. Born in Poland in 1975, she studied art and photography and discovered her love for fashion while styling her models. Moving to New York City opened a new chapter: the world of vintage became her playground. Her curated finds became Bloda's Choice, a Chinatown boutique celebrating quality, color therapy, and self-expression. With a Y3K lens and an eye for the unusual, Anna transforms timeless pieces into art, making her a legend in fashion and photography.",
+ "Anna Bloda: NYC-based photographer, model, and vintage collector. Born in Poland in 1975, she studied art and photography and discovered her love for fashion while styling her models. Moving to New York City opened a new chapter: the world of vintage became her playground. Her curated finds became Bloda's Choice, a Chinatown boutique celebrating quality, color therapy, and self-expression. With a Y3K lens and an eye for the unusual, Anna transforms timeless pieces into art, making her a legend in fashion and photography.",
  website: "https://blodaschoice.com",
  dataSource: "blodas-choice",
  image: "/stores/blodas-choice.jpg",
@@ -85,7 +85,7 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "230978",
  authenticityPolicy:
- "Every piece at Bloda's Choice is personally sourced and hand-selected by Anna — a photographer, model, and lifelong collector with a Y3K lens and an eye for color therapy, character, and the unusual. Each item is chosen for its story and quality, accurately described so you always know exactly what you're getting.",
+ "Every piece at Bloda's Choice is personally sourced and hand-selected by Anna. A photographer, model, and lifelong collector with a Y3K lens and an eye for color therapy, character, and the unusual. Each item is chosen for its story and quality, accurately described so you always know exactly what you're getting.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -124,7 +124,7 @@ export const stores = [
  name: "California Boho Studio",
  location: "San Francisco, CA",
  description:
- "California Boho Studio was founded by Charlette, a California native and lifelong vintage hunter who started the Studio out of a love for fashion and the thrill of the hunt — sourcing rare pieces for others the way she always has for herself.\n\nBuilt on that California energy of contrast, culture, and creativity, the Studio is about individuality without limits — vintage or modern, minimal or bold, never about following a rule. A maximalist at heart, Charlette is drawn to rare, one-of-a-kind pieces from discontinued and luxury houses like Bracher Emden and El Dantés, alongside bold names like Cavalli, Galliano-era Dior, and Y2K Baby Phat. Every piece is handpicked, something she'd wear herself, and every piece comes with a story.",
+ "California Boho Studio was founded by Charlette, a California native and lifelong vintage hunter who started the Studio out of a love for fashion and the thrill of the hunt, sourcing rare pieces for others the way she always has for herself.\n\nBuilt on that California energy of contrast, culture, and creativity, the Studio is about individuality without limits. Vintage or modern, minimal or bold, never about following a rule. A maximalist at heart, Charlette is drawn to rare, one-of-a-kind pieces from discontinued and luxury houses like Bracher Emden and El Dantés, alongside bold names like Cavalli, Galliano-era Dior, and Y2K Baby Phat. Every piece is handpicked, something she'd wear herself, and every piece comes with a story.",
  website: "https://californiabohostudio.com",
  dataSource: "california-boho-studio",
  image: "/stores/california-boho-studio.jpg",
@@ -139,7 +139,7 @@ export const stores = [
  shippingPolicy:
  "Ships from San Francisco, CA. Shipping rates are calculated at checkout.",
  returnPolicy:
- "All sales are final. Each piece is hand-selected and personally inspected by Charlette. Please review all item details and photos carefully before purchasing — email hello@californiabohostudio.com with any pre-purchase questions.",
+ "All sales are final. Each piece is hand-selected and personally inspected by Charlette. Please review all item details and photos carefully before purchasing. Email hello@californiabohostudio.com with any pre-purchase questions.",
  },
  {
  slug: "capsule-edit",
@@ -156,7 +156,7 @@ export const stores = [
  logoBg: "#ffffff",
  // Capsule Édit is based in Melbourne but their Shopify base currency is
  // USD (their site auto-displays USD via Shopify Markets). The products.json
- // API returns USD numbers — so no conversion needed.
+ // API returns USD numbers, so no conversion needed.
  currency: "USD",
  commissionType: "shopify-collabs" as const,
  affiliatePath: "VYA",
@@ -164,7 +164,7 @@ export const stores = [
  authenticityPolicy:
  "Every piece at Capsule Édit is curated for design integrity, quality craftsmanship, and long-term wearability. Each item is carefully selected and accurately described so collectors can shop with confidence.",
  shippingPolicy:
- "Ships from Melbourne, Australia. International shipping available — rates calculated at checkout.",
+ "Ships from Melbourne, Australia. International shipping available: rates calculated at checkout.",
  returnPolicy:
  "All sales are final. As a curated vintage and pre-owned designer boutique, each piece is one-of-a-kind. Please review all item details and photos carefully before purchasing.",
  },
@@ -236,7 +236,7 @@ export const stores = [
  shippingPolicy:
  "Ships from London, UK. Shipping rates and delivery times are calculated at checkout. International customers may be responsible for customs duties and taxes.",
  returnPolicy:
- "Returns accepted on unworn items with tags in original packaging — refunds are issued to your original payment method within 10 business days of approval (EU customers have a 14-day right to cancel). Sale items and gift cards are non-returnable.",
+ "Returns accepted on unworn items with tags in original packaging. Refunds are issued to your original payment method within 10 business days of approval (EU customers have a 14-day right to cancel). Sale items and gift cards are non-returnable.",
  },
  {
  slug: "club-fleur",
@@ -244,7 +244,7 @@ export const stores = [
  name: "Club Fleur Vintage",
  location: "Washington, DC",
  description:
- "A club where vintage blooms. Club Fleur Vintage offers a romantic take on designer vintage. Based in Washington, DC, Club Fleur features a thoughtful curation of iconic accessories, reworked floral heels, and distinctive pieces with presence — including coveted designers like Manolo Blahnik and Jimmy Choo, and statement shoes Carrie Bradshaw would die for — each selected for its craftsmanship, character, and ability to bring individuality and story into a modern wardrobe.",
+ "A club where vintage blooms. Club Fleur Vintage offers a romantic take on designer vintage. Based in Washington, DC, Club Fleur features a thoughtful curation of iconic accessories, reworked floral heels, and distinctive pieces with presence, including coveted designers like Manolo Blahnik and Jimmy Choo, and statement shoes Carrie Bradshaw would die for. Each selected for its craftsmanship, character, and ability to bring individuality and story into a modern wardrobe.",
  website: "https://clubfleurvintage.com",
  dataSource: "club-fleur",
  image: "/stores/club-fleur.jpg",
@@ -255,11 +255,11 @@ export const stores = [
  affiliatePath: "CLUBFLEURXVYA",
  collabsStoreId: "231864",
  authenticityPolicy:
- "Every piece at Club Fleur Vintage is personally sourced and hand-selected for its craftsmanship, character, and romantic presence. Specializing in iconic designer accessories and shoes — Manolo Blahnik, Jimmy Choo, and beyond — each item is carefully inspected and accurately described before listing.",
+ "Every piece at Club Fleur Vintage is personally sourced and hand-selected for its craftsmanship, character, and romantic presence. Specializing in iconic designer accessories and shoes, Manolo Blahnik, Jimmy Choo, and beyond. Each item is carefully inspected and accurately described before listing.",
  shippingPolicy:
  "Ships from Washington, DC. Shipping rates are calculated at checkout.",
  returnPolicy:
- "Returns accepted for store credit on clothing and shoe items within 7 days of delivery, provided the item is returned in its original condition. Some pieces are marked final sale — this is noted in the item's listing. Use the form below or email theclubfleur@gmail.com with any pre-purchase questions.",
+ "Returns accepted for store credit on clothing and shoe items within 7 days of delivery, provided the item is returned in its original condition. Some pieces are marked final sale. This is noted in the item's listing. Use the form below or email theclubfleur@gmail.com with any pre-purchase questions.",
  },
  {
  slug: "dayton-jane",
@@ -290,7 +290,7 @@ export const stores = [
  location: "Los Angeles, CA",
  contactEmail: "rachel.dearmuse@gmail.com",
  description:
- "Dear Muse is built on the belief that fashion should feel personal, not mass-produced. With over 15 years in the industry, she curates rare, era-defining handbags. Every handbag is sourced with intention for their craftsmanship, history, and emotional impact. Dear Muse invites you to move beyond trends and find pieces that feel like you — distinct, expressive, and entirely your own.",
+ "Dear Muse is built on the belief that fashion should feel personal, not mass-produced. With over 15 years in the industry, she curates rare, era-defining handbags. Every handbag is sourced with intention for their craftsmanship, history, and emotional impact. Dear Muse invites you to move beyond trends and find pieces that feel like you. Distinct, expressive, and entirely your own.",
  website: "https://shopdearmuse.com",
  dataSource: "dear-muse",
  image: "/stores/dear-muse.jpg",
@@ -301,7 +301,7 @@ export const stores = [
  affiliatePath: "1111",
  collabsStoreId: "237672",
  authenticityPolicy:
- "100% Authenticity Guaranteed\n\nEvery piece offered by Dear Muse undergoes an authentication process conducted by trusted third-party experts — the same industry-recognized services used by platforms such as eBay and Vestiaire Collective. Some items may include a physical authentication card or certificate, while others will have digital verification records. Regardless of format, every purchase is fully backed by our Authenticity Guarantee.\n\nFor additional photos, videos, or questions about this piece, please contact rachel.dearmuse@gmail.com or send a message on Instagram at @__dearmuse. I'm always happy to provide further details.",
+ "100% Authenticity Guaranteed\n\nEvery piece offered by Dear Muse undergoes an authentication process conducted by trusted third-party experts. The same industry-recognized services used by platforms such as eBay and Vestiaire Collective. Some items may include a physical authentication card or certificate, while others will have digital verification records. Regardless of format, every purchase is fully backed by our Authenticity Guarantee.\n\nFor additional photos, videos, or questions about this piece, please contact rachel.dearmuse@gmail.com or send a message on Instagram at @__dearmuse. I'm always happy to provide further details.",
  shippingPolicy:
  "Ships from Los Angeles, CA. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -348,7 +348,7 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "232048",
  authenticityPolicy:
- "Every piece at For The Globe is hand-selected by Abbey from vintage markets and sources around the globe — curated with a commitment to quality, sustainability, and conscious style. Each item is carefully inspected and accurately described before listing, with any notable condition details disclosed.",
+ "Every piece at For The Globe is hand-selected by Abbey from vintage markets and sources around the globe. Curated with a commitment to quality, sustainability, and conscious style. Each item is carefully inspected and accurately described before listing, with any notable condition details disclosed.",
  shippingPolicy:
  "Ships from Richmond, VA. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -383,7 +383,7 @@ export const stores = [
  name: "Hachi Archive",
  location: "New York, NY",
  description:
- "Hachi Archive is a leading destination for pre-owned luxury fashion — carefully curated, every piece authenticated, and priced to be within reach. From its online collections to its NYC pop-up events, Hachi Archive has built a reputation for quality and authenticity with a dedicated and growing customer base. Driven by circularity, the brand is committed to making curated designer fashion accessible.",
+ "Hachi Archive is a leading destination for pre-owned luxury fashion. Carefully curated, every piece authenticated, and priced to be within reach. From its online collections to its NYC pop-up events, Hachi Archive has built a reputation for quality and authenticity with a dedicated and growing customer base. Driven by circularity, the brand is committed to making curated designer fashion accessible.",
  website: "https://hachiarchive.com",
  contactEmail: "patricia@hachiarchive.com",
  dataSource: "hachi-archive",
@@ -417,7 +417,7 @@ export const stores = [
  commissionType: "shopify-collabs" as const,
  collabsStoreId: "252945",
  authenticityPolicy:
- "Every piece at Honeybear Vintage is personally sourced by Morgan and Liz with an emphasis on size variety and quality materials built to last. Each item is carefully inspected and accurately described before listing — so you can find something effortless that lives in your closet forever.",
+ "Every piece at Honeybear Vintage is personally sourced by Morgan and Liz with an emphasis on size variety and quality materials built to last. Each item is carefully inspected and accurately described before listing, so you can find something effortless that lives in your closet forever.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -429,7 +429,7 @@ export const stores = [
  name: "House on a Chain",
  location: "London, UK",
  description:
- "House on a Chain is a London-based curated vintage store specialising in rare archival designer and elevated wardrobe pieces, built around the idea of continuity — garments moving from one hand to another and becoming part of a new story. The name carries a double meaning: a playful, confident tone intended to feel empowering, while referencing the fashion houses behind each piece and the chain of ownership that allows garments to move from one life to the next. The curation centres on 90s and early 2000s luxury, from Galliano-era Dior and Prada to Chanel and La Perla, chosen for craftsmanship, femininity and elevation.",
+ "House on a Chain is a London-based curated vintage store specialising in rare archival designer and elevated wardrobe pieces, built around the idea of continuity. Garments moving from one hand to another and becoming part of a new story. The name carries a double meaning: a playful, confident tone intended to feel empowering, while referencing the fashion houses behind each piece and the chain of ownership that allows garments to move from one life to the next. The curation centres on 90s and early 2000s luxury, from Galliano-era Dior and Prada to Chanel and La Perla, chosen for craftsmanship, femininity and elevation.",
  website: "https://www.houseonachain.com",
  dataSource: "house-on-a-chain",
  image: "/stores/house-on-a-chain.jpg",
@@ -440,7 +440,7 @@ export const stores = [
  affiliatePath: "VIA-7",
  collabsStoreId: "230455",
  authenticityPolicy:
- "Every piece at House on a Chain is sourced from trusted vintage dealers, collectors, and archival resale markets — then authenticated and evaluated for condition before listing. The curation centres on rare 90s and early 2000s luxury — Galliano-era Dior, Prada, Chanel, La Perla — chosen for femininity, craftsmanship, and elevation.",
+ "Every piece at House on a Chain is sourced from trusted vintage dealers, collectors, and archival resale markets, then authenticated and evaluated for condition before listing. The curation centres on rare 90s and early 2000s luxury, Galliano-era Dior, Prada, Chanel, La Perla. Chosen for femininity, craftsmanship, and elevation.",
  shippingPolicy:
  "Orders ship from London, UK. Shipping rates and delivery times are calculated at checkout. International customers may be responsible for customs duties and taxes.",
  returnPolicy:
@@ -462,7 +462,7 @@ export const stores = [
  currency: "USD",
  commissionType: "squarespace-manual" as const,
  authenticityPolicy:
- "Every piece at In a Past Life is hand-picked in Europe and inspected before listing — chosen for its character, history, and craftsmanship, and accurately described so you can shop with confidence.",
+ "Every piece at In a Past Life is hand-picked in Europe and inspected before listing. Chosen for its character, history, and craftsmanship, and accurately described so you can shop with confidence.",
  shippingPolicy:
  "Ships from Detroit, MI. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -474,7 +474,7 @@ export const stores = [
  name: "Jade Vintage",
  location: "Toronto, Canada",
  description:
- "Jade Vintage is a curated e-commerce business based in Toronto, Canada specializing in small-batch collections of rare, authenticated pre-loved designer pieces, including Balenciaga City bags, Chanel Classic Flaps, and other timeless vintage styles. Beyond sourcing, the brand prioritizes building strong client relationships through education—guiding customers on how to shop smarter, invest in quality, and make more conscious purchasing decisions. Rooted in expertise, transparency, and considered curation, Jade Vintage makes luxury more accessible while championing a slower, more intentional approach to fashion—where each piece is chosen with purpose and worn with meaning.",
+ "Jade Vintage is a curated e-commerce business based in Toronto, Canada specializing in small-batch collections of rare, authenticated pre-loved designer pieces, including Balenciaga City bags, Chanel Classic Flaps, and other timeless vintage styles. Beyond sourcing, the brand prioritizes building strong client relationships through education. Guiding customers on how to shop smarter, invest in quality, and make more conscious purchasing decisions. Rooted in expertise, transparency, and considered curation, Jade Vintage makes luxury more accessible while championing a slower, more intentional approach to fashion, where each piece is chosen with purpose and worn with meaning.",
  website: "https://jadevintage.ca",
  dataSource: "jade-vintage",
  image: "/stores/jade-vintage.jpg",
@@ -485,7 +485,7 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "233878",
  authenticityPolicy:
- "Every piece at Jade Vintage is personally authenticated and carefully inspected before listing. Specializing in rare designer pieces — Balenciaga City bags, Chanel Classic Flaps, and archival luxury — each item is sourced with expertise and described with full transparency so you can shop with confidence.",
+ "Every piece at Jade Vintage is personally authenticated and carefully inspected before listing. Specializing in rare designer pieces, Balenciaga City bags, Chanel Classic Flaps, and archival luxury. Each item is sourced with expertise and described with full transparency so you can shop with confidence.",
  shippingPolicy:
  "Ships from Toronto, Canada. Shipping rates are calculated at checkout. International customers may be responsible for customs duties and taxes.",
  returnPolicy:
@@ -497,7 +497,7 @@ export const stores = [
  name: "Keepin It Real Luxe",
  location: "San Francisco, CA",
  description:
-  "They say fashion is a passion, but for the founder, it's always been a lifestyle. For years, she lived in that relatable tug-of-war: a deep, unshakeable love for designer craftsmanship versus the reality of adulting. Life happens—bills, family, and long-term commitments naturally took the driver's seat when it came to where her paycheck went. But while her budget was being responsible, her soul was still craving that specific rush that only luxury fashion provides. She realized she didn't just want what was 'trending' on a department store shelf. She wanted the pieces with a story. She craved the rare, the hard-to-find, and the 'how did you get your hands on that?' items that define a personal collection. She started Keepin' It Real Luxe to bridge that gap for people just like her. She spent years mastering the art of the 'luxe budget'—learning how to source authentic, rare designer pieces without compromising her financial priorities.",
+  "They say fashion is a passion, but for the founder, it's always been a lifestyle. For years, she lived in that relatable tug-of-war: a deep, unshakeable love for designer craftsmanship versus the reality of adulting. Life happens. Bills, family, and long-term commitments naturally took the driver's seat when it came to where her paycheck went. But while her budget was being responsible, her soul was still craving that specific rush that only luxury fashion provides. She realized she didn't just want what was 'trending' on a department store shelf. She wanted the pieces with a story. She craved the rare, the hard-to-find, and the 'how did you get your hands on that?' items that define a personal collection. She started Keepin' It Real Luxe to bridge that gap for people just like her. She spent years mastering the art of the 'luxe budget'. Learning how to source authentic, rare designer pieces without compromising her financial priorities.",
  website: "https://www.keepinitrealluxe.com",
  contactEmail: "info@keepinitrealluxe.com",
  dataSource: "keepin-it-real-luxe",
@@ -507,7 +507,7 @@ export const stores = [
  currency: "USD",
  commissionType: "squarespace-manual" as const,
  authenticityPolicy:
-  "Every piece at Keepin' It Real Luxe is personally sourced and authenticated before listing. Each item is hand-selected with years of expertise in sourcing authentic, rare designer pieces — accurately described so you can shop with confidence.",
+  "Every piece at Keepin' It Real Luxe is personally sourced and authenticated before listing. Each item is hand-selected with years of expertise in sourcing authentic, rare designer pieces. Accurately described so you can shop with confidence.",
  shippingPolicy:
   "Ships from San Francisco, CA. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -519,7 +519,7 @@ export const stores = [
  name: "Lamash",
  location: "Sheffield, UK",
  description:
- "Based in the UK, Lamash is a curated vintage store specialising in designer pieces sourced through years of experience across the UK and Paris. The collection celebrates fun, confident dressing — offering everything from effortless everyday staples to statement event wear, with a focus on timeless vintage that feels unique, wearable, and effortlessly sexy.",
+ "Based in the UK, Lamash is a curated vintage store specialising in designer pieces sourced through years of experience across the UK and Paris. The collection celebrates fun, confident dressing. Offering everything from effortless everyday staples to statement event wear, with a focus on timeless vintage that feels unique, wearable, and effortlessly sexy.",
  website: "https://lamash-store.myshopify.com",
  dataSource: "lamash",
  image: "/stores/lamash.jpg",
@@ -549,13 +549,13 @@ export const stores = [
  logoBg: "#ffffff",
  currency: "USD",
  authenticityPolicy:
- "Every piece at LEI is personally curated and inspected before it reaches you. We stand behind the accuracy of each listing — if your item arrives significantly different from its description, reach out within 48 hours of delivery and we'll make it right.",
+ "Every piece at LEI is personally curated and inspected before it reaches you. We stand behind the accuracy of each listing, if your item arrives significantly different from its description, reach out within 48 hours of delivery and we'll make it right.",
  shippingPolicy:
  "Shipping rates are calculated at checkout. Orders ship to the address provided at checkout.",
  returnPolicy:
  "All sales are final. If your item arrives significantly different from its description or arrives damaged, contact info@shoplei.com within 48 hours of delivery with photos and the team will review.",
  commissionType: "squarespace-manual" as const,
- // No affiliatePath — uses Squarespace pixel for conversion tracking
+ // No affiliatePath: uses Squarespace pixel for conversion tracking
  },
  {
  slug: "loved-again",
@@ -571,13 +571,13 @@ export const stores = [
  logo: "/stores/loved-again.jpg",
  logoBg: "#ffffff",
  // Based in Melbourne (native AUD), but their products.json is served
- // USD-localized via Shopify Markets when fetched from our US servers — so
+ // USD-localized via Shopify Markets when fetched from our US servers, so
  // the sync must NOT convert (setting "AUD" here double-converts, ~0.72x too low).
  currency: "USD",
  commissionType: "shopify-collabs" as const,
  collabsStoreId: "252378",
  authenticityPolicy:
- "Every piece at Loved, Again is personally sourced and inspected — including authentic vintage designer bags sourced from Japan and around the world — and accurately described before listing.",
+ "Every piece at Loved, Again is personally sourced and inspected, including authentic vintage designer bags sourced from Japan and around the world, and accurately described before listing.",
  shippingPolicy:
  "Ships from Melbourne, Australia. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -600,11 +600,11 @@ export const stores = [
  affiliatePath: "VIAPARTNER",
  collabsStoreId: "229026",
  authenticityPolicy:
- "Each piece is hand-selected with a feminine, romantic eye — chosen for its charm, character, and timeless appeal. Any notable wear or flaws are disclosed in individual item descriptions so you always know exactly what you're getting.",
+ "Each piece is hand-selected with a feminine, romantic eye. Chosen for its charm, character, and timeless appeal. Any notable wear or flaws are disclosed in individual item descriptions so you always know exactly what you're getting.",
  shippingPolicy:
  "Ships from Newport Beach, CA. Shipping rates are calculated at checkout.",
  returnPolicy:
- "All sales are final — no returns under any circumstances. All vintage items may show signs of wear consistent with age. Any notable wear is disclosed in the item description. Please review carefully before purchasing.",
+ "All sales are final, no returns under any circumstances. All vintage items may show signs of wear consistent with age. Any notable wear is disclosed in the item description. Please review carefully before purchasing.",
  },
  {
  slug: "maison-optimism-vintage",
@@ -627,7 +627,7 @@ export const stores = [
  shippingPolicy:
  "Ships from Houston, TX. Shipping rates are calculated at checkout.",
  returnPolicy:
- "All sales are final — no returns under any circumstances. All vintage items may show signs of wear consistent with age. Any notable wear is disclosed in the item description. Please review carefully before purchasing.",
+ "All sales are final, no returns under any circumstances. All vintage items may show signs of wear consistent with age. Any notable wear is disclosed in the item description. Please review carefully before purchasing.",
  },
  {
  slug: "missi-archives",
@@ -635,7 +635,7 @@ export const stores = [
  name: "Missi Archives",
  location: "New York, NY",
  description:
- "Missi Archives is a curated vintage collection inspired by early 2000s fashion, street style, and model off-duty looks. Based in New York, each piece is hand-selected to feel both nostalgic and current — from standout clothing and bags to shoes and accessories, all chosen with an eye for individuality and timeless cool.",
+ "Missi Archives is a curated vintage collection inspired by early 2000s fashion, street style, and model off-duty looks. Based in New York, each piece is hand-selected to feel both nostalgic and current, from standout clothing and bags to shoes and accessories, all chosen with an eye for individuality and timeless cool.",
  website: "https://www.missiarchives.com",
  dataSource: "missi-archives",
  image: "/stores/missi-archives.jpg",
@@ -648,13 +648,13 @@ export const stores = [
  affiliatePath: "0001",
  collabsStoreId: "228526",
  discountCode: "0001",
- perk: "VYA customers get free shipping — use code 0001 at checkout",
+ perk: "VYA customers get free shipping. Use code 0001 at checkout",
  authenticityPolicy:
  "All vintage designer pieces are sourced from trusted, reputable sellers who specialize in authenticated luxury goods. Each item then undergoes a thorough in-house inspection to determine authenticity, and third-party authenticators are used for select designer pieces.",
  shippingPolicy:
  "Orders are processed within 2–5 business days. Delivery times vary by destination and chosen shipping service. A confirmation email with tracking details is sent once your order is dispatched.",
  returnPolicy:
- "All sales are final — no returns or refunds. If you experience any issues with your order, email missiarchives@gmail.com and the team will do their best to help.",
+ "All sales are final, no returns or refunds. If you experience any issues with your order, email missiarchives@gmail.com and the team will do their best to help.",
  },
  {
  slug: "montrose-edit",
@@ -662,7 +662,7 @@ export const stores = [
  name: "Montrose Edit",
  location: "Houston, TX",
  description:
- "MontroseEdit is a Houston based curated luxury resale brand specializing in elevated pre loved designer pieces. Rooted in storytelling and personal style, MontroseEdit is more than a storefront — it is a community built around the Montrose girl, someone who is effortless, fashion forward, and intentional in the way she lives and dresses. Through curated drops, pop ups, luxury markets, and digital content, MontroseEdit brings a fresh and approachable perspective to luxury resale, making timeless pieces feel personal, accessible, and meaningful.",
+ "MontroseEdit is a Houston based curated luxury resale brand specializing in elevated pre loved designer pieces. Rooted in storytelling and personal style, MontroseEdit is more than a storefront. It is a community built around the Montrose girl, someone who is effortless, fashion forward, and intentional in the way she lives and dresses. Through curated drops, pop ups, luxury markets, and digital content, MontroseEdit brings a fresh and approachable perspective to luxury resale, making timeless pieces feel personal, accessible, and meaningful.",
  website: "https://www.montroseedit.com",
  dataSource: "montrose-edit",
  image: "/stores/montrose-edit-brand.jpg",
@@ -671,7 +671,7 @@ export const stores = [
  currency: "USD",
  commissionType: "squarespace-manual" as const,
  authenticityPolicy:
- "Every piece at Montrose Edit is personally sourced and hand-selected for its quality, character, and elevated aesthetic. Specializing in pre-loved luxury and designer pieces, each item is carefully inspected and described with full condition details — reflecting the Montrose girl's effortless, intentional approach to style.",
+ "Every piece at Montrose Edit is personally sourced and hand-selected for its quality, character, and elevated aesthetic. Specializing in pre-loved luxury and designer pieces, each item is carefully inspected and described with full condition details. Reflecting the Montrose girl's effortless, intentional approach to style.",
  shippingPolicy:
  "Ships from Houston, TX. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -698,7 +698,7 @@ export const stores = [
  shippingPolicy:
  "Ships from San Diego, CA. Shipping rates are calculated at checkout.",
  returnPolicy:
- "All sales are final. Each piece is hand-selected and personally inspected by Madeleine. Please review all item details and photos carefully before purchasing — email madeleine@mookiestudios.com with any pre-purchase questions.",
+ "All sales are final. Each piece is hand-selected and personally inspected by Madeleine. Please review all item details and photos carefully before purchasing. Email madeleine@mookiestudios.com with any pre-purchase questions.",
  },
  {
  slug: "moonstruck-vintage",
@@ -717,11 +717,11 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "230452",
  authenticityPolicy:
- "Every piece at Moonstruck Vintage is handpicked with care, authenticity, and style in mind — with a focus on bags and shoes, each selected to give it a second life. Sustainability is at the heart of the curation, and every item is personally chosen and accurately described before listing.",
+ "Every piece at Moonstruck Vintage is handpicked with care, authenticity, and style in mind, with a focus on bags and shoes, each selected to give it a second life. Sustainability is at the heart of the curation, and every item is personally chosen and accurately described before listing.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
- "All sales are final. Moonstruck is committed to accurate descriptions and the thrill of the find — please review all item details and photos carefully before purchasing. Use the form below for any pre-purchase questions.",
+ "All sales are final. Moonstruck is committed to accurate descriptions and the thrill of the find. Please review all item details and photos carefully before purchasing. Use the form below for any pre-purchase questions.",
  },
  {
  slug: "nello-vintage",
@@ -783,7 +783,7 @@ export const stores = [
  commissionType: "shopify-collabs" as const,
  collabsStoreId: "252525",
  authenticityPolicy:
- "Every piece at Of Substance is personally sourced and inspected before listing — chosen for craftsmanship, character, and lasting relevance, and accurately described so you can shop with confidence.",
+ "Every piece at Of Substance is personally sourced and inspected before listing. Chosen for craftsmanship, character, and lasting relevance, and accurately described so you can shop with confidence.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -795,7 +795,7 @@ export const stores = [
  name: "Other Matters Atelier",
  location: "Los Angeles, CA",
  description:
- "other matters atelier is an edit of one-of-one archival designer pieces sourced from paris — flea markets, private archives, the kinds of finds that don't surface twice. every piece is chosen through the eye of a working fashion designer with over a decade in the industry. construction and provenance matter as much as the label. the collection is always small by design.",
+ "other matters atelier is an edit of one-of-one archival designer pieces sourced from paris. Flea markets, private archives, the kinds of finds that don't surface twice. every piece is chosen through the eye of a working fashion designer with over a decade in the industry. construction and provenance matter as much as the label. the collection is always small by design.",
  website: "https://othermattersatelier.com",
  contactEmail: "othermattersatelier@gmail.com",
  dataSource: "other-matters-atelier",
@@ -829,7 +829,7 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "231616",
  authenticityPolicy:
- "Every piece at Petria Vintage is Entrupy Verified — authenticated using Entrupy's AI-powered technology before listing. You can shop with confidence knowing each item has passed independent authentication.",
+ "Every piece at Petria Vintage is Entrupy Verified. Authenticated using Entrupy's AI-powered technology before listing. You can shop with confidence knowing each item has passed independent authentication.",
  shippingPolicy:
  "Ships from Montreal, Canada. Shipping rates are calculated at checkout. International customers may be responsible for customs duties and taxes.",
  returnPolicy:
@@ -841,7 +841,7 @@ export const stores = [
  name: "Porter's Preloved",
  location: "New York, NY",
  description:
- "Porter's Preloved is a New York–based vintage luxury boutique founded by Alexandra Porter, a Fashion Business student at the Fashion Institute of Technology. With a sharp eye for archival detail and market value, Alexandra curates rare early-2000s designer pieces, timeless handbags, and collectible ready-to-wear sourced both locally and internationally. The edit focuses on iconic silhouettes, elevated everyday essentials, and statement runway-era finds — from Balenciaga City bags to Galliano-era Dior heels.",
+ "Porter's Preloved is a New York–based vintage luxury boutique founded by Alexandra Porter, a Fashion Business student at the Fashion Institute of Technology. With a sharp eye for archival detail and market value, Alexandra curates rare early-2000s designer pieces, timeless handbags, and collectible ready-to-wear sourced both locally and internationally. The edit focuses on iconic silhouettes, elevated everyday essentials, and statement runway-era finds, from Balenciaga City bags to Galliano-era Dior heels.",
  website: "https://porterspreloved.com",
  dataSource: "porters-preloved",
  image: "/stores/porters-preloved.jpg",
@@ -852,7 +852,7 @@ export const stores = [
  affiliatePath: "VIA",
  collabsStoreId: "232515",
  authenticityPolicy:
- "Every piece at Porter's Preloved is personally sourced and hand-selected by Alexandra — a Fashion Business student at FIT with a sharp eye for archival detail and market value. From Balenciaga City bags to Galliano-era Dior heels, each item is authenticated, inspected, and described with full condition details before listing.",
+ "Every piece at Porter's Preloved is personally sourced and hand-selected by Alexandra. A Fashion Business student at FIT with a sharp eye for archival detail and market value. From Balenciaga City bags to Galliano-era Dior heels, each item is authenticated, inspected, and described with full condition details before listing.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -863,7 +863,7 @@ export const stores = [
  dashboardToken: "prom-6c1d8a3e5f9b2",
  name: "Promised Vintage",
  location: "Boston, MA",
- description: "Promised Vintage is a shop built on a commitment to honing your most authentic self with the help of fabulous clothing and accessories. Founded by Kellan, every piece she carries is handpicked from Europe — rare, discontinued, one-of-one, and designer finds that just don't exist in the US market. The kind of thing you see and just know is yours - because getting dressed should feel like an extension of who you actually are. If your taste exists slightly outside of what's easy to find — you're in the right place.",
+ description: "Promised Vintage is a shop built on a commitment to honing your most authentic self with the help of fabulous clothing and accessories. Founded by Kellan, every piece she carries is handpicked from Europe. Rare, discontinued, one-of-one, and designer finds that just don't exist in the US market. The kind of thing you see and just know is yours - because getting dressed should feel like an extension of who you actually are. If your taste exists slightly outside of what's easy to find. You're in the right place.",
  website: "https://promisedvintage.com",
  dataSource: "promised-vintage",
  image: "/stores/promised-vintage.jpg",
@@ -874,11 +874,11 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "231785",
  authenticityPolicy:
- "Every piece at Promised Vintage is hand-selected by Kellan — personally sourced from across Europe, where rare, discontinued, and one-of-one designer finds just don't exist in the US market. Each item is inspected and described with honest condition details so you know exactly what you're getting.",
+ "Every piece at Promised Vintage is hand-selected by Kellan. Personally sourced from across Europe, where rare, discontinued, and one-of-one designer finds just don't exist in the US market. Each item is inspected and described with honest condition details so you know exactly what you're getting.",
  shippingPolicy:
  "Ships from Boston, MA. Shipping rates are calculated at checkout.",
  returnPolicy:
- "All sales are final. These pieces are often one-of-one finds sourced internationally — returns aren't possible. If there's a significant discrepancy from the listing description, contact kellanmccormick@gmail.com within 48 hours of delivery.",
+ "All sales are final. These pieces are often one-of-one finds sourced internationally. Returns aren't possible. If there's a significant discrepancy from the listing description, contact kellanmccormick@gmail.com within 48 hours of delivery.",
  },
  {
  slug: "rareality-archive",
@@ -886,7 +886,7 @@ export const stores = [
  name: "Rareality Archive",
  location: "Australia",
  description:
- "Rareality is a curated vintage designer archive for those who stand out without trying. Founded by Holly, from a love of creating a capsule wardrobe you truly adore, each piece is hand-selected to be bold, colourful, and impossible to ignore—think iconic heels and statement finds from Galliano-era Dior, Giuseppe Zanotti, Chanel, and Prada. While still in its baby phase, the brand is driven by big dreams and a genuine care for every single customer. She only sources and restores high-quality vintage so each piece can have its next moment—made for those who value individuality and confidence.",
+ "Rareality is a curated vintage designer archive for those who stand out without trying. Founded by Holly, from a love of creating a capsule wardrobe you truly adore, each piece is hand-selected to be bold, colourful, and impossible to ignore. Think iconic heels and statement finds from Galliano-era Dior, Giuseppe Zanotti, Chanel, and Prada. While still in its baby phase, the brand is driven by big dreams and a genuine care for every single customer. She only sources and restores high-quality vintage so each piece can have its next moment. Made for those who value individuality and confidence.",
  website: "https://rarealityarchive.com",
  dataSource: "rareality-archive",
  image: "/stores/rareality-archive.jpg",
@@ -897,9 +897,9 @@ export const stores = [
  affiliatePath: "RAREALITY",
  collabsStoreId: "230749",
  authenticityPolicy:
- "Every piece at Rareality Archive is personally sourced with a sharp archival eye — rare, considered items hand-selected for quality, character, and lasting appeal. Each item is inspected before listing and accurately described with any notable condition details clearly disclosed.",
+ "Every piece at Rareality Archive is personally sourced with a sharp archival eye. Rare, considered items hand-selected for quality, character, and lasting appeal. Each item is inspected before listing and accurately described with any notable condition details clearly disclosed.",
  shippingPolicy:
- "Ships from Australia. Shipping rates and delivery times are calculated at checkout. For U.S. customers, all applicable tariffs and duties are included in the price — no surprise fees on delivery.",
+ "Ships from Australia. Shipping rates and delivery times are calculated at checkout. For U.S. customers, all applicable tariffs and duties are included in the price, no surprise fees on delivery.",
  returnPolicy:
  "All sales are final. Due to the vintage and pre-loved nature of items, returns are not accepted. If there is a quality or condition issue, use the form below within 2 business days of delivery.",
  },
@@ -909,7 +909,7 @@ export const stores = [
  name: "Reine Revival",
  location: "Los Angeles, CA",
  description:
- "Reine Revival was born from a lifelong love of thrifting and finding unique vintage pieces — for myself, my friends, and my family. Vintage clothing tells a story, and I love giving those pieces a second life, helping others discover the quality, craftsmanship, and character that make vintage so special. The name 'Reine' is close to my heart: it's my sister's middle name and a nod to my hometown of Seattle, the 'Rain City' — and in French, reine means 'queen,' which is what those close to me call me, the 'vintage queen.' Based in Los Angeles.",
+ "Reine Revival was born from a lifelong love of thrifting and finding unique vintage pieces, for myself, my friends, and my family. Vintage clothing tells a story, and I love giving those pieces a second life, helping others discover the quality, craftsmanship, and character that make vintage so special. The name 'Reine' is close to my heart: it's my sister's middle name and a nod to my hometown of Seattle, the 'Rain City', and in French, reine means 'queen,' which is what those close to me call me, the 'vintage queen.' Based in Los Angeles.",
  website: "https://reinerevival.com",
  contactEmail: "kaylendbusiness@gmail.com",
  dataSource: "reine-revival",
@@ -931,7 +931,7 @@ export const stores = [
  name: "Rejects Only Vintage",
  location: "Rhode Island",
  description:
- "Rejects Only Vintage is a curated premium vintage boutique based in Rhode Island, founded by Jordan Cameron. Born and raised in Narragansett, RI, Jordan studied Textiles, Fashion Merchandising and Design at the University of Rhode Island and spent time abroad at Academia Italiana Arte Moda Design in Florence, studying Fashion Design & Illustration. After launching her career in the luxury fashion industry at Gucci in New York City, she channeled her lifelong love of fashion, one-of-a-kind pieces, and sustainability into Rejects Only Vintage. At Rejects Only Premium Vintage, you'll find an intentionally sourced collection of pre-loved and vintage pieces — offering a meaningful way to satisfy the desire for new clothing, and giving a second life to those rejected pieces.",
+ "Rejects Only Vintage is a curated premium vintage boutique based in Rhode Island, founded by Jordan Cameron. Born and raised in Narragansett, RI, Jordan studied Textiles, Fashion Merchandising and Design at the University of Rhode Island and spent time abroad at Academia Italiana Arte Moda Design in Florence, studying Fashion Design & Illustration. After launching her career in the luxury fashion industry at Gucci in New York City, she channeled her lifelong love of fashion, one-of-a-kind pieces, and sustainability into Rejects Only Vintage. At Rejects Only Premium Vintage, you'll find an intentionally sourced collection of pre-loved and vintage pieces. Offering a meaningful way to satisfy the desire for new clothing, and giving a second life to those rejected pieces.",
  website: "https://rejectsonlyvintage.com/VYA",
  contactEmail: "Rejectsonlyvintage@gmail.com",
  dataSource: "rejects-only-vintage",
@@ -943,7 +943,7 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "238591",
  authenticityPolicy:
- "Every piece at Rejects Only Vintage is personally and intentionally sourced by founder Jordan Cameron — chosen for its quality, character, and ability to give pre-loved pieces a meaningful second life. Each item is carefully inspected and accurately described before listing.",
+ "Every piece at Rejects Only Vintage is personally and intentionally sourced by founder Jordan Cameron. Chosen for its quality, character, and ability to give pre-loved pieces a meaningful second life. Each item is carefully inspected and accurately described before listing.",
  shippingPolicy:
  "Ships from Rhode Island. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -966,11 +966,11 @@ export const stores = [
  affiliatePath: "1234",
  collabsStoreId: "231753",
  authenticityPolicy:
- "Every piece at Sablier Vintage is hand-selected and inspected by the team — from timeless vintage staples and statement pieces to custom designs reconstructed from second-hand fabrics. Each item is authentic, quality-checked, and described with full condition details, with sustainability and individuality at the core of every selection.",
+ "Every piece at Sablier Vintage is hand-selected and inspected by the team, from timeless vintage staples and statement pieces to custom designs reconstructed from second-hand fabrics. Each item is authentic, quality-checked, and described with full condition details, with sustainability and individuality at the core of every selection.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
- "Exchanges accepted within 14 days of receipt — no cash refunds. Items must be unworn and unused with tags and original packaging; once inspected, store credit for the value is issued. If there is an issue with your order, contact the team and they will do their best to help.",
+ "Exchanges accepted within 14 days of receipt, no cash refunds. Items must be unworn and unused with tags and original packaging; once inspected, store credit for the value is issued. If there is an issue with your order, contact the team and they will do their best to help.",
  },
  {
  slug: "sacrare",
@@ -1051,7 +1051,7 @@ export const stores = [
  affiliatePath: "VIAXSCARZ",
  collabsStoreId: "228153",
  discountCode: "VIAXSCARZ",
- perk: "VYA customers get free shipping — use code VIAXSCARZ at checkout",
+ perk: "VYA customers get free shipping. Use code VIAXSCARZ at checkout",
  authenticityPolicy:
  "Each item is carefully inspected based on significant experience with luxury fashion. Detailed photos of tags and labels are provided in every listing to assist in your evaluation. While thorough checks are conducted, Scarz Vintage is not a certified authentication service.",
  shippingPolicy:
@@ -1076,7 +1076,7 @@ export const stores = [
  collabsStoreId: "231298",
  commissionRates: [{ upTo: 1000, rate: 0.05 }, { upTo: 5000, rate: 0.04 }, { rate: 0.03 }],
  authenticityPolicy:
- "Every piece at Sheer Vintage is hand-selected with a focus on designer bridal and evening wear — curated for enduring quality, condition, and style. Items are accurately described with full condition details before listing.",
+ "Every piece at Sheer Vintage is hand-selected with a focus on designer bridal and evening wear. Curated for enduring quality, condition, and style. Items are accurately described with full condition details before listing.",
  shippingPolicy:
  "Ships from Calgary, Canada. Shipping rates are calculated at checkout. International customers may be responsible for customs duties and taxes.",
  returnPolicy:
@@ -1088,7 +1088,7 @@ export const stores = [
  name: "Shiranka Vintage",
  location: "San Francisco, CA",
  description:
- "Shiranka Vintage specializes in tracking down rare, highly coveted designer grails alongside curating wardrobe staples for the everyday girl who wants to wear something no one else has. Shiranka believes not all clothes are created equal — every piece is intentionally sourced to define eras, celebrate construction, and bring late-90s and 2000s archival luxury directly into your modern rotation.",
+ "Shiranka Vintage specializes in tracking down rare, highly coveted designer grails alongside curating wardrobe staples for the everyday girl who wants to wear something no one else has. Shiranka believes not all clothes are created equal. Every piece is intentionally sourced to define eras, celebrate construction, and bring late-90s and 2000s archival luxury directly into your modern rotation.",
  website: "https://shirankavintage.com",
  dataSource: "shiranka-vintage",
  image: "/stores/shiranka-vintage.jpg",
@@ -1103,7 +1103,7 @@ export const stores = [
  shippingPolicy:
  "Ships from San Francisco, CA. Shipping rates are calculated at checkout.",
  returnPolicy:
- "All sales are final. Each piece is hand-selected and personally inspected. Please review all item details and photos carefully before purchasing — email info@shirankavintage.com with any pre-purchase questions.",
+ "All sales are final. Each piece is hand-selected and personally inspected. Please review all item details and photos carefully before purchasing. Email info@shirankavintage.com with any pre-purchase questions.",
  },
  {
  slug: "situations-vintage",
@@ -1111,7 +1111,7 @@ export const stores = [
  name: "Situations Vintage",
  location: "New York, NY",
  description:
- "Situations Vintage is all about finding your next situation! Situations Vintage believes vintage items are more than just clothes — they're stories, moods, and moments waiting to happen. Founded by two best friends in New York City, the shop sources and curates archival 90s and early 2000s pieces.",
+ "Situations Vintage is all about finding your next situation! Situations Vintage believes vintage items are more than just clothes. They're stories, moods, and moments waiting to happen. Founded by two best friends in New York City, the shop sources and curates archival 90s and early 2000s pieces.",
  website: "https://situationsvintage.com",
  contactEmail: "info@situationsvintage.com",
  dataSource: "situations-vintage",
@@ -1169,11 +1169,11 @@ export const stores = [
  affiliatePath: "VIACONNECT",
  collabsStoreId: "230428",
  authenticityPolicy:
- "Every piece is personally sourced by Emma from trusted vintage dealers, flea markets, and private sellers across Milan and Europe — inspected for quality and selected only in excellent or very good condition. The focus is on expressive 90s and early 2000s designer pieces from labels like Roberto Cavalli, Christian Dior, and iconic Italian houses. Any age or wear is noted in the description.",
+ "Every piece is personally sourced by Emma from trusted vintage dealers, flea markets, and private sellers across Milan and Europe. Inspected for quality and selected only in excellent or very good condition. The focus is on expressive 90s and early 2000s designer pieces from labels like Roberto Cavalli, Christian Dior, and iconic Italian houses. Any age or wear is noted in the description.",
  shippingPolicy:
  "Ships from Washington, DC. Shipping rates are calculated at checkout.",
  returnPolicy:
- "Returns accepted within 7 days of delivery — items must be shipped back within 7 business days of return confirmation. Refunds are issued as store credit for the full price minus a $15 restocking and return shipping fee. Final sale items (belts, jewelry, swimwear, lingerie, and sale items) are not eligible. Contact hello@sourcedbyscottie.com to initiate a return.",
+ "Returns accepted within 7 days of delivery. Items must be shipped back within 7 business days of return confirmation. Refunds are issued as store credit for the full price minus a $15 restocking and return shipping fee. Final sale items (belts, jewelry, swimwear, lingerie, and sale items) are not eligible. Contact hello@sourcedbyscottie.com to initiate a return.",
  },
  {
  slug: "stone-studio-vintage",
@@ -1181,7 +1181,7 @@ export const stores = [
  name: "Stone Studio Vintage",
  location: "Miami, FL",
  description:
- "Stone Studio Vintage is a curated collection of authentic luxury and designer vintage, handpicked for those who love rare, timeless pieces with a modern edge. Founded by two sisters with a shared love for vintage fashion, Stone Studio Vintage was created from an obsession with finding the coolest, most niche pieces — constantly searching for rare designer finds and one-of-a-kind vintage that feels special, unexpected, and impossible to find everywhere else.",
+ "Stone Studio Vintage is a curated collection of authentic luxury and designer vintage, handpicked for those who love rare, timeless pieces with a modern edge. Founded by two sisters with a shared love for vintage fashion, Stone Studio Vintage was created from an obsession with finding the coolest, most niche pieces. Constantly searching for rare designer finds and one-of-a-kind vintage that feels special, unexpected, and impossible to find everywhere else.",
  website: "https://stonestudiovintage.com",
  contactEmail: "stonestudiovintage@gmail.com",
  dataSource: "stone-studio-vintage",
@@ -1204,7 +1204,7 @@ export const stores = [
  name: "Tess Elizabeth Vintage",
  location: "Los Angeles, CA",
  description:
- "Tess Elizabeth Vintage is a curated collection of timeless vintage and antique pieces, founded by Tess Elizabeth — Los Angeles-based photographer and creative director. Each piece is carefully selected for its craftsmanship, story, and modern wearability, bringing history into the present through romantic curation and design.",
+ "Tess Elizabeth Vintage is a curated collection of timeless vintage and antique pieces, founded by Tess Elizabeth. Los Angeles-based photographer and creative director. Each piece is carefully selected for its craftsmanship, story, and modern wearability, bringing history into the present through romantic curation and design.",
  website: "https://tesselizabethvintage.com",
  dataSource: "tess-elizabeth-vintage",
  image: "/stores/tess-elizabeth-vintage.jpg",
@@ -1219,7 +1219,7 @@ export const stores = [
  shippingPolicy:
  "Shipping rates are calculated at checkout.",
  returnPolicy:
- "Returns accepted up to 14 days after delivery for store credit (not a cash refund) — you receive the full order amount minus shipping. Items must be returned in the same condition they were sent, and all sale items are final. Email hello@tesselizabeth.com to arrange a return.",
+ "Returns accepted up to 14 days after delivery for store credit (not a cash refund). You receive the full order amount minus shipping. Items must be returned in the same condition they were sent, and all sale items are final. Email hello@tesselizabeth.com to arrange a return.",
  },
  {
  slug: "the-haus-archive",
@@ -1227,7 +1227,7 @@ export const stores = [
  name: "The Haus Archive",
  location: "Greensboro, NC",
  description:
- "The Haus Archive is a curated luxury resale and vintage boutique in Greensboro, NC, founded by Claribel Paulino for women who believe style should have story. The shop specializes in designer handbags, vintage fashion, small leather goods, statement accessories, consignment, and sourcing — every piece selected with intention for its character, craftsmanship, and history. A world that is curated, not crowded: timeless designer pieces, vintage treasures, and second-life luxury, offered through an intimate shopping experience that feels personal and elevated. Curated. Archived. Reawakened.",
+ "The Haus Archive is a curated luxury resale and vintage boutique in Greensboro, NC, founded by Claribel Paulino for women who believe style should have story. The shop specializes in designer handbags, vintage fashion, small leather goods, statement accessories, consignment, and sourcing. Every piece selected with intention for its character, craftsmanship, and history. A world that is curated, not crowded: timeless designer pieces, vintage treasures, and second-life luxury, offered through an intimate shopping experience that feels personal and elevated. Curated. Archived. Reawakened.",
  website: "https://thehausarchive.com",
  contactEmail: "hello@verdehausmedia.com",
  dataSource: "the-haus-archive",
@@ -1251,7 +1251,7 @@ export const stores = [
  name: "The Objects of Affection",
  location: "New Hope, Pennsylvania",
  description:
- "Founded by Mackenzie and based in New Hope, Pennsylvania, The Objects of Affection is a curated vintage and archival fashion house specializing in luxury handbags, clothing, shoes, and accessories from the designers and houses that defined eras.\n\nWith an archival mindset and an editorial eye, Mackenzie sources pieces not for trend, but for reverence — hand-selecting objects defined by craftsmanship, condition, rarity, and the emotional pull a truly remarkable piece gives. These are pieces worth longing for, chosen for those who build their wardrobes slowly and with intention, collecting for today to be passed on as heirlooms.\n\nAt The Objects of Affection, clients are celebrated just as thoughtfully as the pieces themselves. Every object is authenticated, transparently presented, and sent off with the care and white-glove attention of buying it brand new. The Objects of Affection serves its collectors like family, because devotion to the object should always be matched by devotion to the experience.",
+ "Founded by Mackenzie and based in New Hope, Pennsylvania, The Objects of Affection is a curated vintage and archival fashion house specializing in luxury handbags, clothing, shoes, and accessories from the designers and houses that defined eras.\n\nWith an archival mindset and an editorial eye, Mackenzie sources pieces not for trend, but for reverence. Hand-selecting objects defined by craftsmanship, condition, rarity, and the emotional pull a truly remarkable piece gives. These are pieces worth longing for, chosen for those who build their wardrobes slowly and with intention, collecting for today to be passed on as heirlooms.\n\nAt The Objects of Affection, clients are celebrated just as thoughtfully as the pieces themselves. Every object is authenticated, transparently presented, and sent off with the care and white-glove attention of buying it brand new. The Objects of Affection serves its collectors like family, because devotion to the object should always be matched by devotion to the experience.",
  website: "https://theobjectsofaffection.com",
  dataSource: "the-objects-of-affection",
  image: "/stores/the-objects-of-affection-3.jpg",
@@ -1286,11 +1286,11 @@ export const stores = [
  affiliatePath: "VYA",
  collabsStoreId: "250595",
  authenticityPolicy:
- "The Vintage New Yorker requires a strict two-round authentication process on every piece in the collection, and provides as much transparent detail as possible on each item. As lovers of fashion history, we're proud to be part of a circular movement — promoting less waste and a longer life cycle for great fashion.",
+ "The Vintage New Yorker requires a strict two-round authentication process on every piece in the collection, and provides as much transparent detail as possible on each item. As lovers of fashion history, we're proud to be part of a circular movement. Promoting less waste and a longer life cycle for great fashion.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
- "Every item is presented with transparent detail — please review all descriptions and photos carefully before purchasing. For any questions about an order or a return, contact info@thevintagenewyorker.com.",
+ "Every item is presented with transparent detail. Please review all descriptions and photos carefully before purchasing. For any questions about an order or a return, contact info@thevintagenewyorker.com.",
  },
  {
  slug: "thread-and-bloom",
@@ -1330,7 +1330,7 @@ export const stores = [
  affiliatePath: "HANA",
  collabsStoreId: "228807",
  authenticityPolicy:
- "Every piece at To Us Vintage is hand-selected and personally inspected by founder Kathleen Scarrone. Specializing in iconic designer and statement pieces — from Thierry Mugler tailoring to rare Dolce & Gabbana Y2K finds — each item is chosen for quality, character, and individuality, and accurately described before listing.",
+ "Every piece at To Us Vintage is hand-selected and personally inspected by founder Kathleen Scarrone. Specializing in iconic designer and statement pieces, from Thierry Mugler tailoring to rare Dolce & Gabbana Y2K finds. Each item is chosen for quality, character, and individuality, and accurately described before listing.",
  shippingPolicy:
  "Ships from New York, NY. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -1342,7 +1342,7 @@ export const stores = [
  name: "Vangie",
  location: "Philadelphia, PA",
  description:
- "Vangie is a Philadelphia-based vintage studio curating collectible, investment-worthy fashion — bold statement pieces and art-to-wear with real design integrity. Founded by Evan Noll after more than a decade in tech, Vangie is rooted in craftsmanship, sustainability, and personal storytelling. Named for Evan's grandmother (short for Evangeline), the studio honors a legacy of fearless self-expression — clothing as confidence and personality. Explore clothing, jewelry, and accessories ranging from the 1950s to Y2K.",
+ "Vangie is a Philadelphia-based vintage studio curating collectible, investment-worthy fashion. Bold statement pieces and art-to-wear with real design integrity. Founded by Evan Noll after more than a decade in tech, Vangie is rooted in craftsmanship, sustainability, and personal storytelling. Named for Evan's grandmother (short for Evangeline), the studio honors a legacy of fearless self-expression. Clothing as confidence and personality. Explore clothing, jewelry, and accessories ranging from the 1950s to Y2K.",
  website: "https://vangie.co",
  dataSource: "vangie",
  image: "/stores/vangie.jpg",
@@ -1353,7 +1353,7 @@ export const stores = [
  affiliatePath: "1",
  collabsStoreId: "230072",
  authenticityPolicy:
- "Every piece at Vangie is personally sourced and authenticated by Evan before listing. Specializing in collectible and investment-worthy vintage, each item is hand-selected for craftsmanship, condition, and design integrity — bold statement pieces chosen to be treasured for a lifetime.",
+ "Every piece at Vangie is personally sourced and authenticated by Evan before listing. Specializing in collectible and investment-worthy vintage, each item is hand-selected for craftsmanship, condition, and design integrity. Bold statement pieces chosen to be treasured for a lifetime.",
  shippingPolicy:
  "Ships from Philadelphia, PA. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -1381,7 +1381,7 @@ export const stores = [
  shippingPolicy:
  "Orders are processed within 3–7 business days. Delivery takes an additional 3–7 business days depending on location. Shipping rates are calculated at checkout based on destination and package weight. US shipping only.",
  returnPolicy:
- "All sales are final — no refunds, exchanges, or returns. Please review all item details carefully before purchasing.",
+ "All sales are final, no refunds, exchanges, or returns. Please review all item details carefully before purchasing.",
  },
  {
  slug: "vintage-girlfriend",
@@ -1401,7 +1401,7 @@ export const stores = [
  affiliatePath: "VYAPARTNER",
  collabsStoreId: "231641",
  authenticityPolicy:
- "Every piece goes through rigorous in-house inspection and independent third-party verification using services including Entrupy, Zeko's, LegitGrails, and Real Authentication — only authenticated items make it through. Each purchase comes with a complimentary Certificate of Authenticity, so you can shop pre-owned luxury without worry.",
+ "Every piece goes through rigorous in-house inspection and independent third-party verification using services including Entrupy, Zeko's, LegitGrails, and Real Authentication, only authenticated items make it through. Each purchase comes with a complimentary Certificate of Authenticity, so you can shop pre-owned luxury without worry.",
  shippingPolicy:
  "Ships from Menlo Park, CA. Shipping rates are calculated at checkout.",
  returnPolicy:
@@ -1413,7 +1413,7 @@ export const stores = [
  name: "Vintari Vault",
  location: "Dallas, Texas",
  description:
- "Vintari Vault is a Dallas-based seller of vintage designer handbags founded by two best friends, one with a deep love for designer handbags and the other with a passion for vintage fashion history. What began as sourcing pieces for personal collections grew into a mission to provide a curated selection of authentic, timeless designer bags that celebrate the history of vintage fashion while bringing it to the everyday wardrobe. Operating primarily online with select Dallas pop-ups, their mission is to make timeless luxury accessible and inclusive — unlocking vintage one bag at a time.",
+ "Vintari Vault is a Dallas-based seller of vintage designer handbags founded by two best friends, one with a deep love for designer handbags and the other with a passion for vintage fashion history. What began as sourcing pieces for personal collections grew into a mission to provide a curated selection of authentic, timeless designer bags that celebrate the history of vintage fashion while bringing it to the everyday wardrobe. Operating primarily online with select Dallas pop-ups, their mission is to make timeless luxury accessible and inclusive. Unlocking vintage one bag at a time.",
  website: "https://vintarivault.com",
  dataSource: "vintari-vault",
  image: "/stores/vintari-vault.jpg",
@@ -1455,12 +1455,12 @@ export const stores = [
  },
 ];
 
-/** Stores shown on the public site — Shopify Collabs stores must have a collabsStoreId; other types (Squarespace, Square, Wix, custom) are always shown. */
+/** Stores shown on the public site. Shopify Collabs stores must have a collabsStoreId; other types (Squarespace, Square, Wix, custom) are always shown. */
 export const visibleStores = stores.filter(s =>
  s.commissionType !== "shopify-collabs" || 'collabsStoreId' in s
 );
 
-/** Shopify Collabs stores without a collabsStoreId — hidden site-wide until onboarded. */
+/** Shopify Collabs stores without a collabsStoreId. Hidden site-wide until onboarded. */
 export const HIDDEN_STORE_SLUGS: string[] = (stores as Array<{ commissionType: string; slug: string; collabsStoreId?: string }>)
  .filter(s => s.commissionType === "shopify-collabs" && !s.collabsStoreId)
  .map(s => s.slug);
@@ -1471,7 +1471,7 @@ export const HIDDEN_STORE_SLUGS: string[] = (stores as Array<{ commissionType: s
  * case, hyphens, and surrounding punctuation, so "sassysowhat", "Sassy So What", and
  * "sassy-so-what," all resolve to "sassy-so-what". If no store matches, returns a
  * best-effort cleaned slug (lowercased, punctuation collapsed to single hyphens) so we
- * never lose data — but known stores are always normalized to their canonical slug.
+ * never lose data, but known stores are always normalized to their canonical slug.
  */
 const slugByCanonKey: Map<string, string> = new Map(
  stores.map((s) => [s.slug.toLowerCase().replace(/[^a-z0-9]/g, ""), s.slug])
@@ -1508,7 +1508,7 @@ export function getCommissionAmount(price: number): number {
 
 /**
  * Store contact emails for sourcing request notifications.
- * Fill in each store's email address — leave blank to skip that store.
+ * Fill in each store's email address. Leave blank to skip that store.
  */
 export const storeContactEmails: Record<string, string> = {
  "the-haus-archive": "hello@verdehausmedia.com",
@@ -1574,7 +1574,7 @@ export const storeContactEmails: Record<string, string> = {
  "blummier": "blummier@gmail.com",
   "nunumia": "nunumiavintage@gmail.com",
   "thread-and-bloom": "shopthreadandbloom@gmail.com",
- // VYA admin test account — sees all requests
+ // VYA admin test account. Sees all requests
  "via-admin": "hana@theviaplatform.com",
 };
 
@@ -1592,7 +1592,7 @@ const FALLBACK_RATES: Record<string, number> = {
  AUD: 0.72,
 };
 
-// Module-level rates — updated by refreshExchangeRates() at sync time
+// Module-level rates. Updated by refreshExchangeRates() at sync time
 let _exchangeRates: Record<string, number> = { ...FALLBACK_RATES };
 
 /**
@@ -1615,7 +1615,7 @@ export async function refreshExchangeRates(): Promise<void> {
  }
  _exchangeRates = fresh;
  console.log(
- `[FX] Live rates — GBP:${fresh.GBP?.toFixed(4)} EUR:${fresh.EUR?.toFixed(4)} CAD:${fresh.CAD?.toFixed(4)} AUD:${fresh.AUD?.toFixed(4)}`
+ `[FX] Live rates. GBP:${fresh.GBP?.toFixed(4)} EUR:${fresh.EUR?.toFixed(4)} CAD:${fresh.CAD?.toFixed(4)} AUD:${fresh.AUD?.toFixed(4)}`
  );
  } catch (err) {
  console.warn("[FX] Live fetch failed, using fallback rates:", err);

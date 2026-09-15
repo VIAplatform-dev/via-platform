@@ -392,7 +392,7 @@
 #infra .stats .wrap{position:relative;z-index:2}
 #infra .netcv{opacity:.5}
 
-/* ── Rotating storefronts (hero) — 3D coverflow ── */
+/* ── Rotating storefronts (hero): 3D coverflow ── */
 #infra .shopfloat{position:relative;width:100%;max-width:560px;margin:0 auto;height:495px;perspective:1500px;animation:infra-shopbob 7s ease-in-out infinite}
 @keyframes infra-shopbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
 #infra .shopcard{position:absolute;top:0;left:50%;width:72%;transform-style:preserve-3d;transition:transform 1s cubic-bezier(.3,.1,.2,1),opacity 1s,filter 1s;backface-visibility:hidden;will-change:transform}

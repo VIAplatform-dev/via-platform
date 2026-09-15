@@ -1,4 +1,4 @@
-// Who a filter reaches. Pure — no I/O.
+// Who a filter reaches. Pure, no I/O.
 //
 // The customer list and the campaign sender both run THIS, so the count on the page is the count
 // that sends. Two implementations of "tagged vip and spent over £50" is how a seller emails 40
@@ -10,7 +10,7 @@ export type AudienceCustomer = {
  spentCents: number;
  /** Categories of the pieces this customer has bought, lower-cased. */
  categories: string[];
- /** When they last bought, ISO — null for someone who never has. Drives "hasn't shopped in a while". */
+ /** When they last bought, ISO. Null for someone who never has. Drives "hasn't shopped in a while". */
  lastOrderAt?: string | null;
 };
 
@@ -24,7 +24,7 @@ export type AudienceFilter = {
   * Win-back: people whose last order is older than this many days.
   *
   * Someone who has NEVER ordered is not in it. "Haven't shopped in a while" means a customer who
-  * drifted, not a name on an imported list who never bought — those are a different email, and
+  * drifted, not a name on an imported list who never bought. Those are a different email, and
   * sweeping them in would quietly turn a win-back into a send-to-everyone.
   */
  notOrderedInDays?: number | null;

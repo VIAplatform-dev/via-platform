@@ -13,7 +13,7 @@ export const PAYOUT_METHOD_LABELS: Record<string, string> = {
  *
  * The phone only ever showed what the store had already switched on, and a store that has never
  * opened the web settings page is on the table default: store_credit, and nothing else. So the
- * phone looked broken ("I can only pay by store credit") when in truth nothing had been enabled —
+ * phone looked broken ("I can only pay by store credit") when in truth nothing had been enabled,
  * and the page that enables them was web-only. These are the switches, on the phone.
  *
  * Mirrors app/infrastructure/admin/consignment/settings/page.tsx.
@@ -54,7 +54,7 @@ export function payoutMethodOptions(methods: string[] | null | undefined): { key
 }
 
 /**
- * Their cut, as a number the API will take — or null for "use the store default".
+ * Their cut, as a number the API will take, or null for "use the store default".
  *
  * Blank is null, not 0: a consignor on 0% keeps nothing, which is a real (if unkind) arrangement,
  * and it must not be what an empty box quietly means. Out-of-range values are clamped rather than
@@ -77,7 +77,7 @@ export function describeConsignor(c: {
   const bits: string[] = [];
   if (c.defaultSplitPct != null) bits.push(`${c.defaultSplitPct}%`);
   if (c.payoutMethod) bits.push(PAYOUT_METHOD_LABELS[c.payoutMethod] ?? c.payoutMethod.replace(/_/g, " "));
-  // Only ever said when it is NOT the ordinary case — a line that reads "Active" on every row is
+  // Only ever said when it is NOT the ordinary case. A line that reads "Active" on every row is
   // one the eye stops seeing, and then the one inactive consignor reads as active too.
   if (c.status && c.status !== "active") bits.push(c.status);
   return bits.join(" · ") || "No cut set";

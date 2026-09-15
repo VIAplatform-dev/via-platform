@@ -2,14 +2,14 @@
 //
 // Two products, two identities. The shopper side of this app is vyaplatform.com: cream ground,
 // one deep burgundy carrying every piece of ink (see ./theme.ts). The seller side is getvya.ai,
-// which is warmer, browner and quieter — ink is a soft near-black, oxblood is reserved for the
+// which is warmer, browner and quieter. Ink is a soft near-black, oxblood is reserved for the
 // things you act on, and the whole thing sits on paper rather than cream.
 //
 // The values below are lifted verbatim from app/infrastructure/infrastructure.css, the getvya.ai
 // stylesheet, so the site and the portal cannot drift apart by eye. Its custom-property name is
 // kept in a comment beside each one.
 //
-// The exported NAMES match ./theme.ts exactly — colors, spacing, fonts, eyebrow, with the same
+// The exported NAMES match ./theme.ts exactly. Colors, spacing, fonts, eyebrow, with the same
 // keys. That is deliberate: a seller screen swaps one import path and needs no other edit, and a
 // screen can never half-adopt the portal identity.
 
@@ -52,15 +52,18 @@ export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 // The body face is where the portal departs from the site, on purpose. getvya.ai is a marketing
 // page read once at leisure; this is a dashboard read at a glance, in a shop, one-handed. A serif
 // body at 13px in a dense table is the wrong tool, and the existing shopper theme already makes
-// this call for the same reason. So the brand faces dress the CHROME — titles, eyebrows, buttons,
-// section headings — and the numbers and rows a seller scans stay in the system sans.
+// this call for the same reason. So the brand faces dress the CHROME. Titles, eyebrows, buttons,
+// section headings, and the numbers and rows a seller scans stay in the system sans.
+// THE SAME TWO FACES AS getvya.ai. The workspace on a laptop is set in Newsreader and Hanken
+// Grotesk; the app was in Playfair Display and Cormorant, so the same product read as two products
+// depending on which screen a seller was looking at. One pair, both places.
 export const fonts = {
-  /** Screen titles, section headings, the wordmark. */
-  serif: "PlayfairDisplay_500Medium",
+  /** Screen titles, section headings, the wordmark. --font-display on the web. */
+  serif: "Newsreader_500Medium",
   /** Uppercase, letter-spaced labels: eyebrows, buttons, tab bar. */
-  label: "Cormorant_600SemiBold",
-  /** Dense data: prices, counts, product titles, table rows. */
-  sans: undefined as string | undefined,
+  label: "HankenGrotesk_600SemiBold",
+  /** Dense data: prices, counts, product titles, table rows. --font-sans on the web. */
+  sans: "HankenGrotesk_400Regular" as string | undefined,
 };
 
 /** Every font family the portal needs, for useFonts() at the root.
@@ -68,14 +71,16 @@ export const fonts = {
  *  rewritten to a runtime asset reference. */
 /* eslint-disable @typescript-eslint/no-require-imports */
 export const PORTAL_FONTS = {
-  PlayfairDisplay_500Medium: require("@expo-google-fonts/playfair-display/500Medium/PlayfairDisplay_500Medium.ttf"),
-  PlayfairDisplay_600SemiBold: require("@expo-google-fonts/playfair-display/600SemiBold/PlayfairDisplay_600SemiBold.ttf"),
-  Cormorant_600SemiBold: require("@expo-google-fonts/cormorant/600SemiBold/Cormorant_600SemiBold.ttf"),
+  Newsreader_500Medium: require("@expo-google-fonts/newsreader/500Medium/Newsreader_500Medium.ttf"),
+  Newsreader_600SemiBold: require("@expo-google-fonts/newsreader/600SemiBold/Newsreader_600SemiBold.ttf"),
+  HankenGrotesk_400Regular: require("@expo-google-fonts/hanken-grotesk/400Regular/HankenGrotesk_400Regular.ttf"),
+  HankenGrotesk_500Medium: require("@expo-google-fonts/hanken-grotesk/500Medium/HankenGrotesk_500Medium.ttf"),
+  HankenGrotesk_600SemiBold: require("@expo-google-fonts/hanken-grotesk/600SemiBold/HankenGrotesk_600SemiBold.ttf"),
 };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 /** The uppercase, letter-spaced label above every section heading.
- *  getvya.ai sets these in Cormorant 600 at .2em, in oxblood — not in the body grey. */
+ *  getvya.ai sets these in Cormorant 600 at .2em, in oxblood, not in the body grey. */
 export const eyebrow = {
   fontFamily: fonts.label,
   fontSize: 13,
@@ -84,7 +89,7 @@ export const eyebrow = {
   color: colors.accent,
 };
 
-/** getvya.ai's buttons: Cormorant 600, .18em tracking, uppercase, and a 2px radius — corners just
+/** getvya.ai's buttons: Cormorant 600, .18em tracking, uppercase, and a 2px radius. Corners just
  *  soft enough to read as deliberate rather than rounded. */
 export const button = {
   fontFamily: fonts.label,

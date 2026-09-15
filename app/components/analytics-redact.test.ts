@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { redactOnPrivateScreens } from "./analytics-redact.ts";
 
 // The privacy guarantee, and the thing that breaks everything if it throws: PostHog runs this on
-// EVERY event, so an exception here doesn't lose one property — it silently stops all analytics.
+// EVERY event, so an exception here doesn't lose one property. It silently stops all analytics.
 
 test("leaves ordinary workspace screens alone", () => {
  const props = { $pathname: "/admin/cross-listing/settings", $el_text: "Connect a marketplace" };
@@ -12,7 +12,7 @@ test("leaves ordinary workspace screens alone", () => {
 
 test("redacts the text of what was clicked on a seller's private screens", () => {
  for (const path of ["/admin/orders", "/admin/customers/buyers", "/admin/inbox", "/admin/payments", "/admin/consignment/payouts", "/admin/customers/recovery"]) {
-  const out = redactOnPrivateScreens({ $pathname: path, $el_text: "Priya Raman — priya@example.com" });
+  const out = redactOnPrivateScreens({ $pathname: path, $el_text: "Priya Raman: priya@example.com" });
   assert.equal(out.$el_text, "[redacted]", path);
  }
 });
@@ -40,7 +40,7 @@ test("redacts the attributes that carry a person too, not just the text", () => 
 });
 
 test("never throws, whatever PostHog hands it", () => {
- // If this throws, EVERY event stops — not just the ones on private screens.
+ // If this throws, EVERY event stops, not just the ones on private screens.
  const nasty: Record<string, unknown>[] = [
   {},
   { $pathname: "/admin/orders" },

@@ -1,7 +1,7 @@
 // Who may take a reserved piece back: only the bag that reserved it.
 //
 // A reservation's owner tag says who holds the piece: the bag's own token, another buyer's
-// token, "checkout", "offer-<token>", or "hold:<name>" (the seller keeping it for someone —
+// token, "checkout", "offer-<token>", or "hold:<name>" (the seller keeping it for someone,
 // see holds-core.ts). The bag retrying a checkout may release its OWN earlier reservation and
 // nothing else. Releasing a hold here would sell a piece out from under the customer it was
 // promised to, which is exactly what happened before this file existed.

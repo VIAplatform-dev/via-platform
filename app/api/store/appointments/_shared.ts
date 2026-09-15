@@ -13,7 +13,7 @@ export const today = () => new Date().toISOString().slice(0, 10);
 /**
  * Public store context. A shopper has no session, so it comes from what the page knows: a STORE
  * slug (an appointments section anywhere on the site) or an ITEM (the rent box, which knows its
- * piece). Never asks whether the store rents — appointments are their own feature.
+ * piece). Never asks whether the store rents. Appointments are their own feature.
  */
 export async function publicContext(params: { storeSlug?: string; itemId?: string; request?: NextRequest }) {
  let sellerId: string | null = null;
@@ -25,7 +25,7 @@ export async function publicContext(params: { storeSlug?: string; itemId?: strin
   const owner = await ownerOfItem(params.itemId);
   if (owner) ({ sellerId, storeSlug } = owner);
  } else if (params.request) {
-  // No slug and no item — the storefront EDITOR, where the seller is signed in. Without this the
+  // No slug and no item. The storefront EDITOR, where the seller is signed in. Without this the
   // canvas can never show a shop its own diary, which is exactly where it needs to see it.
   const acting = await actingSeller(params.request);
   if (acting) { sellerId = acting.seller.id; storeSlug = acting.slug; }

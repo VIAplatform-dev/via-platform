@@ -57,7 +57,7 @@ export function formatPickupAddress(a: PickupAddress): string {
 /**
  * What this order is: delivered or collected, what postage is owed, and whether we need to ask for
  * an address. Falls back to delivery for anything it cannot honour, so a bad or hostile request can
- * only ever cost the shopper postage they were already going to pay — never the seller.
+ * only ever cost the shopper postage they were already going to pay, never the seller.
  */
 export function deliveryChoice(
  chosen: DeliveryMethod | string | undefined | null,

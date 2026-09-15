@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizePath, linkTargets, partitionByReachability } from "./capture-links.ts";
 
-// The cost of getting this wrong is not a broken page — it is a seller told that a collection she
+// The cost of getting this wrong is not a broken page. It is a seller told that a collection she
 // retired is live on her shop, or told that a collection she is selling from is not. Both are worse
 // than no label at all, so the edges matter more than the happy path here.
 
@@ -73,7 +73,7 @@ test("a trailing slash on either side is still the same page", () => {
 });
 
 test("no source html means nothing is claimed either way", () => {
- // A capture we can't read links from must not mark the whole shop as dead — better an unlabelled
+ // A capture we can't read links from must not mark the whole shop as dead. Better an unlabelled
  // strip than one telling her every collection is orphaned.
  const { linked, unlinked } = partitionByReachability(["/", "/collections/a", "/collections/b"], []);
  assert.deepEqual(linked, ["/"]);

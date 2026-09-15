@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-// PATCH — edit one of the acting store's listings (scoped to its slug).
+// PATCH: edit one of the acting store's listings (scoped to its slug).
 export async function PATCH(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
  return NextResponse.json({ ok: true, listing });
 }
 
-// DELETE — remove one of the acting store's listings.
+// DELETE: remove one of the acting store's listings.
 export async function DELETE(request: NextRequest, { params }: Ctx) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

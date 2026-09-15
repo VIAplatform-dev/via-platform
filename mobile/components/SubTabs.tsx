@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from "react-native";
 import { colors, fonts, spacing } from "../lib/theme";
 
-// The underlined row that splits a tab in two or three — Obsessions / Sold Out / Searches, and
+// The underlined row that splits a tab in two or three. Obsessions / Sold Out / Searches, and
 // Community / Messages. Serif, like the title above it; the active one is full-strength with a rule
 // under it, the rest are muted with no rule.
 

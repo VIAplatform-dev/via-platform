@@ -9,7 +9,7 @@ import type { Item } from "@/app/lib/db/index";
 export const dynamic = "force-dynamic";
 
 // Publishes scheduled listings whose time has come: any draft with publish_at <= now flips to
-// active. On flip it does exactly what a manual publish does — fan out to the seller's other
+// active. On flip it does exactly what a manual publish does. Fan out to the seller's other
 // channels (cross-listing, Instagram) and send ONE new-arrivals digest per store for the drop.
 // Runs frequently (see vercel.json) so a scheduled time is honored within the cron interval.
 export async function GET(request: Request) {

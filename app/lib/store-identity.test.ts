@@ -12,17 +12,17 @@ test("a store whose three records agree is left alone", () => {
 
 test("a shop with no address of its own gets the owner's", () => {
  // sellers.email is the reply-to on her emails and the contact on her shipping labels. Blank is
- // not cosmetic — five real shops are in this state.
+ // not cosmetic: five real shops are in this state.
  assert.deepEqual(review(rec({ sellerEmail: null })), { slug: "shop", kind: "set-seller-email", to: "her@shop.com", from: null });
  assert.deepEqual(review(rec({ sellerEmail: "" })).kind, "set-seller-email");
 });
 
 test("one of OUR addresses standing in for a seller's is replaced", () => {
- // sourcedbyscottie's contact was import-test+sourcedbyscottie@vyaplatform.com — ours, from an
+ // sourcedbyscottie's contact was import-test+sourcedbyscottie@vyaplatform.com. Ours, from an
  // import, sitting where her address should be.
  const f = review(rec({ accountOwner: null, accessOwner: "emma@scottiestudios.com", sellerEmail: "import-test+x@vyaplatform.com" }));
  assert.deepEqual(f, { slug: "shop", kind: "set-seller-email", to: "emma@scottiestudios.com", from: "import-test+x@vyaplatform.com" });
- // But if the owner IS one of ours (a test store), leave it — there is nothing better to use.
+ // But if the owner IS one of ours (a test store), leave it. There is nothing better to use.
  assert.equal(review(rec({ accountOwner: "x@vyaplatform.com", accessOwner: "x@vyaplatform.com", sellerEmail: "import-test+y@vyaplatform.com" })).kind, "ok");
 });
 

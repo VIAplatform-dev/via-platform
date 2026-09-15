@@ -2,7 +2,7 @@ import { Pressable, ScrollView, Text } from "react-native";
 import { Link } from "expo-router";
 import { colors, spacing } from "../lib/theme";
 
-// The row under the wordmark on Home. Plain text, evenly spread, no pills or chips — it reads as
+// The row under the wordmark on Home. Plain text, evenly spread, no pills or chips. It reads as
 // a masthead's nav rather than a filter bar, which is the point: these are departments, not toggles.
 
 const CATEGORIES: { label: string; slug: string }[] = [

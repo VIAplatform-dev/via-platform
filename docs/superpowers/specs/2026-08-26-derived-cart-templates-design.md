@@ -1,4 +1,4 @@
-# Derived cart templates — rendering any theme's cart without knowing the theme
+# Derived cart templates. Rendering any theme's cart without knowing the theme
 
 **Date:** 2026-08-26
 **Status:** proposed
@@ -7,7 +7,7 @@
 ## The constraint everything else follows from
 
 Shopify renders a theme's sections from **Liquid**, on their servers, from files we do not have.
-When a theme's JavaScript adds an item to the cart it does not only POST — it also asks the server
+When a theme's JavaScript adds an item to the cart it does not only POST. It also asks the server
 to re-render named sections and swaps the returned HTML into the page:
 
 ```js
@@ -17,7 +17,7 @@ document.querySelector('#CartDrawer').innerHTML =
 ```
 
 We have no Liquid renderer, so we must produce that HTML ourselves. **That is the whole problem.**
-Every cart bug we have — the empty drawer, the wrong row, the stale total — is a consequence of
+Every cart bug we have, the empty drawer, the wrong row, the stale total. Is a consequence of
 having to reproduce markup we cannot render.
 
 ## Why the current approach cannot work
@@ -35,7 +35,7 @@ Those are **Dawn's** names. Measured against the real corpus:
 | `lamash` | Horizon | `cart-items__table-row` | `<cart-drawer-component>` |
 
 `lamash` has no `<form>` in its drawer at all, and its *table header* row is
-`cart-items__table-row` — which matches the selector `tr[class*='cart-item']`, so the current code
+`cart-items__table-row`, which matches the selector `tr[class*='cart-item']`, so the current code
 clones the header ("Product image", "Product information") as if it were a product row.
 
 Adding a Horizon branch fixes two stores and fails on the third theme. Shopify themes are arbitrary
@@ -45,7 +45,7 @@ shape of solution.**
 ## The idea: let each store show us its own markup
 
 We already put a real product into a cart on the source store at import time
-(`captureCartTemplate`) and capture what the theme renders. That capture contains the answer — we
+(`captureCartTemplate`) and capture what the theme renders. That capture contains the answer. We
 have simply been guessing at it with class names instead of reading it.
 
 **Capture with two KNOWN products instead of one, and every slot identifies itself:**
@@ -87,7 +87,7 @@ SERVE TIME (every request)             ▼
 ### The derived template
 
 ```ts
-/** Where a value goes inside the row, as a PATH from the row root — never a class name. */
+/** Where a value goes inside the row, as a PATH from the row root, never a class name. */
 type Slot = { path: number[]; kind: "text" | "attr"; attr?: string };
 
 export type CartTemplate = {
@@ -104,7 +104,7 @@ export type CartTemplate = {
   subtotalPaths: number[][];  // every element whose text was the sum
   emptyPaths: number[][];     // elements present only when the cart is empty
   quantityPaths: number[][];  // steppers to neutralise (one-of-one stock)
-  confidence: number;         // 0..1 — see below
+  confidence: number;         // 0..1: see below
 };
 ```
 
@@ -115,7 +115,7 @@ cannot accidentally match a table header the way `[class*='cart-item']` does.
 
 1. Parse the 1-item and 2-item captures.
 2. Find every element whose text contains known title A. Take the **deepest common ancestor** of the
-   A-matching set that does NOT contain title B — that is the row for A.
+   A-matching set that does NOT contain title B. That is the row for A.
 3. Verify: the same-shaped sibling containing title B exists. Two rows, one parent → the parent is
    the items container.
 4. Within the row, locate slots by matching known values (title, price, image URL, product href).
@@ -131,10 +131,10 @@ template (0.6); image, href, subtotal and empty-state each add.
 | Confidence | Behaviour |
 |---|---|
 | ≥ 0.6 | Use the derived template |
-| < 0.6 | Fall back to `fallback-cart-page.ts` — VYA's own clean cart markup inside the store's chrome |
+| < 0.6 | Fall back to `fallback-cart-page.ts`. VYA's own clean cart markup inside the store's chrome |
 
 The fallback already exists and is already tested. **A derivation miss degrades to a working,
-on-brand cart page — never to an empty drawer.** That is the property the current code lacks: today
+on-brand cart page, never to an empty drawer.** That is the property the current code lacks: today
 a miss is silent and looks like a broken button.
 
 Derivation failure is recorded as an import warning (`checks.ts`), so it surfaces at import time
@@ -144,17 +144,17 @@ rather than when a shopper clicks.
 
 | Today | After |
 |---|---|
-| `injectCartPage` — Dawn selectors, ~120 lines | `renderCart(template, lines)` |
-| `buildCartDrawerSection` — Dawn selectors, ~90 lines | same function, different root |
-| `buildKnownCartSections` — 3 hand-built Dawn section ids | derived, plus the icon bubble |
+| `injectCartPage`: Dawn selectors, ~120 lines | `renderCart(template, lines)` |
+| `buildCartDrawerSection`: Dawn selectors, ~90 lines | same function, different root |
+| `buildKnownCartSections`. 3 hand-built Dawn section ids | derived, plus the icon bubble |
 | a future Horizon renderer | *does not get written* |
 
-`fallback-cart-page.ts` stays exactly as it is — it becomes the explicit low-confidence path rather
+`fallback-cart-page.ts` stays exactly as it is. It becomes the explicit low-confidence path rather
 than only a missing-capture path.
 
 ## Scope boundaries
 
-**In scope:** the cart page, the cart drawer, cart section re-renders, the count badge — for Shopify
+**In scope:** the cart page, the cart drawer, cart section re-renders, the count badge, for Shopify
 themes of any generation.
 
 **Not in scope:**
@@ -181,15 +181,15 @@ themes of any generation.
 
 ## Testing
 
-Pure functions, so unit tests carry most of it — but the fixtures must be **real captured HTML**, not
+Pure functions, so unit tests carry most of it, but the fixtures must be **real captured HTML**, not
 hand-written, or we would be testing our idea of a theme rather than a theme:
 
-- `derive-cart-template.test.ts` — Dawn fixture (`loved-again`) and Horizon fixture (`lamash`) must
+- `derive-cart-template.test.ts`. Dawn fixture (`loved-again`) and Horizon fixture (`lamash`) must
   each yield a template with the correct row, and **must not** select a table header row
 - confidence scoring: a capture with no repeated subtree scores 0
-- `render-cart.test.ts` — one template, one set of lines, correct output for page and drawer
+- `render-cart.test.ts`. One template, one set of lines, correct output for page and drawer
 - a regression test for the `?variant=` lookup bug (below)
-- an end-to-end HTTP check per theme generation, using the `Host:`-header recipe — add an item, assert
+- an end-to-end HTTP check per theme generation, using the `Host:`-header recipe. Add an item, assert
   the returned `cart-drawer` section contains the title and the correct subtotal
 
 **Two theme generations in the test corpus from day one.** The failure this design exists to prevent
@@ -205,7 +205,7 @@ was generalising from a sample of one.
 | 3 | `renderCart()`; drawer reads the derived template when confidence ≥ 0.6 | Drawer correct on `lamash` |
 | 4 | Cart page reads it too; delete the Dawn selector lists | 16 stores unchanged; `lamash` fixed |
 
-Phase 0 is independent and ships first — it is a live bug on every theme, including the ones that
+Phase 0 is independent and ships first. It is a live bug on every theme, including the ones that
 otherwise work.
 
 ## Open question for the reader
@@ -213,5 +213,5 @@ otherwise work.
 Phase 4 deletes `injectCartPage`'s selector logic, which today serves 16 working stores. The safer
 alternative is to leave it as a second fallback tier below derivation and above
 `fallback-cart-page.ts`. That is three tiers to reason about instead of two. **Recommendation: delete
-it**, once derivation is proven on both theme generations — three tiers is how the current mess
+it**, once derivation is proven on both theme generations. Three tiers is how the current mess
 started.

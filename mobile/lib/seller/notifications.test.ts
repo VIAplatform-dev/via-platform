@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PREF_ROWS, DEFAULT_PREFS, toggled, applyPatch, normalizePrefs } from "./notifications.ts";
 
-// The Notifications screen's rows and the PUT it sends. One toggle is one key — the server merges,
+// The Notifications screen's rows and the PUT it sends. One toggle is one key. The server merges,
 // so a patch never carries the other six and never overwrites a change made on another device.
 
 test("the rows, grouped and worded as the screen has always shown them", () => {

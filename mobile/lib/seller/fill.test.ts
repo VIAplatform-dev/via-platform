@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fillBlanks, fillSummary } from "./fill.ts";
+import { fillBlanks, fillSummary, fillDraftBlanks, describeFilled } from "./fill.ts";
+import type { DraftFields } from "./intake-shape.ts";
 import type { FieldKey } from "./listing-fields.ts";
 
 /** A piece where only the listed fields have anything in them. */
@@ -94,4 +95,58 @@ test("what it says it did", () => {
   assert.match(fillSummary(["brand"]), /Filled 1 empty field\./);
   assert.match(fillSummary(["brand", "era"]), /Filled 2 empty fields\./);
   assert.match(fillSummary(["brand", "era"]), /Nothing you had written was changed/);
+});
+
+// ── the new-piece flow's shape ────────────────────────────────────────────────
+
+test("fillDraftBlanks writes only into blanks", () => {
+  const draft: DraftFields = { brand: "Fendi", era: "1990s", material: "Zucca canvas", title: "Fendi baguette" };
+  const { fields, filled } = fillDraftBlanks(draft, { brand: "Fendi Roma", title: "" });
+  // Hers stands, whatever the model thinks.
+  assert.equal(fields.brand, "Fendi Roma");
+  assert.ok(!filled.includes("brand"));
+  // The blanks get the answer.
+  assert.equal(fields.title, "Fendi baguette");
+  assert.equal(fields.era, "1990s");
+  assert.deepEqual(filled.sort(), ["era", "material", "title"]);
+});
+
+test("fillDraftBlanks leaves a field the model cannot read", () => {
+  const { fields, filled } = fillDraftBlanks({ material: "Unknown", size: "N/A", colour: "  " }, {});
+  assert.equal(fields.material, undefined);
+  assert.equal(fields.size, undefined);
+  assert.equal(fields.colour, undefined);
+  assert.deepEqual(filled, []);
+});
+
+test("flaws she named are not added to", () => {
+  const mine: DraftFields = { flaws: ["small mark to the hem"] };
+  const { fields, filled } = fillDraftBlanks({ flaws: ["scuffed toe", "light pilling"] }, mine);
+  assert.deepEqual(fields.flaws, ["small mark to the hem"]);
+  assert.ok(!filled.includes("flaws"));
+  // …but an empty list is a blank.
+  const empty = fillDraftBlanks({ flaws: ["scuffed toe"] }, { flaws: [] });
+  assert.deepEqual(empty.fields.flaws, ["scuffed toe"]);
+  assert.ok(empty.filled.includes("flaws"));
+});
+
+test("a weight she typed outranks the model's parcel", () => {
+  const parcel = { weightOz: 40, lengthIn: 12 };
+  assert.equal(fillDraftBlanks({ parcel }, { weightOz: "18" }).fields.parcel, undefined);
+  // And a parcel already on the draft is not replaced.
+  const had = { weightOz: 9 };
+  assert.deepEqual(fillDraftBlanks({ parcel }, { parcel: had }).fields.parcel, had);
+  // A piece with neither takes it.
+  const got = fillDraftBlanks({ parcel }, {});
+  assert.deepEqual(got.fields.parcel, parcel);
+  assert.ok(got.filled.includes("weight"));
+});
+
+test("what she is told was filled", () => {
+  assert.match(describeFilled([]), /Nothing left to fill/);
+  assert.equal(describeFilled(["brand"]), "Filled brand. Nothing you had written was changed.");
+  assert.equal(describeFilled(["brand", "era"]), "Filled brand and era. Nothing you had written was changed.");
+  assert.equal(describeFilled(["brand", "era", "size"]), "Filled brand, era and 1 more. Nothing you had written was changed.");
+  // The keys are not the words on the rows.
+  assert.match(describeFilled(["colour", "conditionNote", "weight"]), /^Filled colour, condition note and 1 more\./);
 });

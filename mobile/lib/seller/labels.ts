@@ -2,7 +2,7 @@
 
 export type LabelQuote = {
   rate: { provider: string; service: string; costCents: number; estDays: number | null; rateId: string };
-  /** True when the label comes out of HER card — i.e. the buyer did not fund shipping at checkout. */
+  /** True when the label comes out of HER card. I.e. the buyer did not fund shipping at checkout. */
   sellerPays: boolean;
   buyerPaidCents: number;
   /** What VYA keeps when the buyer's flat tier covered more than the label actually cost. */
@@ -32,8 +32,8 @@ export function labelQuoteLine(q: LabelQuote, currency: string): string {
   const days = q.rate.estDays ? `, about ${q.rate.estDays} ${q.rate.estDays === 1 ? "day" : "days"}` : "";
   const service = `${q.rate.provider} ${q.rate.service}`.trim();
   const who = q.sellerPays
-    ? `${cost} — charged to your card, because shipping was free on this order.`
+    ? `${cost}: charged to your card, because shipping was free on this order.`
     : `${cost}, covered by the ${money(q.buyerPaidCents, currency)} the buyer paid for shipping.`;
-  const abroad = q.international ? ` Going abroad${q.incoterm === "DDU" ? " — the buyer settles duty on delivery." : " with duty covered."}` : "";
+  const abroad = q.international ? ` Going abroad${q.incoterm === "DDU" ? ": the buyer settles duty on delivery." : " with duty covered."}` : "";
   return `${who} ${service}${days}.${abroad}`;
 }

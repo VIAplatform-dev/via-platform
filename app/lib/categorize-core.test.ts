@@ -133,8 +133,8 @@ test("every override family maps to a slug inside that same family", () => {
 // ── The two taxonomies must agree ────────────────────────────────────────────
 //
 // There are two lists of category slugs: this one (titles → slug, for imported catalogue)
-// and item-tags.ts (the seller's picker and the AI tagger). They are separate on purpose —
-// different inputs — but they must never disagree about which FAMILY a slug belongs to, or
+// and item-tags.ts (the seller's picker and the AI tagger). They are separate on purpose,
+// different inputs, but they must never disagree about which FAMILY a slug belongs to, or
 // an item tagged one way in the app lands under a different heading on the web.
 
 test("every slug the seller picker offers belongs to the family it is listed under", () => {
@@ -152,7 +152,7 @@ test("every slug the seller picker offers belongs to the family it is listed und
 
 test("the seller picker can express every slug the title rules produce", () => {
   // A slug the importer assigns but the picker can't offer is a category a seller can see
-  // but never set — and the AI sweep can never correct an item into it.
+  // but never set, and the AI sweep can never correct an item into it.
   const pickable = new Set(CATEGORY_GROUPS.flatMap((g) => g.slugs));
   for (const title of [
     "Gucci Long Wallet", "Leather Tote", "Beaded Evening Clutch", "Quilted Crossbody",

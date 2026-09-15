@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
  const approved = results.filter((r) => r.approved).length;
  const emailed = results.filter((r) => r.emailed).length;
- console.log(`[PilotApproval] Done — ${approved} approved, ${emailed} emailed`);
+ console.log(`[PilotApproval] Done: ${approved} approved, ${emailed} emailed`);
  return NextResponse.json({ approved, emailed });
  } catch (error) {
  console.error("[PilotApproval] Error:", error);

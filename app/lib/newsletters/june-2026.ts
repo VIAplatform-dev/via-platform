@@ -1,5 +1,5 @@
 /**
- * June 2026 Insider Newsletter — drop-in HTML for the insider shell.
+ * June 2026 Insider Newsletter. Drop-in HTML for the insider shell.
  * Pass `JUNE_2026_NEWSLETTER_HTML` as `contentHtml` to /api/admin/send-insider-newsletter.
  *
  * Uses brand fonts: Playfair Display for headlines + Cormorant Garamond for body,
@@ -83,7 +83,7 @@ function productCard(args: {
 }
 
 /**
- * Outfit mood-board with linked piece list — used in Natalie's styling section.
+ * Outfit mood-board with linked piece list. Used in Natalie's styling section.
  * Big square outfit image at the top, followed by a clean list of small
  * underlined links to each individual piece.
  */
@@ -158,7 +158,7 @@ const IMG = {
  dgMiniSkirt: "https://cdn.shopify.com/s/files/1/0933/2454/2227/files/IMG_3858.jpg?v=1761759623",
 };
 
-export const JUNE_2026_NEWSLETTER_SUBJECT = "via VYA — the vintage fashion guide for VYA insiders · June";
+export const JUNE_2026_NEWSLETTER_SUBJECT = "via VYA. The vintage fashion guide for VYA insiders · June";
 
 export const JUNE_2026_NEWSLETTER_HTML = `
  ${para(`Welcome to the first <em>via VYA</em>. Built for our top community members to get the inside scoop &mdash; what we&rsquo;re loving, who we&rsquo;re featuring, and what&rsquo;s coming next.`)}
@@ -215,7 +215,7 @@ export const JUNE_2026_NEWSLETTER_HTML = `
  })}
 
  ${eventCard({
- name: "NY Archive — Open Now",
+ name: "NY Archive: Open Now",
  bullets: [
  "Every piece is sold by one of their vendors",
  "Space for shopping appointments, stylist pulls, creative shoots, and community events",

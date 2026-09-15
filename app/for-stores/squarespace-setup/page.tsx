@@ -13,7 +13,7 @@ export default function SquarespaceSetupPage() {
  const displaySlug = storeSlug || "your-store-slug";
  const displayName = storeName || "Your Store Name";
 
- // One script goes in Header — handles click tracking AND order conversion
+ // One script goes in Header. Handles click tracking AND order conversion
  const headerCode = `<!-- VYA Tracking -->
 <script>
 (function() {
@@ -43,7 +43,7 @@ export default function SquarespaceSetupPage() {
  if (c.indexOf('via_click_id=') === 0) { viaClickId = c.substring(13); break; }
  }
 
- // Find the order total — take the largest dollar amount on the page
+ // Find the order total, take the largest dollar amount on the page
  function findTotal() {
  var matches = document.body.innerText.match(/\\$[\\d,]+\\.\\d{2}/g) || [];
  var amounts = matches.map(function(m) { return parseFloat(m.replace(/[\\$,]/g, '')); });

@@ -1,13 +1,13 @@
 // The shape of an import, and how it reports itself.
 //
-// Everything here is PURE — no database, no network — so the step machine, the resume decision and
+// Everything here is PURE, no database, no network, so the step machine, the resume decision and
 // the seller-facing report string can be unit tested directly (`node --test`). The database side
 // lives in jobs-db.ts and the orchestration in run-import.ts.
 //
 // Why this exists at all: every step of an import used to swallow its own errors and return zeros
 // (`.catch(() => ({ added: 0, … }))`), so a total failure and a store with no new products produced
 // the SAME response. A seller learned their import had failed by complaining. A step now records
-// what happened — including that it failed — and the job carries that record.
+// what happened, including that it failed, and the job carries that record.
 
 /** The ordered steps of an import. `crawl` is the only resumable one (it's the long pole). */
 export const STEP_NAMES = ["crawl", "products", "collections", "membership", "blocks", "checks"] as const;
@@ -21,7 +21,7 @@ export type Step = {
  status: StepStatus;
  /** Human-readable outcome ("42 pages", "318 products · 12 updated"). */
  detail?: string;
- /** Why it failed / what was lost. Surfaces to the seller — keep it readable, not a stack trace. */
+ /** Why it failed / what was lost. Surfaces to the seller. Keep it readable, not a stack trace. */
  warning?: string;
  ms?: number;
 };
@@ -34,7 +34,7 @@ export type JobCounts = { pages: number; products: number; collections: number }
 export type CrawlState = {
  /** Paths not yet fetched. */
  queue: string[];
- /** Paths already attempted (fetched or skipped) — never re-fetched on resume. */
+ /** Paths already attempted (fetched or skipped), never re-fetched on resume. */
  done: string[];
  /** Paths successfully stored. */
  paths: string[];
@@ -55,7 +55,7 @@ export type ImportJob = {
  error: string | null;
 };
 
-/** A fresh step list — every step pending. */
+/** A fresh step list. Every step pending. */
 export function initialSteps(): Step[] {
  return STEP_NAMES.map((name) => ({ name, status: "pending" as StepStatus }));
 }
@@ -89,7 +89,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 /**
  * The one-line report a seller sees: `42 pages · 318 products · 18 collections · 2 warnings`.
  *
- * Zero counts are kept (not hidden) — "0 products" is exactly the signal that something went wrong
+ * Zero counts are kept (not hidden): "0 products" is exactly the signal that something went wrong
  * and is the thing that used to be indistinguishable from success. Warnings appear only when there
  * are any, so a clean import reads clean.
  */
@@ -108,7 +108,7 @@ export function reportLine(counts: JobCounts, warnings: string[]): string {
  * failed while its store sat half-imported. The later steps are all idempotent (products match on
  * source identity), so re-running them is safe.
  *
- * A job killed before the crawl produced anything has nothing to resume — a retry is a fresh import.
+ * A job killed before the crawl produced anything has nothing to resume. A retry is a fresh import.
  */
 export function isResumable(job: Pick<ImportJob, "status" | "crawl">): boolean {
  if (job.status !== "paused" && job.status !== "running" && job.status !== "stalled") return false;

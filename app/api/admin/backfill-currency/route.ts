@@ -13,8 +13,8 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 /**
- * GET — preview: show how many rows would be updated and their current vs converted amounts
- * POST — execute: convert all non-USD order_totals to USD in place
+ * GET: preview: show how many rows would be updated and their current vs converted amounts
+ * POST: execute: convert all non-USD order_totals to USD in place
  */
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
  `;
 
  if (rows.length === 0) {
- return NextResponse.json({ message: "Nothing to convert — all rows are already USD.", updated: 0 });
+ return NextResponse.json({ message: "Nothing to convert: all rows are already USD.", updated: 0 });
  }
 
  let updated = 0;

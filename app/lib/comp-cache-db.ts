@@ -3,7 +3,7 @@ import type { Comp } from "./comps";
 import { convertCurrencyToUSD } from "./stores";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Comp cache — every external comp we pay SerpApi to fetch is saved here, so future
+// Comp cache: every external comp we pay SerpApi to fetch is saved here, so future
 // pricing for the same item/segment reuses our OWN history instead of spending again.
 // Each paid lookup becomes a reusable asset; repeat brands/items price for ~free, and
 // the cache also feeds the internal benchmark so we always have a market number.
@@ -62,7 +62,7 @@ const toComp = (r: Record<string, unknown>): Comp => ({
 /**
  * Persist fetched comps so future lookups for the same item/segment reuse them (no new
  * SerpApi spend). Upserts by a dedup key and refreshes fetched_at, so a re-fetch of the
- * same listing just bumps its recency rather than duplicating. Best-effort — never throws.
+ * same listing just bumps its recency rather than duplicating. Best-effort, never throws.
  */
 export async function saveComps(
  comps: Comp[],
@@ -98,7 +98,7 @@ export async function saveComps(
 }
 
 /**
- * Reuse recently-fetched comps for this item — the exact normalized query first (most
+ * Reuse recently-fetched comps for this item. The exact normalized query first (most
  * relevant), then the brand/category segment. Only rows newer than maxAgeDays. Empty when
  * the cache is cold, which tells the caller to do a live lookup (and cache the results).
  */
@@ -113,7 +113,7 @@ export async function getCachedComps(opts: {
  const sql = db();
  const qn = normalizeQuery(opts.query);
  const cutoff = new Date(Date.now() - opts.maxAgeDays * 86_400_000).toISOString();
- // EXACT query only. The old brand+category segment fallback cross-contaminated models — e.g. a
+ // EXACT query only. The old brand+category segment fallback cross-contaminated models. E.g. a
  // "Prada Re-Edition 2005" got priced off a "Prada Raso Luce sequin" bag's cached comps. A thin
  // exact cache now simply triggers a fresh live fetch in the pricer (which returns the right model's
  // comps), instead of borrowing another item's stale ones.
@@ -123,7 +123,7 @@ export async function getCachedComps(opts: {
 
 /**
  * Days since the most recent cached comp for this exact query (null if none cached). Lets the
- * pricer refresh a STALE cache — plenty of comps, but all weeks old — not just a cold one.
+ * pricer refresh a STALE cache, plenty of comps, but all weeks old, not just a cold one.
  */
 export async function newestCompAgeDays(query: string): Promise<number | null> {
  await ensure();
@@ -138,7 +138,7 @@ export async function newestCompAgeDays(query: string): Promise<number | null> {
 /**
  * Comps from VYA's OWN data, matched by brand:
  *  - sold_items → items that actually SOLD on the marketplace (real transactions, weighted high)
- *  - products → items currently LISTED (asking prices — a soft reference only; kept as
+ *  - products → items currently LISTED (asking prices. A soft reference only; kept as
  *    sold=false so the valuation weights them BELOW real sold prices, avoiding an
  *    AI-pricing-off-its-own-AI-prices echo chamber).
  * Prices are converted to USD. Empty when brand is unknown.
@@ -170,7 +170,7 @@ export async function getVyaComps(opts: { brand: string | null; limit?: number }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// piece_facts — derived facts about a SPECIFIC piece (brand + normalized title), currently the
+// piece_facts. Derived facts about a SPECIFIC piece (brand + normalized title), currently the
 // runway season. Once any listing establishes a piece's runway, future identical pieces reuse it
 // instantly, and we accumulate an owned "piece → runway" knowledge base.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ export async function savePieceRunway(brand: string, title: string, runway: stri
  }
 }
 
-/** Delete cache rows older than the given age — call from a nightly cron to bound growth. */
+/** Delete cache rows older than the given age. Call from a nightly cron to bound growth. */
 export async function pruneCompCache(maxAgeDays = 90): Promise<number> {
  await ensure();
  const sql = db();

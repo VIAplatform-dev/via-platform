@@ -13,7 +13,7 @@ test("a path becomes the screen name a seller would use", () => {
 
 test("each line reads like a sentence, not an event name", () => {
  assert.equal(describeActivity({ kind: "viewed", detail: "/admin/orders" }), "Opened Orders");
- assert.equal(describeActivity({ kind: "published", detail: "1990s silk slip dress" }), "Published — 1990s silk slip dress");
+ assert.equal(describeActivity({ kind: "published", detail: "1990s silk slip dress" }), "Published: 1990s silk slip dress");
  assert.equal(describeActivity({ kind: "store-claimed", detail: null }), "Opened the store we'd built for her");
 });
 

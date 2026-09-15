@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { fleetStores, EXCLUDED_STORES } from "./fleet-roster.ts";
 
 test("the duplicate test copies are not part of the fleet", () => {
- // test-import is the-objects-of-affection and test-import-2 is bag-crush — the same two shops
+ // test-import is the-objects-of-affection and test-import-2 is bag-crush. The same two shops
  // imported twice. Checking both doubles the run, and every finding on a copy is counted again in
  // the census as though it were another seller's store.
  const all = ["bag-crush", "blummier", "test-import", "test-import-2", "the-objects-of-affection"];

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Infrastructure admin design system — the "techie white" look from the pitch deck.
+// Infrastructure admin design system. The "techie white" look from the pitch deck.
 // Mint-green as the primary accent, uppercase mono micro-labels, metric cards with
 // sparklines, status pills, and hairline data tables. Scoped to /admin
 // only (the accent is set as --accent on the admin shell; the seller /store portal
@@ -11,13 +11,13 @@ export const cn = (...c: (string | false | null | undefined)[]) => c.filter(Bool
 
 // Green scale (deck mint). --accent drives the shared components inside the admin.
 export const GREEN = {
- ink: "#0b7a5c", // deep mint — text/links on white
+ ink: "#0b7a5c", // deep mint: text/links on white
  accent: "#0e9f76", // primary
  bright: "#2fd39b", // sparklines, live dots, fills
  soft: "#eafaf3", // tints (pills, hover)
 } as const;
 
-// ── Section label — uppercase tracked mono chip (deck's "DISTRIBUTION" / "OPERATE") ──
+// ── Section label: uppercase tracked mono chip (deck's "DISTRIBUTION" / "OPERATE") ──
 export function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
  return (
  <span className={cn("inline-flex items-center rounded-md border border-stone-200 bg-white px-2 py-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-stone-500", className)}>
@@ -26,12 +26,14 @@ export function SectionLabel({ children, className }: { children: React.ReactNod
  );
 }
 
-// ── Card — hairline border, soft shadow, white ──
-export function TechCard({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+// ── Card: hairline border, soft shadow, white ──
+// ComponentPropsWithRef, not HTMLAttributes: React 19 passes `ref` as an ordinary prop, and a
+// caller that wants to scroll a card into view should not have to wrap it in a spare div.
+export function TechCard({ className, children, ...props }: React.ComponentPropsWithRef<"div">) {
  return <div className={cn("rounded-2xl border border-stone-200/80 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-16px_rgba(16,24,40,0.12)]", className)} {...props}>{children}</div>;
 }
 
-// ── Sparkline — tiny SVG line + area from a series ──
+// ── Sparkline: tiny SVG line + area from a series ──
 export function Sparkline({ data, up = true, w = 132, h = 40, className }: { data?: number[]; up?: boolean; w?: number; h?: number; className?: string }) {
  const series = data && data.length > 1 ? data : [4, 6, 5, 7, 6, 8, 7, 9, 8, 11, 10, 13];
  const min = Math.min(...series), max = Math.max(...series);
@@ -57,7 +59,7 @@ export function Sparkline({ data, up = true, w = 132, h = 40, className }: { dat
  );
 }
 
-// ── Area chart — larger, editorial hero chart with faint baseline + gradient ──
+// ── Area chart: larger, editorial hero chart with faint baseline + gradient ──
 export function AreaChart({ data, up = true, h = 168, className }: { data?: number[]; up?: boolean; h?: number; className?: string }) {
  const series = data && data.length > 1 ? data : [5, 6, 5.5, 7, 6.5, 8, 7.5, 9, 8, 10, 9.5, 12, 11, 13];
  const w = 640;
@@ -88,10 +90,10 @@ export function AreaChart({ data, up = true, h = 168, className }: { data?: numb
  );
 }
 
-// ── Metric card — uppercase label + big number + sparkline + delta pill (deck) ──
+// ── Metric card: uppercase label + big number + sparkline + delta pill (deck) ──
 export function MetricCard({ label, value, delta, sub, data, up = true, className, href }: {
  label: string; value: React.ReactNode; delta?: string; sub?: string; data?: number[]; up?: boolean; className?: string;
- /** Makes the whole card a link — a count is a question ("which four?"), so it should be openable. */
+ /** Makes the whole card a link. A count is a question ("which four?"), so it should be openable. */
  href?: string;
 }) {
  return (
@@ -116,7 +118,7 @@ export function MetricCard({ label, value, delta, sub, data, up = true, classNam
  );
 }
 
-// ── Status pill — live/paid (green), pending/draft (amber), sold (neutral), down (rose) ──
+// ── Status pill: live/paid (green), pending/draft (amber), sold (neutral), down (rose) ──
 type PillTone = "live" | "pending" | "neutral" | "down" | "info";
 const PILL: Record<PillTone, string> = {
  live: "bg-[var(--accent-soft,#eafaf3)] text-[var(--accent-ink,#0b7a5c)]",
@@ -134,7 +136,7 @@ export function StatusPill({ tone = "neutral", dot, children, className, title }
  );
 }
 
-// ── Toggle — green when on ──
+// ── Toggle: green when on ──
 export function Toggle({ on, onClick, disabled, className }: { on: boolean; onClick?: () => void; disabled?: boolean; className?: string }) {
  return (
  <button type="button" onClick={onClick} disabled={disabled} aria-pressed={on} className={cn("relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition", on ? "bg-[var(--accent,#0e9f76)]" : "bg-stone-200", disabled && "cursor-not-allowed opacity-50", className)}>
@@ -143,7 +145,7 @@ export function Toggle({ on, onClick, disabled, className }: { on: boolean; onCl
  );
 }
 
-// ── Bar chart — vertical green bars (deck's sales-by-channel) ──
+// ── Bar chart: vertical green bars (deck's sales-by-channel) ──
 export function BarChart({ data, h = 150, showValues = true, money: asMoney = false, className }: { data: { label: string; value: number }[]; h?: number; showValues?: boolean; money?: boolean; className?: string }) {
  const max = Math.max(...data.map((d) => d.value), 1);
  const fmt = (v: number) => `${asMoney ? "$" : ""}${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v)}`;
@@ -164,7 +166,7 @@ export function BarChart({ data, h = 150, showValues = true, money: asMoney = fa
  );
 }
 
-// ── Donut chart — distribution ring with segments (Pango-style distribution) ──
+// ── Donut chart: distribution ring with segments (Pango-style distribution) ──
 export const DONUT_COLORS = ["#0e9f76", "#2fd39b", "#7fd8b8", "#b8e6d4", "#e6b980", "#c99a6a", "#c9cdd2"];
 export function DonutChart({ data, size = 128, thickness = 16, className }: { data: { label: string; value: number }[]; size?: number; thickness?: number; className?: string }) {
  const total = data.reduce((s, d) => s + d.value, 0) || 1;
@@ -191,7 +193,7 @@ export function DonutChart({ data, size = 128, thickness = 16, className }: { da
  );
 }
 
-// ── Segmented control — Today / 7d / 30d / 90d (Pango-style filter) ──
+// ── Segmented control: Today / 7d / 30d / 90d (Pango-style filter) ──
 export function SegmentedControl({ options, value, onChange, className }: { options: string[]; value: string; onChange: (v: string) => void; className?: string }) {
  return (
  <div className={cn("inline-flex items-center gap-0.5 rounded-full border border-stone-200 bg-white p-[3px]", className)}>
@@ -202,7 +204,7 @@ export function SegmentedControl({ options, value, onChange, className }: { opti
  );
 }
 
-// ── Demand row — brand name + mini sparkline + delta (deck's "what to source") ──
+// ── Demand row: brand name + mini sparkline + delta (deck's "what to source") ──
 export function DemandRow({ name, delta, up, data }: { name: string; delta: string; up: boolean; data?: number[] }) {
  return (
  <div className="flex items-center justify-between gap-3 border-t border-stone-100 py-2.5 first:border-t-0">
@@ -215,7 +217,7 @@ export function DemandRow({ name, delta, up, data }: { name: string; delta: stri
  );
 }
 
-// ── Page shell — the one editorial frame every admin page shares ──────────────
+// ── Page shell: the one editorial frame every admin page shares ──────────────
 // Warm-canvas container + eyebrow/serif header, matched to Home. Use so pages read
 // as one piece of software instead of 20 different Tailwind layouts.
 export const serif = { fontFamily: "var(--font-display)" } as React.CSSProperties;
@@ -239,7 +241,7 @@ export function AdminHeader({ eyebrow, title, subtitle, actions, className }: {
  );
 }
 
-// ── Button — pill, green primary / hairline secondary / ghost (admin-scoped) ──
+// ── Button: pill, green primary / hairline secondary / ghost (admin-scoped) ──
 type AdminBtn = "primary" | "secondary" | "ghost";
 const ADMIN_BTN: Record<AdminBtn, string> = {
  primary: "bg-[var(--accent,#0e9f76)] text-white hover:bg-[var(--accent-hover,#0b8a66)] shadow-[0_1px_2px_rgba(16,24,40,0.08)]",
@@ -254,7 +256,7 @@ export function TechButtonLink({ variant = "primary", className, ...props }: Rea
  return <a className={cn(ADMIN_BTN_BASE, ADMIN_BTN[variant], className)} {...props} />;
 }
 
-// ── Tag chip — the single interaction for picking a category/status, and for filtering by one ──
+// ── Tag chip: the single interaction for picking a category/status, and for filtering by one ──
 // Same pill in both places on purpose: what you tag an item with is what you filter it by.
 export function Tag({ on, count, className, children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean; count?: number }) {
  return (
@@ -295,7 +297,7 @@ export function TagRow<T extends string>({ options, value, onChange, counts, lab
  );
 }
 
-// ── Empty state — dashed hairline, calm ──
+// ── Empty state: dashed hairline, calm ──
 export function TechEmpty({ icon, title, body, action, className }: { icon?: React.ReactNode; title: string; body?: string; action?: React.ReactNode; className?: string }) {
  return (
  <div className={cn("flex flex-col items-center justify-center rounded-2xl border border-dashed border-stone-200 bg-white/60 px-6 py-16 text-center", className)}>
@@ -307,7 +309,7 @@ export function TechEmpty({ icon, title, body, action, className }: { icon?: Rea
  );
 }
 
-// ── Data table primitives — uppercase headers, tabular nums, hairline rows ──
+// ── Data table primitives. Uppercase headers, tabular nums, hairline rows ──
 export function TH({ children, right, className }: { children?: React.ReactNode; right?: boolean; className?: string }) {
  return <th className={cn("border-b border-stone-200 pt-4 pb-2.5 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-400", right ? "text-right" : "text-left", className)}>{children}</th>;
 }
@@ -316,7 +318,7 @@ export function TD({ children, right, className }: { children?: React.ReactNode;
 }
 
 /**
- * A confirmation dialog rendered IN the app — never `window.confirm`, which looks like a browser
+ * A confirmation dialog rendered IN the app, never `window.confirm`, which looks like a browser
  * error and can't show the thing you're about to act on. Escape or the backdrop cancels; the
  * destructive button is focused last so a stray Return doesn't delete anything.
  */

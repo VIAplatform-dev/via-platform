@@ -618,7 +618,7 @@ function ExitRatesSection({ exitRates }: { exitRates: ExitRate[] }) {
 function TimeOnPageSection({ items }: { items: TimeOnPage[] }) {
  const filtered = items.filter((i) => i.sampleSize > 0);
  if (!filtered.length)
- return <p style={{ color: MUTED, fontSize: 13 }}>No data yet — time-on-page tracking requires the new session flow columns.</p>;
+ return <p style={{ color: MUTED, fontSize: 13 }}>No data yet. Time-on-page tracking requires the new session flow columns.</p>;
 
  const maxMs = filtered[0]?.avgMs ?? 1;
 

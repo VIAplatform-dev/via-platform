@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Rental settings — the store's house rules, and how an item overrides them.
+// Rental settings. The store's house rules, and how an item overrides them.
 //
 // Pure and unit-tested, no I/O. Every number a rental shop might argue about is
 // here with a default; nothing about how rentals work is hardcoded elsewhere.
@@ -30,7 +30,7 @@ export type RentalSettings = {
  leadDays: number;
 
  // The three bands that make a rental occupy more days than it bills for. Each
- // is the store's own measurement — "two days to ship, three to clean" — and
+ // is the store's own measurement, "two days to ship, three to clean", and
  // each can be 0 for a shop that hands pieces over in person and doesn't clean.
  shipOutDays: number;
  shipBackDays: number;
@@ -49,7 +49,7 @@ export type RentalSettings = {
  /**
   * What a discount code comes off on a rental.
   *
-  * A rental is three numbers, not one — the rent, the damage waiver, and the deposit — so "15% off"
+  * A rental is three numbers, not one, the rent, the damage waiver, and the deposit, so "15% off"
   * has no obvious meaning until the store says which. The deposit is never one of them: it is the
   * renter's own money coming back to her, so discounting it would refund more than she ever paid.
   *
@@ -69,7 +69,7 @@ export type RentalSettings = {
  rentLabel: string;
  pickupLabel: string;
  deliverLabel: string;
- /** "Will this fit?" links here when set — a size guide, a measurements page, whatever they have. */
+ /** "Will this fit?" links here when set. A size guide, a measurements page, whatever they have. */
  fitGuideUrl: string | null;
  /** Replaces the assembled sentence under the button when a store would rather write its own. */
  highlightsText: string | null;
@@ -121,7 +121,7 @@ function count(v: unknown, fallback: number, max = 3650): number {
  if (!Number.isFinite(n)) return fallback;
  return Math.min(Math.max(Math.round(n), 0), max);
 }
-/** A label a store typed. Blank falls back to ours — an empty button is never what they meant. */
+/** A label a store typed. Blank falls back to ours. An empty button is never what they meant. */
 function text(v: unknown, fallback: string, max: number): string {
  return typeof v === "string" && v.trim() ? v.trim().slice(0, max) : fallback;
 }
@@ -131,7 +131,7 @@ function oneOf<T extends string>(v: unknown, allowed: T[], fallback: T): T {
 
 /**
  * Fold store settings and item overrides onto the defaults. Unknown keys are
- * ignored and bad values fall back rather than throw — an override blob is
+ * ignored and bad values fall back rather than throw. An override blob is
  * seller-entered JSON, and one bad field must never take a listing down.
  */
 export function resolveSettings(
@@ -178,11 +178,11 @@ export function resolveSettings(
 /**
  * What a shopper is offered for one piece: rent, buy, both, or (rarely) neither.
  *
- * `rentable` is gated on the STORE's rentals toggle — a piece with tiers means nothing to a shopper
+ * `rentable` is gated on the STORE's rentals toggle. A piece with tiers means nothing to a shopper
  * until the seller turns rentals on. `buyable` is NOT gated on that toggle: whether a piece is FOR
  * SALE is a fact about this item, from `alsoForSale`, and must hold whether or not the store's rental
  * *booking flow* happens to be switched on yet. Getting this backwards is exactly how a rent-only
- * piece — priced at $0 because it has no buy price at all — ended up with a live Buy button: the
+ * piece, priced at $0 because it has no buy price at all. Ended up with a live Buy button: the
  * store hadn't enabled rentals, so `rentable` was false, and the old rule read that as "so buyable
  * must be true," ignoring what the item's own terms said.
  */
@@ -205,7 +205,7 @@ export type SettingsWarning =
 
 /**
  * Combinations that are legal but will misbehave. Surfaced on the settings
- * screen rather than discovered downstream — with this many toggles, the ugly
+ * screen rather than discovered downstream, with this many toggles, the ugly
  * bugs live in the odd pairings, not in any single field.
  */
 export function settingsWarnings(s: RentalSettings): SettingsWarning[] {

@@ -125,7 +125,7 @@ export default async function SourcingRequestDetailPage({
  </div>
  </div>
 
- {/* Edit + Pay — available before payment or while still searching */}
+ {/* Edit + Pay: available before payment or while still searching */}
  {(req.status === "paid" || req.status === "pending_payment") && (
  <div className="mt-8">
  <EditRequestSection
@@ -144,24 +144,24 @@ export default async function SourcingRequestDetailPage({
  </div>
  )}
 
- {/* Pay now — only for unpaid requests */}
+ {/* Pay now, only for unpaid requests */}
  {req.status === "pending_payment" && (
  <div className="mt-6">
  <PayNowSection requestId={req.id} />
  </div>
  )}
 
- {/* Delete draft — only for unpaid requests */}
+ {/* Delete draft, only for unpaid requests */}
  {req.status === "pending_payment" && (
  <DeleteDraftSection requestId={req.id} />
  )}
 
- {/* Cancel — only while actively searching and within 21 days */}
+ {/* Cancel, only while actively searching and within 21 days */}
  {req.status === "paid" && (
  <CancelRequestSection requestId={req.id} createdAt={req.createdAt} />
  )}
 
- {/* Offers — only show when request is active or matched */}
+ {/* Offers, only show when request is active or matched */}
  {(req.status === "paid" || req.status === "matched") && (
  <AcceptOfferSection
  requestId={req.id}

@@ -13,7 +13,7 @@ import { rentalDay, bookingLine, trackingLine, todayDay, type Booking } from "..
 // matters. OVERDUE IS FIRST when there is any: a piece due three days ago is a phone call, not a
 // return, and a screen that files it under "coming back" is how it stays lost for a week.
 //
-// The return label and the carrier's tracking sit on the row rather than a detail screen — at the
+// The return label and the carrier's tracking sit on the row rather than a detail screen, at the
 // counter the question is "where is it", and making her tap through to find out is the whole
 // friction this screen exists to remove.
 

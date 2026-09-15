@@ -1,5 +1,5 @@
 // The shipping screen's vocabulary and its one piece of arithmetic. Mirrors app/lib/shipping-zones.ts
-// and app/lib/customs.ts — the phone must call a zone the same thing the server files it under, or a
+// and app/lib/customs.ts. The phone must call a zone the same thing the server files it under, or a
 // seller turns Europe on here and finds it off on the web.
 
 export type ZoneId = "domestic" | "europe" | "north_america" | "rest_of_world";
@@ -20,7 +20,7 @@ export type Zones = Partial<Record<ZoneId, ZoneRate>>;
  * One zone switched on or off, with everything else left exactly as it was.
  *
  * The `rates` a zone may carry are per-tier prices the seller set on the web. Rebuilding the object
- * from scratch would drop them — she'd turn Europe off and on again on her phone and silently lose
+ * from scratch would drop them. She'd turn Europe off and on again on her phone and silently lose
  * the postage prices she worked out for it. So this spreads the existing zone rather than replacing it.
  */
 export function zonesWith(zones: Zones | null | undefined, id: ZoneId, enabled: boolean): Zones {
@@ -29,7 +29,7 @@ export function zonesWith(zones: Zones | null | undefined, id: ZoneId, enabled: 
   return base;
 }
 
-/** Whether she ships anywhere beyond her own country — what decides if duty is worth asking about. */
+/** Whether she ships anywhere beyond her own country. What decides if duty is worth asking about. */
 export function shipsAbroad(zones: Zones | null | undefined): boolean {
   return ZONE_IDS.some((z) => z !== "domestic" && Boolean(zones?.[z]?.enabled));
 }

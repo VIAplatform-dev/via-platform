@@ -50,10 +50,10 @@ export async function fireAutomationTrigger(
 /**
  * Daily new-listings digest → the store's SUBSCRIBED customers, if the built-in
  * "new arrivals" flow is on OR a custom "new_listing" automation is active. Batched,
- * so a whole drop is one email — never one per publish.
+ * so a whole drop is one email, never one per publish.
  */
 export type NewListingItem = { id: string; title: string; image: string | null; priceCents: number; currency: string };
-// testRecipient: send only to that address, skipping the enabled/subscriber gates — for previews.
+// testRecipient: send only to that address, skipping the enabled/subscriber gates, for previews.
 export async function sendNewListingsDigest(storeSlug: string, newItems: NewListingItem[], testRecipient?: string): Promise<{ sent: number } | null> {
  if (!newItems.length) return null;
  const custom = await getCustomAutomationsForTrigger(storeSlug, "new_listing").catch(() => []);
@@ -72,7 +72,7 @@ export async function sendNewListingsDigest(storeSlug: string, newItems: NewList
  recipients = [...new Set(profiles.filter((c) => c.subscribed && c.email.includes("@")).map((c) => c.email))];
  }
  if (!recipients.length) return null;
- // Their tool sends new arrivals now — and has the pieces, because the store sync sends them.
+ // Their tool sends new arrivals now, and has the pieces, because the store sync sends them.
  // A test send is still allowed: the seller asked for that one specifically.
  if (!testRecipient && !(await vyaSends(storeSlug, "new-arrivals"))) return null;
 
@@ -84,17 +84,17 @@ export async function sendNewListingsDigest(storeSlug: string, newItems: NewList
  const shopUrl = sf?.handle ? `${NEW_ARRIVALS_BASE}/s/${sf.handle}/shop` : website;
  const products = newItems.slice(0, 12).map((i) => ({ title: i.title, image: i.image, priceCents: i.priceCents, currency: i.currency, url: itemUrl(i.id) }));
 
- // The store's own logo, colours and fonts — the same brand every other automatic email uses.
+ // The store's own logo, colours and fonts. The same brand every other automatic email uses.
  const brand = await getStoreEmailBrand(storeSlug).catch(() => undefined);
  const subject = custom[0]?.subject?.trim() || `New arrivals from ${fromName}`;
- // Plain, and true whatever the store sells. The old default sold at the reader — "Fresh one-of-one
- // pieces just landed. Shop them before they're gone." — which is a voice most stores wouldn't pick.
+ // Plain, and true whatever the store sells. The old default sold at the reader. "Fresh one-of-one
+ // pieces just landed. Shop them before they're gone.", which is a voice most stores wouldn't pick.
  const count = newItems.length;
  const intro = custom[0]?.body?.trim() || `${count} new ${count === 1 ? "piece" : "pieces"} just landed.`;
  // New arrivals is NOT an automatic email any more.
  //
- // The others fire because a shopper did something — she bought, she abandoned a basket, she signed
- // up — and the message is about that. "Here are four new pieces" is a shop deciding to advertise,
+ // The others fire because a shopper did something. She bought, she abandoned a basket, she signed
+ // up, and the message is about that. "Here are four new pieces" is a shop deciding to advertise,
  // and which four, and how it reads, are the seller's call. Sending it unattended meant a store
  // could email its whole list without ever seeing what went out.
  //
@@ -113,7 +113,7 @@ export async function sendNewListingsDigest(storeSlug: string, newItems: NewList
 const CHECKOUT_BASE = "https://vyaplatform.com";
 
 /**
- * Nudge a shopper who opened checkout for a one-of-one piece but didn't finish —
+ * Nudge a shopper who opened checkout for a one-of-one piece but didn't finish,
  * only if the store's "abandoned cart" flow is on. A custom "order_placed"-style
  * automation could layer on later; this covers the built-in flow.
  */
@@ -121,7 +121,7 @@ export async function sendAbandonedCartEmail(cart: AbandonedCart, opts: { force?
  // Manual sends (the seller clicking "Send reminder") bypass the automation toggle; the cron respects it.
  if (!opts.force && !(await isAutomationEnabled(cart.storeSlug, "abandoned_cart").catch(() => true))) return false;
  // The one most likely to be sent twice: a connected store's tool has the basket and its own
- // recovery timing, so ours stands down. A seller pressing "Send reminder" herself still sends —
+ // recovery timing, so ours stands down. A seller pressing "Send reminder" herself still sends,
  // she's looking at the person and has decided.
  if (!opts.force && !(await vyaSends(cart.storeSlug, "abandoned-basket"))) return false;
  if (!cart.email.includes("@")) return false;
@@ -130,7 +130,7 @@ export async function sendAbandonedCartEmail(cart: AbandonedCart, opts: { force?
  const brand = await getStoreEmailBrand(cart.storeSlug).catch(() => undefined);
  const piece = cart.itemTitle || "your piece";
  const subject = `${piece} is still in your basket`;
- // First line becomes the headline, the rest sits under it — see sendStoreAutomationEmail.
+ // First line becomes the headline, the rest sits under it. See sendStoreAutomationEmail.
  const body = `You left ${piece} in your basket.\nIt's still here if you'd like it.`;
  const r = await sendStoreAutomationEmail({ storeSlug: cart.storeSlug, storeName: fromName, storeEmail: replyTo, fromAddress, subject, body, link: `${CHECKOUT_BASE}/checkout?item=${cart.itemId}`, recipients: [cart.email], brand }).catch(() => null);
  return !!r && r.sent > 0;

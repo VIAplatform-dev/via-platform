@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
  ]);
 
  if (!cookie || !csrfToken) {
- return NextResponse.json({ error: "No Collabs credentials stored — run sync-collabs first" }, { status: 400 });
+ return NextResponse.json({ error: "No Collabs credentials stored. Run sync-collabs first" }, { status: 400 });
  }
 
  const headers = {

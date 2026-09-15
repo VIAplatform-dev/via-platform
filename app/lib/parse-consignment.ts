@@ -2,7 +2,7 @@ import type { ConsignorImportRow } from "./consignment-db";
 
 // Generic consignor-roster CSV parser for stores migrating off another consignment platform
 // (ConsignCloud, SimpleConsign, Ricochet, Resaleworld, or a plain spreadsheet). Rather than a
-// parser per tool, we column-map by common header names — every export carries the same shape:
+// parser per tool, we column-map by common header names. Every export carries the same shape:
 // a consignor (name/contact), their split, and a current balance owed. The balance is the one
 // that matters: it comes over as a stated OPENING figure, never a replay of past sales (see
 // importConsignors), so nothing gets double-counted or double-paid.
@@ -29,7 +29,7 @@ function splitLine(line: string, delim: string): string[] {
  *
  * Has to cope with both conventions, because a store's export follows its own locale: "1,240.50"
  * (comma groups thousands) and "1.240,50" or "124,50" (comma is the decimal point). Getting this
- * wrong is not a cosmetic bug — reading "124,50" as 12450 tells a store it owes a consignor
+ * wrong is not a cosmetic bug. Reading "124,50" as 12450 tells a store it owes a consignor
  * $12,450 instead of $124.50.
  *
  * The rule is positional, which is what actually distinguishes them: whichever separator comes LAST
@@ -42,7 +42,7 @@ export const toCents = (v: string): number => {
  const lastDot = raw.lastIndexOf(".");
  let normalised: string;
  if (lastComma > -1 && lastDot > -1) {
-  // Both present — the later one is the decimal point, the earlier one groups thousands.
+  // Both present: the later one is the decimal point, the earlier one groups thousands.
   normalised = lastComma > lastDot ? raw.replace(/\./g, "").replace(",", ".") : raw.replace(/,/g, "");
  } else if (lastComma > -1) {
   // Only commas. Two digits after a single comma is a decimal ("124,50"); anything else groups.

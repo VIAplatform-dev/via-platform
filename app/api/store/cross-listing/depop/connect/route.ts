@@ -5,7 +5,7 @@ import { saveDepopTokens } from "@/app/lib/depop-tokens-db";
 export const dynamic = "force-dynamic";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Depop connect — the email sign-in-link handshake.
+// Depop connect: the email sign-in-link handshake.
 //
 // Depop stopped handing out Selling API access, so app/lib/depop.ts (written against the official
 // partner API) has no way to obtain a token. This is the other route sellers already use with
@@ -15,8 +15,8 @@ export const dynamic = "force-dynamic";
 // that must be exchanged, or an opaque id that only means something to Depop's own client. So this
 // route has two modes:
 //
-//   probe   — parse the link, report the SHAPE of what is in it, store nothing.
-//   connect — same parse, and store the credential if the link plainly carried one.
+//   probe: parse the link, report the SHAPE of what is in it, store nothing.
+//   connect: same parse, and store the credential if the link plainly carried one.
 //
 // Probe exists so the first look costs nothing: it reports parameter names, value lengths and a
 // 4-character prefix, which is enough to tell a JWT from a UUID and not enough to use. Nobody has
@@ -54,7 +54,7 @@ function toUrl(raw: string): URL | null {
  }
 }
 
-/** Every candidate credential in a link — query string, #fragment, and path segments. */
+/** Every candidate credential in a link. Query string, #fragment, and path segments. */
 function inspect(u: URL): Found[] {
  const found: Found[] = [];
  const consider = (key: string, value: string, where: Found["where"]) => {
@@ -97,17 +97,17 @@ export async function POST(request: NextRequest) {
  if (!link.trim()) return NextResponse.json({ error: "Paste the sign-in link from Depop’s email." }, { status: 400 });
 
  const u = toUrl(link);
- if (!u) return NextResponse.json({ ok: false, error: "That doesn’t look like a link — paste the whole URL from the email." }, { status: 400 });
+ if (!u) return NextResponse.json({ ok: false, error: "That doesn’t look like a link. Paste the whole URL from the email." }, { status: 400 });
 
  // A link pointing anywhere other than Depop is a mistake or a phishing attempt. Either way this
  // endpoint has no business pulling credentials out of it.
  if (!/(^|\.)depop\.com$/i.test(u.host)) {
-  return NextResponse.json({ ok: false, host: u.host, error: `That link points at ${u.host} — expected a depop.com link.` }, { status: 400 });
+  return NextResponse.json({ ok: false, host: u.host, error: `That link points at ${u.host}: expected a depop.com link.` }, { status: 400 });
  }
 
  // ── REDEEM ────────────────────────────────────────────────────────────────
  // The real Depop magic link carries its secret in the PATH (/login/magic-link/verify/<blob>/web),
- // not as a query token — so we don't extract anything, we replay the whole link the way clicking
+ // not as a query token, so we don't extract anything, we replay the whole link the way clicking
  // it would, and watch what Depop does. A magic link is designed to hand a session to whoever holds
  // it, so a plain server-side GET often gets Set-Cookie'd straight back. We follow the redirect
  // chain by hand (so we can read cookies on each hop) and stop the moment either a session appears
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
 
   if (authCookie && !wall) {
    await saveDepopTokens(slug, {
-    accessToken: cookieHeader,             // the whole cookie jar — what the poster will replay
+    accessToken: cookieHeader,             // the whole cookie jar. What the poster will replay
     depopUser: typeof body?.handle === "string" ? body.handle.trim().replace(/^@/, "") : null,
    });
    return NextResponse.json({
@@ -173,8 +173,8 @@ export async function POST(request: NextRequest) {
    chain: chain.map((c) => ({ status: c.status, path: c.path, setCookies: c.setCookies })),
    wall,
    note: wall
-    ? `The redeem bounced to ${wall} — Depop wants a check the link alone doesn't satisfy. That's the wall; I won't try to get around it.`
-    : "No session cookie came back. The redeem endpoint likely isn't the web link — send me this chain and I'll adjust.",
+    ? `The redeem bounced to ${wall}: Depop wants a check the link alone doesn't satisfy. That's the wall; I won't try to get around it.`
+    : "No session cookie came back. The redeem endpoint likely isn't the web link. Send me this chain and I'll adjust.",
   });
  }
 
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
    verdict: token
     ? "Carries what looks like a usable token."
     : code
-    ? "Carries a one-shot code — needs an exchange step that isn’t built yet."
+    ? "Carries a one-shot code. Needs an exchange step that isn’t built yet."
     : "No credential found in this link.",
   });
  }
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
  }
 
  const value = valueFor(u, token);
- if (!value) return NextResponse.json({ ok: false, error: "Found a credential but couldn’t read it back — run the probe and send me its output." }, { status: 422 });
+ if (!value) return NextResponse.json({ ok: false, error: "Found a credential but couldn’t read it back. Run the probe and send me its output." }, { status: 422 });
 
  // A JWT states its own expiry, which tells us how often a seller will have to reconnect.
  let expiresInSec: number | null = null;
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
    const payload = JSON.parse(Buffer.from(value.split(".")[1], "base64url").toString());
    if (typeof payload?.exp === "number") expiresInSec = Math.max(60, payload.exp - Math.floor(Date.now() / 1000));
   } catch {
-   /* doesn't decode — store it and find out empirically */
+   /* doesn't decode: store it and find out empirically */
   }
  }
 

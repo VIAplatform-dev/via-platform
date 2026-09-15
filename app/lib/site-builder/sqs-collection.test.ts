@@ -7,7 +7,7 @@ import { SQS_SHOP } from "./fixtures.ts";
 
 // F5: Squarespace shop pages now go live through the same fill as Shopify collection pages. Their card
 // puts the name and the price inside ONE price-classed wrapper (.product-list-title-price), and the fill
-// used to write the price over that wrapper — so turning /shop live would have wiped every name.
+// used to write the price over that wrapper, so turning /shop live would have wiped every name.
 
 const live = (i: number, extra: Partial<CollectionCardItem> = {}): CollectionCardItem => ({ id: `it${i}`, title: `Live Piece Number ${i}`, priceCents: 10000 * i + 55, currency: "USD", images: [`https://blob/p${i}.jpg`], sourceId: `h${i}`, available: true, ...extra });
 

@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const size = OG_SIZE;
 export const contentType = "image/png";
-export const alt = "VYA — discover your new favorite pieces";
+export const alt = "VYA. Discover your new favorite pieces";
 
 export default function Image() {
  return renderOgHero();

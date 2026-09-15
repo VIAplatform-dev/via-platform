@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 // EVERYTHING THE PHONE'S HOME SCREEN NEEDS, IN ONE ROUND TRIP.
 //
 // It was fifteen. Fifteen separate HTTPS requests, fired in parallel the instant the screen mounted,
-// and Home was only ever as fast as the slowest of them — which on a stall's cellular signal is not
+// and Home was only ever as fast as the slowest of them, which on a stall's cellular signal is not
 // a theoretical problem. Worse, one of the fifteen was /api/store/items, which returns the WHOLE
 // inventory: a screen that wanted "412 live · 2 over 90 days" was downloading every piece and every
 // image URL the store has to work it out on the phone.
@@ -29,14 +29,14 @@ export const dynamic = "force-dynamic";
 //   1. One request instead of fifteen. One TLS handshake, one round trip.
 //   2. COUNTS, NOT CATALOGUES. The aging arithmetic runs here, next to the database, and what
 //      crosses the wire is three numbers. The lists that DO cross are the ones Home actually draws
-//      by name — parcels to post, unread threads, consignors owed, holds lapsing — and they are
+//      by name, parcels to post, unread threads, consignors owed, holds lapsing, and they are
 //      short by nature and capped anyway.
 //
 // Every figure is composed from the SAME helper the dedicated route uses, so this can never quietly
 // disagree with the screen a seller taps into from here. Nothing is reimplemented.
 //
 // Failures are per-section, not global. A carrier outage inside rentals, or an analytics query that
-// times out, must not blank the whole screen — each block falls back to its own empty state and the
+// times out, must not blank the whole screen. Each block falls back to its own empty state and the
 // rest of Home still renders. That is the difference between a slow day and a broken app.
 
 /** Small lists still cross the wire; these are the ceilings, so one busy day can't make it big. */
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
  const seller = await getSellerBySlug(slug);
  if (!seller) return NextResponse.json({ error: "No such store" }, { status: 404 });
 
- // The two opt-in modes decide whether their sections are fetched at all — a shop that doesn't rent
+ // The two opt-in modes decide whether their sections are fetched at all. A shop that doesn't rent
  // pays nothing for the rentals block.
  const [rentalSettings, apptSettings] = await Promise.all([
   getRentalSettings(slug).catch(() => null),
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({
   ok: true,
   // NO STORE IDENTITY HERE ON PURPOSE. Name, currency and website come from /api/store/me, which
-  // resolves them from the static store map AND the database — logic worth exactly one home, since
+  // resolves them from the static store map AND the database. Logic worth exactly one home, since
   // getting it wrong is how a seller was once greeted by her own slug. Home keeps that call; it is
   // cheap, and every other screen shares the cached answer anyway.
   takings: {
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
    priorRevenueCents: analytics?.prior?.revenueCents ?? 0,
   },
   inventory: { live, drafts, aging },
-  // Parcels, not pieces — the same grouping the Orders screen counts in.
+  // Parcels, not pieces. The same grouping the Orders screen counts in.
   parcels: groupIntoParcels(orderRows).slice(0, MAX_ROWS),
   inbox: { unread: conversations.filter((c) => c.storeUnread > 0).slice(0, MAX_ROWS) },
   consignment: {

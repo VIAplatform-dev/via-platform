@@ -28,7 +28,7 @@ function getDatabaseUrl(): string {
 
 // Fold a coarse normalizeCategory family into a broad TYPE. We only flag
 // cross-TYPE disagreements (a bag filed under jewelry, a shoe filed under
-// clothing) — the errors that actually matter for browsing. Everything inside
+// clothing). The errors that actually matter for browsing. Everything inside
 // "clothing" (jeans vs pants, sweater vs top, skirt vs jacket) is left alone:
 // jeans/pants stay separate categories, but the vision model can't reliably
 // tell them apart from a photo, so those disagreements aren't actionable.
@@ -41,7 +41,7 @@ function coarseToType(coarse: string | null): string | null {
 }
 
 // Multi-item listings ("... Set", "... Suit") are genuinely more than one
-// category — vision picks one piece, the title another. Don't flag them.
+// category: vision picks one piece, the title another. Don't flag them.
 const MULTI_ITEM_RE = /\b(set|suit)\b/i;
 
 // Human-readable phrase for the verification (Stage 2) prompt, per broad type.
@@ -57,13 +57,13 @@ const TYPE_PHRASE: Record<string, string> = {
 // what users see) against an INDEPENDENT vision read of the photo. Both are folded
 // to a broad TYPE; only cross-TYPE mismatches are flagged. The optional `types`
 // filter restricts the (paid) vision call to products whose storefront type is in
-// the list — use `types=bags,accessories` to hunt bag/jewelry mislabels cheaply.
+// the list: use `types=bags,accessories` to hunt bag/jewelry mislabels cheaply.
 // YOU trigger it, in batches (bump offset until scanned hits 0).
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  if (!isVisionConfigured()) {
  return NextResponse.json(
- { ok: false, notConfigured: true, error: "ANTHROPIC_API_KEY not set — vision is off." },
+ { ok: false, notConfigured: true, error: "ANTHROPIC_API_KEY not set: vision is off." },
  { status: 503 },
  );
  }
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
  return;
  }
  checked++;
- // Stage 1 found a cross-TYPE disagreement. Don't report it yet — Stage 2
+ // Stage 1 found a cross-TYPE disagreement. Don't report it yet. Stage 2
  // asks a stronger model to confirm the photo really ISN'T the filed type.
  if (p.storefrontType !== imageType) {
  let verdict: "match" | "mismatch" | null = null;

@@ -1,12 +1,12 @@
 import "server-only";
 import sanitizeHtml from "sanitize-html";
 
-// Custom storefront sections let VYA (or a hands-on seller) build ANY component from HTML —
-// accordions via <details>, tabs, comparison tables, timelines, custom layouts — styled with the
+// Custom storefront sections let VYA (or a hands-on seller) build ANY component from HTML,
+// accordions via <details>, tabs, comparison tables, timelines, custom layouts. Styled with the
 // storefront's custom CSS. Because that HTML renders on a PUBLIC page, every write path funnels
 // through this allowlist first (see setStorefrontTheme): structural + text markup, native
 // interactive elements, images and links are kept; scripts, event handlers, iframes, forms, and
-// unsafe URLs are dropped. Interactivity is CSS/`<details>`-native — no JS ever runs.
+// unsafe URLs are dropped. Interactivity is CSS/`<details>`-native, no JS ever runs.
 const CONFIG: sanitizeHtml.IOptions = {
  allowedTags: [
  "div", "section", "article", "header", "footer", "aside", "main", "nav",
@@ -29,7 +29,7 @@ const CONFIG: sanitizeHtml.IOptions = {
  td: ["colspan", "rowspan"],
  th: ["colspan", "rowspan", "scope"],
  button: ["type"],
- // Inline SVG (icons/dividers) — geometry only, no scripting surface.
+ // Inline SVG (icons/dividers). Geometry only, no scripting surface.
  svg: ["viewbox", "width", "height", "fill", "stroke", "stroke-width", "xmlns"],
  path: ["d", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin"],
  g: ["fill", "stroke", "transform"],
@@ -41,7 +41,7 @@ const CONFIG: sanitizeHtml.IOptions = {
  },
  // Images/links may only point at real web resources (no javascript:, no data:text/html).
  allowedSchemesByTag: { a: ["http", "https", "mailto"], img: ["http", "https"] },
- // Keep <button> (for styling) but it can never carry a handler — that's already stripped as a
+ // Keep <button> (for styling) but it can never carry a handler. That's already stripped as a
  // non-allowed attribute. Force safe rel on any new tab link.
  transformTags: {
  a: (tagName, attribs) => {

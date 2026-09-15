@@ -29,7 +29,7 @@ type Order = {
  paidAt: string | null;
  /** "pickup" = collected in store: no label to print. Absent on orders placed before collection existed. */
  deliveryMethod?: "ship" | "pickup";
- /** The payment every piece bought together shares — what makes three orders one parcel. */
+ /** The payment every piece bought together shares. What makes three orders one parcel. */
  paymentIntent?: string | null;
  labelUrl?: string | null;
  trackingNumber?: string | null;
@@ -59,7 +59,7 @@ function tone(status: string): "success" | "warning" | "neutral" | "info" {
  return "info";
 }
 
-// Friendlier label — "paid" alone doesn't tell the seller it still needs shipping.
+// Friendlier label: "paid" alone doesn't tell the seller it still needs shipping.
 function statusLabel(status: string): string {
  const s = (status || "").toLowerCase();
  if (s === "paid") return "needs shipping";
@@ -80,13 +80,13 @@ export default function OrdersPage() {
  const [orders, setOrders] = useState<Order[]>([]);
  const [imported, setImported] = useState<ImportedOrder[]>([]);
  const [importOpen, setImportOpen] = useState(false);
- // ?delivery=pickup — Home's "collections waiting" row lands on the orders someone is coming in
+ // ?delivery=pickup: Home's "collections waiting" row lands on the orders someone is coming in
  // for. Read once from the URL; "Show all" clears it like any other filter.
  const [pickupOnly, setPickupOnly] = useState(false);
  const [busyKey, setBusyKey] = useState<string | null>(null);
  const [actErr, setActErr] = useState<string | null>(null);
  // Option J: a label cannot be bought without a ship-from address (orders/[id] refuses), so when
- // there are parcels to post and no address, this page says so — and only then.
+ // there are parcels to post and no address, this page says so, and only then.
  const [gate, setGate] = useState<ShipFromGate | null>(null);
  useEffect(() => {
  if (new URLSearchParams(window.location.search).get("delivery") === "pickup") void Promise.resolve().then(() => setPickupOnly(true));
@@ -133,12 +133,12 @@ export default function OrdersPage() {
  const aov = orders.length ? revenue / orders.length : 0;
  const currency = orders[0]?.currency || imported[0]?.currency || "USD";
  // Parcels, not pieces (parcels-core.ts): a buyer who took three things is one row, one label, one
- // Mark posted — and "to ship" counts bags on her table, not lines on a list.
+ // Mark posted, and "to ship" counts bags on her table, not lines on a list.
  const parcels = groupIntoParcels(orders);
  const toPost = parcelsToPost(parcels).length;
  const shown = pickupOnly ? parcels.filter((p) => p.deliveryMethod === "pickup" && p.status === "paid") : parcels;
 
- // Both sources in one file — a seller doing their books wants every sale of the
+ // Both sources in one file. A seller doing their books wants every sale of the
  // year, not the ones that happened to come through the storefront.
  function exportCsv() {
   const rows = [
@@ -177,7 +177,7 @@ export default function OrdersPage() {
  {actErr && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{actErr}</div>}
 
  {orders.length === 0 && imported.length === 0 ? (
- <EmptyState icon={<ShoppingBag size={28} strokeWidth={1.5} />} title="No orders yet" body="When a buyer checks out on your storefront, the order shows up here — or import your past orders with “Import history”." />
+ <EmptyState icon={<ShoppingBag size={28} strokeWidth={1.5} />} title="No orders yet" body="When a buyer checks out on your storefront, the order shows up here, or import your past orders with “Import history”." />
  ) : orders.length > 0 ? (
  <Card className="overflow-hidden">
  {pickupOnly && (
@@ -218,9 +218,9 @@ export default function OrdersPage() {
  </>
  ) : <span className="block truncate">{first.itemTitle || "Item"}</span>}
  </td>
- <td className="px-5 py-3 text-stone-600">{p.buyerEmail || "—"}</td>
- <td className="px-5 py-3 tabular-nums text-stone-500">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "—"}</td>
- {/* "needs shipping" is a lie for a collection — nothing is being posted. */}
+ <td className="px-5 py-3 text-stone-600">{p.buyerEmail || "-"}</td>
+ <td className="px-5 py-3 tabular-nums text-stone-500">{p.paidAt ? new Date(p.paidAt).toLocaleDateString() : "-"}</td>
+ {/* "needs shipping" is a lie for a collection. Nothing is being posted. */}
  <td className="px-5 py-3">
  <Badge tone={tone(p.status)} dot>{pickup && p.status === "paid" ? "awaiting collection" : statusLabel(p.status)}</Badge>
  {pickup && <span className="ml-1.5 align-middle text-[11px] text-stone-400">collection</span>}
@@ -272,10 +272,10 @@ export default function OrdersPage() {
  <tbody className="divide-y divide-stone-100">
  {imported.map((o) => (
  <tr key={o.id} className="text-stone-600">
- <td className="whitespace-nowrap px-5 py-3 font-mono text-[12px] tabular-nums text-stone-400">{o.externalId || "—"}</td>
- <td className="max-w-[260px] truncate px-5 py-3 font-medium text-stone-800">{o.itemTitle || "—"}</td>
- <td className="px-5 py-3">{o.buyerEmail || o.buyerName || "—"}</td>
- <td className="px-5 py-3 tabular-nums text-stone-500">{o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "—"}</td>
+ <td className="whitespace-nowrap px-5 py-3 font-mono text-[12px] tabular-nums text-stone-400">{o.externalId || "-"}</td>
+ <td className="max-w-[260px] truncate px-5 py-3 font-medium text-stone-800">{o.itemTitle || "-"}</td>
+ <td className="px-5 py-3">{o.buyerEmail || o.buyerName || "-"}</td>
+ <td className="px-5 py-3 tabular-nums text-stone-500">{o.orderDate ? new Date(o.orderDate).toLocaleDateString() : "-"}</td>
  <td className="px-5 py-3 text-right font-medium tabular-nums text-stone-800">{formatPriceCents(o.amountCents, o.currency || currency)}</td>
  </tr>
  ))}
@@ -318,7 +318,7 @@ function OrderImportModal({ onClose }: { onClose: () => void }) {
  <div className="mb-4 flex items-start justify-between">
  <div>
  <h2 className="text-base font-semibold text-stone-900">Import order history</h2>
- <p className="mt-0.5 text-[12px] text-stone-500">Export your orders from Shopify/Square (or any spreadsheet) and drop the CSV here. Kept separate from your live sales — for your records, LTV, and repeat customers.</p>
+ <p className="mt-0.5 text-[12px] text-stone-500">Drop in a CSV of past orders from Shopify, Square or a spreadsheet. They sit alongside your live sales for customer history.</p>
  </div>
  <button onClick={onClose} className="text-stone-400 hover:text-stone-700">✕</button>
  </div>

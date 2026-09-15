@@ -11,7 +11,7 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 // GET /api/admin/store-audience-debug?store=vintage-girlfriend&title=Chrome+Hearts+Heart+Orbit
-//   favoriters: VYA users who favorited the product matching `title` (works even after it sold —
+//   favoriters: VYA users who favorited the product matching `title` (works even after it sold,
 //               resolves the deleted products.id via product_history + the favorite snapshot).
 //   clickers:   VYA users who clicked out to `store` all-time (identified + an anonymous count).
 export async function GET(request: NextRequest) {
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const sql = neon(dbUrl);
   const pattern = `%${title}%`;
 
-  // Favoriters — match the (now-deleted) product by history id OR by the snapshot title stored
+  // Favoriters: match the (now-deleted) product by history id OR by the snapshot title stored
   // on the favorite. Scoped to the store so a title substring can't leak another store's favorites.
   const favoriters = title
     ? await sql`
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
     ORDER BY clicks DESC
   `;
 
-  // Clicks in the Collabs attribution window (default 30 days) before the Aug 7 order — the buyer
+  // Clicks in the Collabs attribution window (default 30 days) before the Aug 7 order. The buyer
   // that earned the commission must have clicked in here. Includes ALL girlfriend-ish variants.
   const orderIso = request.nextUrl.searchParams.get("orderIso") ?? "2026-08-07T04:33:11Z";
   const windowDaysRaw = parseInt(request.nextUrl.searchParams.get("attributionDays") ?? "30", 10);

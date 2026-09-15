@@ -3,20 +3,20 @@
 // The Pages rail: her site's pages, in the order her menu shows them.
 //
 // Shaped like Shopify's navigation and pages screens put together, because that is the mental model
-// she already has: the menu at the top, in menu order, reorderable — then the pages that exist but are
+// she already has: the menu at the top, in menu order, reorderable, then the pages that exist but are
 // not in it. Per row: open it, rename it, take it in or out of the menu, hide it.
 //
 // Hiding is the reversible one and the default: shoppers get "Page not found" and the menu links go,
 // but the page is untouched and Show brings it straight back. Deleting for good is a second,
-// confirmed choice — the same rule Step 2 settled on for sections.
+// confirmed choice: the same rule Step 2 settled on for sections.
 //
 // REORDERING IS NOT A DRAG-ONLY FEATURE. This started on the browser's own drag-and-drop
-// (draggable + dragstart/drop), and on a trackpad it frequently refused to start at all — the owner
+// (draggable + dragstart/drop), and on a trackpad it frequently refused to start at all. The owner
 // reported the rows simply would not move. So: pointer events, which behave the same for a mouse, a
 // trackpad and a finger, plus ▲▼ on every row, which always work and are reachable by keyboard.
 //
 // Row lives OUTSIDE this component on purpose. Declared inside, it is a new component type on every
-// render, so React throws every row away and rebuilds it whenever any state changes — which drops the
+// render, so React throws every row away and rebuilds it whenever any state changes, which drops the
 // pointer capture the drag depends on the instant the drag sets state, and the row never moves.
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Pencil, Plus, ExternalLink, Lock } from "lucide-react";
@@ -25,7 +25,7 @@ export type PageEntryView = {
  path: string; label: string; title: string | null; navLabel: string | null;
  hidden: boolean; kind: "captured" | "added"; group: "menu" | "collections" | "other" | "unlinked" | "product";
  inMenu: boolean; canHide: boolean; refusal: string | null;
- /** How many links on her navigation pages still point here — the warning before she hides it. */
+ /** How many links on her navigation pages still point here. The warning before she hides it. */
  linkedFrom?: number;
 };
 
@@ -139,7 +139,7 @@ export default function PagesPanel(props: {
  dragRef: { current: string | null };
 }) {
  const { pages } = props;
- // The row being dragged, and the row the pointer is over — the one it will change places with.
+ // The row being dragged, and the row the pointer is over. The one it will change places with.
  const [dragPath, setDragPath] = useState<string | null>(null);
  const [overPath, setOverPath] = useState<string | null>(null);
 
@@ -153,17 +153,17 @@ export default function PagesPanel(props: {
     </button>
    </div>
    <p className="mb-3 text-[12px] leading-snug text-stone-400">
-    Your menu order is what shoppers see. Renaming changes the page&rsquo;s name and its menu label — never its web address, so no link anyone has ever breaks.
+    Drag to set the order shoppers see. Renaming changes the label, never the web address, so existing links keep working.
    </p>
 
    {!props.ready && (
     <p className="mb-3 rounded-lg border border-[#5D0F17]/25 bg-white px-3 py-2 text-[11.5px] leading-relaxed text-[#5D0F17]">
-     Page settings aren&rsquo;t switched on for this site yet, so renaming, hiding and adding pages are unavailable. Your pages are all still listed below.
+     Renaming, hiding and adding pages aren&rsquo;t available for this site yet. Your pages are listed below.
     </p>
    )}
    {props.drifted && (
     <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11.5px] leading-relaxed text-amber-800">
-     Your menu changed since you last arranged it, so we&rsquo;re showing the one on your site now. Move anything to save a new order.
+     Your menu has changed since you last arranged it. This is the current one: move anything to save a new order.
     </p>
    )}
    {props.note && <p className="mb-3 rounded-lg border border-black/10 bg-white px-3 py-2 text-[11.5px] leading-relaxed text-stone-600">{props.note}</p>}

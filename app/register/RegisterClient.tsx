@@ -85,10 +85,10 @@ export default function RegisterClient() {
 
   return (
     <div className="fixed inset-0 z-[200] flex">
-      {/* Left — solid red */}
+      {/* Left: solid red */}
       <div className="hidden lg:block lg:w-1/2 bg-[#5D0F17]" />
 
-      {/* Right — form */}
+      {/* Right: form */}
       <div className="w-full lg:w-1/2 bg-white flex flex-col overflow-y-auto">
         <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 py-12 max-w-xl w-full mx-auto">
           {/* Logo */}
@@ -103,7 +103,7 @@ export default function RegisterClient() {
                 <>
                   <h1 className="font-serif text-3xl text-[#5D0F17] mb-3">You&apos;re in.</h1>
                   <p className="text-[#5D0F17]/60 text-sm leading-relaxed mb-8">
-                    Welcome, <strong>{firstName}</strong>. We&apos;ve sent a sign-in link to <strong>{email}</strong> — click it to access VYA.
+                    Welcome, <strong>{firstName}</strong>. We&apos;ve sent a sign-in link to <strong>{email}</strong>. Click it to access VYA.
                   </p>
                 </>
               ) : (
@@ -115,7 +115,7 @@ export default function RegisterClient() {
                 </>
               )}
 
-              {/* Referral — move up the waitlist (only for pending users) */}
+              {/* Referral: move up the waitlist (only for pending users) */}
               {!approved && myReferralCode && (
                 <div className="bg-[#FFFDF8] px-6 py-6 mb-4">
                   <p className="text-[10px] uppercase tracking-[0.2em] text-[#5D0F17]/50 mb-1">Move up faster</p>

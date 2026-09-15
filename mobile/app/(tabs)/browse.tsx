@@ -7,7 +7,7 @@ import AppHeader from "../../components/AppHeader";
 import { imageUrl, IMG } from "../../lib/imageUrl";
 import { colors, fonts, spacing } from "../../lib/theme";
 
-// Browse — the way in when you don't have a search term: designers, and the curated collections.
+// Browse: the way in when you don't have a search term: designers, and the curated collections.
 //
 // This is the home of /api/public/brands and /api/public/collections, which the shipped app called
 // and nothing else here uses. Shop answers "I know what I want"; Browse answers "show me what's

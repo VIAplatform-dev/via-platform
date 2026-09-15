@@ -5,10 +5,10 @@
 //   <script type="importmap">{"imports":{"@theme/component":"/cdn/shop/t/1/assets/component.js?v=…"}}</script>
 //
 // Those specifiers are ROOT-RELATIVE. On Shopify they resolve against the seller's own domain, which
-// proxies Shopify's CDN under `/cdn/`. Served from a VYA store origin they resolve against US — and
+// proxies Shopify's CDN under `/cdn/`. Served from a VYA store origin they resolve against US, and
 // nothing here answered `/cdn/…`, so every module 404'd. Next's 404 is an HTML page, so the browser
 // then reported "Refused to execute script … MIME type ('text/html')", every `@theme/*` import
-// failed, and the theme's JavaScript — the entire reason Plan B exists — never ran. ~40 console
+// failed, and the theme's JavaScript, the entire reason Plan B exists, never ran. ~40 console
 // errors on a single product page, and a storefront whose carousels, variant picker, quantity
 // selector and cart drawer were all dead.
 //
@@ -23,7 +23,7 @@ import { classifyScript } from "./scripts.ts";
 
 export type AssetPlan =
  | { action: "proxy"; url: string }
- /** Answered locally with a valid-but-empty body — one that parses BOTH as an ES module and as a
+ /** Answered locally with a valid-but-empty body. One that parses BOTH as an ES module and as a
   *  classic script. `import()` of it resolves, so a theme lazily pulling in Shop Pay gets a silent
   *  no-op rather than an unhandled rejection; and a plain `<script src>` runs it without error. */
  | { action: "inert"; contentType: string; body: string }
@@ -32,7 +32,7 @@ export type AssetPlan =
 /** Content types we can safely fake. Anything else is denied rather than guessed at. */
 function inertFor(pathname: string): AssetPlan {
  // A COMMENT, not `export {}`. Both are empty modules, but only one is also a valid CLASSIC
- // script — and Shopify's own bootstrap injects trekkie and shop_events_listener as classic
+ // script, and Shopify's own bootstrap injects trekkie and shop_events_listener as classic
  // `<script src>` tags at runtime, where `export` is a syntax error. That threw
  // "Uncaught SyntaxError: Unexpected token 'export'" on every page of every hosted store, from the
  // stub we serve to keep those scripts quiet. An empty module still resolves on import().
@@ -67,7 +67,7 @@ export function planCdnRequest(pathname: string, search: string, sourceOrigin: s
 
  // Same verdicts as capture time. `classifyScript` tests its patterns against the whole string
  // first, so a root-relative telemetry or checkout path is caught here even though the host is the
- // seller's own — which is precisely the case that got through before.
+ // seller's own, which is precisely the case that got through before.
  const verdict = classifyScript(p + (search || ""), sourceOrigin);
  if (verdict === "vendor" || verdict === "checkout") return inertFor(p);
 

@@ -2,7 +2,7 @@
 //
 // The full sync is for setting up and for catching up. This is the everyday path: someone
 // subscribes, buys, or unsubscribes on VYA, and their record in Klaviyo or Mailchimp changes within
-// the second — so a store's flows fire on real state rather than on a list that's a day behind.
+// the second, so a store's flows fire on real state rather than on a list that's a day behind.
 //
 // Deliberately best-effort and never awaited by anything a shopper is waiting on. If Klaviyo is
 // down, an unsubscribe on VYA still succeeds; the next full sync repairs it.
@@ -26,8 +26,8 @@ export function mirrorToEsp(storeSlug: string, contact: Contact): void {
 /**
  * Whether VYA should send a given email itself.
  *
- * Everything that sends a MARKETING email asks this first. Transactional callers don't need to —
- * `vyaShouldSend` always says yes for those — but asking is harmless and makes the rule visible at
+ * Everything that sends a MARKETING email asks this first. Transactional callers don't need to,
+ * `vyaShouldSend` always says yes for those, but asking is harmless and makes the rule visible at
  * the call site.
  */
 export async function vyaSends(storeSlug: string, kind: EmailKind): Promise<boolean> {
@@ -40,7 +40,7 @@ export async function vyaSends(storeSlug: string, kind: EmailKind): Promise<bool
   });
  } catch {
   // If we can't tell, SEND. A missed marketing email is a smaller harm than silence caused by a
-  // database hiccup — and the duplicate case needs a working connection to happen at all.
+  // database hiccup, and the duplicate case needs a working connection to happen at all.
   return true;
  }
 }

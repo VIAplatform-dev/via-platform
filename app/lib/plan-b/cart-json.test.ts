@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { buildCart, toCartLine, variantIdFromAddBody, buildSuggest, type CartLineItem } from "./cart-json.ts";
 
 // The contract with the seller's own theme JavaScript. These field names and units are not ours to
-// choose — a theme reads them directly, so getting one wrong shows up as a broken cart drawer.
+// choose: a theme reads them directly, so getting one wrong shows up as a broken cart drawer.
 
 const item = (over: Partial<CartLineItem> = {}): CartLineItem => ({
  id: "itm_1", title: "1990s Silk Slip Dress", priceCents: 18000, currency: "GBP",

@@ -6,7 +6,7 @@ import { stores } from "@/app/lib/stores";
 
 // Explains a drop in the Shopify Collabs total-commission figure (which is a live mirror of Collabs
 // and moves DOWN when an attributed order is refunded/canceled).
-//  1. refundCandidatesNow — stores where we have MORE Collabs orders on record (conversions table,
+//  1. refundCandidatesNow: stores where we have MORE Collabs orders on record (conversions table,
 //     never deleted) than Collabs currently reports → an order was removed, i.e. a refund there.
 //  2. Records a DATED daily snapshot of every partnership's commission, so from now on a drop is
 //     attributed to the exact store day-over-day (the live snapshot setting is single-latest and
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
  const sql = getDb();
 
  const raw = await getSetting("collabs_partnerships_snapshot").catch(() => null);
- if (!raw) return NextResponse.json({ error: "No collabs snapshot yet — open the Shopify Collabs tab / Sync first." }, { status: 404 });
+ if (!raw) return NextResponse.json({ error: "No collabs snapshot yet. Open the Shopify Collabs tab / Sync first." }, { status: 404 });
  let parts: Partnership[];
  try { parts = JSON.parse(raw); } catch { return NextResponse.json({ error: "Snapshot unparseable." }, { status: 500 }); }
  if (!Array.isArray(parts)) return NextResponse.json({ error: "Snapshot not an array." }, { status: 500 });

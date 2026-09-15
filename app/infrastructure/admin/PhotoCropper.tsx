@@ -7,7 +7,7 @@ import { CARD_ASPECT } from "@/app/lib/image-crop";
  * Position a listing photo inside the frame it will actually be seen in.
  *
  * Sellers shoot vertically and the card crops the middle, so a piece photographed low in the frame
- * lost its hem. Reordering the photos didn't help — the crop was the problem. Drag to move, zoom to
+ * lost its hem. Reordering the photos didn't help. The crop was the problem. Drag to move, zoom to
  * fill; the frame is fixed to the product card's shape so what you see here is what a shopper gets.
  *
  * The gesture reports a pan as a FRACTION of the slack rather than in pixels, so the numbers mean
@@ -31,7 +31,7 @@ export default function PhotoCropper({ url, onCancel, onCropped }: {
    const box = frame.current?.getBoundingClientRect();
    if (!d || !box) return;
    // Dividing by half the frame maps a drag across the whole frame to the full -1…1 range, which
-   // is roughly how far the photo can travel at a typical zoom — so it tracks the finger closely
+   // is roughly how far the photo can travel at a typical zoom, so it tracks the finger closely
    // without needing the image's own dimensions on this side.
    setPan({
     x: Math.max(-1, Math.min(1, d.px - (e.clientX - d.x) / (box.width / 2))),

@@ -27,7 +27,7 @@ export default function MembershipCTA({ isLoggedIn }: { isLoggedIn: boolean }) {
  onClick={handleJoin}
  className="w-full text-sm uppercase tracking-wide px-8 py-3 bg-black text-white hover:bg-black/85 transition"
  >
- Join VYA Insider — $10/month
+ Join VYA Insider: $10/month
  </button>
  );
 }

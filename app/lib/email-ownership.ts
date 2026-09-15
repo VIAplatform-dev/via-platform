@@ -3,17 +3,17 @@
 //
 // Without a rule here, a shopper who abandons a basket gets TWO emails about it: ours, and the one
 // the store's own tool now has the data to send. That's the single worst outcome of connecting an
-// email tool, and it's silent — the store finds out from a customer.
+// email tool, and it's silent. The store finds out from a customer.
 //
 // The split is the same one Shopify uses, and it holds up for a reason:
 //
 //   TRANSACTIONAL stays with VYA, always. An order confirmation, a shipping notice, a booking
-//   confirmation — these are a receipt for something that just happened. They have to go out in
+//   confirmation: these are a receipt for something that just happened. They have to go out in
 //   seconds whether or not a marketing tool is connected, working, or paid up, and they're not
 //   something a store composes. Handing them to Mailchimp would mean an order confirmation that
 //   depends on a marketing subscription being current.
 //
-//   MARKETING moves to the store's tool. New arrivals, abandoned baskets, win-backs — the tool they
+//   MARKETING moves to the store's tool. New arrivals, abandoned baskets, win-backs. The tool they
 //   already use does these better than we do, with their templates and their timing, and now has
 //   the data to. Us sending them too is the double-email problem.
 //
@@ -23,12 +23,12 @@
 
 /** Everything VYA can send on a store's behalf. */
 export type EmailKind =
- // Transactional — a receipt for something that happened.
+ // Transactional: a receipt for something that happened.
  | "order-confirmation" | "shipping" | "delivery" | "refund"
  | "appointment-confirmation" | "appointment-reminder" | "appointment-decision"
  | "rental-confirmation" | "rental-return" | "deposit-receipt"
  | "offer-reply" | "message-reply" | "consignor-payout"
- // Marketing — sent because a store wants to sell something.
+ // Marketing: sent because a store wants to sell something.
  | "new-arrivals" | "abandoned-basket" | "welcome" | "win-back" | "custom-automation" | "campaign";
 
 const MARKETING: ReadonlySet<EmailKind> = new Set<EmailKind>([
@@ -51,7 +51,7 @@ export type OwnershipState = {
 /**
  * Who sends this email.
  *
- * A campaign the seller writes and presses send on in VYA is still VYA's to send — she's standing
+ * A campaign the seller writes and presses send on in VYA is still VYA's to send. She's standing
  * in front of it. Handover is about the automatic ones that fire without anyone watching.
  */
 export function sender(kind: EmailKind, s: OwnershipState): Sender {
@@ -87,5 +87,5 @@ export function describe(s: OwnershipState, providerName: string): string {
  if (!s.espConnected) return "VYA sends everything: your order emails and your marketing.";
  return s.handOverMarketing
   ? `VYA sends your order emails. ${providerName} sends your marketing, so nobody gets the same email twice.`
-  : `VYA sends everything. ${providerName} has your customer list, but isn't sending to it — watch for people getting two of the same email.`;
+  : `VYA sends everything. ${providerName} has your customer list, but isn't sending to it. Watch for people getting two of the same email.`;
 }

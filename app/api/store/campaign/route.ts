@@ -27,8 +27,8 @@ function audienceFromBody(v: unknown): AudienceFilter {
  };
 }
 
-// GET — the real recipient count (subscribed, unified) + a breakdown + reply-to, for the composer.
-// With an audience in the query, `recipientCount` is that audience's count — the number that sends.
+// GET: the real recipient count (subscribed, unified) + a breakdown + reply-to, for the composer.
+// With an audience in the query, `recipientCount` is that audience's count. The number that sends.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,10 +55,10 @@ export async function GET(request: NextRequest) {
  });
 }
 
-// POST — send a campaign. { subject, body, link?, test?, design? }. test:true sends only to the
+// POST: send a campaign. { subject, body, link?, test?, design? }. test:true sends only to the
 // store's own email so they can check it before blasting the list.
 //
-// `design` is the composer's full layout, and it is what actually gets rendered — the same builder
+// `design` is the composer's full layout, and it is what actually gets rendered. The same builder
 // the preview uses (campaign-email.ts). Without it (the assistant, an older client) this falls back
 // to the plain headline-and-link email, which is what every campaign used to be regardless of what
 // the seller had laid out on screen.
@@ -71,14 +71,14 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: "Add a subject and a message." }, { status: 400 });
  }
  const { fromName, fromAddress, replyTo, website } = await resolveStoreSender(slug);
- if (!replyTo) return NextResponse.json({ error: "No store email on file — replies need somewhere to go. Add one in Email settings first." }, { status: 400 });
+ if (!replyTo) return NextResponse.json({ error: "No store email on file. Replies need somewhere to go. Add one in Email settings first." }, { status: 400 });
 
  const audience = audienceFromBody(body.audience);
  const link = (String(body.link || "").trim() || website) || undefined;
  const brand = await getStoreEmailBrand(slug);
  const common = { storeSlug: slug, storeName: fromName, storeEmail: replyTo, fromAddress, subject: String(body.subject).slice(0, 200), body: String(body.body).slice(0, 10000), link, brand };
 
- // The layout the seller built. Resolved once — pieces, brand, links — and reused for every
+ // The layout the seller built. Resolved once, pieces, brand, links, and reused for every
  // recipient in the batch.
  const design = body.design ? parseCampaignDesign(body.design) : null;
  const renderHtml = design ? (await campaignRenderer(slug, design, { fallbackLink: link })).render : undefined;
@@ -88,10 +88,10 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, test: true, sentTo: replyTo, ...r });
  }
 
- // The real audience: subscribed contacts across imported + buyers, deduped — the same set the
+ // The real audience: subscribed contacts across imported + buyers, deduped. The same set the
  // composer counts, so what's shown is what sends (and unsubscribes are honored).
  const subs = await listSubscribers(slug, audience).catch(() => []);
- // Plan check on the REAL send only — a test to yourself is not a campaign, and refusing it would
+ // Plan check on the REAL send only. A test to yourself is not a campaign, and refusing it would
  // stop a seller checking her own email before she pays to send it.
  const [tier, sentThisMonth] = await Promise.all([
   getStoreTier(slug).catch(() => null),
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
  if (!verdict.ok) return NextResponse.json({ error: verdict.reason, upgrade: verdict.upgrade }, { status: 402 });
 
  // Scheduled for later: stored and left for the cron, which sends it at the time she chose. The
- // plan check happens HERE rather than at send time — a store shouldn't queue six campaigns on a
+ // plan check happens HERE rather than at send time. A store shouldn't queue six campaigns on a
  // plan that allows four and find out at midnight.
  if (body.scheduledAt) {
   const when = new Date(String(body.scheduledAt));
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
  }
 
  const recipients = [...new Set(subs.map((c) => c.email.toLowerCase().trim()).filter((e) => e.includes("@")))];
- if (recipients.length === 0) return NextResponse.json({ error: audienceIsEmpty(audience) ? "No subscribers to send to yet — import a list in Customers, or wait for your first buyers." : "Nobody matches that audience yet." }, { status: 400 });
+ if (recipients.length === 0) return NextResponse.json({ error: audienceIsEmpty(audience) ? "No subscribers to send to yet. Import a list in Customers, or wait for your first buyers." : "Nobody matches that audience yet." }, { status: 400 });
 
  const r = await sendStoreCampaign({ ...common, recipients, renderHtml });
  return NextResponse.json({ ok: true, recipients: recipients.length, ...r });

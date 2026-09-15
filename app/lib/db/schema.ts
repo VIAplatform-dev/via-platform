@@ -26,7 +26,7 @@ export const sellers = pgTable("sellers", {
  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
-// One-of-one inventory item. Quantity is always 1 — the status carries availability.
+// One-of-one inventory item. Quantity is always 1. The status carries availability.
 export const items = pgTable(
  "items",
  {
@@ -35,7 +35,7 @@ export const items = pgTable(
  title: text("title").notNull(),
  description: text("description"),
  priceCents: integer("price_cents").notNull().default(0),
- costCents: integer("cost_cents"), // what the seller paid — private, for their margin
+ costCents: integer("cost_cents"), // what the seller paid. Private, for their margin
  currency: text("currency").notNull().default("USD"),
  images: jsonb("images").$type<string[]>().notNull().default([]),
  brand: text("brand"),
@@ -46,7 +46,7 @@ export const items = pgTable(
  colour: text("colour"),
  condition: text("condition"),
  size: text("size"),
- // Garment/flat measurements (bust/waist/length, or a bag's dimensions) — the #1 thing a secondhand
+ // Garment/flat measurements (bust/waist/length, or a bag's dimensions). The #1 thing a secondhand
  // buyer needs since they can't try it on. Free text so it fits any category ("Bust 34\" · Waist 28\" · Length 40\"").
  measurements: text("measurements"),
  category: text("category"),
@@ -61,7 +61,7 @@ export const items = pgTable(
  // Where an imported item came from, so re-imports can MATCH rather than guess. Everything used
  // to key off the title, which breaks two ways on one-of-one vintage: two listings with the same
  // name collapse into one, and a rename re-imports as a duplicate. `sourceId` is the platform's
- // own id/handle (Shopify handle, Squarespace item id, Woo product id) — stable across renames.
+ // own id/handle (Shopify handle, Squarespace item id, Woo product id). Stable across renames.
  sourcePlatform: text("source_platform"), // shopify | squarespace | woocommerce | …
  sourceId: text("source_id"),
  sourceUrl: text("source_url"),
@@ -76,22 +76,22 @@ export const items = pgTable(
  origin: text("origin").notNull().default("source"), // source | user
  // WHY a piece cannot be bought: `sold_out` = the seller's platform said so; `vanished` = it left
  // their feed and we inferred it. NULL = recorded before we started keeping the reason. Drives the
- // wording a shopper sees — see app/lib/unavailable-label.ts.
+ // wording a shopper sees. See app/lib/unavailable-label.ts.
  unavailableReason: text("unavailable_reason"),
  // What the piece was before the seller marked it down, when a markdown is running. NULL = not on
  // sale. Refreshed from the feed every import, so unlike a compare-at frozen at capture time it is
  // a discount we can vouch for.
  compareAtCents: integer("compare_at_cents"),
  // Whether every photo on this listing lives on OUR storage. Set by the copier, and cleared by the
- // importer whenever it writes the seller's own URLs back — otherwise a re-sync silently undoes the
+ // importer whenever it writes the seller's own URLs back. Otherwise a re-sync silently undoes the
  // copying while the marker still claims it is done. See app/lib/rehost-images-core.ts.
  imagesRehosted: boolean("images_rehosted").default(false),
- // Scheduled publish: a draft with publish_at in the future is "scheduled" — the cron flips it to
+ // Scheduled publish: a draft with publish_at in the future is "scheduled". The cron flips it to
  // active at that time. NULL = not scheduled (a normal draft or an already-live item).
  publishAt: timestamp("publish_at", { withTimezone: true }),
  // Which marketplaces this piece should cross-list to, chosen per listing in the
  // intake form. Persisted so a SCHEDULED listing still fans out to the channels the
- // seller picked, hours later, when the cron publishes it — NULL means they made no
+ // seller picked, hours later, when the cron publishes it. NULL means they made no
  // explicit choice and each channel's auto-list default applies.
  crossListChannels: text("cross_list_channels").array(),
  // Specific visible flaws, one per entry ("light pilling at cuffs"). The intake model has always
@@ -99,11 +99,11 @@ export const items = pgTable(
  // product page. See app/lib/flaws-core.ts.
  flaws: jsonb("flaws").$type<string[]>().default([]),
  // Sizing and condition as structure (owner audit #31, #27):
- //  measurementsJson — `{ key, value, unit }[]` per app/lib/measurements-core.ts. The older
+ //  measurementsJson: `{ key, value, unit }[]` per app/lib/measurements-core.ts. The older
  //   `measurements` TEXT column stays for imported prose; the product page prefers this one.
- //  conditionNote — what she adds beyond the grade; `condition` holds the grade itself when it
+ //  conditionNote: what she adds beyond the grade; `condition` holds the grade itself when it
  //   was chosen from the scale (app/lib/condition-core.ts), free text on rows saved before it.
- //  parcelEstimate — the intake model's (or the category table's) parcel, kept so the edit form
+ //  parcelEstimate: the intake model's (or the category table's) parcel, kept so the edit form
  //   can warn when a typed weight lands in a different tier (app/lib/parcel-core.ts).
  measurementsJson: jsonb("measurements_json").$type<{ key: string; value: number; unit: "cm" | "in" }[]>(),
  conditionNote: text("condition_note"),
@@ -154,7 +154,7 @@ export const orders = pgTable(
  feeCents: integer("fee_cents"), // VYA's application fee on this order
  shippingPaidCents: integer("shipping_paid_cents"), // shipping the buyer paid at checkout (buyer_pays); funds the label
  // Sales tax the buyer paid, as calculated by Stripe Tax on the SELLER's connected
- // account — they are merchant of record on a direct charge, so the registrations
+ // account: they are merchant of record on a direct charge, so the registrations
  // and the liability are theirs. Null means tax was never calculated for this
  // order (the store hadn't enabled it), which is different from zero.
  taxCents: integer("tax_cents"),
@@ -164,7 +164,7 @@ export const orders = pgTable(
  stripePaymentIntent: text("stripe_payment_intent"),
  status: orderStatus("status").notNull().default("pending"),
  confirmationSentAt: timestamp("confirmation_sent_at", { withTimezone: true }),
- // The seller's own note on this order — "buyer asked to hold until the 12th",
+ // The seller's own note on this order. "buyer asked to hold until the 12th",
  // "sent a replacement dust bag". Private: never shown to the buyer.
  internalNote: text("internal_note"),
  // Shipping label (bought via Shippo in the fulfillment view).
@@ -195,7 +195,7 @@ export const payouts = pgTable("payouts", {
 
 // A seller-defined collection (e.g. "Y2K", "Designer bags", "New arrivals"). Items
 // belong to zero or more; when a one-of-one piece sells it simply drops out and the
-// collection persists — so the curation work isn't wasted when something sells.
+// collection persists, so the curation work isn't wasted when something sells.
 export const collections = pgTable(
  "collections",
  {
@@ -205,7 +205,7 @@ export const collections = pgTable(
  slug: text("slug").notNull(),
  // The cover photo a shopper sees on a "shop by collection" tile. Added lazily by
  // ensureCollectionDisplayColumns() rather than through a migration, like `position` on
- // item_collections — a deploy must never land code that reads a column the database lacks.
+ // item_collections. A deploy must never land code that reads a column the database lacks.
  imageUrl: text("image_url"),
  // Where this collection sits in the seller's own order. A storefront row only has space for a few
  // tiles, so which ones appear IS this number; null sorts last, then by title.
@@ -223,7 +223,7 @@ export const itemCollections = pgTable(
  collectionId: uuid("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
  // Where this item sits INSIDE the collection. Without it the order was whatever Postgres chose to
  // return, so "show the first 5 of this collection" was arbitrary and could differ between page
- // loads. Nullable so existing rows stay valid — they sort behind anything explicitly ordered.
+ // loads. Nullable so existing rows stay valid. They sort behind anything explicitly ordered.
  position: integer("position"),
  },
  (t) => [primaryKey({ columns: [t.itemId, t.collectionId] })],

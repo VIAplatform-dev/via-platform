@@ -1,6 +1,6 @@
-// A cash receipt's words, and the tag that remembers where the customer was met. Pure — no I/O.
+// A cash receipt's words, and the tag that remembers where the customer was met. Pure, no I/O.
 
-/** `market:brick-lane` — the tag a stall customer carries into the customer list. */
+/** `market:brick-lane`: the tag a stall customer carries into the customer list. */
 export function marketTag(sessionName: string): string {
  const slug = String(sessionName || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "")
   .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -33,7 +33,7 @@ const money = (cents: number, currency: string) => {
 /** Subject + a plain-text body the store-branded shell wraps (paragraphs split on blank lines). */
 export function receiptCopy(r: ReceiptInput): { subject: string; body: string } {
  const cur = r.currency || "USD";
- const items = r.lines.map((l) => `${l.title} — ${money(l.saleCents, cur)}`).join("\n");
+ const items = r.lines.map((l) => `${l.title}: ${money(l.saleCents, cur)}`).join("\n");
  const paid = r.tender === "cash" ? "Paid in cash" : "Paid by card";
  const change = r.tender === "cash" && r.tenderedCents != null && r.changeCents != null && r.changeCents > 0
   ? ` (${money(r.tenderedCents, cur)} given, ${money(r.changeCents, cur)} change)` : "";

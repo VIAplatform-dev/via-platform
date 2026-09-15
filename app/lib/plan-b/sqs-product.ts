@@ -3,7 +3,7 @@
 // Squarespace's product page is driven entirely by its own JavaScript: a `ProductDetail` controller
 // reads the product out of a `data-context` JSON blob and its Add-to-cart button posts
 // `{itemId, sku, quantity}` to /api/commerce/shopping-cart/entries (see sqs-cart-json.ts, which
-// answers that call). The id it posts is whatever the capture froze — the SOURCE store's product id,
+// answers that call). The id it posts is whatever the capture froze. The SOURCE store's product id,
 // which means nothing to VYA.
 //
 // So the identity is rewritten at serve time, exactly as Plan B does for a Shopify quick-add form:
@@ -16,7 +16,7 @@ import type { Element as DomElement } from "domhandler";
 export type SqsProductIdentity = {
  /** The source store's own product id, as captured. */
  productId: string;
- /** The product's name, from the same blob — the key we match a VYA item on when the import didn't
+ /** The product's name, from the same blob. The key we match a VYA item on when the import didn't
   *  record source ids. */
  title: string;
 };
@@ -44,9 +44,9 @@ export function sqsProductIdentity(html: string): SqsProductIdentity | null {
 /**
  * Point the page's Add-to-cart at a VYA item.
  *
- * Rewrites the id in all three places the capture repeats it — the `data-context` payload the
+ * Rewrites the id in all three places the capture repeats it. The `data-context` payload the
  * controller actually reads, the `data-product-id` attribute beside it, and the page region's
- * `data-item-id` — so nothing on the page still claims to be the source's product. Only values
+ * `data-item-id`, so nothing on the page still claims to be the source's product. Only values
  * EQUAL to the captured product id are touched, so a collection id or a website id that happens to
  * sit in the same attribute set is left alone.
  *
@@ -54,7 +54,7 @@ export function sqsProductIdentity(html: string): SqsProductIdentity | null {
  * the injected VYA cart drawer drives the same button instead (see injectCart).
  */
 export function applySqsProductIdentity(html: string, vyaItemId: string, known?: SqsProductIdentity | null): string {
- // `known` is the identity the caller already read (it needed the title to find the VYA item) —
+ // `known` is the identity the caller already read (it needed the title to find the VYA item),
  // passing it back saves a second parse of a multi-megabyte page on every product view.
  const identity = known ?? sqsProductIdentity(html);
  if (!identity || !vyaItemId) return html;
@@ -77,7 +77,7 @@ export function applySqsProductIdentity(html: string, vyaItemId: string, known?:
 
  // Squarespace repeats the same id in its page-context bootstrap (`Static.SQUARESPACE_CONTEXT.item`),
  // which its quick view and its analytics read. A literal swap of that exact id is bounded and safe;
- // parsing arbitrary inline JS is not. The `<body id="item-…">` hook is deliberately left alone —
+ // parsing arbitrary inline JS is not. The `<body id="item-…">` hook is deliberately left alone,
  // a seller's page-specific custom CSS is written against it.
  $("script:not([src])").each((_: number, el: DomElement) => {
   const code = $(el).html() || "";

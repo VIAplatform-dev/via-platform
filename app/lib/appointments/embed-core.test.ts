@@ -49,7 +49,7 @@ test("Acuity and Squarespace Scheduling both frame", () => {
 
 test("anything we don't recognise falls back to a link, not an empty frame", () => {
  assert.equal(bookingEmbed("https://example.com/book"), null);
- assert.equal(bookingEmbed("calendly.com/hana"), null); // no scheme — not a usable href either
+ assert.equal(bookingEmbed("calendly.com/hana"), null); // no scheme, not a usable href either
  assert.equal(bookingEmbed(""), null);
  assert.equal(bookingEmbed(null), null);
  assert.equal(bookingEmbed("javascript:alert(1)"), null);

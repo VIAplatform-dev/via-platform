@@ -4,10 +4,10 @@ import { neon } from "@neondatabase/serverless";
 //
 // Its own table rather than a column on storefront_settings, for one blunt reason: that row has a
 // NOT NULL UNIQUE `handle`, so writing to it means inventing a public address for a store that may
-// not have one. Tess doesn't — her site is served from the capture, and she has no settings row at
+// not have one. Tess doesn't: her site is served from the capture, and she has no settings row at
 // all. Making "drag a thumbnail" depend on creating a public handle would be a strange trade.
 //
-// Self-healing DDL, like the rest of the schema — no migration step.
+// Self-healing DDL, like the rest of the schema, no migration step.
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;

@@ -26,7 +26,7 @@ export type SellerOrderRow = {
  status: string;
  paidAt: Date | null;
  createdAt: Date | null;
- /** The payment every piece bought together shares — the parcel key (app/lib/parcels-core.ts). */
+ /** The payment every piece bought together shares. The parcel key (app/lib/parcels-core.ts). */
  paymentIntent: string | null;
  labelUrl: string | null;
  trackingNumber: string | null;
@@ -68,14 +68,14 @@ export async function listSellerOrders(sellerId: string): Promise<SellerOrderRow
 }
 
 /**
- * The pieces of one parcel — every order on one payment — with what the tracking email needs.
+ * The pieces of one parcel, every order on one payment, with what the tracking email needs.
  * Seller-scoped so a parcel can never be acted on across stores.
  */
 /**
  * Every piece going in one box, with the measurements the label needs.
  *
  * Orders are one row per piece, so a checkout with three things is three rows sharing a payment
- * intent — and the label was bought from ONE of them. A t-shirt and a large bag produced a
+ * intent, and the label was bought from ONE of them. A t-shirt and a large bag produced a
  * t-shirt-sized label for a box holding both.
  */
 export async function listParcelItemSizes(sellerId: string, pi: string) {
@@ -103,7 +103,7 @@ export async function listParcelOrders(sellerId: string, pi: string) {
 }
 
 /**
- * Mark a whole parcel posted in ONE statement — the closest the HTTP driver gets to a transaction,
+ * Mark a whole parcel posted in ONE statement. The closest the HTTP driver gets to a transaction,
  * and enough: every piece flips or none does. Only pieces still "paid" move; the rest are left as
  * they are. Returns the ids that changed.
  */
@@ -135,7 +135,7 @@ export async function markTrackingEmailSentMany(orderIds: string[]): Promise<voi
  * One shopper's orders at one store, for her own account panel.
  *
  * Scoped by seller AND email in SQL rather than filtered afterwards: the row must never leave the
- * database if it isn't hers. Only the columns a shopper may see are selected — see shopper-orders.ts.
+ * database if it isn't hers. Only the columns a shopper may see are selected. See shopper-orders.ts.
  */
 export async function listOrdersForShopper(sellerId: string, email: string) {
  const key = (email || "").trim().toLowerCase();
@@ -179,7 +179,7 @@ export async function createPaidOrder(o: {
  stripePaymentIntent: string | null;
 }): Promise<Order> {
  const db = getDb();
- // Before the insert, not after it — see ensureTaxOrderCols for the two weeks this cost.
+ // Before the insert, not after it. See ensureTaxOrderCols for the two weeks this cost.
  await ensureTaxOrderCols();
  const [row] = await db
  .insert(orders)
@@ -320,7 +320,7 @@ export async function setOrderShipped(orderId: string, label: { labelUrl: string
  }).where(eq(orders.id, orderId));
 }
 
-/** Store a purchased label WITHOUT marking the order shipped — for auto-generate at order time, so
+/** Store a purchased label WITHOUT marking the order shipped, for auto-generate at order time, so
  *  the seller prints a prepaid label and marks it shipped only when they actually drop it off. */
 export async function setOrderLabel(orderId: string, label: { labelUrl: string; trackingNumber: string; trackingUrl: string | null; labelCostCents: number }): Promise<void> {
  await getDb().update(orders).set({
@@ -368,7 +368,7 @@ async function ensureRefundCols(): Promise<void> {
 }
 
 /** Record that the store rejected a returned item: reason + evidence photos (kept for a possible
- *  chargeback). Deliberately does NOT refund — the money stays with the store. */
+ *  chargeback). Deliberately does NOT refund. The money stays with the store. */
 export async function setReturnRejected(orderId: string, note: string | null, evidence: string[]): Promise<void> {
  await ensureRefundCols();
  await rawSql()`UPDATE orders SET return_status = 'rejected', return_rejection_note = ${note}, return_evidence = ${JSON.stringify(evidence.slice(0, 12))} WHERE id = ${orderId}`;
@@ -395,7 +395,7 @@ export async function getReturnLabelInfo(orderId: string): Promise<{ url: string
  return { url: (r?.return_label_url as string) ?? null, trackingNumber: (r?.return_tracking_number as string) ?? null, costCents: r?.return_label_cost_cents != null ? Number(r.return_label_cost_cents) : null };
 }
 
-/** Mark an order refunded and record WHEN + HOW MUCH — so a refunded sale is a real record, not just
+/** Mark an order refunded and record WHEN + HOW MUCH, so a refunded sale is a real record, not just
  *  a mutated status. */
 export async function markOrderRefunded(orderId: string, refundAmountCents: number): Promise<void> {
  await ensureRefundCols();
@@ -413,7 +413,7 @@ export async function claimOrderRefund(orderId: string): Promise<boolean> {
  return rows.length > 0;
 }
 
-/** Undo a claim whose refund failed — only while nothing has been recorded against it. */
+/** Undo a claim whose refund failed, only while nothing has been recorded against it. */
 export async function revertOrderRefundClaim(orderId: string): Promise<void> {
  await ensureRefundCols();
  await rawSql()`UPDATE orders SET status = 'paid' WHERE id = ${orderId} AND status = 'refunded' AND refunded_at IS NULL`;
@@ -438,7 +438,7 @@ export async function recordPayout(o: { orderId: string; sellerId: string; amoun
  });
 }
 
-/** Webhook idempotency — Stripe can deliver the same event twice. */
+/** Webhook idempotency: Stripe can deliver the same event twice. */
 // ── Market Mode (in-person sales) ─────────────────────────────────────────────────────────────
 // Additive columns so an order knows which channel/tender it came through and which market
 // session + checkout produced it. Raw SQL (like the refund cols) so nothing needs `db:push`.
@@ -452,7 +452,7 @@ export async function ensureMarketOrderCols(): Promise<void> {
  await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS market_session_id uuid`;
  await s`ALTER TABLE orders ADD COLUMN IF NOT EXISTS market_checkout_id uuid`;
  // One order per (PaymentIntent, item): a cart is N orders on ONE intent, so the intent alone can't be
- // unique — but the same item can never be recorded twice for the same payment (closes the
+ // unique, but the same item can never be recorded twice for the same payment (closes the
  // check-then-act gap in fulfill()). Drops the earlier intent-only index if it was ever created.
  await s`DROP INDEX IF EXISTS orders_pi_uniq`;
  await s`DROP INDEX IF EXISTS orders_market_checkout_uniq`;
@@ -505,7 +505,7 @@ export async function listMarketOrders(sellerId: string, sessionId: string): Pro
  }));
 }
 
-/** One market sale with the columns a void needs (tender, session, payment) — null if not a market order. */
+/** One market sale with the columns a void needs (tender, session, payment): null if not a market order. */
 export async function getMarketOrder(orderId: string): Promise<(MarketOrderRow & { sellerId: string; sessionId: string | null; refundedAt: string | null }) | null> {
  await ensureMarketOrderCols();
  await ensureRefundCols();
@@ -528,7 +528,7 @@ export async function getMarketOrder(orderId: string): Promise<(MarketOrderRow &
  };
 }
 
-/** The orders a market checkout already produced (one per item) — for crash-safe retries. */
+/** The orders a market checkout already produced (one per item), for crash-safe retries. */
 export async function getOrdersByMarketCheckout(checkoutId: string): Promise<{ id: string; itemId: string }[]> {
  await ensureMarketOrderCols();
  const rows = (await rawSql()`SELECT id, item_id FROM orders WHERE market_checkout_id = ${checkoutId}`) as Array<{ id: string; item_id: string }>;
@@ -537,7 +537,7 @@ export async function getOrdersByMarketCheckout(checkoutId: string): Promise<{ i
 
 // ── Collect in store ──────────────────────────────────────────────────────────────────────────
 // How the buyer got the piece, and where she collected it from. Additive raw-SQL columns like the
-// Market Mode ones above, so nothing needs `db:push`. `delivery_method` defaults to 'ship' — every
+// Market Mode ones above, so nothing needs `db:push`. `delivery_method` defaults to 'ship'. Every
 // order placed before collection existed IS a delivery, and that must stay true.
 let pickupColsEnsured = false;
 export async function ensurePickupOrderCols(): Promise<void> {
@@ -575,7 +575,7 @@ export async function listPickupOrderIds(sellerId: string): Promise<string[]> {
  } catch { return []; }
 }
 
-/** Collections paid for and not yet handed over — someone is coming to the counter. */
+/** Collections paid for and not yet handed over. Someone is coming to the counter. */
 export async function countPickupsWaiting(sellerId: string): Promise<number> {
  await ensurePickupOrderCols();
  try {
@@ -584,7 +584,7 @@ export async function countPickupsWaiting(sellerId: string): Promise<number> {
  } catch { return 0; }
 }
 
-/** How one order leaves the shop. Read separately from getOrderDetail — these columns aren't in the drizzle schema. */
+/** How one order leaves the shop. Read separately from getOrderDetail. These columns aren't in the drizzle schema. */
 export async function getOrderDelivery(orderId: string): Promise<{ method: "ship" | "pickup"; collectFrom: string | null; instructions: string | null }> {
  await ensurePickupOrderCols();
  const rows = (await rawSql()`SELECT delivery_method, collect_from, collect_instructions FROM orders WHERE id = ${orderId}`) as Array<Record<string, unknown>>;
@@ -599,7 +599,7 @@ export async function orderExistsForPaymentIntent(pi: string): Promise<boolean> 
  return rows.length > 0;
 }
 
-/** The order(s) tied to a PaymentIntent — used to unwind a sale on a dispute/chargeback or refund. */
+/** The order(s) tied to a PaymentIntent. Used to unwind a sale on a dispute/chargeback or refund. */
 export async function getOrdersByPaymentIntent(pi: string): Promise<{ id: string; itemId: string; sellerId: string; status: string }[]> {
  const db = getDb();
  const rows = await db.select({ id: orders.id, itemId: orders.itemId, sellerId: orders.sellerId, status: orders.status }).from(orders).where(eq(orders.stripePaymentIntent, pi));
@@ -637,18 +637,18 @@ let taxColsEnsured = false;
  * The two sales-tax columns, added if they aren't there. Called by BOTH the writer that fills them
  * in and createPaidOrder, which is the fix for how they came to be missing in the first place.
  *
- * THE DEADLOCK THIS ENDS. These columns used to be created here and nowhere else — inside
+ * THE DEADLOCK THIS ENDS. These columns used to be created here and nowhere else. Inside
  * setOrderTax, which only ever runs AFTER an order exists. Drizzle names every column of the table
  * in its INSERT, so the moment `taxJurisdiction` entered the schema (31 Aug 2026) and the column
  * did not exist, every insert into `orders` was rejected: "column tax_jurisdiction does not exist".
  * No order could be created, so setOrderTax never ran, so the column was never added. Two weeks of
- * sales — $2,665 across six Market Mode checkouts, one of them a cash sale at a counter — were
+ * sales, $2,665 across six Market Mode checkouts, one of them a cash sale at a counter. Were
  * taken with no order row behind them, and the reconciler correctly alarmed about all of them.
  *
  * Ensuring from the CREATE path breaks the circle: the first sale after a deploy heals the table.
  * The two ALTERs are separate statements and a connection can drop between them (the Neon HTTP
  * driver opens one per query), which is exactly how `tax_cents` came to exist while
- * `tax_jurisdiction` did not — so the latch is only set once BOTH have gone through, and a failure
+ * `tax_jurisdiction` did not, so the latch is only set once BOTH have gone through, and a failure
  * is reported rather than swallowed. Silence here is what made this take a fortnight to find.
  */
 export async function ensureTaxOrderCols(): Promise<void> {
@@ -659,7 +659,7 @@ export async function ensureTaxOrderCols(): Promise<void> {
   await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_jurisdiction text`);
   taxColsEnsured = true;
  } catch (e) {
-  // Not thrown: a sale must not fail because a column could not be added. Said out loud, though —
+  // Not thrown: a sale must not fail because a column could not be added. Said out loud, though,
   // an order insert is about to fail for a reason nobody could see last time.
   await logError("orders-ensure-tax-cols", e, { severity: "critical" }).catch(() => {});
  }
@@ -671,4 +671,17 @@ export async function setOrderTax(orderId: string, taxCents: number | null, juri
  await db.update(orders)
   .set({ taxCents: taxCents == null ? null : Math.round(taxCents), taxJurisdiction: jurisdiction })
   .where(eq(orders.id, orderId));
+}
+
+/**
+ * What the label for this order actually cost, as recorded when it was bought.
+ *
+ * Read on its own rather than added to getOrderDetail, which a dozen screens call and none of them
+ * need this. A carrier adjustment weeks later is the only caller: it states a new total and this is
+ * what it is measured against.
+ */
+export async function getOrderLabelCost(orderId: string): Promise<number | null> {
+ const rows = (await rawSql()`SELECT label_cost_cents FROM orders WHERE id = ${orderId} LIMIT 1`.catch(() => [])) as Array<{ label_cost_cents: number | null }>;
+ const v = rows[0]?.label_cost_cents;
+ return typeof v === "number" ? v : null;
 }

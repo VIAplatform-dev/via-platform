@@ -4,22 +4,22 @@ import { membershipSubjects, mergeCapturedMembership, worthImporting, unreadColl
 
 // ── a piece her shop only rents ──────────────────────────────────────────────────────────────────
 // Venus Vintage rents most of its pieces and sells only some. A rent-only piece has no buy price,
-// so it must never be for sale — but it is a real piece of her inventory, with a real rental price,
+// so it must never be for sale, but it is a real piece of her inventory, with a real rental price,
 // so it is imported as a DRAFT (visible to her, never to a shopper) with its rental ladder saved.
 // That is a data holding pattern, not a launch: nothing rents through VYA until she turns rentals on
-// AND the checkout/cross-listing paths are built for it — see the phase-2 report.
+// AND the checkout/cross-listing paths are built for it. See the phase-2 report.
 test("a rent-only piece we have never imported is created as a new draft", () => {
  assert.equal(rentOnlyAction(null), "create-draft");
 });
 
-test("a rent-only piece already held here — draft or wrongly for sale — is refreshed as a draft", () => {
- // Five Venus pieces were imported at a RENTAL price as if it were the buy price — the Dior tan
+test("a rent-only piece already held here, draft or wrongly for sale. Is refreshed as a draft", () => {
+ // Five Venus pieces were imported at a RENTAL price as if it were the buy price. The Dior tan
  // gaucho heels at $25. Leaving them alone would keep those rows for sale at the wrong price.
  assert.equal(rentOnlyAction({ origin: "source", status: "active" }), "update-draft");
  assert.equal(rentOnlyAction({ origin: "source", status: "draft" }), "update-draft");
 });
 
-test("a rent-only piece the seller edited herself is left alone — her version wins", () => {
+test("a rent-only piece the seller edited herself is left alone. Her version wins", () => {
  assert.equal(rentOnlyAction({ origin: "user", status: "active" }), "skip");
 });
 
@@ -41,7 +41,7 @@ test("the rent-only note says how many were saved as drafts, and nothing when th
 
 // ── a piece she has sold and zeroed the price on ─────────────────────────────────────────────────
 test("a SOLD piece with no price is still imported", () => {
- // bag-crush keeps 24 sold pieces published with 19–28 photographs each and the price zeroed —
+ // bag-crush keeps 24 sold pieces published with 19–28 photographs each and the price zeroed,
  // Chanel Mademoiselle Flap, a Louis Vuitton Multi Pochette, a Chanel Classic Flap. Every one was
  // dropped by `!cents`, so her archive was 24 of her best pieces smaller on our copy, silently.
  //
@@ -76,9 +76,9 @@ test("availability we could not read is treated as live, so a priceless piece is
 test("a collection that read cleanly and came back empty is believed", () => {
  // shop-vintage-charm's "USA" shows 34 pieces on our copy and NOTHING on hers. Same for frames (21),
  // plates-bowls (26), boots and flats on ascensio. 86 products in categories the sellers cleared out
- // months ago — frozen because an empty answer was read as a failed read, every single run, while
+ // months ago: frozen because an empty answer was read as a failed read, every single run, while
  // she was told "we couldn't read these, re-run the import" for a problem that does not exist.
- // A realistic store: 267 collections, of which she has cleared one. The fixture matters — with a
+ // A realistic store: 267 collections, of which she has cleared one. The fixture matters, with a
  // single collection, "one emptied" is the whole shop and the mass-emptying guard rightly fires.
  assert.deepEqual(unreadCollectionSlugs({
   readCount: new Map([["dresses", 40], ["bags", 12], ["jewelry", 9]]),
@@ -99,7 +99,7 @@ test("a collection that came back empty WITHOUT a clean read is still protected"
 
 test("a whole store going empty at once is refused, however clean each read looked", () => {
  // One seller clearing one category is ordinary. Every category emptying in the same pass is a
- // store-wide failure wearing an ordinary answer — the same shape the product sweep guard already
+ // store-wide failure wearing an ordinary answer. The same shape the product sweep guard already
  // refuses. We would rather serve a stale collection than empty a seller's shop.
  const stored = new Map([["a", 10], ["b", 10], ["c", 10], ["d", 10]]);
  const got = unreadCollectionSlugs({ readCount: new Map(), storedCount: stored, completed: new Set(["a", "b", "c", "d"]) });
@@ -151,7 +151,7 @@ test("feed and preserved are merged without duplicates", () => {
 
 test("taggedSlugs: a tag cannot file a piece into a collection whose listing we read", () => {
  // ascensio's three Prada/Mulberry boots are all still tagged "Boots", but she emptied her Boots
- // collection when they sold. We read that collection to the end — so the tag is a stale guess and
+ // collection when they sold. We read that collection to the end, so the tag is a stale guess and
  // the read is the answer. Filing them back is how her empty collection kept showing 3 sold pairs.
  const out = taggedSlugs({ tags: ["Boots", "Prada"], known: new Set(["boots"]), unread: new Set() });
  assert.deepEqual(out, []);
@@ -168,7 +168,7 @@ test("taggedSlugs: tags naming no collection of ours are ignored either way", ()
 });
 
 test("unfileVanished: a piece her store no longer lists leaves the collections we read", () => {
- // blummier's Chantal Thomass corset sold and she deleted it — it is in none of her 157 products.
+ // blummier's Chantal Thomass corset sold and she deleted it. It is in none of her 157 products.
  // The membership loop only walks pieces the feed still returns, so its old links stood for ever.
  const out = unfileVanished({ held: new Map([["i1", ["c1", "c2"]]]), vanished: new Set(["i1"]), unread: [] });
  assert.deepEqual([...out], [["i1", []]]);
@@ -191,13 +191,13 @@ test("unfileVanished: no write when there is nothing to unfile", () => {
 });
 
 // ── Who the membership pass is ABOUT ─────────────────────────────────────────────────────────────
-// The pass walked `products` — whatever the feed read returned in the SAME invocation — and looked
+// The pass walked `products`, whatever the feed read returned in the SAME invocation, and looked
 // each one up in the database. On a small store that is invisible: one read returns the whole
 // catalogue, so "what the feed returned" and "what we hold" are the same list.
 //
 // They come apart completely on a large one. 2nd Street's shop holds 5,289 items; a feed read
 // against a rate-limited storefront returned 72. So the pass read up to 300 of her collections from
-// her live site — ten minutes of requests — and could then file at most those 72 pieces. It reported
+// her live site, ten minutes of requests, and could then file at most those 72 pieces. It reported
 // success and wrote nothing. Every one of her 761 collection pages would have been empty.
 //
 // The collection read is the authority on membership, and it is keyed by source id, not by whether
@@ -223,7 +223,7 @@ test("membershipSubjects: the feed's tags ride along when the feed saw the piece
  const subjects = membershipSubjects(items, products);
  assert.deepEqual(subjects.find((s) => s.itemId === "i2")!.tags, ["bags", "evening"]);
  // Tags only ever vote on collections we could NOT read (see taggedSlugs), so a piece the feed
- // missed simply gets no tag vote — never a guess in place of one.
+ // missed simply gets no tag vote, never a guess in place of one.
  assert.deepEqual(subjects.find((s) => s.itemId === "i1")!.tags, []);
 });
 
@@ -238,7 +238,7 @@ test("membershipSubjects: a piece the seller filed herself is left alone", () =>
 });
 
 test("membershipSubjects: an old row with no source id is still matched by title", () => {
- // Rows imported before source identity existed carry no sourceId — the legacy byTitle fallback.
+ // Rows imported before source identity existed carry no sourceId. The legacy byTitle fallback.
  const items = [{ id: "i1", sourceId: null, title: "Silk  SLIP ", origin: "import" }];
  const products = [{ sourceId: "h9", name: "silk slip", tags: ["dresses"] }];
  const s = membershipSubjects(items, products);
@@ -260,7 +260,7 @@ test("membershipSubjects: two held rows never fight over one feed row", () => {
 });
 
 // ── Collections we could not read live ───────────────────────────────────────────────────────────
-// A collection the live pass could not reach — throttled, or past the ceiling — holds nothing at
+// A collection the live pass could not reach, throttled, or past the ceiling. Holds nothing at
 // all. 461 of 2nd Street's 761 are in that position on every run. But we have already downloaded
 // its page: the crawl stored /collections/{slug} along with 941 others. Reading membership off the
 // page we already paid for costs no requests at all.
@@ -280,7 +280,7 @@ test("mergeCapturedMembership: an unread collection is filled from the page we a
 
 test("mergeCapturedMembership: a collection we DID read live is never overridden by a stale page", () => {
  // She emptied "dresses" and we read that correctly. The captured page is from crawl day and still
- // shows the old contents — believing it would put her archive back, which is the whole failure
+ // shows the old contents. Believing it would put her archive back, which is the whole failure
  // mode the sold-policy and unread work exists to prevent.
  const live = new Map<string, string[]>();
  const captured = new Map<string, string[]>([["dresses", ["h1", "h2"]]]);

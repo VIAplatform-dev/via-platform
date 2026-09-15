@@ -36,7 +36,7 @@ export async function saveEbayTokens(storeSlug: string, t: { accessToken: string
  `.catch(() => {});
 }
 
-// Only the access token gets refreshed — keep the existing refresh token.
+// Only the access token gets refreshed. Keep the existing refresh token.
 export async function updateEbayAccessToken(storeSlug: string, accessToken: string, expiresInSec: number): Promise<void> {
  await ensureTable();
  const expiresAt = new Date(Date.now() + Math.max(60, expiresInSec - 120) * 1000).toISOString();
@@ -64,7 +64,7 @@ export async function clearEbayTokensByUser(ebayUser: string): Promise<void> {
  await db()`DELETE FROM ebay_tokens WHERE lower(ebay_user) = ${ebayUser.toLowerCase()}`.catch(() => {});
 }
 
-// Every store with a connected eBay account — drives the sale-sync cron.
+// Every store with a connected eBay account. Drives the sale-sync cron.
 export async function listEbayConnectedStores(): Promise<string[]> {
  await ensureTable();
  const rows = (await db()`SELECT store_slug FROM ebay_tokens`.catch(() => [])) as any[];

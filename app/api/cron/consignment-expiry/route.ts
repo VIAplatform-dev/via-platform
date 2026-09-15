@@ -5,7 +5,7 @@ import { logError } from "@/app/lib/error-log";
 
 // Expiry sweep: once a day, flip every consigned item past its agreed end date to 'expired'
 // (surfaces as "Ended" in the consignor portal) and email each affected store a digest so the
-// owner can return the piece or renew the terms. Does not pull anything from sale — that's the
+// owner can return the piece or renew the terms. Does not pull anything from sale. That's the
 // store's call. Idempotent (an item is only ever swept once), so a re-run is harmless.
 export const maxDuration = 300;
 

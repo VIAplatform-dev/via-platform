@@ -11,11 +11,11 @@ import { publishRefusal } from "@/app/lib/setup-gate-core";
 
 export const dynamic = "force-dynamic";
 
-// GET — all of the acting store's VYA-native items (any status).
-// GET — every one of the store's pieces.
+// GET: all of the acting store's VYA-native items (any status).
+// GET: every one of the store's pieces.
 //
 // ?view=list gives the projection a LIST draws: photo, title, price, cost, category, state, dates.
-// See app/lib/item-list-shape.ts for the measurements — the whole row is 12.5 MB on the largest
+// See app/lib/item-list-shape.ts for the measurements. The whole row is 12.5 MB on the largest
 // store here, and the list reads about a tenth of it. Opt-in, because the desktop Inventory edits
 // in place and does read most of the rest; a caller that asks for nothing gets what it always got.
 export async function GET(request: NextRequest) {
@@ -39,15 +39,15 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, items: withCols, isAdmin });
 }
 
-// POST { action: "publish" | "remove" | "addToCollection" | "cost" | "raiseToFloor", ids: string[] } — bulk
+// POST { action: "publish" | "remove" | "addToCollection" | "cost" | "raiseToFloor", ids: string[] }: bulk
 // action on the acting store's items, e.g. push a whole drop of drafts live at once. Scoped to the
 // seller, so passing another store's ids is a no-op.
 //
-//   cost { eachCents } | { totalCents } — fill in cost: the same on every piece, or a total split
+//   cost { eachCents } | { totalCents }: fill in cost: the same on every piece, or a total split
 //        across them in proportion to their prices (equal when a price is missing), remainder
 //        pennies to the first.
 //
-// The "lot" action — a batch's source name, acquired date and lot id — was removed with the
+// The "lot" action, a batch's source name, acquired date and lot id. Was removed with the
 // sourcing fields. Dividing what a batch cost survives it, as `cost`.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
  count = await setItemCosts(seller.id, owned, costs);
  // THE FIRST MOMENT THE FLOOR CAN BE CHECKED AT ALL.
  //
- // A lot is priced before its cost is known — she buys "these twenty for £340" and the cost is split
+ // A lot is priced before its cost is known. She buys "these twenty for £340" and the cost is split
  // across them in proportion to their prices, so a per-piece cost does not exist until now. Until it
  // does, nothing can tell whether a price clears her minimum markup. So the check runs the instant
  // the cost lands, and the answer goes back with it rather than waiting to be asked for.
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
  });
  } else if (action === "raiseToFloor") {
  // Lift the named pieces to cost plus her markup. Only ever upward, and only where a cost is
- // actually recorded — this exists to undo a price that was set before the cost was known, never to
+ // actually recorded. This exists to undo a price that was set before the cost was known, never to
  // move a price she chose herself.
  const minMarkupBps = await getMinMarkupBps(slug).catch(() => 3000);
  let raised = 0;
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, count });
 }
 
-// DELETE — owner-only: wipe ALL of this store's inventory, sold included (plus the
+// DELETE: owner-only: wipe ALL of this store's inventory, sold included (plus the
 // orders behind sold items). For you as the tester/owner, not a per-seller feature.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -125,7 +125,7 @@ export async function DELETE(request: NextRequest) {
  if (!isOwner(request, slug)) return NextResponse.json({ error: "Owner only" }, { status: 403 });
  const seller = await getSellerBySlug(slug);
  const deleted = seller ? await deleteAllItems(seller.id).catch(() => 0) : 0;
- // Clearing the whole inventory also clears the store's collections — otherwise they'd linger empty.
+ // Clearing the whole inventory also clears the store's collections. Otherwise they'd linger empty.
  if (seller) await deleteAllCollections(seller.id).catch(() => 0);
  return NextResponse.json({ ok: true, deleted });
 }

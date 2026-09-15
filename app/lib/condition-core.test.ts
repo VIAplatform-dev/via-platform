@@ -22,7 +22,7 @@ test("the intake model's own grades map onto the scale", () => {
 });
 
 test("free text a seller already saved lands on the nearest grade, or nowhere", () => {
- assert.equal(normalizeCondition("Excellent — light wear to the sole"), "Excellent");
+ assert.equal(normalizeCondition("Excellent: light wear to the sole"), "Excellent");
  assert.equal(normalizeCondition("NWT, never worn"), "Mint");
  assert.equal(normalizeCondition("like new"), "Excellent");
  assert.equal(normalizeCondition("gently worn"), "Good");
@@ -33,8 +33,8 @@ test("free text a seller already saved lands on the nearest grade, or nowhere", 
  assert.equal(normalizeCondition(null), null);
 });
 
-test("isConditionGrade is exact — only a stored grade gets the definition line", () => {
+test("isConditionGrade is exact, only a stored grade gets the definition line", () => {
  assert.equal(isConditionGrade("Very good"), true);
  assert.equal(isConditionGrade("very good"), false);
- assert.equal(isConditionGrade("Excellent — light wear"), false);
+ assert.equal(isConditionGrade("Excellent: light wear"), false);
 });

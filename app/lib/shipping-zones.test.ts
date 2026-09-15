@@ -5,7 +5,7 @@ import { zoneFor, quoteShipping, servedZones, normalizeZones, tierPriceCents, DE
 const MEDIUM = { weightOz: 30, lengthIn: 14, widthIn: 10, heightIn: 4 };
 
 test("home always wins over the geographic buckets", () => {
- // A French store posting to Paris is domestic, not "Europe" — otherwise the cheapest possible
+ // A French store posting to Paris is domestic, not "Europe". Otherwise the cheapest possible
  // parcel gets charged the export rate.
  assert.equal(zoneFor("FR", "FR"), "domestic");
  assert.equal(zoneFor("GB", "GB"), "domestic");
@@ -37,39 +37,78 @@ test("an unserved destination is refused, not priced", () => {
  if (!q.ok) { assert.equal(q.reason, "not-served"); assert.equal(q.zone, "north_america"); }
 });
 
-test("a served zone uses its own rate", () => {
+test("a rate left over on a zone is not charged: VYA prices the parcel", () => {
+ // This asserted 2500, the store's own number. Postage is VYA's to price now, and a rate saved by
+ // the old settings form is inert rather than a trap nobody can reach (shipping-prices-core.ts).
  const q = quoteShipping({
   fromCountry: "GB", toCountry: "US", parcel: MEDIUM,
   zones: { north_america: { enabled: true, rates: { medium: 2500 } } },
  });
  assert.equal(q.ok, true);
- if (q.ok) { assert.equal(q.amountCents, 2500); assert.equal(q.tier, "medium"); }
+ if (q.ok) { assert.equal(q.amountCents, 4800); assert.equal(q.tier, "medium"); }
 });
 
-test("a served zone with no rate of its own falls back to the standard tier price", () => {
+test("a served zone with no rate of its own is priced for the DISTANCE, not the domestic rate", () => {
+ // THE BUG: this used to assert tierPriceCents("medium"), the home price, for a parcel crossing
+ // the Atlantic. A store offering worldwide postage on flat pricing quoted its domestic rate on
+ // every export and paid the difference out of the sale.
  const q = quoteShipping({
   fromCountry: "GB", toCountry: "US", parcel: MEDIUM,
   zones: { north_america: { enabled: true } },
  });
  assert.equal(q.ok, true);
- if (q.ok) assert.equal(q.amountCents, tierPriceCents("medium"));
+ if (q.ok) {
+  assert.ok(q.amountCents > tierPriceCents("medium"), "an export costs more than posting at home");
+  assert.equal(q.amountCents, 4800); // 1400 × 3.4 (far), rounded up to the whole unit
+ }
 });
 
-test("a zone rate of zero is free shipping, not a missing field", () => {
+test("the same zone costs less to a store that lives in it", () => {
+ // "europe" is Paris-from-London and Paris-from-Chicago, and they are not the same parcel. The
+ // single default table charged them identically.
+ const near = quoteShipping({ fromCountry: "GB", toCountry: "FR", parcel: MEDIUM, zones: { europe: { enabled: true } } });
+ const far = quoteShipping({ fromCountry: "US", toCountry: "FR", parcel: MEDIUM, zones: { europe: { enabled: true } } });
+ assert.equal(near.ok && far.ok, true);
+ if (near.ok && far.ok) assert.ok(near.amountCents < far.amountCents, "London to Paris beats Chicago to Paris");
+});
+
+test("a store that has not said where it stands is priced as far", () => {
+ // The cautious answer. An unknown origin cannot be assumed next door to the buyer, and guessing
+ // near would sell postage below what the label costs.
+ const unknown = quoteShipping({ fromCountry: "", toCountry: "FR", parcel: MEDIUM, zones: { europe: { enabled: true } } });
+ const chicago = quoteShipping({ fromCountry: "US", toCountry: "FR", parcel: MEDIUM, zones: { europe: { enabled: true } } });
+ assert.equal(unknown.ok && chicago.ok, true);
+ if (unknown.ok && chicago.ok) assert.equal(unknown.amountCents, chicago.amountCents);
+});
+
+test("a zero left on a zone is not free postage either", () => {
+ // The most expensive leftover of the lot: a real label bought against a price of nothing, set by
+ // the one party that never pays for it.
  const q = quoteShipping({
   fromCountry: "GB", toCountry: "US", parcel: MEDIUM,
   zones: { north_america: { enabled: true, rates: { medium: 0 } } },
  });
  assert.equal(q.ok, true);
- if (q.ok) assert.equal(q.amountCents, 0);
+ if (q.ok) assert.equal(q.amountCents, 4800);
+});
+
+test("normalizeZones drops a rate rather than storing it", () => {
+ // So the rows that already hold one clear themselves the next time the store saves anything.
+ const z = normalizeZones({ domestic: { enabled: true, rates: { small: 100, medium: 100 } }, europe: { enabled: true, rates: { large: 0 } } });
+ assert.deepEqual(z.domestic, { enabled: true });
+ assert.deepEqual(z.europe, { enabled: true });
 });
 
 test("the parcel still decides the tier inside a zone", () => {
- const zones = { north_america: { enabled: true, rates: { small: 1200, large: 4000 } } };
+ const zones = { north_america: { enabled: true } };
  const small = quoteShipping({ fromCountry: "GB", toCountry: "US", parcel: { weightOz: 8, lengthIn: 8, widthIn: 6, heightIn: 2 }, zones });
  const large = quoteShipping({ fromCountry: "GB", toCountry: "US", parcel: { weightOz: 200, lengthIn: 24, widthIn: 18, heightIn: 10 }, zones });
- if (small.ok) assert.equal(small.amountCents, 1200);
- if (large.ok) assert.equal(large.amountCents, 4000);
+ assert.equal(small.ok && large.ok, true);
+ if (small.ok && large.ok) {
+  assert.equal(small.tier, "small");
+  assert.equal(large.tier, "large");
+  assert.ok(large.amountCents > small.amountCents, "a bigger parcel costs more to send");
+ }
 });
 
 test("home can never be switched off", () => {

@@ -24,7 +24,7 @@ function resolveStore(storeSlugParam: string | null, shopDomain: string | null):
  if (storeSlugParam) {
  const store = stores.find((s) => s.slug === storeSlugParam);
  if (store) return { slug: store.slug, name: store.name };
- // Accept unknown slug if it came from a per-store webhook URL — we'll record it as-is.
+ // Accept unknown slug if it came from a per-store webhook URL. We'll record it as-is.
  // The secret validation below is the real auth gate.
  if (storeSlugParam.trim()) return { slug: storeSlugParam, name: storeSlugParam };
  }
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
  }
 
  // Conversion RECORDING is owned by Collabs for shopify-collabs stores (their
- // commission feed is the source of truth — letting the webhook also record
+ // commission feed is the source of truth. Letting the webhook also record
  // double-counts). The webhook only records for NON-Collabs stores (e.g.
  // custom-webhook stores like Carroll Street), where it's the only revenue path.
  const storeObj = stores.find((s) => s.slug === storeSlug);
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
  // ── Non-Collabs store: webhook is the recorder. Require via_click_id (set by
  // /api/track) as proof the order came through VYA, then record the conversion.
  if (!cartViaClickId) {
- console.log(`[shopify-webhook] Cached only: store=${storeSlug}, order=${orderName} (no via_click_id — direct sale, non-collabs store)`);
+ console.log(`[shopify-webhook] Cached only: store=${storeSlug}, order=${orderName} (no via_click_id: direct sale, non-collabs store)`);
  return NextResponse.json({ received: true, cached: true, recorded: false });
  }
 
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
  console.error(`[shopify-webhook] Failed to look up click by via_click_id:`, err);
  }
  if (!matchedClick) {
- console.warn(`[shopify-webhook] Cached only: store=${storeSlug}, order=${orderName} — via_click_id ${cartViaClickId} not found in clicks`);
+ console.warn(`[shopify-webhook] Cached only: store=${storeSlug}, order=${orderName}: via_click_id ${cartViaClickId} not found in clicks`);
  return NextResponse.json({ received: true, cached: true, recorded: false });
  }
 

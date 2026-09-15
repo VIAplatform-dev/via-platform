@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
  * POST /api/flyer-join  { email, slug }
  *
  * Someone scanned a printed flyer and gave us their email. They are approved IMMEDIATELY and sent
- * straight in — no email round trip, no password.
+ * straight in, no email round trip, no password.
  *
  * TWO THINGS ARE NEEDED TO BROWSE, not one. `proxy.ts` gates pages on a SESSION first and the
  * approval cookie second, so the cookie alone opens the API and still bounces every page to
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
  const flyer = flyerBySlug(body?.slug);
 
  // A missing/unknown slug means someone posted here by hand. Refuse rather than attributing the
- // signup to nothing — a row with no source is worse than no row.
+ // signup to nothing. A row with no source is worse than no row.
  if (!flyer) return NextResponse.json({ error: "Unknown flyer" }, { status: 400 });
  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
   return NextResponse.json({ error: "That email doesn’t look right." }, { status: 400 });
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
  try {
   // Already known to us? Make sure they end up approved either way. Someone who joined the
-  // waitlist weeks ago and now scans a flyer has earned the same instant access as a stranger —
+  // waitlist weeks ago and now scans a flyer has earned the same instant access as a stranger,
   // being an earlier fan should not mean waiting longer.
   const status = await getPilotStatus(email).catch(() => "none");
   if (status === "approved") {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
  }
 
  // The link that actually gets them in. If it cannot be built (no AUTH_SECRET, DB trouble) it
- // falls back to /login — degraded, but never a dead end.
+ // falls back to /login. Degraded, but never a dead end.
  // Land them where the flyer promised. pilot-check sets the approval cookie on the way through
  // and then forwards to `next`, so the Fendi poster ends on Fendi rather than a homepage they
  // would have to go searching from.

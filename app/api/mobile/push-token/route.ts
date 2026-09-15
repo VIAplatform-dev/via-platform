@@ -24,7 +24,7 @@ export async function POST(request: Request) {
  await registerPushToken(payload.sub, token, body.platform ?? null);
 
  // If this account is a store partner, also register the token for store notifications (a sale,
- // a buyer message). The static contact map first, then store_users — the self-serve table that
+ // a buyer message). The static contact map first, then store_users. The self-serve table that
  // every store onboarded through the wizard lives in and that this route used to ignore, which is
  // why those stores' phones never got a push.
  /* allow-swallow: a DB blip must not fail the customer-side registration that already succeeded */

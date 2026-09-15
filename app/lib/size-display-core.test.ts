@@ -30,7 +30,7 @@ test("a tag with nothing to convert prints as marked, with no invented conversio
  assert.equal(us?.fits, null);
 });
 
-test("no size at all is null, not 'Marked —'", () => {
+test("no size at all is null, not 'Marked. '", () => {
  assert.equal(sizeLine({ size: null, category: "tops", title: "Blouse", description: "lovely", currency: "USD" }), null);
  assert.equal(sizeLine({ size: "  ", category: "tops", title: "Blouse", description: null, currency: "USD" }), null);
  assert.equal(formatSizeLine(null), null);

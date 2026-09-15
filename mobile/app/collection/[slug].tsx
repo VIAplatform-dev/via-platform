@@ -14,7 +14,7 @@ import ProductGrid from "../../components/ProductGrid";
 import type { Product } from "../../lib/types";
 import { colors, eyebrow, fonts, spacing } from "../../lib/theme";
 
-// An editorially curated set. The curator is named above the title rather than below it — on a
+// An editorially curated set. The curator is named above the title rather than below it, on a
 // marketplace of independent shops, WHO chose these is most of why you'd trust the selection.
 
 type CollectionResponse = {

@@ -31,9 +31,9 @@ function isAuthorized(request: NextRequest): boolean {
 /**
  * POST /api/admin/send-new-arrivals
  *
- * { preview: true } — show product count and since date without sending
- * { send: true } — send to all approved pilot users and reset the cron lock
- * { testEmail: "x" } — send only to that address, does not reset the lock
+ * { preview: true }: show product count and since date without sending
+ * { send: true }: send to all approved pilot users and reset the cron lock
+ * { testEmail: "x" }: send only to that address, does not reset the lock
  */
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) {
@@ -58,14 +58,14 @@ export async function POST(request: NextRequest) {
  const sql = neon(dbUrl);
  const lastSentRaw = await getSetting("new_arrivals_last_sent_at");
  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
- // Always look back at least 7 days — if the cron ran recently and set the lock
+ // Always look back at least 7 days, if the cron ran recently and set the lock
  // to today, using that as `since` would produce an empty window.
  const since = lastSentRaw && new Date(lastSentRaw) < sevenDaysAgo
  ? new Date(lastSentRaw)
  : sevenDaysAgo;
  const sinceIso = since.toISOString();
 
- // Diversify across stores so the email highlights everyone — round-robin one
+ // Diversify across stores so the email highlights everyone. Round-robin one
  // item per store (rn=1) before any store's second item, instead of letting the
  // most-recently-synced store fill the whole email.
  const rows = await sql`
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
  `;
 
  // Hand-curated email picks (from /admin/collections → "New Arrivals Email") take precedence,
- // exactly like the cron — otherwise the manual button would ignore your curation and send the
+ // exactly like the cron. Otherwise the manual button would ignore your curation and send the
  // auto-ranked window instead. Fall back to the auto window only when nothing is curated.
  const emailPicks = await getEmailPickProducts();
  const usingPicks = emailPicks.length > 0;

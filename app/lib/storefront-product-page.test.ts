@@ -44,7 +44,7 @@ test("a seller's own label wins, and a blank one falls back to ours", () => {
  assert.equal(visibleFields(d, facts).find((f) => f.key === "measurements")?.label, "Measurements");
 });
 
-test("emptying a sentence hides it — it does not fall back to ours", () => {
+test("emptying a sentence hides it. It does not fall back to ours", () => {
  const c = resolveProductPage({ assurance: "", backLabel: "" });
  assert.equal(c.assurance, "");
  assert.equal(c.backLabel, "");
@@ -104,7 +104,7 @@ test("a chip is allowed for a short value and refused for prose", () => {
   fields: [{ key: "size", show: true, mode: "chip" }, { key: "description", show: true, mode: "chip" }],
  });
  assert.equal(c.fields.find((f) => f.key === "size")?.mode, "chip");
- // Refused, not silently kept — a paragraph in a pill is a paragraph with a border round it.
+ // Refused, not silently kept. A paragraph in a pill is a paragraph with a border round it.
  assert.equal(c.fields.find((f) => f.key === "description")?.mode, "inline");
 });
 

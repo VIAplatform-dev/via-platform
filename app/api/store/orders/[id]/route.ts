@@ -10,13 +10,19 @@ import { voidOrderLabel, generateReturnLabel, generateShipBackLabel } from "@/ap
 import { getReturnLabelInfo, setReturnRejected } from "@/app/lib/db/orders";
 import { getRefundPolicy } from "@/app/lib/store-policy-db";
 import { sendOpsAlert } from "@/app/lib/ops-alert";
-import { sendReturnLabelEmail, sendReturnRejectedEmail, sendStoreOwnerAlert, ownerAlertButton } from "@/app/lib/email";
+import { sendReturnLabelEmail, sendReturnRejectedEmail } from "@/app/lib/email";
 import { recordLabelTransaction } from "@/app/lib/shippo-labels-db";
 import { getSellerPayments } from "@/app/lib/seller-payments-db";
 import { getShippingSettings, hasShipFrom } from "@/app/lib/store-shipping-db";
+import { missingForLabel, describeMissing } from "@/app/lib/ship-from-core";
+import { sendLabelReadyEmail } from "@/app/lib/order-label";
+import { getStoreProfile } from "@/app/lib/store-profile-db";
 import { DEFAULT_LABEL_PRINTER } from "@/app/lib/label-format-core";
 import { stripePost, stripeGet } from "@/app/lib/stripe";
 import { refundOrderPayment } from "@/app/lib/order-refund";
+import { reverseTaxTransaction } from "@/app/lib/sales-tax";
+import { taxReversalFor } from "@/app/lib/tax-reversal-core";
+import { taxTransactionFor, markTaxTransactionReversed } from "@/app/lib/order-tax-db";
 import { getRates, buyLabel, isShipConfigured, getOrCreateShipAccount } from "@/app/lib/ship-provider";
 import { shippingMarginCents, MIN_MARGIN_CENTS } from "@/app/lib/shipping-tiers";
 import { logError } from "@/app/lib/error-log";
@@ -53,7 +59,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  const pi = await stripeGet(`payment_intents/${r.order.stripePaymentIntent}?expand[]=latest_charge.balance_transaction`, undefined, pay.stripeAccountId) as { latest_charge?: { balance_transaction?: { fee?: number; fee_details?: { type: string; amount: number }[] } } };
  const bt = pi?.latest_charge?.balance_transaction;
  // balance_transaction.fee BUNDLES VYA's application fee with Stripe's processing
- // fee — take only the stripe_fee line so we don't double-count our own cut.
+ // fee, take only the stripe_fee line so we don't double-count our own cut.
  const stripeOnly = (bt?.fee_details || []).filter((f) => f.type === "stripe_fee").reduce((s, f) => s + (f.amount || 0), 0);
  stripeFeeCents = stripeOnly || bt?.fee || 0;
  } catch { /* fee just won't show */ }
@@ -64,7 +70,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  return NextResponse.json({ order: { ...r.order, ...delivery, deliveryMethod: delivery.method }, stripeFeeCents });
 }
 
-// PATCH { status } — lifecycle. "refunded" performs the REAL refund (#9): refund
+// PATCH { status }: lifecycle. "refunded" performs the REAL refund (#9): refund
 // the buyer on the connected account, reverse VYA's 1% application fee, relist the
 // one-of-one. Other statuses just record the step.
 const STATUSES: OrderStatus[] = ["paid", "shipped", "delivered", "refunded"];
@@ -87,12 +93,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  const policy = await getRefundPolicy(r.slug).catch(() => null);
  const feePct = feeOverride != null ? Math.max(0, Math.min(50, Number(feeOverride) || 0)) : (policy?.restockingFeePct ?? 0);
  // Everything the buyer actually paid. A collected order was charged no postage, so this is the
- // item price alone — refunding it never hands back shipping that was never taken.
+ // item price alone: refunding it never hands back shipping that was never taken.
  const fullCharge = chargedTotalCents(r.order);
  const sharedIntent = r.order.stripePaymentIntent ? (await getOrdersByPaymentIntent(r.order.stripePaymentIntent).catch(() => [])).length > 1 : false;
  const restockingFeeCents = Math.round((r.order.amountCents * feePct) / 100);
  // If the store's policy is buyer-pays-return-shipping AND a return label was bought, the buyer
- // covers it — deduct that label cost from their refund too.
+ // covers it: deduct that label cost from their refund too.
  const rlabel = await getReturnLabelInfo(id).catch(() => ({ costCents: null }));
  const returnShipDeduction = policy?.returnShippingPaidBy !== "store" && rlabel.costCents ? rlabel.costCents : 0;
  const totalDeduction = restockingFeeCents + returnShipDeduction;
@@ -107,13 +113,47 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  });
  if (!refunded.ok) return NextResponse.json({ error: refunded.error }, { status: 502 });
  }
+
+ // UNDO THE TAX THE SALE FILED, and only now that the money has actually gone back.
+ //
+ // The refund already reverses the payout, VYA's fee, the consignment credit and the shipping
+ // label. The tax transaction was the one thing left standing, so the seller's Stripe Tax report
+ // kept counting tax on a sale that no longer existed and she would have filed, and paid, tax she
+ // had already handed back. Nobody would notice until a return.
+ //
+ // A PARTIAL refund is not ours to guess at. See tax-reversal-core.ts: a kept restocking fee or a
+ // bag sharing one intent both mean part of the tax still stands, and a wrong figure filed against
+ // her account is worse than a flagged one.
+ if (r.order.stripePaymentIntent) {
+  const pi = r.order.stripePaymentIntent;
+  const filed = await taxTransactionFor(pi).catch(() => null);
+  const siblings = sharedIntent ? await getOrdersByPaymentIntent(pi).catch(() => []) : [];
+  const decision = taxReversalFor({
+   fullChargeCents: fullCharge,
+   refundAmountCents,
+   sharedIntent,
+   siblingsAllRefunded: siblings.filter((o) => o.id !== id).every((o) => o.status === "refunded"),
+   taxCollected: Boolean(filed),
+  });
+  if (filed && decision === "full") {
+   const done = await reverseTaxTransaction({ acctId: filed.acctId, transactionId: filed.id, reference: pi });
+   if (done) await markTaxTransactionReversed(pi).catch(() => {});
+  } else if (filed && decision === "manual") {
+   await sendOpsAlert(
+    `Tax reversal needs a person: order ${id} (${r.slug})`,
+    `Refunded ${refundAmountCents} of ${fullCharge} cents${sharedIntent ? ", on an intent shared with other pieces" : ""}. ` +
+    `Tax transaction ${filed.id} still stands and only part of it should come off. Reverse the taxable portion in Stripe.`,
+   ).catch(() => {});
+  }
+ }
+
  await relistItem(r.order.itemId); // default: the one-of-one is available again
- // If this was a consigned piece, undo the consignor's credit too — otherwise a refunded sale
+ // If this was a consigned piece, undo the consignor's credit too. Otherwise a refunded sale
  // still gets paid out at the next payout run. Reverts the item to available + debits the ledger.
  await reverseConsignedSale({ productId: r.order.itemId, orderId: id }).catch(() => {});
  // Reverse the seller-payout ledger row too, so seller-net reporting doesn't count a returned sale.
  await reversePayoutForOrder(id).catch(() => {});
- // Void the shipping label if it hasn't shipped — recover the label cost VYA fronted.
+ // Void the shipping label if it hasn't shipped. Recover the label cost VYA fronted.
  await voidOrderLabel(id).catch(() => {});
  // Record the refund (status + when + how much was actually returned to the buyer).
  await markOrderRefunded(id, refundAmountCents);
@@ -124,7 +164,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  return NextResponse.json({ ok: true, status });
 }
 
-// POST — label actions (#7): { action: "label_quote" } shows the cost before buying;
+// POST: label actions (#7): { action: "label_quote" } shows the cost before buying;
 // { action: "buy_label", rateId } purchases the label + recovers the cost.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const { id } = await params;
@@ -133,9 +173,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const { order, slug, seller } = r;
  const body = await request.json().catch(() => null);
 
- // Return label — buy a prepaid label (buyer → store) and email it to the buyer. Who ultimately
+ // Return label: buy a prepaid label (buyer → store) and email it to the buyer. Who ultimately
  // pays is the store's returns policy: buyer-pays → the cost is deducted from their eventual refund.
- // The seller's own note on the order. Private — it never reaches the buyer,
+ // The seller's own note on the order. Private: it never reaches the buyer,
  // and nothing in the email templates reads it.
  if (body?.action === "set_note") {
  await setOrderNote(id, typeof body.note === "string" ? body.note : null);
@@ -153,7 +193,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  return NextResponse.json({ ok: true, returnLabelUrl: res.labelUrl, trackingNumber: res.trackingNumber, costCents: res.costCents, paidBy });
  }
 
- // Reject a return — the item came back but the store won't accept it. Records the reason + evidence
+ // Reject a return: the item came back but the store won't accept it. Records the reason + evidence
  // photos (kept for a possible chargeback), does NOT refund, and optionally ships the item back.
  if (body?.action === "reject_return") {
  const note = typeof body?.note === "string" ? body.note.trim().slice(0, 1000) : null;
@@ -170,11 +210,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  return NextResponse.json({ ok: true, returnStatus: "rejected", shipBackUrl: shipBackUrl ?? null });
  }
 
- // Mark shipped — the label is already generated (auto or manual); this confirms drop-off and emails
+ // Mark shipped. The label is already generated (auto or manual); this confirms drop-off and emails
  // the buyer their tracking. Handled before the Shippo/rate checks since it needs neither.
  if (body?.action === "mark_shipped") {
  await markOrderShipped(id);
- // Email the buyer their tracking — ONCE PER PARCEL. A piece bought with others shares their
+ // Email the buyer their tracking. ONCE PER PARCEL. A piece bought with others shares their
  // payment; if any of them has already been told, this one says nothing more (parcel-notify.ts).
  // The tracking number is the bag's (the label sits on the first piece), so a sibling with none
  // of its own still sends the bag's number.
@@ -188,10 +228,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  return NextResponse.json({ ok: true, status: "shipped", email: email.sent ? "sent" : email.reason });
  }
 
- // A collection is never posted — there's no address and there must be no label. Checked before
+ // A collection is never posted. There's no address and there must be no label. Checked before
  // the provider/ship-from checks so the seller is told the real reason, not a shipping-setup one.
  const del = await getOrderDelivery(id).catch(() => ({ method: "ship" as const }));
- if (del.method === "pickup") return NextResponse.json({ error: "This order is being collected in store — there’s nothing to post." }, { status: 400 });
+ if (del.method === "pickup") return NextResponse.json({ error: "This order is being collected in store. There’s nothing to post." }, { status: 400 });
  if (!isShipConfigured()) return NextResponse.json({ error: "Shipping labels aren’t enabled yet." }, { status: 503 });
  const shipping = await getShippingSettings(slug);
  // What she prints on (label-format-core.ts): 4×6 for a thermal printer, the sheet otherwise.
@@ -200,8 +240,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  if (!order.shipLine1 || !order.shipCity) return NextResponse.json({ error: "This order has no shipping address." }, { status: 400 });
 
  const f = shipping.shipFrom!;
- // USPS requires a sender email or phone — fall back to the seller's email.
- const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone, email: seller.email };
+ // USPS requires a sender email AND phone, and refuses the label without either. This comment
+ // already said so and the code still sent whatever was there, which is how six of the last
+ // fourteen purchases on this account died. Checked here too, because the rate preview is where a
+ // seller looks first and the cheapest place to find out.
+ const fromEmail = String(seller.email || "").trim()
+  || String((await getStoreProfile(slug).catch(() => null))?.supportEmail || "").trim()
+  || null;
+ const labelGaps = missingForLabel(f, fromEmail);
+ if (labelGaps.length) {
+  return NextResponse.json({ error: `Add your ${describeMissing(labelGaps)} in Settings → Shipping before buying a label. The carrier won't accept one without it.` }, { status: 400 });
+ }
+ const from = { name: f.name || seller.name, street1: f.street1!, street2: f.street2, city: f.city!, state: f.state!, zip: f.zip!, country: f.country || "US", phone: f.phone, email: fromEmail ?? undefined };
  const to = { name: order.buyerName, street1: order.shipLine1, street2: order.shipLine2, city: order.shipCity, state: order.shipState || "", zip: order.shipPostal || "", country: order.shipCountry || "US", phone: order.buyerPhone, email: order.buyerEmail };
  // The same parcel the label will actually be bought at, so this preview can't promise a price
  // the purchase won't honour.
@@ -224,7 +274,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   return NextResponse.json({ error: "This order is over $2,500 and shipping abroad, so US customs needs an AES filing with an ITN before it can go. File it at aesdirect.census.gov, then ship with that number." }, { status: 400 });
  }
  const rates = await getRates(from, to, parcel, shipAcct, customs, printer);
- if (!rates.length) return NextResponse.json({ error: customs ? "No international rates for this address — check the ship-from country and the parcel weight." : "No shipping rates available for this address." }, { status: 502 });
+ if (!rates.length) return NextResponse.json({ error: customs ? "No international rates for this address. Check the ship-from country and the parcel weight." : "No shipping rates available for this address." }, { status: 502 });
  const cheapest = rates[0];
 
  // Cost recovery: if the buyer funded shipping at checkout, the label is covered;
@@ -232,34 +282,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const sellerPays = !(order.shippingPaidCents && order.shippingPaidCents > 0);
 
  if (body?.action === "label_quote") {
- // The buyer paid a flat tier at checkout; the real label costs less — the difference is VYA's margin.
+ // The buyer paid a flat tier at checkout; the real label costs less. The difference is VYA's margin.
  const buyerPaidCents = order.shippingPaidCents || 0;
  const marginCents = buyerPaidCents > 0 ? shippingMarginCents(buyerPaidCents, cheapest.amountCents) : 0;
  // Exotic skins and fur can be seized whatever the piece's age, so the seller sees this WITH the
-  // quote, before she commits — not in a support email afterwards. Advisory: "croc embossed
+  // quote, before she commits, not in a support email afterwards. Advisory: "croc embossed
   // calfskin" is a cow, and only a person can tell the difference.
   return NextResponse.json({ rate: { provider: cheapest.provider, service: cheapest.service, costCents: cheapest.amountCents, estDays: cheapest.estDays, rateId: cheapest.rateId }, sellerPays, buyerPaidCents, marginCents, international: Boolean(customs), incoterm: customs?.incoterm ?? null, customsWarnings: warnings });
  }
 
  if (body?.action === "buy_label") {
  const rateId = String(body?.rateId || cheapest.rateId);
- // Free-shipping labels are billed to the seller — require a card up front.
+ // Free-shipping labels are billed to the seller. Require a card up front.
  if (sellerPays && !seller.stripeCustomerId) return NextResponse.json({ error: "Add a payment method to cover free-shipping labels first." }, { status: 400 });
  // Buy the label FIRST: if Shippo fails, the seller is never left charged for a label they didn't get.
  const label = await buyLabel(rateId, shipAcct, printer);
- if (!label) return NextResponse.json({ error: "Label purchase failed — try again." }, { status: 502 });
+ if (!label) return NextResponse.json({ error: "Label purchase failed. Try again." }, { status: 502 });
  // Then recover the cost from the seller. Idempotency key stops a double-click double-charge; and if
- // billing fails the order still ships — we don't strand the buyer over a seller-card problem, just log it.
+ // billing fails the order still ships. We don't strand the buyer over a seller-card problem, just log it.
  if (sellerPays) {
- await stripePost("payment_intents", { amount: String(label.costCents || cheapest.amountCents), currency: (order.currency || "usd").toLowerCase(), customer: seller.stripeCustomerId, confirm: "true", off_session: "true", description: `VYA shipping label — order ${id}` }, undefined, `ship-label-${id}`).catch((e) => logError("label-seller-charge", e, { context: { orderId: id, slug, costCents: label.costCents } }));
+ await stripePost("payment_intents", { amount: String(label.costCents || cheapest.amountCents), currency: (order.currency || "usd").toLowerCase(), customer: seller.stripeCustomerId, confirm: "true", off_session: "true", description: `VYA shipping label: order ${id}` }, undefined, `ship-label-${id}`).catch((e) => logError("label-seller-charge", e, { context: { orderId: id, slug, costCents: label.costCents } }));
  }
- // Store the label WITHOUT marking shipped — the seller prints it, then hits "Mark shipped" when they
+ // Store the label WITHOUT marking shipped. The seller prints it, then hits "Mark shipped" when they
  // actually drop it off (which is what emails the buyer their tracking).
  await setOrderLabel(id, { labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl, labelCostCents: label.costCents });
  await recordLabelTransaction(id, label.transactionId); // so it can be voided if the order is refunded
 
  // MARGIN WATCH, on this path too. It already existed in order-label.ts (the automatic path) and
- // was missing here — which is the path the app and the dashboard use. A label bought from the
+ // was missing here, which is the path the app and the dashboard use. A label bought from the
  // phone that cost more than the buyer paid told nobody at all.
  const paidCents = order.shippingPaidCents || 0;
  if (paidCents > 0 && label.costCents > paidCents - MIN_MARGIN_CENTS) {
@@ -270,23 +320,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  }
 
  // SEND HER THE LABEL. Until now it was only STORED: the app said "Label sent to you" and nothing
- // had been. On a laptop the stored URL is enough — click, print. On a phone there is no printer,
+ // had been. On a laptop the stored URL is enough. Click, print. On a phone there is no printer,
  // so the practical path from "bought" to "on the box" is an email she opens at a desk. Buying a
  // label from the app and then having no way to print it is the same as not having bought one.
- /* allow-swallow: the label IS bought and stored; a mail outage must not make this look like a failure */
- if (label.labelUrl) {
- const tracking = label.trackingNumber ? `<p style="font-size:13px;color:#6b6b6b;margin:16px 0 0;">Tracking: <b>${label.trackingNumber}</b></p>` : "";
- // USPS Label Broker, when the carrier gives us one: no printer needed at all — the counter
- // scans this and prints the label for her. Only ever shown when it actually came back.
- const qr = label.qrCodeUrl
-  ? `<p style="font-size:14px;line-height:1.7;margin:18px 0 0;">No printer? Show this at the Post Office and they'll print it for you.</p>${ownerAlertButton(label.qrCodeUrl, "Open the QR code")}`
-  : "";
- await sendStoreOwnerAlert(slug, {
-  subject: `Shipping label — ${order.itemTitle || `order ${id}`}`,
-  html: `<p style="font-size:16px;line-height:1.7;margin:0 0 18px;">Your label for <b>${order.itemTitle || `order ${id}`}</b> is ready. Print it, tape it on, and mark the order posted when it's dropped off.</p>${ownerAlertButton(label.labelUrl, "Print the label")}${qr}${tracking}`,
- }).catch(() => {});
- }
-
+ // The same email the automatic path sends, from the same function. It used to be written out
+ // here and only here, which is how the normal path came to send nothing at all.
+ await sendLabelReadyEmail({
+  storeSlug: slug,
+  orderId: id,
+  itemTitle: order.itemTitle,
+  labelUrl: label.labelUrl,
+  trackingNumber: label.trackingNumber,
+  qrCodeUrl: label.qrCodeUrl,
+ });
  return NextResponse.json({ ok: true, labelUrl: label.labelUrl, trackingNumber: label.trackingNumber, trackingUrl: label.trackingUrl });
  }
 

@@ -9,14 +9,14 @@ import { allTags, filterByTag, withTag, withoutTag } from "../../lib/seller/cust
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, Button, Notice } from "../../components/seller/Form";
 
-// Customers, sorted by what they have spent — not alphabetically. The one line that matters is at
+// Customers, sorted by what they have spent, not alphabetically. The one line that matters is at
 // the bottom: how much of her business is repeat.
 //
 // Tap one and it opens in place: her note (saved when she leaves the box) and her tags (add one,
-// tap one to remove it). Tags are also the filter row along the top — "who did I tag market?" is
+// tap one to remove it). Tags are also the filter row along the top. "who did I tag market?" is
 // the counter question. Same route the web's customer page writes to, same shape.
 //
-// SHE CAN ALSO ADD ONE. The list only ever grew by itself — somebody bought something — so a shop
+// SHE CAN ALSO ADD ONE. The list only ever grew by itself, somebody bought something, so a shop
 // with no online orders yet opened this to "No customers yet" and no way to change that, which is
 // the wrong answer for a seller who just sold a coat across a counter to someone who left an email.
 // Adding by hand fires the store's new-customer automation, exactly as the web's does; a bulk
@@ -24,7 +24,7 @@ import { Field, Button, Notice } from "../../components/seller/Form";
 
 type Customer = { email: string; name: string | null; location: string | null; orders: number; spentCents: number; tags?: string[]; notes?: string | null };
 
-/** The first line of her note — enough to remember who this is at the counter. */
+/** The first line of her note. Enough to remember who this is at the counter. */
 const noteLine = (notes: string | null | undefined) => (notes || "").split("\n").map((l) => l.trim()).find(Boolean) ?? null;
 
 export default function CustomersScreen() {
@@ -179,7 +179,7 @@ export default function CustomersScreen() {
                       onChangeText={setNote}
                       onBlur={() => saveNote(c)}
                       multiline
-                      placeholder="What to remember about them — sizes, what they look for, how they like to be reached"
+                      placeholder="What to remember about them. Sizes, what they look for, how they like to be reached"
                       placeholderTextColor={colors.textDim}
                       style={{ fontSize: 14, color: colors.text, lineHeight: 20, minHeight: 60, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }}
                     />

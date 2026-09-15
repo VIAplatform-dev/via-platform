@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Free-layer store features — built from a store's OWN data only (activity on
+// Free-layer store features. Built from a store's OWN data only (activity on
 // its own items). No cross-store market intelligence. (Listing quality lives in
 // listing-quality-db.ts and is shared with the admin tool.)
 // ───────────────────────────────────────────────────────────────────────────
@@ -14,7 +14,7 @@ function db() {
 const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString());
 
 // ── Activity feed ──
-// Recent things happening to the store's own items — favorites, cart-adds, and
+// Recent things happening to the store's own items. Favorites, cart-adds, and
 // sales. Anonymized: the piece and the moment, never the shopper.
 export type ActivityItem = { type: "favorite" | "cart" | "sale"; title: string; at: string };
 

@@ -45,13 +45,13 @@ export const dynamic = "force-dynamic";
 
 // Serves a seller's captured site, page by page, straight from VYA. Every internal
 // link in the captured HTML points back here (/site/{slug}/…), so the whole site
-// navigates on VYA — pixel-faithful, no dependency on their old host.
+// navigates on VYA: pixel-faithful, no dependency on their old host.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string; path?: string[] }> }) {
  const { slug, path } = await params;
  const pathname = path && path.length ? "/" + path.join("/") : "/";
 
- // The store's own search results page. Nothing is ever captured at /search — the source renders it
- // per query — so this path has no stored HTML by definition and is built below from the store's own
+ // The store's own search results page. Nothing is ever captured at /search. The source renders it
+ // per query, so this path has no stored HTML by definition and is built below from the store's own
  // collection template instead. Before that it fell straight through to the 404 on the next line,
  // which is why every hosted storefront's search box led to "Page not found."
  const isSearchPath = /^\/search\/?$/.test(pathname);
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  const isCartPath = /^\/cart\/?$/.test(pathname);
 
  // Reserved internal paths (the derived cart template) are stored as capture rows so they are
- // created and deleted with the capture they describe — but they are data, not pages, and must
+ // created and deleted with the capture they describe, but they are data, not pages, and must
  // never be servable.
  if (isReservedCapturePath(pathname)) return new Response("Not found.", { status: 404, headers: { "Content-Type": "text/plain" } });
 
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // The cart page, when the store's OWN cart page was never captured.
  //
  // captureCartTemplate is best-effort and returns null on any failure, and an audit of the stored
- // captures found five stores where it had failed silently — including one with a cart drawer on all
+ // captures found five stores where it had failed silently, including one with a cart drawer on all
  // 24 of its pages, and one with 781 pages captured and no cart page. For those, this route answered
  // "Page not found." at the exact moment a shopper was trying to buy.
  //
@@ -84,7 +84,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  if (!html && isCartPath) {
   html = await getCapturePage(slug, "/").catch(() => null);
   if (!html) {
-   // No home page either — take the shortest path we hold, which is the closest thing to a root.
+   // No home page either, take the shortest path we hold, which is the closest thing to a root.
    const paths = await listCapturePaths(slug).catch(() => [] as string[]);
    const nearest = paths.slice().sort((a, b) => a.length - b.length)[0];
    if (nearest) html = await getCapturePage(slug, nearest).catch(() => null);
@@ -93,16 +93,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
  if (!html && !isSearchPath) return new Response("Page not found.", { status: 404, headers: { "Content-Type": "text/plain" } });
 
- // Search tracking: captured sites route their search box to a ?q=/query=/s= URL —
+ // Search tracking: captured sites route their search box to a ?q=/query=/s= URL,
  // log the query for the store's analytics.
  const sp = req.nextUrl.searchParams;
  // Edit mode now runs further down, on the fully-rendered page, so these counters are reached while
- // she is editing. Her own editing session is not a visit — without this, opening a product page in
+ // she is editing. Her own editing session is not a visit, without this, opening a product page in
  // the editor recorded a product view against her own store.
  const isEditRequest = sp.get("edit") === "1";
  // NUMBER HER PAGE BEFORE ANYTHING BELOW CHANGES IT. The save counts the stored page; the live grids,
  // collection tiles and cleanup below add and remove elements, and the editor used to be numbered after
- // them — so "#N" meant different elements in the editor and in the save. Only for someone who may edit,
+ // them, so "#N" meant different elements in the editor and in the save. Only for someone who may edit,
  // so a shopper's copy of the page never carries the numbers. See stampEditIds.
  // `editorView` is also what lets an empty product grid say so, instead of vanishing (see the builder pass below).
  const editorView = !!html && isEditRequest && canEditCapture(slug, { slug: await resolveStoreSlugAny(req).catch(() => null), isAdmin: isAdminRequest(req) }).allowed;
@@ -111,7 +111,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  }
 
  // ── A PAGE SHE HAS HIDDEN ───────────────────────────────────────────────────────────────────────
- // Shoppers get the plain "Page not found" an address that never existed would get — her decision
+ // Shoppers get the plain "Page not found" an address that never existed would get. Her decision
  // (builder spec, open question 1). Nothing about the page is changed, so Show brings it straight
  // back, and her own editor still opens it with a bar saying it is hidden.
  //
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // quietly handing back a fragment of a page shoppers are not supposed to have.
  //
  // This read also carries her menu order and her hidden pages down to the builder pass below, so the
- // whole of Step 3 costs one lookup per request (cached per store — see pages-db.ts).
+ // whole of Step 3 costs one lookup per request (cached per store: see pages-db.ts).
  const builderState = await hostedPageState(slug, pathname);
  if (builderState.hidden && !editorView) {
   return new Response("Page not found.", { status: 404, headers: { "Content-Type": "text/plain" } });
@@ -132,16 +132,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
  // Every product grid on a captured page renders the store's LIVE VYA inventory, not the frozen
  // markup we crawled. That's the whole point of the mirror: when the seller adds, reprices or
- // sells an item in the portal, their site reflects it immediately — no re-crawl. Collection
+ // sells an item in the portal, their site reflects it immediately, no re-crawl. Collection
  // pages show that collection; the homepage (and any other page with a grid) shows the newest
  // inventory, which is what a "featured/archive" strip on a vintage store means in practice.
- // Which collection this page shows: Shopify's /collections/{handle} — and, on a Squarespace capture,
+ // Which collection this page shows: Shopify's /collections/{handle}, and, on a Squarespace capture,
  // /shop (everything) and /shop/{category}, which used to be served exactly as crawled, with pieces
  // that had since sold still for sale. See app/lib/site-builder/collection-path.ts.
  const collHandle = collectionHandleForPath(pathname, { squarespace: looksSquarespace(html) });
  const isHome = pathname === "/" || pathname === "";
  // Plan B (this request arrived on the store's OWN registrable domain): the seller's JavaScript is
- // isolated from VYA by the same-origin policy, so it runs — that's what makes their carousels,
+ // isolated from VYA by the same-origin policy, so it runs. That's what makes their carousels,
  // filters and cart drawer work natively. The shim would only fight it, so it's not injected.
  //
  // Plan A (a VYA origin): the very same stored HTML must be served WITHOUT their scripts, or a
@@ -154,18 +154,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  let cartCount: number | null = null;
  // Shopify's Section Rendering API. Horizon-generation themes re-render one section at a time
  // (facets, sorting, pagination, the search drawer) and morph the fragment into the page. We build
- // the page exactly as normal — live inventory and all — then hand back only that section, so a
+ // the page exactly as normal, live inventory and all, then hand back only that section, so a
  // filtered or paginated view carries the same live data a full page load would.
  const sectionId = onStoreOrigin ? requestedSectionId(req.nextUrl.searchParams) : null;
 
- // One live-inventory card shape, shared by the collection grids, the homepage strips and search —
+ // One live-inventory card shape, shared by the collection grids, the homepage strips and search,
  // so a piece looks and links the same wherever a shopper meets it.
  const card = (it: { id: string; title: string; priceCents: number | null; currency: string | null; images: unknown; sourceId?: string | null; status?: string; unavailableReason?: string | null; compareAtCents?: number | null }) =>
   ({ id: it.id, title: it.title, priceCents: it.priceCents, currency: it.currency, images: it.images, sourceId: it.sourceId, ...storefrontAvailability(it), compareAtCents: it.compareAtCents });
  // Keep shoppers on the mirrored site: an imported item links to its captured product page (served
  // on demand, with the VYA buy button wired in). Items the seller created here have no source page,
  // so they fall back to VYA's own product route.
- // On a store origin the storefront IS the root of its own domain, so these must be root-relative —
+ // On a store origin the storefront IS the root of its own domain, so these must be root-relative,
  // a /site/{slug}/… href still resolves, but it shows the shopper a VYA-shaped URL on what is
  // supposed to be the seller's own site.
  const productBase = onStoreOrigin ? "" : `/site/${slug}`;
@@ -174,7 +174,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
  // ── SEARCH ────────────────────────────────────────────────────────────────────────────────────
  // Built on the store's OWN collection template, so results arrive in the seller's cards, type and
- // grid rather than in a VYA-shaped list — the same rule the collection pages follow. Predictive
+ // grid rather than in a VYA-shaped list. The same rule the collection pages follow. Predictive
  // search (/api/plan-b/search/suggest) already answered from live inventory; this is the page its
  // "View all results" link, and the Enter key, have always pointed at.
  if (isSearchPath) {
@@ -190,7 +190,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const selfPath = `${onStoreOrigin ? "" : `/site/${slug}`}/search?q=${encodeURIComponent(query)}`;
   // renderEmpty is unconditional here: "no results" is the honest answer to a query that matched
   // nothing, and falling back to the borrowed template's captured grid would answer it with a page
-  // full of pieces that don't match — every one a dead end the shopper clicks anyway.
+  // full of pieces that don't match. Every one a dead end the shopper clicks anyway.
   const grid = injectCollectionItems(template, hits.map(card), hrefFor, {
    page: pageNo, path: selfPath, keepQuickAdd: onStoreOrigin, renderEmpty: true,
   });
@@ -205,26 +205,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   let items: Awaited<ReturnType<typeof listCollectionItems>> = [];
   // Have we actually READ this collection from her site? The difference between "never read" and
   // "read, and empty" decides whether an empty collection shows nothing or refills itself from the
-  // crawl-day snapshot — see app/lib/plan-b/collection-contents.ts.
+  // crawl-day snapshot: see app/lib/plan-b/collection-contents.ts.
   let collectionSync = false;
   if (isHome || collHandle === "all") items = await listStorefrontItems(seller.id).catch(() => []);
   else {
    // Assigned items PLUS anything matching the handle by category/brand, so listings the seller
    // adds in the portal show up on the collection page they belong to without manual filing.
-   // ONE query for both the collection and whether we have read it from her site — the two used to
+   // ONE query for both the collection and whether we have read it from her site. The two used to
    // be separate calls, putting a second round trip on the busiest page type across 21 stores.
    const collection = await getCollectionWithSyncState(seller.id, collHandle!).catch(() => null);
    collectionSync = collection?.membershipKnown ?? false;
-   // Her own answer about sold pieces, not ours — see collection-sold-policy.ts.
+   // Her own answer about sold pieces, not ours. See collection-sold-policy.ts.
    items = await listCollectionItemsForStorefront(seller.id, collection?.id ?? null, collHandle!, collection?.keepsSold ?? null).catch(() => []);
   }
   // A collection with no VYA assignment and no category/brand match is very likely a manually
   // curated Shopify collection with no pattern behind the choice at all ("collection-1", specific
   // pieces someone dragged in). The captured page still knows exactly which products belong on
-  // it — read those handles back out and ask for THOSE, live, rather than jumping straight to the
+  // it: read those handles back out and ask for THOSE, live, rather than jumping straight to the
   // seller's whole catalogue, which turned a hand-picked 6-piece edit into a dump of everything
   // they've ever listed. And when even that yields nothing, the collection is empty: say so. See
-  // chooseCollectionItems — falling back to the whole catalogue here served all 164 of blummier's
+  // chooseCollectionItems. Falling back to the whole catalogue here served all 164 of blummier's
   // pieces under "Alaïa", under "Blumarine", and under 45 other empty collections.
   let renderEmptyCollection = false;
   // Which of the three answers this page is giving, stamped onto it so a check can tell a page that
@@ -234,7 +234,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
    const handles = items.length ? [] : capturedGridProductHandles(html);
    const fromCapturedGrid = handles.length ? await listStorefrontItemsBySourceIds(seller.id, handles).catch(() => []) : [];
    // Have we actually read this collection from her site? If we have, and nothing is filed in it,
-   // it is empty and we say so rather than refilling it from the capture — see collection-contents.
+   // it is empty and we say so rather than refilling it from the capture. See collection-contents.
    const chosen = chooseCollectionItems({ assigned: items, fromCapturedGrid, capturedNamedProducts: handles.length > 0, membershipKnown: collectionSync });
    collectionSource = items.length ? "filed" : chosen.items.length ? "captured" : "empty";
    items = chosen.items;
@@ -253,13 +253,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     byHandle.set(h, await listCollectionItemsForStorefront(seller.id, c?.id ?? null, h).catch(() => []));
    }));
    // A grid detectGridHandles() couldn't name (no VYA collection, no /collections/ link nearby to
-   // even try) still knows what it showed — a "collection focus carousel" picks products via
+   // even try) still knows what it showed. A "collection focus carousel" picks products via
    // Liquid, which compiles away to plain product links with no collection name left in the HTML at
    // all. Read below, only for the grids that actually need it (skip the work for grids that
    // resolved normally).
    const ownHandlesPerGrid = handles.some((h) => !h || !byHandle.get(h)?.length) ? capturedGridProductHandlesPerGrid(html) : [];
    // Which grids ARE a collection, rather than a rail showing its own captured pieces. Only these
-   // may grow past the number of cards the crawl happened to photograph — see injectLiveGrids.
+   // may grow past the number of cards the crawl happened to photograph. See injectLiveGrids.
    const uncapped: boolean[] = [];
    const perGrid = await Promise.all(handles.map(async (h, i) => {
     const fromCollection = h ? byHandle.get(h) : undefined;
@@ -276,18 +276,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
    const selfPath = onStoreOrigin ? pathname : `/site/${slug}${pathname}`;
    // The theme's filter and sort controls re-request this page with Shopify's parameters attached
    // (see plan-b/facets.ts). Ignoring them meant the facet UI moved, refetched, and got back the
-   // same unfiltered grid — which reads as broken filters, not missing ones. Paging is applied by
+   // same unfiltered grid, which reads as broken filters, not missing ones. Paging is applied by
    // injectCollectionItems from the theme's own page size, so only filter+sort are applied here.
    //
    // A Horizon-generation theme's own filter checkboxes can submit an opaque Shopify id rather than
-   // a label (Standard Product Taxonomy, a linked Metaobject) — see facet-labels.ts. `html` here is
-   // still the full captured page, filter form and all, from BEFORE the grid it names is replaced —
-   // section extraction (if this is one of those requests) happens later, on the finished page — so
+   // a label (Standard Product Taxonomy, a linked Metaobject). See facet-labels.ts. `html` here is
+   // still the full captured page, filter form and all, from BEFORE the grid it names is replaced,
+   // section extraction (if this is one of those requests) happens later, on the finished page, so
    // the very checkboxes the shopper ticked are what resolve their own ids back to real labels.
    const facetLabels = extractFacetLabels(html);
    const faceted = applyFacets(items, req.nextUrl.searchParams, { perPage: 0, paginate: false, labels: facetLabels });
    // A filter that matches nothing must render an EMPTY collection, not silently fall back to the
-   // full one — "no pieces match" is a true answer; showing all of them is a lie the shopper acts on.
+   // full one: "no pieces match" is a true answer; showing all of them is a lie the shopper acts on.
    // Only when the shopper actually filtered, though: an ordinary page load with no live data still
    // shows the captured grid rather than blanking the store.
    html = injectCollectionItems(html, faceted.items.map(card), hrefFor, {
@@ -296,7 +296,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     source: collectionSource,
    });
   } else if (renderEmptyCollection) {
-   // An empty collection still has to CLEAR the captured grid — leaving it shows capture-day cards
+   // An empty collection still has to CLEAR the captured grid. Leaving it shows capture-day cards
    // for a collection the seller has emptied.
    html = injectCollectionItems(html, [], hrefFor, { path: onStoreOrigin ? pathname : `/site/${slug}${pathname}`, keepQuickAdd: onStoreOrigin, renderEmpty: true });
   }
@@ -304,10 +304,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  }
 
  // A SQUARESPACE product page. Its Add-to-cart is driven entirely by the seller's own JavaScript,
- // which posts the product id the capture froze — the SOURCE store's, which means nothing to VYA, so
+ // which posts the product id the capture froze. The SOURCE store's, which means nothing to VYA, so
  // the button did nothing at all. Rewrite that identity to the VYA piece this page shows and the
  // seller's own button drives VYA's cart (see plan-b/sqs-product.ts and the route that answers it).
- // Shopify product pages don't come through here — they have their own route, which already does
+ // Shopify product pages don't come through here. They have their own route, which already does
  // this through the quick-add form's variant field.
  const sqsProduct = sqsProductIdentity(html);
  if (sqsProduct) {
@@ -317,7 +317,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
    html = applySqsProductIdentity(html, itemId, sqsProduct);
    // A SOLD piece must not offer a buy button. The Shopify product route already does this; this
    // path did not, so a sold Squarespace product served a live "Add to cart" that the cart endpoint
-   // then correctly refused with a 422 — the shopper clicks, nothing happens, and nothing explains
+   // then correctly refused with a 422. The shopper clicks, nothing happens, and nothing explains
    // why. One-of-one stores are mostly sold stock, so this is the common case, not the edge.
    const mine = await getItem(itemId).catch(() => null);
    if (mine && !storefrontAvailability(mine).available) html = applyCartState(html, { inCart: false, soldOut: true, unavailableReason: storefrontAvailability(mine).unavailableReason });
@@ -328,7 +328,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // The "shop by collection" tiles, from the seller's OWN collections rather than the row her old
  // site happened to carry on crawl day. Runs on every page type, not just the two above: such a row
  // turns up on a homepage, in a "browse by category" band halfway down a landing page, and on the
- // /collections index — which matches neither `coll` (it has no handle) nor `isHome`, and so was
+ // /collections index, which matches neither `coll` (it has no handle) nor `isHome`, and so was
  // never touched at all. A page with no such row is returned unchanged, so this is cheap everywhere
  // else. See app/lib/plan-b/collection-tiles.ts.
  {
@@ -347,25 +347,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  }
 
  // ── PRODUCT GRIDS SHE ADDED (imported-site builder) ─────────────────────────────────────────────
- // Her grid markers, filled from live inventory. AFTER the live grids and collection tiles above —
- // those find product grids by their shape, and must never mistake hers for the theme's — and BEFORE
+ // Her grid markers, filled from live inventory. AFTER the live grids and collection tiles above,
+ // those find product grids by their shape, and must never mistake hers for the theme's, and BEFORE
  // edit mode, so the editor shows exactly the cards a shopper gets. The cart page fills its own once it
  // has borrowed the home page's chrome (below). See app/lib/site-builder/apply.ts.
  if (html && !isCartPath) html = await applySiteBuilderForRequest(html, { slug, onStoreOrigin, editor: editorView, state: builderState, path: pathname });
 
  // ── EDIT MODE (?edit=1) ─────────────────────────────────────────────────────────────────────────
- // Placed HERE, after the live grids and the collection tiles — not up before all of them, where it
+ // Placed HERE, after the live grids and the collection tiles, not up before all of them, where it
  // used to sit and return the CAPTURED page. That gave the editor crawl-day products at crawl-day
  // prices while every shopper got the same page rebuilt from live inventory: two different pages,
  // and the seller was editing the one nobody sees. A price she clicked was a photograph of a number
  // that had since changed, under a link to a product route the app does not serve.
  //
- // It still stops short of the cart, the checkout wiring and the theme-script shims further down —
+ // It still stops short of the cart, the checkout wiring and the theme-script shims further down,
  // those are a shopper's machinery, not hers.
- // Edit mode (?edit=1): the seller's own click-to-edit view — no cart, just the visual editor.
+ // Edit mode (?edit=1): the seller's own click-to-edit view, no cart, just the visual editor.
  //
  // THIS IS A PUBLIC ROUTE. "/site" is in the middleware's PUBLIC_ROUTES because shoppers browse
- // hosted stores, so this handler is the only thing standing between a visitor and edit mode — and
+ // hosted stores, so this handler is the only thing standing between a visitor and edit mode, and
  // until this check existed there was nothing: anyone who added ?edit=1 to any hosted storefront
  // (VYA path or the seller's own domain) got the seller's editing toolbar over her live shop. The
  // save endpoint was auth-gated, so nothing could be written, but a shopper meeting an "editing
@@ -378,21 +378,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const actingSlug = await resolveStoreSlugAny(req).catch(() => null); /* allow-swallow: an auth blip must show the public page, never the editor */
   if (canEditCapture(slug, { slug: actingSlug, isAdmin: admin }).allowed) {
    // LOOK BEFORE YOU EDIT. She may only edit pages of a capture she has already compared with her
-   // own site, side by side, in the Hosted Store tab — see app/lib/capture-review-gate.ts for the
+   // own site, side by side, in the Hosted Store tab. See app/lib/capture-review-gate.ts for the
    // rule and why it is this one. Enforced HERE, not only on the button, or it is decorative: the
    // edit URL is a plain link she could keep. Admins (us, debugging a store) are exempt.
    const gate = admin
     ? { passed: true as const, reason: "reviewed" as const }
-    : reviewGate(await getReviewState(slug).catch(() => null)); /* allow-swallow: fails OPEN on purpose — this is a workflow step, not the security control (that is canEditCapture above), and a health-table blip must not lock every seller out of her own editor */
+    : reviewGate(await getReviewState(slug).catch(() => null)); /* allow-swallow: fails OPEN on purpose. This is a workflow step, not the security control (that is canEditCapture above), and a health-table blip must not lock every seller out of her own editor */
    if (gate.passed) {
-    // The editor serves the CAPTURED page, deliberately — a seller edits her own markup, not our
+    // The editor serves the CAPTURED page, deliberately. A seller edits her own markup, not our
     // render of it. But two things on that page are not hers to type, and until they said so she
     // was handed a text box for each:
     //
     //  · a product's name and price, which every shopper's page regenerates from Inventory, so an
     //    edit here is thrown away on the next load. Stamped with the piece they belong to, which is
     //    what lets the panel offer her the piece in Inventory instead of a box that lies.
-    //  · the "shop by collection" tiles, which are her collections — hers to add to, remove from,
+    //  · the "shop by collection" tiles, which are her collections. Hers to add to, remove from,
     //    rename and photograph in the Collections manager. Filled in live so the editor shows the
     //    row her shoppers actually get.
     //
@@ -402,7 +402,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
      const owner = await getSellerBySlug(slug);
      if (owner) {
       // The collection tiles are already live: the pass above ran on this same html. What is left
-      // is the one thing only the editor needs — tying each product card back to the piece it shows,
+      // is the one thing only the editor needs. Tying each product card back to the piece it shows,
       // so clicking its name or price opens the piece rather than a text box that can't be saved.
       const inv = await listStorefrontItems(owner.id).catch(() => []);
       const bySource = new Map(inv.filter((i) => i.sourceId).map((i) => [String(i.sourceId), { id: i.id, title: i.title }]));
@@ -412,7 +412,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     return new Response(prepareEditMode(editHtml, slug, pathname, { hidden: builderState.hidden }), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
    }
    // She IS the owner and simply hasn't reviewed yet. Falling silently through to the public page
-   // is right for a shopper and wrong for her — she clicked Edit (or the storefront studio loaded
+   // is right for a shopper and wrong for her. She clicked Edit (or the storefront studio loaded
    // this URL in its iframe) and got a page that won't edit, with nothing saying why. Her copy of
    // the page carries one line naming the step. No shopper reaches this branch.
    ownerNotice = reviewGateNoticeHtml(gate);
@@ -424,7 +424,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  const setCookie = await captureStorefrontEntry(req, slug);
  const sid = req.cookies.get("via_sess")?.value || (setCookie ? /via_sess=([^;]+)/.exec(setCookie)?.[1] || null : null);
  const pageType = pathname === "/" || pathname === "" ? "home" : isSearchPath ? "search" : /\/products?\//.test(pathname) ? "product" : /\/collections?\//.test(pathname) ? "collection" : "page";
- // A section fetch is part of a page the shopper is ALREADY on — every facet click, sort change and
+ // A section fetch is part of a page the shopper is ALREADY on. Every facet click, sort change and
  // pagination step fires one. Counting them would multiply this store's pageviews by however many
  // times a shopper touched a filter, quietly corrupting the analytics the seller is sold on.
  if (!sectionId) await recordStorePageview({ storeSlug: slug, path: pathname || "/", pageType, sessionId: sid, surface: "storefront" }).catch(() => {});
@@ -437,13 +437,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  };
  if (setCookie) headers["Set-Cookie"] = setCookie;
 
- // Canonical + indexable, so the re-hosted site ranks as itself — AT HER OWN ADDRESS.
+ // Canonical + indexable, so the re-hosted site ranks as itself, AT HER OWN ADDRESS.
  //
  // This used to canonicalise to `vyaplatform.com/site/{slug}` whenever the page was served from a
  // VYA host, which told Google that the canonical home of a seller's shop was a path on the
  // marketplace. It is not, and never was: her shop is {slug}.vyasites.com (or the domain she
  // connected). Pointing search engines at the marketplace copy is the SEO version of the same
- // mistake the redirect above fixes — one shop, one address.
+ // mistake the redirect above fixes. One shop, one address.
  const host = (req.headers.get("host") || "").toLowerCase().split(":")[0];
  const isVyaHost = !host || host === "vyaplatform.com" || host === "www.vyaplatform.com" || host.endsWith(".vercel.app") || host === "localhost";
  const cleanPath = pathname === "/" || pathname === "" ? "" : pathname;
@@ -476,7 +476,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   //
   // It used to be the theme's own cart markup with the visitor's lines injected into it, which meant
   // knowing where each theme puts a row, a price, a total and an empty state. Three browser sweeps
-  // and a day of per-theme fixes later that path still mis-rendered — it cloned a table header as a
+  // and a day of per-theme fixes later that path still mis-rendered. It cloned a table header as a
   // product on one theme, leaked the captured product on another, and showed two carts on a third.
   //
   // buildFallbackCartPage reproduces nothing: it keeps the store's own header, footer, fonts and
@@ -484,16 +484,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   // has never needed a per-store fix, and it now serves them all.
   html = buildFallbackCartPage(html, lines, `/checkout?cart=1${onStoreOrigin ? "" : `&store=${encodeURIComponent(slug)}`}`, { interactive: onStoreOrigin });
   // A grid she added outside the borrowed page's main content (which the cart replaced) still shows
-  // live pieces — and the borrowed header carries her menu order, like every other page.
+  // live pieces, and the borrowed header carries her menu order, like every other page.
   html = await applySiteBuilderForRequest(html, { slug, onStoreOrigin, state: builderState, path: pathname });
 
-  // The cart page just resolved the visitor's real lines — reuse that count for the header badge
+  // The cart page just resolved the visitor's real lines. Reuse that count for the header badge
   // rather than resolving the same items a second time.
   cartCount = lines.length;
  }
  // Plan B keeps the seller's scripts, but the denylist is re-applied at SERVE time (inside
  // cleanShopifyChrome) so captures taken under an older, shorter list stop running trackers we've
- // since learned to recognise — no re-crawl of 45 stores required. See stripVendorScripts.
+ // since learned to recognise, no re-crawl of 45 stores required. See stripVendorScripts.
  // Applied to `base`, before the section fragment is cut out of it, so a facet click that re-renders
  // the header section gets the same number a full page load would.
  // The badge counts THIS store's bag: a shopper carrying pieces from another store must not see
@@ -505,7 +505,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  let base = applyCartBadge(cleanShopifyChrome(onStoreOrigin ? html : stripScripts(html)), cartCount);
 
  // THE THEME'S OWN ASSETS, made same-origin. A browser sweep of all 22 storefronts found most of
- // them serving the theme's scripts from the SELLER's domain — 35 ES modules on one store — every
+ // them serving the theme's scripts from the SELLER's domain, 35 ES modules on one store. Every
  // one refused by Chrome for want of CORS headers. That takes down the menus, carousels, galleries
  // and cart together: the storefront renders and nothing works. Routing them through VYA's own /cdn
  // proxy removes the cross-origin question entirely. See same-origin-assets.ts.
@@ -515,7 +515,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  }
 
  // THE THEME'S OWN CART, hidden. Its JavaScript is alive on a store origin, so pressing Add opened
- // VYA's drawer AND the theme's, one over the other — a browser sweep caught it as "2 cart panels
+ // VYA's drawer AND the theme's, one over the other. A browser sweep caught it as "2 cart panels
  // visible at once". We hide rather than remove, so the theme's cart code still finds every element
  // it queries and runs to completion against something nobody sees. See suppress-theme-cart.ts.
  if (onStoreOrigin) base = suppressThemeCart(base);
@@ -526,7 +526,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // loaded on the page doing the morphing.
  if (sectionId) {
   const fragment = extractSection(base, sectionId)
-   // Sections that exist in the theme but were never on a captured page — the search drawer's empty
+   // Sections that exist in the theme but were never on a captured page. The search drawer's empty
    // state is the one every Horizon store asks for on open.
    ?? (isPredictiveSearchEmptyId(sectionId) ? predictiveSearchEmptySection(sectionId) : emptySection(sectionId));
   return new Response(fragment, {
@@ -535,7 +535,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  }
 
  // A PRODUCT'S BUY BUTTONS, made to match each other. One store's "Enquire" renders at twice the
- // size of the "Add to cart" beside it — same classes, same parent, matched on her own site. See
+ // size of the "Add to cart" beside it. Same classes, same parent, matched on her own site. See
  // button-parity.ts; it only acts when the sizes disagree widely, and takes the smaller.
  base = normaliseBuyButtons(base);
 
@@ -546,7 +546,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
  // THE SELLER'S OWN PERSON ICON, bound to our sign-in. Store-origin only: a VYA origin strips the
  // theme's scripts, so a panel served there could never be opened. Deliberately after the section
- // fragment is returned above — the panel belongs to a document, not to a fragment. Stores with no
+ // fragment is returned above. The panel belongs to a document, not to a fragment. Stores with no
  // account control (the three that aren't on Shopify) are left untouched. See account-panel.ts.
  if (onStoreOrigin) {
   const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
@@ -556,8 +556,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   base = injectAccountPanel(base, { signedInAs: session?.email ?? null, shopName });
  }
 
- // SAVED PIECES, when she has turned them on. Both kinds of storefront reach this line — the
- // imported copy of her shop and the one built from sections — so the feature arrives on both from
+ // SAVED PIECES, when she has turned them on. Both kinds of storefront reach this line. The
+ // imported copy of her shop and the one built from sections, so the feature arrives on both from
  // one place. Nothing is added to her markup: the browser finds product links and lays a heart over
  // each. See wishlist.ts. A failure to read the setting means off, which is the safe way round.
  const wishlist = await getStorefrontBySlug(slug).catch(() => null);
@@ -571,13 +571,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
  // Three browser sweeps of all 22 storefronts settled this. Making the theme's own cart work meant
  // reproducing, per theme, a contract that never bottoms out: cross-origin modules, then import
  // maps, then module shims, then web pixels. Two real fixes later, 20 of 22 stores still could not
- // complete a purchase. Meanwhile VYA's own cart (CART_UI) reproduces nothing — it binds its own
- // Add buttons, intercepts cart links and talks to /api/storefront/cart — and needs no theme
+ // complete a purchase. Meanwhile VYA's own cart (CART_UI) reproduces nothing. It binds its own
+ // Add buttons, intercepts cart links and talks to /api/storefront/cart, and needs no theme
  // knowledge at all.
  //
  // The theme still owns everything else: its domain, its markup, its fonts, and its own JavaScript
  // for menus, carousels and galleries. Only the buy path is ours, so whether a theme's bundle boots
- // affects how polished browsing feels — never whether a shopper can pay.
+ // affects how polished browsing feels, never whether a shopper can pay.
  //
  // injectShim stays Plan-A-only: on a store origin the theme's own scripts are alive and the shim
  // would fight them for the same carousels and dropdowns.

@@ -9,8 +9,8 @@ const EMPTY = { rows: [], totals: { clicks: 0, orders: 0, sales: 0, convPct: 0, 
 const EMPTY_TRAFFIC = { total: 0, byType: [], topSources: [] };
 const EMPTY_PAGES = { total: 0, byType: [], pages: [] };
 
-// GET — where this store's visitors come from (traffic sources, referrer-classified) PLUS click
-// attribution + trend. ?days=30 (default) | all. Per-store — everything is scoped to the slug.
+// GET, where this store's visitors come from (traffic sources, referrer-classified) PLUS click
+// attribution + trend. ?days=30 (default) | all. Per-store: everything is scoped to the slug.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

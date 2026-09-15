@@ -3,7 +3,7 @@
 // Categories are the SAME taxonomy the storefront navigates by (`categoryMap`), so a tag
 // picked here lines up with the category pages, brand pages and nav mega-menu. Free-text
 // category strings (AI intake writes "jackets"/"swimwear"; Shopify imports write whatever
-// the seller typed) are folded onto a canonical slug by `toCategorySlug` — that's what makes
+// the seller typed) are folded onto a canonical slug by `toCategorySlug`. That's what makes
 // the same tag set usable for both editing and filtering.
 
 // .ts extensions so `node --test` can load this module directly (see item-tags.test.ts).
@@ -15,7 +15,7 @@ export type { CategorySlug, ItemStatus };
 // ── Status ─────────────────────────────────────────────────────────────────────
 export const ITEM_STATUSES: ItemStatus[] = ["draft", "active", "reserved", "sold", "removed"];
 
-/** StatusPill tone per status — keeps the pill colour identical everywhere it's shown. */
+/** StatusPill tone per status. Keeps the pill colour identical everywhere it's shown. */
 export const STATUS_TONE: Record<ItemStatus, "live" | "pending" | "neutral" | "down" | "info"> = {
  draft: "pending", active: "live", reserved: "info", sold: "neutral", removed: "down",
 };
@@ -42,14 +42,14 @@ export const categoryTagLabel = (slug: CategorySlug): string => categoryMap[slug
 export const OTHER_FAMILY = "Other";
 const SLUG_SET = new Set<string>(CATEGORY_SLUGS);
 export const isCanonicalCategory = (v: string | null | undefined): v is CategorySlug => !!v && SLUG_SET.has(v);
-/** What to print for a stored category — the taxonomy label, or the seller's own words. */
+/** What to print for a stored category. The taxonomy label, or the seller's own words. */
 export const categoryValueLabel = (v: string): string => (isCanonicalCategory(v) ? categoryMap[v] : v);
 
 const FAMILY_OF = new Map<CategorySlug, string>(
  CATEGORY_GROUPS.flatMap((g) => g.slugs.map((s) => [s, g.label] as [CategorySlug, string])),
 );
 
-/** Which top-level family a category belongs to — the first half of the "Bags › Totes" path. */
+/** Which top-level family a category belongs to. The first half of the "Bags › Totes" path. */
 export const categoryFamily = (v: string): string => FAMILY_OF.get(v as CategorySlug) || OTHER_FAMILY;
 
 export const familySlugs = (family: string): CategorySlug[] =>
@@ -58,25 +58,25 @@ export const familySlugs = (family: string): CategorySlug[] =>
 // Synonyms → slug, checked in order (specific before catch-all), matched as whole words so
 // "flat" doesn't swallow "flatform" and "belt" doesn't swallow "belt bag" (which is checked first).
 const SYNONYMS: [RegExp, CategorySlug][] = [
- // Bags — before "belts"/"accessories" so "belt bag" and "evening bag" land here.
+ // Bags, before "belts"/"accessories" so "belt bag" and "evening bag" land here.
  [/\b(tote|totes|shopper)\b/, "totes"],
  [/\b(clutch|clutches|minaudiere|wristlet|evening bag)\b/, "clutches"],
  [/\b(crossbody|cross-?body|satchel|belt bag|fanny pack)\b/, "crossbody-bags"],
  [/\b(handbag|handbags|purse|purses|top handle|shoulder bag)\b/, "handbags"],
- // A wallet WITH a strap is a bag — checked before the wallet rule below.
+ // A wallet WITH a strap is a bag. Checked before the wallet rule below.
  [/\b(wallet on chain|chain wallet)\b/, "bags"],
  // Wallets & small leather goods: a BAGS slug, not an accessory. Before the bags catch-all
  // so "key pouch" isn't taken by \bpouch\b, and before "accessories" further down.
  [/\b(wallet|wallets|billfold|bifold|bi-?fold|trifold|tri-?fold|card holder|cardholder|card case|key case|key pouch|key holder|cles)\b/, "wallets"],
  [/\b(bag|bags|backpack|backpacks|pouch|luggage|duffel|duffle)\b/, "bags"],
- // Shoes — subcategories before the catch-all.
+ // Shoes: subcategories before the catch-all.
  [/\b(boot|boots|bootie|booties)\b/, "boots"],
  [/\b(heel|heels|pump|pumps|stiletto|stilettos|wedge|wedges|slingback|slingbacks)\b/, "heels"],
  [/\b(sneaker|sneakers|trainer|trainers)\b/, "sneakers"],
  [/\b(sandal|sandals|espadrille|espadrilles|slide|slides|flip-?flop)\b/, "sandals"],
  [/\b(flat|flats|ballet flat|loafer|loafers|mule|mules|clog|clogs|oxford|oxfords|brogue|brogues|mary jane|moccasin|moccasins)\b/, "flats"],
  [/\b(shoe|shoes|footwear)\b/, "shoes"],
- // Clothing — specific garments before the generic families.
+ // Clothing: specific garments before the generic families.
  [/\b(dress|dresses|gown|gowns|sundress|kaftan|caftan)\b/, "dresses"],
  [/\b(skirt|skirts|sarong)\b/, "skirts"],
  [/\b(short|shorts|bermuda|hot pants)\b/, "shorts"],
@@ -89,7 +89,7 @@ const SYNONYMS: [RegExp, CategorySlug][] = [
  [/\b(pant|pants|trouser|trousers|legging|leggings|chino|chinos|jogger|joggers|slacks|culottes)\b/, "pants"],
  [/\b(top|tops|blouse|blouses|shirt|shirts|tee|tees|t-shirt|tank|tanks|cami|camisole|bodysuit|bodysuits|halter|polo|tunic)\b/, "tops"],
  [/\b(clothing|apparel|ready-?to-?wear|rtw|garment|garments)\b/, "other-clothing"],
- // Accessories — subcategories before the catch-all.
+ // Accessories: subcategories before the catch-all.
  [/\b(sunglass|sunglasses|eyewear|spectacles)\b/, "sunglasses"],
  [/\b(jewelry|jewellery|necklace|necklaces|earring|earrings|bracelet|bracelets|brooch|brooches|pendant|pendants)\b/, "jewelry"],
  [/\b(belt|belts)\b/, "belts"],
@@ -102,7 +102,7 @@ const SYNONYMS: [RegExp, CategorySlug][] = [
 
 // ── What a live listing needs ──────────────────────────────────────────────────
 // The fields marked with a * in the editors. A draft may be saved without them; an item
-// can't go active without them — a listing with no photo, price or category can't be
+// can't go active without them. A listing with no photo, price or category can't be
 // browsed, sorted or bought. Kept here so both editors show and enforce the same rule.
 export function publishBlockers(
  form: { title: string; price: string; category: string | null },
@@ -121,7 +121,7 @@ const BY_LABEL = new Map<string, CategorySlug>(
 );
 
 /**
- * Fold any stored category string onto a canonical slug — the slug itself, its display label,
+ * Fold any stored category string onto a canonical slug. The slug itself, its display label,
  * or a synonym. Returns null when there's nothing recognisable (so callers can show "Uncategorised"
  * rather than guessing).
  */

@@ -10,7 +10,7 @@ import { DAWN_MENU_HOME, DAWN_COLLECTION, DAWN_HOME } from "./fixtures.ts";
 
 // ONE PASS, ONE PARSE. What a shopper's page gets on a request: her grids filled from live inventory,
 // her menu order on every copy of the menu, her hidden pages unlinked, and her page title. They are
-// tested together here because they share a single cheerio parse (apply.ts) — the whole reason the
+// tested together here because they share a single cheerio parse (apply.ts). The whole reason the
 // builder has one entry point rather than four.
 
 const menuOf = (html: string) => detectMenus(cheerio.load(html))!;
@@ -37,7 +37,7 @@ test("her menu order alone reaches the page, with no grid work at all", async ()
  }
 });
 
-test("a hidden page loses its menu links, and her renamed page wears its new name — in both copies", async () => {
+test("a hidden page loses its menu links, and her renamed page wears its new name, in both copies", async () => {
  const out = await applySiteBuilder(DAWN_MENU_HOME, {
   hiddenPaths: new Set(["/blogs/news"]),
   menuLabels: new Map([["/pages/about-us", "About us"]]),

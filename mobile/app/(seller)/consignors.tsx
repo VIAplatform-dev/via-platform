@@ -9,19 +9,19 @@ import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
 import { PAYOUT_METHOD_LABELS, payoutMethodOptions, splitPctFromText, describeConsignor, ALL_PAYOUT_METHODS, toggleMethod } from "../../lib/seller/consignors";
 
-// The people who bring pieces in — added, edited and removed on the phone.
+// The people who bring pieces in. Added, edited and removed on the phone.
 //
 // This is the screen the app was missing rather than a screen it did badly: Consignment could show
 // what was OWED and to whom, but a consignor could only be created on the desktop, so a seller
 // standing in her shop with someone handing her a coat had nowhere to put their name.
 //
 // One list, and a form that opens in place under "Add someone". No modal: a modal over a list on a
-// phone hides the thing you are adding to, and this list is short by nature — a shop with two
+// phone hides the thing you are adding to, and this list is short by nature. A shop with two
 // hundred consignors is not a shop, it is a warehouse.
 //
 // PAYOUT METHOD IS THE ONE FIELD THAT CAN BE REFUSED. Whether a sale's cut went into VYA's balance
 // (Stripe) or stayed in the till (cash, credit) was decided AT the sale, so the server rejects a
-// change while a balance is outstanding. That refusal is shown in the server's own words — it names
+// change while a balance is outstanding. That refusal is shown in the server's own words. It names
 // the fix, and rewording it here would only make it vaguer.
 
 type Consignor = {
@@ -186,7 +186,7 @@ export default function ConsignorsScreen() {
           )}
 
           {/* HOW YOU PAY THEM. Until this was here, the phone offered whatever the store had
-              already switched on — and a store that has never opened the web settings page is on
+              already switched on, and a store that has never opened the web settings page is on
               the table default, which is store credit and nothing else. So "I can only pay by
               store credit" was true, and the switch that fixes it lived on a screen she was not
               on. Same four the web offers; the last one on cannot be turned off, because a
@@ -220,7 +220,7 @@ export default function ConsignorsScreen() {
     </SellerScreen>
   );
 
-  // Declared inside so the form reads the same state whether it is adding or editing — the two
+  // Declared inside so the form reads the same state whether it is adding or editing. The two
   // differ only in which request the Save button makes.
   function FormBody() {
     return (
@@ -242,7 +242,7 @@ export default function ConsignorsScreen() {
             options={methods}
             value={form.method}
             onChange={(v) => setForm({ ...form, method: v })}
-            hint={owes ? "They have money outstanding — this can't change until they're paid out." : undefined}
+            hint={owes ? "They have money outstanding. This can't change until they're paid out." : undefined}
           />
         ) : null}
 
@@ -256,7 +256,7 @@ export default function ConsignorsScreen() {
         {typeof open === "number" ? (
           <Pressable onPress={() => void remove(open)} disabled={busy} hitSlop={8} style={{ paddingVertical: spacing.md, alignItems: "center" }}>
             <Text style={{ fontSize: 13, color: colors.textMuted }}>
-              {owes ? `Remove ${editing?.name ?? "them"} — ${formatMoney(owes, currency)} still owed` : `Remove ${editing?.name ?? "them"}`}
+              {owes ? `Remove ${editing?.name ?? "them"}: ${formatMoney(owes, currency)} still owed` : `Remove ${editing?.name ?? "them"}`}
             </Text>
           </Pressable>
         ) : null}

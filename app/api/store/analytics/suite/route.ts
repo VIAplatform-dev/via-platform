@@ -4,7 +4,7 @@ import { getAnalyticsSuite, emptyAnalyticsSuite, parseSections, StoreNotFoundErr
 
 export const dynamic = "force-dynamic";
 
-// GET /api/store/analytics/suite — the acting store's full analytics suite.
+// GET /api/store/analytics/suite: the acting store's full analytics suite.
 //
 //   ?period=30d | 90d | mtd | qtd | ytd | 2026-08 | 2026-Q3 | 2026 | custom | all
 //   ?from=YYYY-MM-DD&to=YYYY-MM-DD   (with period=custom; `to` is inclusive)
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ ok: true, ...suite });
  } catch (e) {
   if (e instanceof StoreNotFoundError) {
-   // The slug authenticated but has no seller row — a store that has signed up and not yet
+   // The slug authenticated but has no seller row. A store that has signed up and not yet
    // written anything. An empty suite is the honest answer, and it has to be an ACTUAL suite:
    // answering 404 with an error object left the dashboard with nothing to render, so a brand-new
    // seller's first look at Analytics said "Analytics unavailable. Try refreshing." on a page

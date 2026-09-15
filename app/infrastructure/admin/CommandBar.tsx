@@ -13,7 +13,7 @@ type Hit = {
  label: string;
  sub?: string;
  href: string;
- /** The piece's cover photo. Only inventory hits carry one — a page or a customer has none. */
+ /** The piece's cover photo. Only inventory hits carry one. A page or a customer has none. */
  image?: string | null;
 };
 type Group = { group: string; hits: Hit[] };
@@ -30,14 +30,15 @@ const PAGES: Hit[] = [
  { id: "p-cust", label: "Customers", href: `${B}/customers` },
  { id: "p-mkt", label: "Marketing", href: `${B}/marketing` },
  { id: "p-disc", label: "Discounts", href: `${B}/discounts` },
- // Apps & integrations is a settings section now, so it arrives with the SETTINGS_SECTIONS spread below.
+ // Apps & integrations is a settings section now, so it arrives with the SETTINGS_SECTIONS spread
+ // below rather than being listed twice. Owner-only, and every card on it says coming soon.
  { id: "p-apps", label: "Apps & integrations", href: `${B}/apps` },
  { id: "p-pay", label: "Payments", href: `${B}/payments` },
  { id: "p-an", label: "Analytics", href: `${B}/dashboard` },
  { id: "p-trends", label: "Trends", href: `${B}/trends` },
  { id: "p-set", label: "Settings", href: `${B}/settings` },
  // Everything the sidebar can reach should be reachable here too. Rentals and Appointments were
- // both missing entirely — a seller typing the name of a section she can see in the sidebar got
+ // both missing entirely: a seller typing the name of a section she can see in the sidebar got
  // "no results", which reads as the feature not existing.
  { id: "p-rentals", label: "Rentals", sub: "bookings, returns, rental queue", href: `${B}/rentals` },
  { id: "p-appts", label: "Appointments", sub: "your schedule, fittings, collections, bookings", href: `${B}/appointments` },
@@ -54,7 +55,7 @@ const PAGES: Hit[] = [
  { id: "p-esp", label: "Klaviyo & Mailchimp", sub: "connect your email tool", href: `${B}/apps/email` },
  { id: "p-recovery", label: "Cart recovery", sub: "people who didn't finish checkout", href: `${B}/customers/recovery` },
  { id: "p-marketplaces", label: "Marketplaces", sub: "depop, ebay, vestiaire cross-listing", href: `${B}/cross-listing/settings` },
- // Every settings section, taken from the ONE list the rail and the landing page already share —
+ // Every settings section, taken from the ONE list the rail and the landing page already share,
  // so a section added there is searchable the same day rather than whenever someone remembers this
  // file. Twenty sections were invisible to search: typing "tax" or "shipping" found nothing.
  ...SETTINGS_SECTIONS.filter((x) => !x.vyaOnly).map((x) => ({
@@ -156,7 +157,7 @@ export default function CommandBar({ hidden }: { hidden?: string[] } = {}) {
  const i = flat.indexOf(h);
  const on = i === activeIdx;
  // Lowercased: the route labels this group "Inventory" and a strict compare would fail
- // silently — every row keeps the plain layout and the pictures never arrive.
+ // silently: every row keeps the plain layout and the pictures never arrive.
  const isPiece = g.group.toLowerCase() === "inventory";
  return (
  <button
@@ -165,7 +166,7 @@ export default function CommandBar({ hidden }: { hidden?: string[] } = {}) {
  >
  <span className="flex min-w-0 items-center gap-2.5">
  {/* The piece itself. Only under Inventory, and with a placeholder for a piece that has no
-     photo yet — a thumbnail on some rows of a group and nothing on others makes the titles
+     photo yet: a thumbnail on some rows of a group and nothing on others makes the titles
      jump left and right as you arrow down it. Pages and customers have no picture to show,
      so they keep the plain layout rather than gaining an empty square. */}
  {isPiece ? (

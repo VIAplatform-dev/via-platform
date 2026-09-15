@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // What VYA has charged this store, so the phone can answer it without the Stripe billing portal.
 //
-// Reduced to the four things a seller actually asks of an invoice list — when, how much, did it go
+// Reduced to the four things a seller actually asks of an invoice list, when, how much, did it go
 // through, and where's the PDF. The portal answers those too, but only in a browser, and "open the
 // website" was the thing this whole pass exists to delete.
 //
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
  if (!stripeConfigured()) return NextResponse.json({ ok: true, invoices: [] });
 
  const plan = await getStorePlan(slug);
- // No customer means nothing has ever been billed. An empty list, not an error — a store on the
+ // No customer means nothing has ever been billed. An empty list, not an error. A store on the
  // free plan asking for its invoices has asked a reasonable question with a boring answer.
  if (!plan.stripeCustomerId) return NextResponse.json({ ok: true, invoices: [] });
 

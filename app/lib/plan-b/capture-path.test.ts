@@ -44,6 +44,6 @@ test("preserves case", () => {
  assert.equal(capturePathFor("/Products/Fendi-Baguette?variant=1"), "/Products/Fendi-Baguette");
 });
 
-test("leaves a trailing slash alone — both forms are stored and the caller retries", () => {
+test("leaves a trailing slash alone. Both forms are stored and the caller retries", () => {
  assert.equal(capturePathFor("/collections/bags/?page=2"), "/collections/bags/");
 });

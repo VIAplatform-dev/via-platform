@@ -18,7 +18,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!adminToken && adminToken === hashPassword(adminPassword);
 }
 
-// GET /api/admin/brand-heat?days=30 — cross-store Brand Heat Index (internal/beta).
+// GET /api/admin/brand-heat?days=30: cross-store Brand Heat Index (internal/beta).
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

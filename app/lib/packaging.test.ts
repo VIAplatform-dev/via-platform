@@ -28,7 +28,7 @@ test("a tee in a small mailer really is Small", () => {
 });
 
 test("a coat in a large box is charged as Large, on size alone", () => {
- // 20+16+10 = 46in girth, past Medium's 40 — so even a light coat can't quote Medium.
+ // 20+16+10 = 46in girth, past Medium's 40, so even a light coat can't quote Medium.
  assert.equal(tierOf("box-l", 30), "large");
  assert.equal(tierOf("box-xl", 20), "large");
 });
@@ -39,11 +39,11 @@ test("a heavy piece is Large however small the box", () => {
 
 test("packed weight includes the packaging, because the scale does", () => {
  assert.equal(packedWeightOz(30, byId("box-l")), 42);
- assert.equal(packedWeightOz(0, byId("box-l")), 0);   // nothing known yet — don't invent one
+ assert.equal(packedWeightOz(0, byId("box-l")), 0);   // nothing known yet: don't invent one
  assert.equal(packedWeightOz(null, byId("box-l")), 0);
 });
 
-test("the list reads as a scale — each option is bigger than the last", () => {
+test("the list reads as a scale. Each option is bigger than the last", () => {
  const vol = (p: typeof PACKAGING[number]) => p.lengthIn * p.widthIn * p.heightIn;
  for (let i = 1; i < PACKAGING.length; i++) {
   assert.ok(vol(PACKAGING[i]) > vol(PACKAGING[i - 1]), `${PACKAGING[i].id} > ${PACKAGING[i - 1].id}`);
@@ -56,7 +56,7 @@ test("every tier is reachable from some packaging, so the ladder isn't decorativ
 });
 
 test("suggested packaging never undercharges the weight it was suggested from", () => {
- // If the AI says 26oz and we preselect a package, that package's tier must cover 26oz — otherwise
+ // If the AI says 26oz and we preselect a package, that package's tier must cover 26oz. Otherwise
  // the default itself is the leak.
  for (const oz of [4, 10, 20, 30, 40, 60, 90, 150]) {
   const p = byId(suggestPackaging(oz));

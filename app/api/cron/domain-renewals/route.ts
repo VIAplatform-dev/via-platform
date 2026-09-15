@@ -19,7 +19,7 @@ export const maxDuration = 300;
 //
 // Auth: CRON_SECRET, same as the other crons.
 
-/** Charge this far ahead of expiry — enough runway to chase a failed card. */
+/** Charge this far ahead of expiry. Enough runway to chase a failed card. */
 const LEAD_DAYS = 30;
 
 export async function GET(request: Request) {
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
      customer: seller.stripeCustomerId,
      confirm: "true",
      off_session: "true",
-     description: `VYA domain renewal — ${domain}`,
+     description: `VYA domain renewal: ${domain}`,
     },
     undefined,
     // Stripe-side idempotency as well as our own, keyed to the same period.
@@ -79,13 +79,13 @@ export async function GET(request: Request) {
    results.push({ domain, store: storeSlug, outcome: "charged" });
   } catch (e) {
    // Card declined. Turn auto-renew OFF so Vercel doesn't bill VYA for a domain
-   // nobody has paid for — the seller can re-enable it by fixing their card,
+   // nobody has paid for. The seller can re-enable it by fixing their card,
    // and the domain stays live until it actually expires.
    await setAutoRenew(domain, false).catch(() => {});
    await settleRenewal(domain, periodEnd, {
     status: "failed",
     amountCents: price.priceCents,
-    detail: `Card declined — auto-renew paused. ${e instanceof Error ? e.message : ""}`.trim(),
+    detail: `Card declined. Auto-renew paused. ${e instanceof Error ? e.message : ""}`.trim(),
    });
    results.push({ domain, store: storeSlug, outcome: "declined" });
   }

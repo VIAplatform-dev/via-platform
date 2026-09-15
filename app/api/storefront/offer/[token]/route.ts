@@ -5,7 +5,7 @@ import { sendOfferUpdateToStore } from "@/app/lib/email";
 
 export const dynamic = "force-dynamic";
 
-// GET — the buyer's view of their offer (state + the full back-and-forth). `handle` is the
+// GET: the buyer's view of their offer (state + the full back-and-forth). `handle` is the
 // store's storefront handle, so the page can send the buyer back to the piece on the store's
 // OWN storefront (/s/{handle}/p/{id}) rather than the marketplace product page, which is
 // waitlist-gated and may not even carry this item.
@@ -17,7 +17,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
  return NextResponse.json({ ok: true, offer: publicOffer(offer), handle: sf?.handle ?? null, events: await getOfferEvents(offer.id) });
 }
 
-// POST — the buyer responds. { action: "accept" | "counter" | "decline" | "withdraw", amountCents? }
+// POST: the buyer responds. { action: "accept" | "counter" | "decline" | "withdraw", amountCents? }
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
  const { token } = await params;
  const offer = await getOfferByToken(token);

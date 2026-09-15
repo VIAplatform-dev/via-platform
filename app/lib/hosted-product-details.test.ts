@@ -5,7 +5,7 @@ import { injectHostedDetails } from "./hosted-product-details.ts";
 
 // Where the details land on a captured theme page: after the buy control (where rewireCommerce and
 // applyCartState put theirs), else after the price, else inside the product's own container, else
-// at the end of the body — and never twice.
+// at the end of the body, and never twice.
 
 const BLOCK = `<section data-vya-details="1"><div data-vya-section="flaws"><p>Flaws</p><ul><li>small mark inside collar</li></ul></div></section>`;
 
@@ -47,7 +47,7 @@ test("a page with neither: the block is appended to the product container, else 
  assert.equal(inMeta(".product-info > [data-vya-details]").length, 1, "the product container, when the page has one");
 });
 
-test("served twice, the page carries one block — the newer one", () => {
+test("served twice, the page carries one block. The newer one", () => {
  const once = injectHostedDetails(SHOPIFY, BLOCK);
  const twice = injectHostedDetails(once, BLOCK.replace("small mark inside collar", "one loose button"));
  const $ = cheerio.load(twice);
@@ -56,7 +56,7 @@ test("served twice, the page carries one block — the newer one", () => {
 });
 
 test("no block means the page is returned untouched, and an old block is taken off", () => {
- assert.equal(injectHostedDetails(SHOPIFY, ""), SHOPIFY, "byte for byte — no reserialising a page for nothing");
+ assert.equal(injectHostedDetails(SHOPIFY, ""), SHOPIFY, "byte for byte, no reserialising a page for nothing");
  const $ = cheerio.load(injectHostedDetails(injectHostedDetails(SHOPIFY, BLOCK), ""));
  assert.equal($("[data-vya-details]").length, 0);
 });

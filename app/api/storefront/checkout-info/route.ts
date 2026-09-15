@@ -6,7 +6,7 @@ import { getRedeemableBindingOffer } from "@/app/lib/offers-db";
 
 export const dynamic = "force-dynamic";
 
-// GET ?item=ID[&offer=TOKEN] — what the buyer checkout page needs: the item, the store, and
+// GET ?item=ID[&offer=TOKEN]: what the buyer checkout page needs: the item, the store, and
 // whether shipping is free for this piece (so the page knows to quote a rate or not). When an
 // accepted binding-offer token is passed, the price shown is the AGREED price (not the list price),
 // and the piece is allowed through even though the store's acceptance reserved it for this buyer.

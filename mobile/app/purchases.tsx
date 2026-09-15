@@ -9,8 +9,8 @@ import { colors, fonts, spacing } from "../lib/theme";
 
 // Everything bought on VYA.
 //
-// ⚠️ /api/mobile/purchases DOES NOT EXIST in the web repo. The shipped app called it — the path is in
-// the recovered bundle — but the route is not in the codebase, so it was either lost with the app's
+// ⚠️ /api/mobile/purchases DOES NOT EXIST in the web repo. The shipped app called it. The path is in
+// the recovered bundle, but the route is not in the codebase, so it was either lost with the app's
 // source or never built and the screen always showed its empty state.
 //
 // This screen therefore treats a 404 as "nothing to show" rather than an error: it degrades to the

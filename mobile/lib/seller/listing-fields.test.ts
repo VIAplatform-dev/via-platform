@@ -8,7 +8,7 @@ test("the phone can edit every listing field the web can", () => {
   //
   // The box dimensions are the one exception, and deliberately so: like the web, the phone asks
   // "Ships in" and writes L/W/H from the chosen preset (lib/seller/packaging.ts). They are still
-  // SENT — they are simply not typed, because nobody measures a mailer.
+  // SENT: they are simply not typed, because nobody measures a mailer.
   const CHOSEN_NOT_TYPED = new Set(["lengthIn", "widthIn", "heightIn"]);
   const onPhone = new Set<string>(FIELDS.map((f) => f.key));
   const missing = WEB_PATCH_FIELDS.filter((k) => !onPhone.has(k) && !CHOSEN_NOT_TYPED.has(k));
@@ -38,7 +38,7 @@ test("every parcel key is stored as an integer, typed or chosen", () => {
   // box at all, but still go through the same integer coercion on the way out.
   assert.deepEqual(PARCEL_KEYS, ["weightOz", "lengthIn", "widthIn", "heightIn"]);
   const weight = FIELDS.find((x) => x.key === ("weightOz" as FieldKey));
-  assert.ok(weight, "weightOz must still be a typed field — the box cannot supply it");
+  assert.ok(weight, "weightOz must still be a typed field. The box cannot supply it");
   assert.equal(weight!.numeric, true);
   for (const k of ["lengthIn", "widthIn", "heightIn"]) {
     assert.ok(!FIELDS.some((f) => f.key === (k as FieldKey)), `${k} is chosen, not typed`);

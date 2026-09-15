@@ -1,11 +1,11 @@
 import { neon } from "@neondatabase/serverless";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Store operating costs — the other half of a P&L.
+// Store operating costs. The other half of a P&L.
 //
 // `items.cost_cents` covers what a piece cost to buy, which gets you gross
-// profit. Everything else a store spends to trade — mailers, dust bags, flyers,
-// the studio, ads, market stalls — lives here, and it's what turns the Profit
+// profit. Everything else a store spends to trade. Mailers, dust bags, flyers,
+// the studio, ads, market stalls. Lives here, and it's what turns the Profit
 // tab from a margin into a real profit & loss statement.
 //
 // One row per cost, whatever door it came in through: typed into the statement,
@@ -22,7 +22,7 @@ function db() {
 
 /**
  * The categories a cost can land in. Deliberately short and in a reseller's own
- * words — this is a list someone picks from on their phone, not a chart of
+ * words. This is a list someone picks from on their phone, not a chart of
  * accounts. One definition, shared by the statement, the API and the assistant,
  * so none of them can drift.
  */
@@ -48,17 +48,17 @@ export function categoryLabel(key: string): string {
  return EXPENSE_CATEGORIES.find((c) => c.key === key)?.label ?? "Other";
 }
 
-// Where a cost came from — shown in the list so a seller can tell what she typed from what a
+// Where a cost came from. Shown in the list so a seller can tell what she typed from what a
 // spreadsheet import brought in, and undo a bad import without touching her own entries.
 export type ExpenseSource = "typed" | "assistant" | "import";
 
 /**
  * How a cost repeats.
  *
- *  null        — a one-off, on the day it happened.
- *  "monthly"   — a fixed monthly bill (studio rent, insurance). `amountCents` is
+ *  null: a one-off, on the day it happened.
+ *  "monthly": a fixed monthly bill (studio rent, insurance). `amountCents` is
  *                the MONTHLY rate, charged pro-rata across whatever window is shown.
- *  "per_order" — a packing-recipe line (a mailer, a dust bag). `amountCents` is the
+ *  "per_order": a packing-recipe line (a mailer, a dust bag). `amountCents` is the
  *                cost of ONE, multiplied by the sales in the window.
  *
  * Recurring rows are rates, not events, so `occurred_on` reads as "effective from":
@@ -114,11 +114,11 @@ function mapRow(r: Record<string, unknown>): Expense {
 
 /**
  * A [start, end) instant window as the pair of CALENDAR DAYS an expense query
- * needs — end inclusive.
+ * needs. End inclusive.
  *
  * Naively slicing the exclusive end instant to 10 characters drops the current
  * day: a rolling 30-day window ends at this moment on, say, the 30th, so
- * `occurred_on < '2026-08-30'` silently excludes everything logged today —
+ * `occurred_on < '2026-08-30'` silently excludes everything logged today,
  * which is most of what a seller has just entered. Taking the day that
  * *contains* the last instant of the window fixes it for both rolling windows
  * and calendar ones (a quarter ending 1 Oct 00:00 resolves to 30 Sep).
@@ -136,7 +136,7 @@ export function windowDates(startISO: string, endISO: string, tz?: string | null
  return [start, endInclusive < start ? start : endInclusive];
 }
 
-/** Today in the store's timezone — a cost said "today" must not land on yesterday. */
+/** Today in the store's timezone. A cost said "today" must not land on yesterday. */
 export function todayIn(tz: string | null | undefined): string {
  try {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz || "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -182,7 +182,7 @@ export async function listExpenses(storeSlug: string, startISO: string, endISO: 
 
 export type CategoryTotal = { category: ExpenseCategory; label: string; amountCents: number; count: number };
 
-/** Totals per category for a window — the operating-costs block of the statement. */
+/** Totals per category for a window. The operating-costs block of the statement. */
 export async function expenseTotals(storeSlug: string, startISO: string, endISO: string, tz?: string | null): Promise<{ totalCents: number; byCategory: CategoryTotal[] }> {
  await ensure();
  const [from, to] = windowDates(startISO, endISO, tz);
@@ -194,7 +194,7 @@ export async function expenseTotals(storeSlug: string, startISO: string, endISO:
   GROUP BY 1
  `) as Array<Record<string, unknown>>;
  const found = new Map(rows.map((r) => [String(r.category), { cents: Number(r.cents) || 0, n: Number(r.n) || 0 }]));
- // Every category is returned, including empty ones — an empty line is what the
+ // Every category is returned, including empty ones. An empty line is what the
  // statement turns into an "add" affordance, so it has to be there to be clicked.
  const byCategory: CategoryTotal[] = EXPENSE_CATEGORIES.map((c) => ({
   category: c.key,
@@ -245,7 +245,7 @@ export type AppliedRecurring = {
 /**
  * Turn the rates into real money for one window.
  *
- * `salesOn` is the store's sale count keyed by day (YYYY-MM-DD) — passed in
+ * `salesOn` is the store's sale count keyed by day (YYYY-MM-DD): passed in
  * rather than queried here so this module stays free of the sales read model,
  * and so the count matches whatever basis the statement's revenue used.
  */

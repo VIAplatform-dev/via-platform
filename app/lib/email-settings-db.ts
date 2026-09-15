@@ -84,7 +84,7 @@ export async function resolveStoreSender(storeSlug: string): Promise<StoreSender
  const s = await getEmailSettings(storeSlug).catch(() => null);
  const seller = await getSellerBySlug(storeSlug).catch(() => null);
  const staticStore = stores.find((x) => x.slug === storeSlug);
- // A seller can rename their store in Settings — that override wins over the curated default.
+ // A seller can rename their store in Settings. That override wins over the curated default.
  const nameOverride = await getDisplayNameOverride(storeSlug).catch(() => null);
 
  const fromName = s?.fromName || nameOverride || seller?.name || staticStore?.name || storeSlug;
@@ -95,7 +95,7 @@ export async function resolveStoreSender(storeSlug: string): Promise<StoreSender
 
 /**
  * A store's custom email design, if it has saved one. `null` means "inherit the storefront brand"
- * — the default. Stored as JSON so the shape can grow with the renderer.
+ * the default. Stored as JSON so the shape can grow with the renderer.
  */
 export async function getEmailBrandOverrides(storeSlug: string): Promise<EmailBrand | null> {
  await ensureTable();

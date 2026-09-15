@@ -6,7 +6,7 @@ import { normaliseEmail, isEmail } from "@/app/lib/seller-access";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Who may open a store on VYA. The VYA owner's list, not a store's — so this is gated on the admin
+// Who may open a store on VYA. The VYA owner's list, not a store's, so this is gated on the admin
 // cookie rather than on a store session. A store owner inviting people to VYA itself would be
 // handing out our front door.
 function isVyaOwner(request: NextRequest): boolean {

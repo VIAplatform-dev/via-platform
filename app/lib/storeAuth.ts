@@ -10,7 +10,7 @@ import { getStoreAccountByOwner } from "./store-accounts-db";
 // ───────────────────────────────────────────────────────────────────────────
 // Store-portal auth resolution. Normally the store is the logged-in partner
 // (session email → slug). But an ADMIN can preview any store's portal exactly as
-// that store sees it by passing ?store=<slug> — so admin views never drift from
+// that store sees it by passing ?store=<slug> so admin views never drift from
 // what sellers actually see (same endpoints, same code).
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ export async function resolveStoreSlug(request: NextRequest): Promise<string | n
  // A STORE IN THE URL, FOR THE PEOPLE WHO BELONG TO IT.
  //
  // `?store=` used to be admin-only, which made it an impersonation tool rather than an address. But
- // store_users is UNIQUE(store_slug, email), so one person can genuinely work at two shops — and
+ // store_users is UNIQUE(store_slug, email), so one person can genuinely work at two shops, and
  // storeSlugForEmail() answers with LIMIT 1, meaning she was dropped into whichever the ORDER BY
  // picked, with nothing naming it and no way to move. Honouring an explicit slug SHE HAS ACCESS TO
  // is what makes /admin/inventory?store=her-shop a real, shareable address instead of a guess.
@@ -72,7 +72,7 @@ export async function resolveStoreSlug(request: NextRequest): Promise<string | n
  // store-users-db.ts describes itself as "the DYNAMIC, self-serve replacement for the hardcoded
  // storeContactEmails map", and a replacement that loses to the thing it replaces never applies to
  // anyone already in that map. That is not hypothetical: a curated marketplace seller who then
- // brings her own site over has two identities — her marketplace slug and her hosted store's slug —
+ // brings her own site over has two identities, her marketplace slug and her hosted store's slug,
  // and the static map would keep sending her to the marketplace one, where her site isn't. She then
  // meets an import screen that thinks she has no site and offers to crawl one.
  //
@@ -80,7 +80,7 @@ export async function resolveStoreSlug(request: NextRequest): Promise<string | n
  // the roster the sourcing/digest crons iterate. Editing it to fix a login edits all three, which is
  // why the fix belongs here instead.
  //
- // Stores with no store_users row — every curated store today — fall through unchanged.
+ // Stores with no store_users row, every curated store today. Fall through unchanged.
  //
  // The catch is deliberate, not laziness: this lookup now runs BEFORE the static map, so without it
  // a database blip would take out curated sellers' logins too, where previously they resolved from
@@ -116,13 +116,13 @@ export async function resolveStoreSlugAny(request: NextRequest): Promise<string 
  * The store a MOBILE session acts as.
  *
  * THREE PLACES SAY WHO OWNS A SHOP, and they can disagree:
- *   · store_users     — access. Who may work on this shop.
- *   · store_accounts  — the account itself, written at signup, with an owner_email.
- *   · storeContactEmails — the hardcoded map, from before either existed.
+ *   · store_users. Access. Who may work on this shop.
+ *   · store_accounts. The account itself, written at signup, with an owner_email.
+ *   · storeContactEmails. The hardcoded map, from before either existed.
  *
  * The WEB gate (whoami) reads all three and, when it finds an account with no access row, writes
  * the missing row back rather than reporting a problem. This read only the first and the third. So
- * a seller whose access row never got written — the exact case whoami exists to repair — could sign
+ * a seller whose access row never got written, the exact case whoami exists to repair. Could sign
  * in on her laptop and not on her phone, and the app told her she had no shop while the website was
  * showing it to her. Nothing about that looks like one bug; it looks like the app being broken.
  *
@@ -137,7 +137,7 @@ export async function storeSlugForMobileEmail(email: string): Promise<string | n
  if (fromAccess) return fromAccess;
 
  // She owns the account but has no access row. The row should have existed; write it and carry on,
- // exactly as the web gate does — repairing costs one insert and ends the mismatch for good.
+ // exactly as the web gate does. Repairing costs one insert and ends the mismatch for good.
  const account = await getStoreAccountByOwner(email).catch(() => null);
  if (account?.slug) {
   await addStoreUser(account.slug, email, "owner").catch(() => {}); /* allow-swallow: signing her in matters more than the repair */

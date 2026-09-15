@@ -2,8 +2,8 @@
 // Stripe product tax codes, per listing category (pure, no I/O, unit-tested).
 //
 // "Resale is clothing" is wrong often enough to be expensive. Several states
-// treat apparel unlike ordinary goods — New York exempts clothing and footwear
-// under $110, Pennsylvania and New Jersey exempt most of it outright — but that
+// treat apparel unlike ordinary goods. New York exempts clothing and footwear
+// under $110, Pennsylvania and New Jersey exempt most of it outright, but that
 // exemption does NOT extend to handbags, jewelry, watches or sunglasses, which
 // stay fully taxable.
 //
@@ -12,7 +12,7 @@
 // over-charges a buyer who owed nothing. Both are real, and they pull opposite
 // ways, which is why this maps category by category rather than picking a side.
 //
-// Codes are Stripe's own (docs.stripe.com/tax/tax-codes) — never constructed.
+// Codes are Stripe's own (docs.stripe.com/tax/tax-codes), never constructed.
 // ───────────────────────────────────────────────────────────────────────────
 
 /** Clothing AND footwear share one code in Stripe's taxonomy. */
@@ -41,11 +41,11 @@ const BY_CATEGORY: Record<string, string> = {
  jeans: TAX_CODE_CLOTHING, shorts: TAX_CODE_CLOTHING, jumpsuits: TAX_CODE_CLOTHING,
  lingerie: TAX_CODE_CLOTHING, swimwear: TAX_CODE_CLOTHING, "other-clothing": TAX_CODE_CLOTHING,
 
- // Footwear — the same Stripe code as clothing, and exempt alongside it in NY.
+ // Footwear: the same Stripe code as clothing, and exempt alongside it in NY.
  boots: TAX_CODE_CLOTHING, heels: TAX_CODE_CLOTHING, sneakers: TAX_CODE_CLOTHING,
  sandals: TAX_CODE_CLOTHING, flats: TAX_CODE_CLOTHING, shoes: TAX_CODE_CLOTHING,
 
- // Bags — NOT clothing. Taxable in states that exempt apparel.
+ // Bags, NOT clothing. Taxable in states that exempt apparel.
  handbags: TAX_CODE_HANDBAGS, totes: TAX_CODE_HANDBAGS, clutches: TAX_CODE_HANDBAGS,
  "crossbody-bags": TAX_CODE_HANDBAGS, bags: TAX_CODE_HANDBAGS,
 
@@ -61,8 +61,8 @@ const BY_CATEGORY: Record<string, string> = {
  home: TAX_CODE_GENERAL,
 };
 
-// Some things a reseller lists constantly aren't their own category — a watch is
-// filed under jewelry, a wallet under bags — and they're taxed differently.
+// Some things a reseller lists constantly aren't their own category. A watch is
+// filed under jewelry, a wallet under bags, and they're taxed differently.
 // Checked against the title only when the category leaves it ambiguous.
 const TITLE_HINTS: { test: RegExp; code: string }[] = [
  { test: /\bwatch(es)?\b/i, code: TAX_CODE_WATCHES },

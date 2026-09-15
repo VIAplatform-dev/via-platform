@@ -5,7 +5,7 @@ import { visibleStores } from "@/app/lib/stores";
 export const dynamic = "force-dynamic";
 
 /**
- * Returns a deterministic "store of the day" — the same store for everyone on a
+ * Returns a deterministic "store of the day". The same store for everyone on a
  * given day, rotating one store per day. It walks a fixed shuffled order of every
  * visible store, so NO store repeats until all of them have been featured once
  * (then the cycle restarts). The shuffle is seeded by a constant, so the order is

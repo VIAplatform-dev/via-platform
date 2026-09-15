@@ -5,7 +5,7 @@ import { ebayConfigured } from "@/app/lib/ebay";
 export const dynamic = "force-dynamic";
 
 // Why does cross-listing say "needs eBay app keys"? ebayConfigured() requires all three env vars.
-// This reports which are PRESENT (boolean only — never the secret values) on THIS environment, so
+// This reports which are PRESENT (boolean only, never the secret values) on THIS environment, so
 // you can tell whether a key is missing, and whether it's missing on localhost vs prod.
 export async function GET(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

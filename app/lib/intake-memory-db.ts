@@ -3,7 +3,7 @@ import { cosine, embedImage, isEmbeddingConfigured } from "./embeddings";
 import { brandMatch } from "./brand-match";
 import type { Comp } from "./comps";
 
-// The intake "correction memory" — v1 of the learning loop.
+// The intake "correction memory". V1 of the learning loop.
 //
 // Every time a seller fixes a field the AI drafted (e.g. brand "Roberto Cavalli"
 // → "Blumarine"), we log it. On the next intake we feed the store's recent brand
@@ -47,7 +47,7 @@ const norm = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
 export async function logCorrections(storeSlug: string, corrections: Correction[]): Promise<void> {
  // A real correction requires the AI to have actually guessed (non-empty aiValue) AND the seller
  // to have changed it. A field the seller typed themselves (aiValue null/empty) is data entry, not
- // an AI miss — logging it inflates the correction count and desyncs it from the prediction log
+ // an AI miss. Logging it inflates the correction count and desyncs it from the prediction log
  // (where it correctly counts as no prediction). Require a real AI guess so corrections == misses.
  const real = corrections.filter((c) => c.aiValue && c.aiValue.trim() && c.finalValue && c.finalValue.trim() && norm(c.aiValue) !== norm(c.finalValue));
  if (real.length === 0) return;
@@ -62,7 +62,7 @@ export async function logCorrections(storeSlug: string, corrections: Correction[
 }
 
 // ── Prediction log: every AI-proposed field + whether the seller kept it (accepted)
-// or changed it (corrected). This is the acceptance flow — the denominator the
+// or changed it (corrected). This is the acceptance flow. The denominator the
 // correction log never had. Powers true per-field accuracy + the eval dataset.
 let predEnsured = false;
 async function ensurePredictionsTable() {
@@ -140,12 +140,12 @@ export async function getIntakeHints(storeSlug: string): Promise<string> {
  }
  if (brandFixes.length) {
   parts.push(
-   "Past brand corrections by this seller (the AI guessed the first, the seller's correct answer is the second — do NOT repeat these mistakes):\n" +
+   "Past brand corrections by this seller (the AI guessed the first, the seller's correct answer is the second. Do NOT repeat these mistakes):\n" +
     brandFixes.map((f) => `• "${f.ai_value}" → "${f.final_value}"`).join("\n"),
   );
  }
  if (parts.length === 0) return "";
- return `\n\nSELLER MEMORY — this store has corrected the AI before; use it:\n${parts.join("\n")}`;
+ return `\n\nSELLER MEMORY: this store has corrected the AI before; use it:\n${parts.join("\n")}`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -169,8 +169,8 @@ async function ensureItemsTable() {
  `;
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS market_cents INTEGER`;
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS price_cents INTEGER`;
- await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS title TEXT`; // the confirmed descriptor — carries the specific model, so retrieval can teach it
- await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS confidence NUMERIC`; // the AI's pricing confidence at intake — lets us CALIBRATE it against how far the seller re-priced
+ await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS title TEXT`; // the confirmed descriptor: carries the specific model, so retrieval can teach it
+ await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS confidence NUMERIC`; // the AI's pricing confidence at intake. Lets us CALIBRATE it against how far the seller re-priced
  await db()`ALTER TABLE intake_memory_items ADD COLUMN IF NOT EXISTS item_id TEXT`; // the published items.id, so a memory row can be joined back to the live piece (see listLowConfidenceItemIds)
  await db()`CREATE INDEX IF NOT EXISTS idx_intake_mem_store ON intake_memory_items (store_slug, created_at DESC)`;
  itemsEnsured = true;
@@ -179,12 +179,12 @@ async function ensureItemsTable() {
 export type MemoryItem = {
  imageUrl: string | null;
  embedding: number[];
- title?: string | null; // the seller's confirmed title — the specific-piece descriptor
+ title?: string | null; // the seller's confirmed title. The specific-piece descriptor
  brand?: string | null; era?: string | null; material?: string | null; condition?: string | null; category?: string | null;
  marketCents?: number | null; // comp market value at intake (raw, before store adjustment)
  priceCents?: number | null;  // the seller's final list price
- confidence?: number | null;  // the AI's pricing confidence (0..1) — for confidence calibration
- itemId?: string | null;      // the published items.id — joins this memory row back to the live piece
+ confidence?: number | null;  // the AI's pricing confidence (0..1), for confidence calibration
+ itemId?: string | null;      // the published items.id: joins this memory row back to the live piece
 };
 
 /**
@@ -204,7 +204,7 @@ export async function rememberItem(storeSlug: string, item: MemoryItem): Promise
 
 /**
  * Live pieces whose AI price the seller should look at: intake confidence under `threshold`, and
- * the price unchanged since — a piece she has re-priced no longer needs checking.
+ * the price unchanged since. A piece she has re-priced no longer needs checking.
  *
  * Joined on item_id where the memory row has one. Rows written before item_id existed are matched
  * by their first photo (items.images->>0 = image_url), which is how the memory has always been
@@ -277,16 +277,16 @@ export async function getVisualHints(storeSlug: string, embedding: number[]): Pr
   const bits = s.r.title || [s.r.brand && `brand: ${s.r.brand}`, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ");
   return `• a visually similar piece this seller listed → ${bits || "(no labels)"}`;
  });
- return `\n\nVISUALLY SIMILAR PAST LISTINGS (this seller's own catalog — strong signal; weight heavily for brand/era/material):\n${lines.join("\n")}`;
+ return `\n\nVISUALLY SIMILAR PAST LISTINGS (this seller's own catalog. Strong signal; weight heavily for brand/era/material):\n${lines.join("\n")}`;
 }
 
 /**
- * Cross-store visual retrieval — the most visually-similar SELLER-CONFIRMED pieces across the WHOLE
+ * Cross-store visual retrieval: the most visually-similar SELLER-CONFIRMED pieces across the WHOLE
  * platform (every store's published items), preferring the same brand when one is known. This is the
- * compounding loop: every seller's confirmed listing becomes a reference example for everyone —
+ * compounding loop: every seller's confirmed listing becomes a reference example for everyone,
  * including a brand-new store's very first upload, which the per-store getVisualHints can't help.
  * Labels only (era/model/category/material), NEVER another store's prices (that stays aggregated in
- * the pricing engine) — so it's privacy-safe and used only to sharpen identification.
+ * the pricing engine), so it's privacy-safe and used only to sharpen identification.
  */
 export async function getCrossStoreSimilar(embedding: number[], brand?: string | null, limit = 4, opts?: { excludeNearIdentical?: boolean }): Promise<string> {
  if (!embedding || embedding.length === 0) return "";
@@ -304,13 +304,13 @@ export async function getCrossStoreSimilar(embedding: number[], brand?: string |
  .sort((a, b2) => b2.score - a.score)
  .slice(0, limit);
  if (scored.length === 0) return "";
- // Prefer the confirmed TITLE — it carries the specific model/line, which is what sharpens ID.
+ // Prefer the confirmed TITLE. It carries the specific model/line, which is what sharpens ID.
  const lines = scored.map((s) => `• ${s.r.title || ([s.r.brand, s.r.era, s.r.material, s.r.category].filter(Boolean).join(" · ") || "(no labels)")}`);
- return `\n\nSIMILAR PIECES CONFIRMED ACROSS VYA (sellers verified these labels — reference for era/model/category/material; do NOT invent a brand from them):\n${lines.join("\n")}`;
+ return `\n\nSIMILAR PIECES CONFIRMED ACROSS VYA (sellers verified these labels. Reference for era/model/category/material; do NOT invent a brand from them):\n${lines.join("\n")}`;
 }
 
 /**
- * Cross-store brand prior — what a KNOWN brand's pieces TEND to be and sell for across the whole
+ * Cross-store brand prior: what a KNOWN brand's pieces TEND to be and sell for across the whole
  * platform (aggregated over every store's confirmed listings). A soft calibration for era/category
  * and a price anchor when the exact piece isn't visually matched. Aggregated + N-gated, so it's
  * privacy-safe (no single store's numbers) and only appears once a brand has enough real history.
@@ -339,17 +339,17 @@ export async function getBrandPrior(brand: string | null | undefined): Promise<s
  if (mats.length) parts.push(`often ${mats.join(", ")}`);
  if (!parts.length && !med) return "";
  const priceStr = med ? `; they resell around $${Math.round(med / 100)} on VYA` : "";
- return `\n\nVYA MEMORY for ${b}: ${parts.join(", ")}${priceStr} (across ${rows.length} listings). Use as a soft prior — calibrate era/category to it, but the actual photo always wins.`;
+ return `\n\nVYA MEMORY for ${b}: ${parts.join(", ")}${priceStr} (across ${rows.length} listings). Use as a soft prior. Calibrate era/category to it, but the actual photo always wins.`;
 }
 
 /**
  * Visual PRICE comps: VYA pieces (ANY store) whose photo looks like this one, returned as comps for
- * the price engine. Reuses embeddings we already stored at intake — so NO new embedding cost. Unlike
+ * the price engine. Reuses embeddings we already stored at intake, so NO new embedding cost. Unlike
  * the brand-text `getVyaComps`, this matches on how the piece LOOKS, so it still finds comps when the
  * brand is unknown or mis-identified. Corpus grows with every intake; thin until it builds up.
  */
 const parseVec = (s: string): number[] => { try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; } };
-const VISUAL_MATCH_MIN = 0.72; // tighter than the label-hint threshold — pricing needs close matches
+const VISUAL_MATCH_MIN = 0.72; // tighter than the label-hint threshold. Pricing needs close matches
 
 export async function getVisualVyaComps(embedding: number[], limit = 8): Promise<Comp[]> {
  if (!embedding || embedding.length === 0) return [];
@@ -357,7 +357,7 @@ export async function getVisualVyaComps(embedding: number[], limit = 8): Promise
  await ensureSoldEmbeddingCol();
  const scored: { score: number; comp: Comp }[] = [];
 
- // Corpus 1 — REAL sold pieces (actual realized price + how fast it sold). The strongest comp.
+ // Corpus 1: REAL sold pieces (actual realized price + how fast it sold). The strongest comp.
  const sold = (await db()`
   SELECT designer, final_price, embedding FROM sold_items
   WHERE embedding IS NOT NULL AND embedding <> '[]' AND final_price > 0
@@ -369,7 +369,7 @@ export async function getVisualVyaComps(embedding: number[], limit = 8): Promise
  scored.push({ score, comp: { title: r.designer || "similar VYA piece", priceCents: Math.round(Number(r.final_price) * 100), currency: "USD", sold: true, source: "VYA (sold)" } });
  }
 
- // Corpus 2 — currently/previously LISTED intake pieces (asking references).
+ // Corpus 2: currently/previously LISTED intake pieces (asking references).
  const listed = (await db()`
   SELECT brand, category, market_cents, price_cents, embedding FROM intake_memory_items
   WHERE embedding IS NOT NULL AND embedding <> '[]' AND (market_cents > 0 OR price_cents > 0)
@@ -386,13 +386,13 @@ export async function getVisualVyaComps(embedding: number[], limit = 8): Promise
 
 // ── Specific-piece resolution (Phase 2): identify the exact model, not just the brand ──
 // "Prada" is trivial (typed); "Prada Re-Nylon ~2019" is what makes the PRICE right. This matches the
-// upload's embedding against the reference index — the labeled catalog (training_examples) + confirmed
-// VYA listings, all carrying a TITLE (the model/line) — same-brand preferred. Returns a discrete
+// upload's embedding against the reference index. The labeled catalog (training_examples) + confirmed
+// VYA listings, all carrying a TITLE (the model/line): same-brand preferred. Returns a discrete
 // resolution only when the best match clears a HIGH similarity bar (so it means "the same piece", not
 // "looks similar"); otherwise null → the pipeline degrades gracefully to brand-only. The returned
 // query drives tighter comps, and the reference price is a sanity prior.
 export type SpecificPiece = {
- model: string;          // the matched title — carries the specific line/model
+ model: string;          // the matched title: carries the specific line/model
  query: string;          // tight comp query built from it (brand-guaranteed)
  similarity: number;     // best cosine, 0..1
  agree: number;          // how many references cleared the bar (confidence)
@@ -401,11 +401,11 @@ export type SpecificPiece = {
  source: string;         // 'catalog' | 'vya-listing'
 };
 
-const SPECIFIC_MIN = 0.82; // asserts "the SAME specific piece" — deliberately high; below this, brand-only
+const SPECIFIC_MIN = 0.82; // asserts "the SAME specific piece". Deliberately high; below this, brand-only
 
 // ── Recall tier (above "specific"): a NEAR-DUPLICATE photo = the SAME physical item, not just a
 // look-alike. Above this bar we RECALL the stored answer verbatim instead of re-generating. Same-logo
-// bags in other colorways land ~0.85–0.93, so the bar is deliberately high — it means "literally this
+// bags in other colorways land ~0.85–0.93, so the bar is deliberately high. It means "literally this
 // item, re-uploaded", the case where the answer (and price) must not drift.
 export const NEAR_DUP_MIN = 0.97;
 export const RECALL_STALE_DAYS = 365; // reuse a recalled price for up to a year, then re-price fresh
@@ -439,7 +439,7 @@ export async function resolveSpecificPiece(embedding: number[], brand?: string |
  }
  if (!refs.length) return null;
  refs.sort((a, c) => c.score - a.score);
- // Drop a near-identical self-match — the SAME photo scoring ~1.0. In production this de-dups an
+ // Drop a near-identical self-match. The SAME photo scoring ~1.0. In production this de-dups an
  // item re-processed against its own stored embedding; in the eval it's the leak guard that keeps
  // "does memory help?" honest (an item can't match against a copy of itself).
  const pool = opts?.excludeNearIdentical ? refs.filter((x) => x.score < 0.995) : refs;
@@ -491,7 +491,7 @@ export type DraftResolution = {
 
 /**
  * Persist a drafted resolution keyed by the photo's fingerprint, so a later draft of the SAME
- * photo can recall it verbatim — even before the seller publishes. Skipped without a fingerprint
+ * photo can recall it verbatim. Even before the seller publishes. Skipped without a fingerprint
  * (nothing to match on) or a title (no descriptor worth recalling).
  */
 export async function rememberDraftResolution(storeSlug: string, r: DraftResolution): Promise<void> {
@@ -518,7 +518,7 @@ type ExactRow = { title: string | null; brand: string | null; era: string | null
  * Recall the SAME piece from its photo. Returns a full record only when the best match clears the
  * NEAR_DUP bar (≈ the same item re-photographed), so the caller can lock identity + reuse the price
  * instead of re-generating. Own-store rows (published items + draft resolutions) are the only source
- * we may recall a PRICE from — another store's price stays private; cross-store gives identity only.
+ * we may recall a PRICE from. Another store's price stays private; cross-store gives identity only.
  */
 export async function resolveExactPiece(embedding: number[], storeSlug: string): Promise<ExactPiece | null> {
  if (!embedding || embedding.length === 0) return null;
@@ -555,7 +555,7 @@ export async function resolveExactPiece(embedding: number[], storeSlug: string):
  const ageDays = created && !isNaN(created.getTime()) ? Math.max(0, Math.round((Date.now() - created.getTime()) / 86400000)) : null;
  return {
   title, brand: row.brand ?? null, era: row.era ?? null, material: row.material ?? null, condition: row.condition ?? null, category: row.category ?? null,
-  // Price ONLY from this store's own record — never another store's number.
+  // Price ONLY from this store's own record, never another store's number.
   priceCents: best.ownStore ? (row.price_cents ?? row.market_cents ?? null) : null,
   marketCents: best.ownStore ? (row.market_cents ?? null) : null,
   ageDays, similarity: Math.round(best.score * 1000) / 1000, source: best.source, ownStore: best.ownStore,
@@ -593,7 +593,7 @@ export async function embedPendingSoldItems(limit = 60): Promise<{ embedded: num
 export type StorePricingSignal = {
  inferredMult: number; // how they price vs market (1 = at market, 1.15 = +15%)
  hasSignal: boolean;   // false = no history/catalog to learn from yet
- conviction: number;   // 0..1 — how consistently they price OFF the market read (≈ how
+ conviction: number;   // 0..1: how consistently they price OFF the market read (≈ how
                        //        much they price hands-on / "keep changing the price a lot")
 };
 
@@ -625,7 +625,7 @@ export async function getStorePricingSignal(storeSlug: string): Promise<StorePri
  return { inferredMult: clampMult(median), hasSignal: true, conviction: Math.min(1, offMarket * 1.15) };
  }
  // 2) SYNCED-catalog fallback (every store): how the store's OWN prices compare to the marketplace
- //    median for the SAME category — controlled for category mix. >1 = this store prices above market
+ //    median for the SAME category. Controlled for category mix. >1 = this store prices above market
  //    (e.g. 1.15 ≈ +15%), <1 = below. Structural pattern, so no per-item conviction.
  const syn = (await db()`
   WITH cat_market AS (

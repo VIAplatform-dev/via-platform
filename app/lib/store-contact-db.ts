@@ -39,7 +39,7 @@ export async function getStoreContact(storeSlug: string): Promise<StoreContact> 
  return pickStoreContact({ replyTo, supportEmail, curated: storeContactEmails[slug] ?? null, ownerLogin });
 }
 
-/** Just the address. Null means the store has none — decide what to do rather than defaulting to ops. */
+/** Just the address. Null means the store has none. Decide what to do rather than defaulting to ops. */
 export const getStoreContactEmail = async (storeSlug: string): Promise<string | null> =>
  (await getStoreContact(storeSlug))?.email ?? null;
 

@@ -5,7 +5,7 @@ import { saveConnection, getConnection, deleteConnection } from "@/app/lib/store
 
 export const dynamic = "force-dynamic";
 
-// GET — current connection + the list of connectable platforms (for the UI).
+// GET: current connection + the list of connectable platforms (for the UI).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-// POST { platform, credentials } — verify via the platform adapter, then save.
+// POST { platform, credentials }: verify via the platform adapter, then save.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,13 +29,13 @@ export async function POST(request: NextRequest) {
  if (!adapter) return NextResponse.json({ error: "Unsupported platform." }, { status: 400 });
 
  const result = await adapter.verify(credentials);
- if (!result.ok) return NextResponse.json({ error: result.error || "Couldn’t connect — check your credentials." }, { status: 400 });
+ if (!result.ok) return NextResponse.json({ error: result.error || "Couldn’t connect: check your credentials." }, { status: 400 });
 
  await saveConnection(slug, platformId, credentials, result.label ?? null);
  return NextResponse.json({ ok: true, platform: platformId, label: result.label ?? null });
 }
 
-// DELETE — disconnect.
+// DELETE: disconnect.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

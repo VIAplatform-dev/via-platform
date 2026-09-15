@@ -19,8 +19,8 @@ const AI_GATE = () => gate("intake-ai", Number(process.env.INTAKE_AI_CONCURRENCY
  * The multiplier to apply to market value for THIS store's suggested price. Blends
  * what we've LEARNED from their behavior (getStorePricingSignal) with what the owner
  * TOLD us in their brief (briefPricingTarget): the owner's stance just NUDGES the
- * learned number by default (weight ~0.3), but the more hands-on they price — high
- * conviction, i.e. they "keep changing the price a lot" — the more their stated intent
+ * learned number by default (weight ~0.3), but the more hands-on they price. High
+ * conviction, i.e. they "keep changing the price a lot". The more their stated intent
  * leads (up to ~0.85). With no learned signal yet, the owner's stance drives outright.
  */
 async function resolveStoreMultiplier(slug: string): Promise<{ mult: number; note: string }> {
@@ -41,14 +41,14 @@ export function titleHasBrand(title: string, brand: string): boolean {
  const b = norm(brand);
  if (b.length < 3 || !norm(title).includes(b)) return false;
  // Stripping punctuation makes "Lauren Ralph Lauren" contain "ralphlauren", so a
- // diffusion title passed as its runway parent — the bug that priced a Ralph
+ // diffusion title passed as its runway parent. The bug that priced a Ralph
  // Lauren Fall 2008 gown against $50 department-store dresses. Reject a comp
  // that names a sibling line two or more tiers away.
  return isFairComp(resolveBrandLine(brand), title);
 }
 
 // Resellers date archival pieces in their titles (e.g. "Prada F/W 1998 leather skirt").
-// Mine the SAME-BRAND comp/match titles for a season+year — but only assert it when the SAME season
+// Mine the SAME-BRAND comp/match titles for a season+year, but only assert it when the SAME season
 // is cited REPEATEDLY and DOMINANTLY. A lone or scattered mention is NOT provenance: resellers of
 // mass-produced production pieces (e.g. the Fendi Baguette) routinely copy a famous debut season
 // into titles, which would otherwise mis-flag an ordinary bag as runway.
@@ -89,32 +89,32 @@ export async function computeListingPricing(opts: {
  era: string;
  material: string;
  category: string;
- condition?: string; // seller/AI condition note — swings resale price, so it's fed to the valuation
+ condition?: string; // seller/AI condition note: swings resale price, so it's fed to the valuation
  conditionGrade?: string; // canonical grade (Phase 4) → explicit price-band multiplier
  searchQuery?: string | null; // AI's tight "brand + specific model + era" comp phrase
  price: string | null; // seller's typed price in dollars; null/"" → suggest one
  // What she PAID, in dollars, as typed. The store's minimum markup is a floor over this, and until
  // now it was the one number that never made the trip: price-engine.ts computes the floor correctly
  // but had no cost to compute it from, so on every server path the floor was null and the market
- // estimate stood alone — a piece could be suggested below cost.
+ // estimate stood alone: a piece could be suggested below cost.
  cost?: string | number | null;
  imageUrls: string[];
  mainUrl: string;
  extraComps: Comp[]; // reverse-image comps for the valuation
  reverseTitles: string[]; // reverse-image match titles, for runway mining
- editorialTitles?: string[]; // editorial/Getty captions (un-brand-filtered) — provenance evidence
- embedding?: number[]; // the intake photo embedding — for VYA visual price comps (already computed, no extra cost)
+ editorialTitles?: string[]; // editorial/Getty captions (un-brand-filtered). Provenance evidence
+ embedding?: number[]; // the intake photo embedding, for VYA visual price comps (already computed, no extra cost)
  knowledgeHintCents: number | null;
  runwaySoFar: string | null; // runway the seller/draft already provided
  celebritySoFar?: string | null; // celebrity provenance the seller/draft already provided
  draftRanFull: boolean; // did the full vision draft run? gates the proactive runway pass
  // Near-duplicate recall: this is the SAME item this store already priced. Reuse that price
- // verbatim (deterministic) unless it's gone stale — the "same price unless a year passed" rule.
+ // verbatim (deterministic) unless it's gone stale. The "same price unless a year passed" rule.
  recalledPriceCents?: number | null;
  recalledMarketCents?: number | null;
  recallAgeDays?: number | null;
 }): Promise<{ estimate: PriceEstimate | null; priceFlag: PriceFlag | null; floorFlag: { floorUsd: number; sellerUsd: number; message: string } | null; runway: string | null; celebrity: string | null }> {
- // Cents, or null when she hasn't said what she paid — a floor over an unknown cost is not a floor.
+ // Cents, or null when she hasn't said what she paid. A floor over an unknown cost is not a floor.
  const costCents = (() => {
   const n = typeof opts.cost === "number" ? opts.cost : parseFloat(String(opts.cost ?? "").replace(/[^0-9.]/g, ""));
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
@@ -123,15 +123,15 @@ export async function computeListingPricing(opts: {
  const baseTitle = opts.title || [opts.era, opts.material, opts.category].filter(Boolean).join(" ");
  const brandTitle = brandVal && !baseTitle.toLowerCase().includes(brandVal.toLowerCase()) ? `${brandVal} ${baseTitle}` : baseTitle;
  // A tight AI search phrase (brand + specific model + era) finds SAME-PIECE comps far better than
- // the SEO title — prefer it, but only when it actually carries the (authoritative) brand.
+ // the SEO title: prefer it, but only when it actually carries the (authoritative) brand.
  const sq = (opts.searchQuery || "").trim();
  const rawQuery = sq && (!brandVal || sq.toLowerCase().includes(brandVal.toLowerCase())) ? sq : brandTitle;
  // Which LINE of the house this is. "Ralph Lauren" is four different markets;
  // searching the bare house returns whichever line is most numerous, which is
  // always the cheapest one.
  let brandLine = resolveBrandLine(brandVal || rawQuery);
- // The seller wrote what the tag says. If that is just the house — "Ralph Lauren",
- // covering a runway Collection gown and a $40 department-store dress alike — work
+ // The seller wrote what the tag says. If that is just the house. "Ralph Lauren",
+ // covering a runway Collection gown and a $40 department-store dress alike. Work
  // the line out from the GARMENT before any comp is fetched or filtered, because
  // everything downstream keys off it. Returns null unless confident, in which case
  // the unqualified house line stands and nothing changes.
@@ -165,7 +165,7 @@ export async function computeListingPricing(opts: {
  const droppedComps = allComps.length - comps.length;
  if (droppedComps > 0) console.log(`[pricing] dropped ${droppedComps}/${allComps.length} cross-tier comps for ${brandLine?.label ?? brandVal}`);
 
- // Celebrity provenance — resolved BEFORE pricing so a verified "worn by" can lift the estimate.
+ // Celebrity provenance: resolved BEFORE pricing so a verified "worn by" can lift the estimate.
  // Only runs when reverse-image surfaced editorial/Getty captions (the evidence), so the common
  // case costs nothing. Seller/draft value wins; otherwise confirm the exact piece against the photo.
  let celebrity: string | null = (opts.celebritySoFar || "").trim() || null;
@@ -175,8 +175,8 @@ export async function computeListingPricing(opts: {
  if (c) celebrity = c.context ? `${c.name} (${c.context})` : c.name;
  }
 
- // The store's minimum markup over cost. Read once: it now applies to EVERY branch — a suggested
- // price, a recalled price, and a price she typed herself — not only the one that asks for a
+ // The store's minimum markup over cost. Read once: it now applies to EVERY branch. A suggested
+ // price, a recalled price, and a price she typed herself, not only the one that asks for a
  // valuation. "The markup is always in effect even if the market says otherwise."
  const minMarkupBps = await getMinMarkupBps(opts.slug).catch(() => 3000);
  const floorCents = costCents ? Math.round(costCents * (1 + minMarkupBps / 10000)) : null;
@@ -197,7 +197,7 @@ export async function computeListingPricing(opts: {
  highCents: Math.round(cents * 1.1),
  confidence: 0.92,
  comps: [],
- rationale: `Recalled from the same piece you listed ${opts.recallAgeDays === 0 ? "recently" : `${opts.recallAgeDays}d ago`} — the market hasn't turned over, so the price carries.`,
+ rationale: `Recalled from the same piece you listed ${opts.recallAgeDays === 0 ? "recently" : `${opts.recallAgeDays}d ago`}: the market hasn't turned over, so the price carries.`,
  source: "knowledge",
  };
  } else if (needPrice) {
@@ -232,12 +232,12 @@ export async function computeListingPricing(opts: {
  }
  }
 
- // Runway — resolve if not already provided. This is a strong buyer-facing claim, so we lean on the
+ // Runway: resolve if not already provided. This is a strong buyer-facing claim, so we lean on the
  // conservative archivist (identifyRunway) rather than raw title-scraping, which over-flags production
  // pieces whose resellers cite a famous season. When the full draft ran it already judged runway (and
- // left it null for production pieces) — we do NOT second-guess that with the title heuristic.
+ // left it null for production pieces). We do NOT second-guess that with the title heuristic.
  let runway: string | null = opts.runwaySoFar;
- let runwayFromIndex = false; // gates the write-back below — the index must not teach itself
+ let runwayFromIndex = false; // gates the write-back below. The index must not teach itself
  if (!runway && brandVal) {
  runway = await getPieceRunway(brandVal, opts.title).catch(() => null); // seen this exact piece before?
  // Then the look index: matching the GARMENT against documented shows beats
@@ -260,7 +260,7 @@ export async function computeListingPricing(opts: {
  }
  if (runway && brandVal && opts.title) await savePieceRunway(brandVal, opts.title, runway).catch(() => {});
  // Teach the look index what this piece looks like, so the next one like it matches on the photo
- // instead of costing a vision call. Skipped when the index is what named it — otherwise it would
+ // instead of costing a vision call. Skipped when the index is what named it. Otherwise it would
  // be learning from itself. Fire-and-forget: a listing must never wait on, or fail from, this.
  if (runway && !runwayFromIndex && opts.imageUrls[0]) {
  void rememberRunwayLook(runway, opts.imageUrls[0]).catch(() => {});
@@ -269,7 +269,7 @@ export async function computeListingPricing(opts: {
  // ── THE FLOOR, APPLIED LAST ────────────────────────────────────────────────────────────────────
  // Every branch above produces a price from the market: comps, the stance multiplier, or a recall of
  // what this store charged last time. None of them knows what she paid. Her floor is cost plus the
- // markup she set, and it outranks all of them — a suggestion below it would be telling her to sell
+ // markup she set, and it outranks all of them. A suggestion below it would be telling her to sell
  // at a loss because strangers on eBay did.
  //
  // It is a FLOOR, not a target: where the market sits above it, the market wins and she earns more.
@@ -283,7 +283,7 @@ export async function computeListingPricing(opts: {
   estimate.rationale += ` · Held at your ${Math.round(minMarkupBps / 100)}% minimum over the $${Math.round(costCents! / 100)} you paid.`;
   }
  }
- // She typed a price of her own. Hers stands — this is her shop — but a price under her own floor is
+ // She typed a price of her own. Hers stands, this is her shop, but a price under her own floor is
  // something she asked to be told about, so it is said plainly rather than silently corrected.
  if (!needPrice) {
   const sellerCents = Math.round(parseFloat(opts.price as string) * 100);
@@ -291,7 +291,7 @@ export async function computeListingPricing(opts: {
   floorFlag = {
    floorUsd: Math.round(floorCents / 100),
    sellerUsd: Math.round(sellerCents / 100),
-   message: `Below your pricing floor — your ${Math.round(minMarkupBps / 100)}% minimum over the $${Math.round(costCents! / 100)} you paid works out at $${Math.round(floorCents / 100)}.`,
+   message: `Below your pricing floor. Your ${Math.round(minMarkupBps / 100)}% minimum over the $${Math.round(costCents! / 100)} you paid works out at $${Math.round(floorCents / 100)}.`,
   };
   }
  }

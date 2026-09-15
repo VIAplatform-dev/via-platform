@@ -3,7 +3,7 @@
 // Alto-style single-link cards, Squarespace (lei-vintage /shop). Only the structure a kit depends on
 // is kept; every stylesheet is a one-rule stand-in.
 
-// A capture inlines a stylesheet once, where its <link> first appeared — so only the FIRST card carries it.
+// A capture inlines a stylesheet once, where its <link> first appeared, so only the FIRST card carries it.
 const dawnCard = (h: string, t: string, p: string, first = false) => `<li class="grid__item scroll-trigger animate--slide-in">${first ? `<style data-vya-src="component-rating.css">.rating{display:inline-block}</style>` : ""}
 <div class="card-wrapper product-card-wrapper underline-links-hover"><div class="card card--standard card--media" style="--ratio-percent: 125.0%;">
 <div class="card__inner color-scheme-2 gradient ratio" style="--ratio-percent: 125.0%;"><div class="card__media"><div class="media media--transparent media--hover-effect">
@@ -50,8 +50,8 @@ export const SQS_HOME = `<html><head><script>Static.SQUARESPACE_CONTEXT = {};</s
 export const NO_CARDS = `<html><head></head><body><main><section class="shopify-section"><h2>About us</h2><p>We source by hand.</p><img src="a.jpg"></section></main></body></html>`;
 
 // ── Menus (Step 3) ───────────────────────────────────────────────────────────────────────────────
-// Cut from thenicheshop-2's real Dawn header (read-only, 2026-09-12): the SAME five-item menu twice —
-// the drawer the phone opens and the inline desktop list — plus the two lists that sit beside it and
+// Cut from thenicheshop-2's real Dawn header (read-only, 2026-09-12): the SAME five-item menu twice,
+// the drawer the phone opens and the inline desktop list, plus the two lists that sit beside it and
 // are not menus at all: a 28-country picker whose every href is "#", and a row of social links.
 const dawnDrawerItem = (href: string, label: string) => `<li><a href="${href}" class="menu-drawer__menu-item list-menu__item">${label}</a></li>`;
 const dawnInlineItem = (href: string, label: string, active = false) =>
@@ -72,7 +72,7 @@ ${DAWN_NAV.map(([h, l]) => (h === "/collections/all"
 <div id="shopify-section-sections--2__footer" class="shopify-section shopify-section-group-footer-group"><footer><ul class="list list-social list-unstyled"><li class="list-social__item"><a href="https://www.instagram.com/theheel.vault/">Instagram</a></li><li class="list-social__item"><a href="https://www.tiktok.com/@theheelvault">TikTok</a></li></ul><a href="/pages/client-care">Client care</a></footer></div>
 </body></html>`;
 
-/** A landing page of the same store carrying its OWN header — a different menu, which a stored order
+/** A landing page of the same store carrying its OWN header. A different menu, which a stored order
  *  must leave alone (signature mismatch). */
 export const DAWN_LANDING = `<html><head></head><body>
 <div class="shopify-section shopify-section-group-header-group"><header class="header"><nav class="header__inline-menu"><ul class="list-menu list-menu--inline">

@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       const currency = order.total_money?.currency ?? "USD";
       const orderTotal = (order.total_money?.amount ?? 0) / 100;
       if (orderTotal <= 0) continue;
-      // Skip OPEN orders that still owe a balance (unpaid invoices/holds) — only record paid sales.
+      // Skip OPEN orders that still owe a balance (unpaid invoices/holds), only record paid sales.
       if ((order.net_amount_due_money?.amount ?? 0) > 0) continue;
 
       const items = (order.line_items ?? []).map((li) => ({

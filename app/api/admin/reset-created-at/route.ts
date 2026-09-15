@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
  return NextResponse.json({
  ok: true,
- message: `Reset ${result.length} products — all are now live for everyone, insider page is empty. Only brand-new products from future syncs will appear on insider.`,
+ message: `Reset ${result.length} products. All are now live for everyone, insider page is empty. Only brand-new products from future syncs will appear on insider.`,
  count: result.length,
  });
 }

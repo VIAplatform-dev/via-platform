@@ -9,7 +9,7 @@ import { stores } from "@/app/lib/stores";
 
 export const dynamic = "force-dynamic";
 
-// Market quick list, step 2: create the item, index its photo, optionally start the checkout — all in
+// Market quick list, step 2: create the item, index its photo, optionally start the checkout. All in
 // one round trip so the seller never leaves Market Mode. Reuses the intake publish sanitation rules.
 // A store WITHOUT a ship-from address gets a draft (a live listing must be shippable); Market Mode
 // can still sell a draft in person (draft → reserved → sold).
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
  if (imageUrl) await indexItem(item.id, acting.seller.id, imageUrl).catch(() => {});
 
  // Cash can complete right here. A card (QR) checkout needs the Stripe Session, which the Confirm
- // screen creates — so for "qr" we return the item and let Confirm auto-start it (?go=qr).
+ // screen creates, so for "qr" we return the item and let Confirm auto-start it (?go=qr).
  const tender = body.startCheckout === "cash" ? "cash" : null;
  if (!tender) return NextResponse.json({ ok: true, item: { id: item.id, status: item.status } });
  const session = await getOrOpenSession(acting.seller.id);

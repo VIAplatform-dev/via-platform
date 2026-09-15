@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 // pages have one, and puts a page back. Deliberately one step: after an undo the slot is cleared
 // and the button goes away, because that is exactly what we can honestly offer.
 //
-// Same auth as every other store endpoint — the acting store, and only its own pages.
+// Same auth as every other store endpoint. The acting store, and only its own pages.
 
-// GET — which of this store's pages can still be undone (and when their last save was).
+// GET, which of this store's pages can still be undone (and when their last save was).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, pages });
 }
 
-// POST { path } — restore that page to the version before its last save.
+// POST { path }: restore that page to the version before its last save.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

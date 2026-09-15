@@ -18,7 +18,7 @@ test("an effect we don't ship falls back to none rather than throwing", () => {
  assert.equal(resolveEffects({ cursor: "fireworks" as never }).cursor, "none");
 });
 
-test("a colour that isn't a hex is dropped — it ends up in a stylesheet", () => {
+test("a colour that isn't a hex is dropped. It ends up in a stylesheet", () => {
  assert.equal(resolveEffects({ cursor: "glitter", cursorColor: "red; }" as never }).cursorColor, null);
  assert.equal(resolveEffects({ cursor: "glitter", cursorColor: "#fff" }).cursorColor, null);
 });

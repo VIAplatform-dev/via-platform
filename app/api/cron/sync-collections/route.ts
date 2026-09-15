@@ -10,7 +10,7 @@ import { initDatabase } from "@/app/lib/db";
 export async function GET(request: Request) {
  const secret = process.env.CRON_SECRET;
  const authHeader = request.headers.get("authorization");
- // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ // Header only: a query-string secret leaks into Vercel/CDN access logs and Referer headers.
  if (!secret || authHeader !== `Bearer ${secret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
@@ -32,6 +32,6 @@ export async function GET(request: Request) {
  }
 
  const totalUpdated = results.reduce((a, r) => a + r.productsUpdated, 0);
- console.log(`[Sync Collections] Done — ${totalUpdated} products tagged across ${results.length} stores`);
+ console.log(`[Sync Collections] Done: ${totalUpdated} products tagged across ${results.length} stores`);
  return NextResponse.json({ ok: true, totalUpdated, stores: results });
 }

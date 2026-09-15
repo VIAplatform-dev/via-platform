@@ -47,7 +47,7 @@ test("mailto is external, and says who it writes to", () => {
 });
 
 test("a dead # falls back to the words, which is how the nav's dropdown parents work", () => {
- // Her CLOTHING nav item has href="#" — the page exists, the anchor never carried its address.
+ // Her CLOTHING nav item has href="#". The page exists, the anchor never carried its address.
  const t = resolveLinkTarget("#", "Clothing", PAGES, OPTS);
  assert.deepEqual(t, { kind: "page", path: "/collections/clothing", label: "Clothing", matched: "name" });
 });

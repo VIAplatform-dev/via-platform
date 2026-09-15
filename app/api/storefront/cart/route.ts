@@ -11,7 +11,7 @@ const COOKIE = "via_cart";
 // Build the buyer-facing cart view: live item details + availability, plus the
 // subtotal. Sold/removed items drop out automatically (one-of-one inventory).
 async function cartView(token: string, sellerId: string | null) {
- // This store's bag only — a shopper browsing VYA has one per store, and a Montrose piece must not
+ // This store's bag only. A shopper browsing VYA has one per store, and a Montrose piece must not
  // appear (or be counted) on Love Again's page. See storefront-cart-scope.
  const ids = await getCartItemIds(token, sellerId);
  const items: { id: string; sellerId: string; title: string; priceCents: number; currency: string; image: string | null; available: boolean }[] = [];
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
  const item = await getItem(itemId);
  if (!item) return NextResponse.json({ error: "That piece is no longer available." }, { status: 404 });
- // A held, sold or unpublished piece never enters the bag — the hosted-site cart already refuses
+ // A held, sold or unpublished piece never enters the bag. The hosted-site cart already refuses
  // these (plan-b/lookup.ts isSellable); the VYA bag let them in and the checkout sold them.
  const refusal = bagRefusal(item.status);
  if (refusal) return NextResponse.json({ error: refusal }, { status: 409 });

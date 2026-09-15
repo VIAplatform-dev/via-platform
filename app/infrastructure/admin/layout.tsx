@@ -28,30 +28,30 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  const router = useRouter();
  const [ok, setOk] = useState<boolean | null>(null);
  const [navOpen, setNavOpen] = useState(false); // mobile drawer
- // "Bring your site" (import/connect) is a ONE-TIME setup step for a store — they do it at
+ // "Bring your site" (import/connect) is a ONE-TIME setup step for a store. They do it at
  // onboarding and shouldn't be nagged to reconnect. So we hide it once a store is set up, but
  // keep it for the owner/internal admin (who re-syncs any store). isOwner = the workspace owner
  // (ADMIN_PASSWORD, i.e. via-admin), NOT a signed-in store partner.
  const [isOwner, setIsOwner] = useState(false);
  // Which store this workspace is acting as. Only used to attribute analytics to the business
- // rather than to the browser — every data fetch resolves the store server-side, not from this.
+ // rather than to the browser. Every data fetch resolves the store server-side, not from this.
  const [storeSlug, setStoreSlug] = useState<string | null>(null);
  const [marketMode, setMarketMode] = useState<boolean | null>(null); // null = not loaded yet
  // Rentals is a mode a store opts into. A shop that doesn't rent shouldn't carry a dead section
- // around its sidebar, so the nav asks before showing it — and stays quiet until it knows.
+ // around its sidebar, so the nav asks before showing it, and stays quiet until it knows.
  const [rentalsOn, setRentalsOn] = useState<boolean | null>(null);
- // Appointments to confirm and rental applications to answer — someone standing at the counter.
+ // Appointments to confirm and rental applications to answer. Someone standing at the counter.
  const [rentalPending, setRentalPending] = useState(0);
  // Appointments are their own feature, so they get their own switch and their own count.
  const [apptsOn, setApptsOn] = useState<boolean | null>(null);
  const [apptPending, setApptPending] = useState(0);
  // Messaging and offers are ON for every store by default, so this hides the Inbox only once we
- // KNOW both are off — the opposite default to rentals and appointments, which a store opts into.
+ // KNOW both are off. The opposite default to rentals and appointments, which a store opts into.
  // The switches live in Settings › Messages & offers, so turning them off isn't a one-way door.
  const [inboxOff, setInboxOff] = useState(false);
  const [marketBusy, setMarketBusy] = useState(false);
 
- // The onboarding wizard lives at /admin/onboarding but is self-contained — it renders
+ // The onboarding wizard lives at /admin/onboarding but is self-contained. It renders
  // WITHOUT the workspace shell and does its own auth, so we skip the gate below for it
  // (otherwise a store with no store-record yet would be stuck on the loading screen).
  const isOnboarding = pathname.endsWith("/admin/onboarding") || pathname.includes("/admin/onboarding/");
@@ -91,10 +91,10 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  }, [isOnboarding, router]);
 
  // WHICH SHOP THIS IS. store_users allows one person at two shops, and until now nothing on screen
- // said which one she was in — the session resolved to one with a SQL LIMIT 1 and that was that.
+ // said which one she was in. The session resolved to one with a SQL LIMIT 1 and that was that.
  const [myStores, setMyStores] = useState<{ slug: string; name: string; role: string }[]>([]);
  // Her shop's name, for the header. "Infrastructure" is VYA's word for its own owner workspace and
- // means nothing to a seller looking at her own shop — she reported it as simply wrong.
+ // means nothing to a seller looking at her own shop. She reported it as simply wrong.
  const [storeName, setStoreName] = useState<string | null>(null);
  const [currentStore, setCurrentStore] = useState<string | null>(null);
  const [storeMenu, setStoreMenu] = useState(false);
@@ -116,7 +116,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
 
  // Rentals and Appointments are switches a seller flips in Settings, and this sidebar read them
  // exactly once on mount. Turning Rentals off left the row sitting there until a hard reload, and
- // turning it on did nothing visible — so the switch looked broken when it had in fact saved.
+ // turning it on did nothing visible, so the switch looked broken when it had in fact saved.
  // `vya:store-updated` is the convention the storefront editor and Sidekick already use.
  const readFeatureSwitches = useCallback(() => {
   fetch(withPreview("/api/store/rentals/settings")).then((m) => (m.ok ? m.json() : null)).then((m) => setRentalsOn(Boolean(m?.settings?.enabled))).catch(() => setRentalsOn(false));
@@ -130,7 +130,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  }, [readFeatureSwitches]);
 
  // "Bring your site" is a step INSIDE onboarding, not a place in the workspace. It used to linger
- // in the sidebar until a status endpoint said the store was set up — which meant a seller who had
+ // in the sidebar until a status endpoint said the store was set up, which meant a seller who had
  // just imported her site still saw an invitation to import it again. It's owner-only now.
  // VYA's own tooling, not a store's. Trends, AI accuracy and the golden set are how WE measure the
  // model; Apps & integrations is platform plumbing. A seller opening her workspace should see her
@@ -200,7 +200,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  if (ok === false) router.replace(loginHref(pathname));
  }, [ok, pathname, router]);
 
- // Render the wizard bare (no nav shell) when on the onboarding route — but still instrumented.
+ // Render the wizard bare (no nav shell) when on the onboarding route, but still instrumented.
  // Onboarding is the single most interesting thing a new store does, and it happens before she has
  // a slug: PostHog records it against her anonymous id, and the identify() call on the first
  // workspace screen stitches that session to the store, so the funnel spans both halves.
@@ -223,12 +223,12 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
 
  return (
  <>
- {/* Product analytics, scoped to the workspace — see app/components/StoreAnalytics.tsx for why it
+ {/* Product analytics, scoped to the workspace. See app/components/StoreAnalytics.tsx for why it
      is mounted here and not in the root layout. Suspense because it reads the query string. */}
  <Suspense fallback={null}>
   <StoreAnalytics slug={storeSlug} isOwner={isOwner} />
  </Suspense>
- {/* Brand type — Hanken Grotesk for UI, Newsreader for editorial display numbers/headings. */}
+ {/* Brand type: Hanken Grotesk for UI, Newsreader for editorial display numbers/headings. */}
  <link rel="preconnect" href="https://fonts.googleapis.com" />
  <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet" />
@@ -236,7 +236,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  className="infra flex min-h-screen overflow-x-clip bg-[#f7f6f3] text-stone-900"
  style={{
  fontFamily: "'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
- // Green accent theme, scoped to the admin — the shared @/app/store/ui components pick these up
+ // Green accent theme, scoped to the admin. The shared @/app/store/ui components pick these up
  // via var(--accent,…); the seller /store portal has no override, so it keeps its wine accent.
  ["--accent" as string]: "#0e9f76",
  ["--accent-hover" as string]: "#0b8a66",
@@ -246,7 +246,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  ["--font-display" as string]: "'Newsreader', Georgia, 'Times New Roman', serif",
  } as React.CSSProperties}
  >
- {/* Mobile top bar — hamburger opens the drawer */}
+ {/* Mobile top bar: hamburger opens the drawer */}
  {/* h-14 matches main's pt-14. The hamburger is the only way into navigation below lg, so it gets a
      full 44px target rather than the bare 20px icon it was. */}
  <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-1 border-b border-stone-200 bg-white/90 px-2 backdrop-blur lg:hidden">
@@ -260,7 +260,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  <button onClick={() => setNavOpen(false)} aria-label="Close menu" className="absolute right-1 top-2 grid h-11 w-11 place-items-center text-stone-400 hover:text-stone-600 lg:hidden"><X size={18} /></button>
  <div className="flex items-center gap-2.5 px-3 pb-5">
  <span className="grid h-8 w-8 place-items-center rounded-lg bg-stone-900">
- {/* VYA mark — the maroon asset flipped to white for the dark badge. */}
+ {/* VYA mark: the maroon asset flipped to white for the dark badge. */}
  {/* eslint-disable-next-line @next/next/no-img-element */}
  <img src="/via-logo-mark.png" alt="VYA" className="h-[18px] w-[18px] object-contain" style={{ filter: "brightness(0) invert(1)" }} />
  </span>
@@ -271,8 +271,8 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  </p>
  </div>
  </div>
- {/* The shop whose numbers are on screen. Shown plainly — a seller reads her own shop's name, not
-     a word about sessions — and only turns into a menu when she actually has a second one. */}
+ {/* The shop whose numbers are on screen. Shown plainly: a seller reads her own shop's name, not
+     a word about sessions, and only turns into a menu when she actually has a second one. */}
  {currentStore && (() => {
   const here = myStores.find((m) => m.slug === currentStore);
   const label = here?.name || currentStore;
@@ -316,7 +316,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
   );
  })()}
 
- {/* The Market Mode switch — the one control that changes what this whole shell is for. */}
+ {/* The Market Mode switch. The one control that changes what this whole shell is for. */}
  <button
  type="button"
  onClick={toggleMarketMode}
@@ -325,13 +325,13 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  >
  <span>
  <span className="block text-[12.5px] font-semibold text-stone-900">Market Mode</span>
- <span className="block text-[10.5px] text-stone-500">{marketMode ? "On — tap to exit" : "Sell in person at a market"}</span>
+ <span className="block text-[10.5px] text-stone-500">{marketMode ? "On: tap to exit" : "Sell in person at a market"}</span>
  </span>
  <span aria-hidden className={`relative inline-flex h-[22px] w-[38px] shrink-0 items-center rounded-full transition ${marketMode ? "bg-[#5D0F17]" : "bg-stone-200"}`}>
  <span className={`inline-block h-[17px] w-[17px] rounded-full bg-white shadow transition ${marketMode ? "translate-x-[19px]" : "translate-x-[3px]"}`} />
  </span>
  </button>
- {/* Global search trigger — opens the ⌘K command bar */}
+ {/* Global search trigger: opens the ⌘K command bar */}
  <button
  onClick={() => window.dispatchEvent(new Event("vya:search"))}
  className="mx-3 mb-4 flex items-center gap-2 rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-[12.5px] text-stone-400 transition hover:border-stone-300 hover:text-stone-600"
@@ -385,7 +385,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  ))}
  </nav>
  <div className="mt-3 border-t border-stone-100 pt-3">
- {/* A real sign-out. What sat here was a Link to /admin wearing a logout icon — which rewrites
+ {/* A real sign-out. What sat here was a Link to /admin wearing a logout icon, which rewrites
      straight back to this workspace, so it looked like a sign-out and did nothing. That left a
      seller no way out of her own shop, and left the owner unable to become the owner again: the
      acting store is resolved from the SESSION first (app/lib/storeAuth.ts), so while any seller
@@ -406,7 +406,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  {/* min-w-0: a flex child's min-width defaults to its content's, which let a long unbreakable row push
  the whole page wider than a phone; clipping the root stops any stray overflow from adding a sideways scroll. */}
  <main className={`ml-0 min-w-0 flex-1 pt-14 lg:ml-[228px] lg:pt-0 ${marketMode && inMarketArea ? "pb-16 lg:pb-0" : ""}`}>{children}</main>
- {/* Phone bottom tab bar — Market Mode is used one-handed at a table, so the core loop is thumb-reachable. */}
+ {/* Phone bottom tab bar. Market Mode is used one-handed at a table, so the core loop is thumb-reachable. */}
  {marketMode && inMarketArea && (
  <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-stone-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
  {MARKET_TABS.map((t) => {

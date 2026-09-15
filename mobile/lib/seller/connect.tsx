@@ -7,20 +7,20 @@ import { stripeNative, stripeAvailable, STRIPE_UNAVAILABLE } from "./stripe-nati
 
 // Stripe's own screens, rendered natively inside VYA rather than in a browser.
 //
-// WHY THIS REPLACED A BROWSER SHEET. Stripe's identity check cannot be rebuilt — it collects a legal
+// WHY THIS REPLACED A BROWSER SHEET. Stripe's identity check cannot be rebuilt. It collects a legal
 // name, an ID document and a bank account under Stripe's licence. But it does not have to be a trip
 // to a WEBSITE: Connect embedded components render as real native views, themed to VYA, inside our
 // own navigation. The seller sees a VYA screen asking Stripe's questions, not vyaplatform.com in a
 // browser with an address bar.
 //
-// ONE HONEST CAVEAT. These are Express accounts, which means Stripe — not VYA — is responsible for
+// ONE HONEST CAVEAT. These are Express accounts, which means Stripe, not VYA. Is responsible for
 // collecting requirements, and Stripe requires the account holder to sign in to Stripe once during
 // onboarding. Stripe presents that single sign-in step in a WebView it controls and explicitly does
 // not allow to be replaced. It is Stripe's page, branded with our name and colour from the Connect
 // settings, and it is the only part of any of this that is not ours. Everything around it is native.
 //
 // The client secret is minted by /api/store/payments/account-session, which already existed for the
-// web's embedded components — the phone reuses it exactly, including the publishable key, so there
+// web's embedded components. The phone reuses it exactly, including the publishable key, so there
 // is no second copy of the Stripe key living in the app bundle to go stale.
 //
 // See stripe-native.ts for why none of this is a static import.
@@ -29,7 +29,7 @@ type Ready = {
   instance: StripeConnectInstance | null;
   error: string | null;
   loading: boolean;
-  /** True when the native module isn't in this binary at all (Expo Go). Not an error — a fact. */
+  /** True when the native module isn't in this binary at all (Expo Go). Not an error: a fact. */
   unavailable: boolean;
 };
 
@@ -40,7 +40,7 @@ export function useConnect(): Ready {
 }
 
 export function SellerConnectProvider({ children }: { children: ReactNode }) {
-  // No native module, nothing to provide — and crucially, nothing to crash. The seller app renders
+  // No native module, nothing to provide, and crucially, nothing to crash. The seller app renders
   // in full; the two screens that need Stripe check `unavailable` and say so.
   if (!stripeAvailable) return <Ctx.Provider value={UNAVAILABLE}>{children}</Ctx.Provider>;
   return <LiveConnectProvider>{children}</LiveConnectProvider>;
@@ -80,7 +80,7 @@ function LiveConnectProvider({ children }: { children: ReactNode }) {
   // getAuthToken() is null. This effect used to run on mount with no dependencies at all: it raced
   // that read, sent an unauthenticated POST, and /api/store/payments/account-session answered 401
   // "Unauthorized". Because it ran exactly once, that single word then sat on the Payouts screen
-  // for the rest of the session, under a heading offering to set up payments — so the one screen
+  // for the rest of the session, under a heading offering to set up payments, so the one screen
   // telling a seller how to get paid was also the one refusing to let her.
   //
   // Every other caller in the app is a react-query query gated on `enabled: !!storeSlug`, which is
@@ -130,7 +130,7 @@ function LiveConnectProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<Ready>(() => ({ instance, error, loading, unavailable: false }), [instance, error, loading]);
 
-  // Until the key is known there is no provider to give — children still render, and any screen that
+  // Until the key is known there is no provider to give. Children still render, and any screen that
   // needs a component checks `instance` first. Nothing here should be able to blank a screen that
   // does not use Stripe at all.
   if (!instance || !publishableKey) return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

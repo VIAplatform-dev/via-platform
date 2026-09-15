@@ -1,12 +1,12 @@
 // What a seller sells drives their whole starting storefront. Each category maps to a distinct kit
 // (template + palette + font pairing) AND tailored content (hero copy, shop-by-category tiles, marquee
 // words). Picking several blends them: the FIRST pick leads the look; tiles + marquee merge across all
-// picks — so "streetwear + vintage" lands somewhere genuinely different from "designer luxury".
+// picks, so "streetwear + vintage" lands somewhere genuinely different from "designer luxury".
 // Shared by the signup wizard (where the seller picks) and the build wizard (which applies the kit).
 import { templateBlocks, templateShopBlocks, templatePages, templateGrid, getTemplate, STOREFRONT_TEMPLATES, STOREFRONT_PALETTES } from "./storefront-templates";
 import type { Block } from "./storefront-blocks";
 
-// The curated font pairings the wizards offer, indexed — a preset's `font` points into this list.
+// The curated font pairings the wizards offer, indexed. A preset's `font` points into this list.
 // The first eight ARE the template pairings, in template order, so a preset that picks a template can
 // point at its own face rather than landing on a near-miss from a separate list.
 export const TAILOR_FONT_PAIRS = [
@@ -41,18 +41,18 @@ export const SELL_CATEGORIES: { key: string; label: string }[] = [
  { key: "accessories", label: "Accessories & jewelry" },
 ];
 
-// Each category maps to the template whose STRUCTURE fits how that inventory is actually shopped —
+// Each category maps to the template whose STRUCTURE fits how that inventory is actually shopped,
 // not to the one whose colours look the part. A denim seller has volume, so they get the search-led
 // catalogue; a consignment workwear shop is a place before it's a site, so it gets the shop card.
 // Two categories may share a template where that is the honest answer; the palette and voice differ.
 export const CATEGORY_PRESET: Record<string, CatPreset> = {
- vintage: { template: "elegant", palette: "elegant", font: 0, hero: { heading: "Vintage, one of one.", sub: "Hand-picked pieces with history — no restocks, ever.", cta: "Shop the edit" }, tiles: ["Dresses", "Denim", "Knitwear", "Outerwear", "Tops", "Accessories"], marquee: ["One of one", "Hand-picked", "With history", "No restocks"] },
- designer: { template: "archival", palette: "archival", font: 1, hero: { heading: "Designer, authenticated.", sub: "Investment pieces and documented labels — verified before they're listed.", cta: "Shop all" }, tiles: ["Bags", "Dresses", "Outerwear", "Shoes", "Jewelry", "Accessories"], marquee: ["Authenticated", "Dated to the season", "Documented", "One of one"] },
- menswear: { template: "archival", palette: "bone-ink", font: 9, hero: { heading: "Menswear, curated.", sub: "Tailoring, staples and standout pieces — edited with intent.", cta: "Shop all" }, tiles: ["Shirts", "Outerwear", "Knitwear", "Trousers", "Denim", "Shoes"], marquee: ["Curated", "Tailored", "Considered", "One of one"] },
+ vintage: { template: "elegant", palette: "elegant", font: 0, hero: { heading: "Vintage, one of one.", sub: "Hand-picked pieces with history, no restocks, ever.", cta: "Shop the edit" }, tiles: ["Dresses", "Denim", "Knitwear", "Outerwear", "Tops", "Accessories"], marquee: ["One of one", "Hand-picked", "With history", "No restocks"] },
+ designer: { template: "archival", palette: "archival", font: 1, hero: { heading: "Designer, authenticated.", sub: "Investment pieces and documented labels. Verified before they're listed.", cta: "Shop all" }, tiles: ["Bags", "Dresses", "Outerwear", "Shoes", "Jewelry", "Accessories"], marquee: ["Authenticated", "Dated to the season", "Documented", "One of one"] },
+ menswear: { template: "archival", palette: "bone-ink", font: 9, hero: { heading: "Menswear, curated.", sub: "Tailoring, staples and standout pieces. Edited with intent.", cta: "Shop all" }, tiles: ["Shirts", "Outerwear", "Knitwear", "Trousers", "Denim", "Shoes"], marquee: ["Curated", "Tailored", "Considered", "One of one"] },
  denim: { template: "catalogue", palette: "dusty-blue", font: 2, hero: { heading: "[000] pairs. Narrow it down.", sub: "Vintage washes, real fades, every pair one of one.", cta: "Shop all" }, tiles: ["Jeans", "Jackets", "Shorts", "Skirts", "Workwear", "Accessories"], marquee: ["Vintage wash", "Selvedge", "Real fades", "One of one"] },
  streetwear: { template: "bold", palette: "bold", font: 3, hero: { heading: "THE GOOD PIECES DON'T WAIT", sub: "New pieces drop every [DROP DAY] at [TIME] [TZ].", cta: "Shop this drop" }, tiles: ["Outerwear", "Tops", "Shoes", "Denim", "Bags", "Accessories"], marquee: ["New drop", "Deadstock", "Grails", "No restocks"] },
- y2k: { template: "playful", palette: "playful", font: 5, hero: { heading: "everything, all at once", sub: "the good stuff from the archives — nostalgic, loud, one of one.", cta: "shop it" }, tiles: ["going out top", "off duty", "dressed up", "club", "summer", "basics"], marquee: ["y2k", "retro", "archive", "one of one"] },
- womenswear: { template: "editorial", palette: "editorial", font: 4, hero: { heading: "Okay so — you're here", sub: "Dresses, knits and finds you won't see on anyone else.", cta: "Have a look" }, tiles: ["Dresses", "Tops", "Knitwear", "Outerwear", "Bags", "Shoes"], marquee: ["One of one", "Hand-picked", "Mended and measured", "No restocks"] },
+ y2k: { template: "playful", palette: "playful", font: 5, hero: { heading: "everything, all at once", sub: "the good stuff from the archives. Nostalgic, loud, one of one.", cta: "shop it" }, tiles: ["going out top", "off duty", "dressed up", "club", "summer", "basics"], marquee: ["y2k", "retro", "archive", "one of one"] },
+ womenswear: { template: "editorial", palette: "editorial", font: 4, hero: { heading: "Okay so: you're here", sub: "Dresses, knits and finds you won't see on anyone else.", cta: "Have a look" }, tiles: ["Dresses", "Tops", "Knitwear", "Outerwear", "Bags", "Shoes"], marquee: ["One of one", "Hand-picked", "Mended and measured", "No restocks"] },
  contemporary: { template: "curated", palette: "curated", font: 6, hero: { heading: "Six pieces. That's the edit.", sub: "", cta: "View" }, tiles: ["Tops", "Outerwear", "Dresses", "Trousers", "Shoes", "Accessories"], marquee: ["Considered", "Everyday", "One of one"] },
  accessories: { template: "curated", palette: "antique-gold", font: 8, hero: { heading: "The finishing pieces.", sub: "Bags, belts and one-of-a-kind jewels.", cta: "View" }, tiles: ["Bags", "Jewelry", "Belts", "Scarves", "Sunglasses", "Shoes"], marquee: ["One of a kind", "Finishing pieces", "Rare", "Curated"] },
  workwear: { template: "local", palette: "local", font: 7, hero: { heading: "Built to last, sourced by hand", sub: "Shop online, or come see it in [YOUR NEIGHBOURHOOD].", cta: "Shop online" }, tiles: ["Outerwear", "Trousers", "Shirts", "Denim", "Shoes", "Bags"], marquee: ["Built to last", "Utility", "Heritage", "One of one"] },
@@ -72,7 +72,7 @@ export function tailoredMarquee(cats: string[]): string[] {
 }
 
 /**
- * Write what a seller sells into a template's sections — hero copy, category tiles, marquee words —
+ * Write what a seller sells into a template's sections, hero copy, category tiles, marquee words,
  * wherever those sections exist. The template's LAYOUT personality is untouched: only copy changes,
  * so a tailored Vitrine is still 2-up and a tailored Drop still leads with the clock.
  *
@@ -101,7 +101,7 @@ export function tailoredHome(templateId: string, cats: string[], customs: string
 }
 
 /**
- * The complete starting store derived from what they sell — template, palette, font pairing, corner
+ * The complete starting store derived from what they sell. Template, palette, font pairing, corner
  * style, header, catalogue density, and every page the template ships with, all tailored. Used to
  * auto-build a store in one shot (no manual wizard).
  *

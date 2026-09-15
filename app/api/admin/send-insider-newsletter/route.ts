@@ -14,7 +14,7 @@ const TEMPLATES: Record<string, { subject: string; html: string }> = {
 };
 
 /**
- * GET — preview audience size only. No emails sent.
+ * GET: preview audience size only. No emails sent.
  * Returns { count, sample } so admin can sanity-check before firing.
  */
 export async function GET() {
@@ -27,11 +27,11 @@ export async function GET() {
 }
 
 /**
- * POST — actually send the newsletter.
+ * POST: actually send the newsletter.
  * Body: {
- *   template?: string,    // e.g. "june-2026" — uses pre-built HTML
+ *   template?: string,    // e.g. "june-2026": uses pre-built HTML
  *   subject?: string,     // overrides template subject (or required if no template)
- *   contentHtml?: string, // raw HTML — required if no template
+ *   contentHtml?: string, // raw HTML: required if no template
  *   testEmail?: string    // if present, only sends to this address
  * }
  *

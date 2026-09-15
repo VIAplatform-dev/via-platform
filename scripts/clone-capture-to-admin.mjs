@@ -2,7 +2,7 @@
 // without touching the seller's live storefront.
 //
 // The workspace already has an owner preview (`?store=<slug>`, see app/lib/storeAuth.ts), but the
-// storefront editor makes 30 API calls and not one of them passes it through — so previewing as her
+// storefront editor makes 30 API calls and not one of them passes it through, so previewing as her
 // would render her editor shell reading YOUR empty store. Threading the parameter through all of
 // them would also point every Save button at her live site, which is the last thing anyone wants
 // days before handing it over.
@@ -14,7 +14,7 @@
 // under another slug is how you end up with two shops claiming the same one-of-a-kind piece. The
 // consequence is visible and worth knowing: product prices and add-to-cart on the copy will be
 // empty, because live inventory is injected at serve time and via-admin has none of hers. The
-// layout, the theme, the editor rail — the things you're looking at — are faithful.
+// layout, the theme, the editor rail, the things you're looking at. Are faithful.
 //
 //   node --env-file=.env.local scripts/clone-capture-to-admin.mjs                    # show
 //   node --env-file=.env.local scripts/clone-capture-to-admin.mjs --write            # copy
@@ -35,7 +35,7 @@ const countPages = async (slug) =>
 
 const srcPages = await countPages(FROM);
 const dstPages = await countPages(TO);
-console.log(`\n${FROM}: ${srcPages} captured pages   (source — never modified)`);
+console.log(`\n${FROM}: ${srcPages} captured pages   (source, never modified)`);
 console.log(`${TO}: ${dstPages} captured pages   (destination)\n`);
 
 if (CLEAN) {
@@ -78,7 +78,7 @@ await sql`INSERT INTO site_captures (store_slug, path, html, source_url, capture
 // The DESIGN columns only, so the editor's Design rail opens on her settings rather than defaults.
 //
 // Explicitly not the whole row: `handle` and `custom_domain` are both UNIQUE, so copying them would
-// either fail on the constraint or — worse, if it somehow didn't — start moving her live address
+// either fail on the constraint or, worse, if it somehow didn't. Start moving her live address
 // onto the owner's store. Her identity stays hers; only the look travels.
 const design = await sql`SELECT theme, accent_color, tagline, hero_image, about
                          FROM storefront_settings WHERE store_slug = ${FROM} LIMIT 1`;
@@ -89,12 +89,12 @@ if (design.length) {
            ON CONFLICT (store_slug) DO UPDATE
              SET theme = EXCLUDED.theme, accent_color = EXCLUDED.accent_color,
                  tagline = EXCLUDED.tagline, hero_image = EXCLUDED.hero_image, about = EXCLUDED.about`;
- console.log("copied the design settings (theme, accent, tagline, hero, about) — not handle or domain");
+ console.log("copied the design settings (theme, accent, tagline, hero, about), not handle or domain");
 } else {
- console.log("no storefront_settings row on the source — the editor will open on theme defaults");
+ console.log("no storefront_settings row on the source. The editor will open on theme defaults");
 }
 
 console.log(`\n${TO}: ${await countPages(TO)} captured pages`);
 console.log(`${FROM}: ${await countPages(FROM)} captured pages (should still read ${srcPages})`);
-console.log(`\nOpen /admin/storefront — it will load the imported-site editor, not the block studio.`);
+console.log(`\nOpen /admin/storefront: it will load the imported-site editor, not the block studio.`);
 console.log(`Undo any time with:  --clean --write`);

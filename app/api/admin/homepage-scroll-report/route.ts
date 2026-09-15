@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Hero reach = the baseline (100% by definition — if you're on the homepage you see the hero)
+    // Hero reach = the baseline (100% by definition, if you're on the homepage you see the hero)
     const heroUnique = bySection.get("hero")?.unique ?? 0;
 
     const sections = SECTION_ORDER.map((section) => {
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       sections: SECTION_ORDER.map((s) => ({ section: s, unique: 0, reachPct: 0 })),
       heroBaseline: 0,
       days,
-      note: "No data yet — table will be created on first homepage visit after deployment",
+      note: "No data yet: table will be created on first homepage visit after deployment",
     });
   }
 }

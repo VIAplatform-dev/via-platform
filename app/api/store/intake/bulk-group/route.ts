@@ -6,10 +6,10 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Cluster a bulk photo drop into distinct ITEMS by visual similarity — each returned group is one
+// Cluster a bulk photo drop into distinct ITEMS by visual similarity. Each returned group is one
 // item's set of photos (e.g. the front/back/tag shots of one bag). Best-effort: without embeddings
 // it falls back to one item per photo, and the client lets the seller merge/split before drafting,
-// so imperfect grouping is fine — this just gives a smart starting point.
+// so imperfect grouping is fine. This just gives a smart starting point.
 const SAME_ITEM = 0.82; // cosine >= this ~ the same piece (a different angle of one item)
 
 export async function POST(request: NextRequest) {

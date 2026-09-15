@@ -93,7 +93,7 @@ export async function GET(request: Request) {
  }
  }
 
- // Send push notifications — one per user, summarizing their new matches
+ // Send push notifications. One per user, summarizing their new matches
  const pushResults: Array<{ userId: string; tokens: number; ok: boolean }> = [];
  for (const [userId, matches] of userBuckets) {
  const tokens = await getPushTokensForUser(userId);

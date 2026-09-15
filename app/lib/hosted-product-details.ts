@@ -4,12 +4,12 @@
  * Where it goes follows where the commerce rewiring already works: rewireCommerce finds the theme's
  * `form[action*="/cart"]` and swaps its submit for VYA's controls (`data-vya-add`, `data-vya-proto`,
  * the `/checkout?item=` link); applyCartState hangs its notice off `[name="add"]`. The block lands
- * right after that form — where a theme prints its own accordions — so a shopper reads the price,
+ * right after that form, where a theme prints its own accordions, so a shopper reads the price,
  * the button, then the facts. A page with no buy form (a sold capture) gets it after the price
  * block; one with neither, inside the product's own container; failing all of that, at the end of
  * the body. It never fails the page: no anchor is a placement problem, not an error.
  *
- * Idempotent: the same page served twice carries one block, and the newer one — a flaw the seller
+ * Idempotent: the same page served twice carries one block, and the newer one. A flaw the seller
  * added since the last request is what prints.
  */
 import * as cheerio from "cheerio";
@@ -24,7 +24,7 @@ const PRODUCT_INFO = "[class*='product__info'], [class*='product-single__meta'],
 
 export function injectHostedDetails(html: string, block: string): string {
  const has = /data-vya-details/.test(html);
- if (!block && !has) return html; // nothing to add, nothing to take off — do not reserialise
+ if (!block && !has) return html; // nothing to add, nothing to take off. Do not reserialise
  const $ = cheerio.load(html);
  const existing = $("[data-vya-details]");
  if (!block) { existing.remove(); return $.html(); }

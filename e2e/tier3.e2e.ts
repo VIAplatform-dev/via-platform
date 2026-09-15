@@ -27,7 +27,7 @@ const SETUP = [
  { id: "shipping", label: "Switch shipping on", href: "/admin/settings/shipping", done: false },
  { id: "first_listing", label: "List your first piece", href: "/admin/add-listing", done: true },
  { id: "returns", label: "Set your returns policy", href: "/admin/settings/general", done: false },
- { id: "domain", label: "Connect your own domain", hint: "Optional — your VYA address works today", href: "/admin/settings/domain", done: false, optional: true },
+ { id: "domain", label: "Connect your own domain", hint: "Optional: your VYA address works today", href: "/admin/settings/domain", done: false, optional: true },
 ];
 const ONBOARDING = (complete: boolean) => ({
  ok: true, onboarded: true, shipFromSet: true, storeName: "Test store",

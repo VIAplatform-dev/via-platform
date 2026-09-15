@@ -1,5 +1,5 @@
 // Shippo shipping aggregator. VYA holds one integration and resells discounted
-// USPS/UPS/FedEx rates — sellers never need their own carrier accounts. Gated by
+// USPS/UPS/FedEx rates. Sellers never need their own carrier accounts. Gated by
 // SHIPPO_API_KEY so it's dormant until you add the key.
 
 const FALLBACK_EMAIL = "shipping@vyaplatform.com";
@@ -47,11 +47,11 @@ async function shippo(path: string, method: "GET" | "POST", body?: any): Promise
 
 function toShippo(a: ShipAddress) {
  // EMAIL IS NOT OPTIONAL TO USPS. It rejects an empty address_from.email and the whole purchase
- // fails — so a store whose sellers row has no email could never buy a label. A placeholder on
+ // fails, so a store whose sellers row has no email could never buy a label. A placeholder on
  // OUR domain is better than a failed label: the carrier only ever uses it for delivery notices.
  return { name: a.name || "", street1: a.street1, street2: a.street2 || "", city: a.city, state: a.state, zip: a.zip, country: a.country, phone: a.phone || "", email: a.email || FALLBACK_EMAIL };
 }
-/** Our declaration in Shippo's field names — its enums are upper-cased and its EEL code is slugged. */
+/** Our declaration in Shippo's field names. Its enums are upper-cased and its EEL code is slugged. */
 function toShippoCustoms(d: CustomsDeclaration) {
  return {
   contents_type: "MERCHANDISE",
@@ -116,7 +116,7 @@ export type PurchasedLabel = {
 /** Buy a label for a previously-returned rate id. Returns null if it didn't succeed. */
 export async function buyLabel(rateId: string, printer: LabelPrinter = DEFAULT_LABEL_PRINTER): Promise<PurchasedLabel | null> {
  // PDF_4x6 for a label printer. This was hardcoded "PDF", which for USPS is an 8.5×11 sheet with
- // the label in the top quarter — unusable on the thermal printer a resale shop actually owns, and
+ // the label in the top quarter. Unusable on the thermal printer a resale shop actually owns, and
  // uncroppable on a phone.
  const tx = await shippo("/transactions/", "POST", { rate: rateId, label_file_type: shippoLabelFileType(printer), async: false });
  if (!tx || tx.status !== "SUCCESS" || !tx.label_url) return null;
@@ -130,7 +130,7 @@ export async function buyLabel(rateId: string, printer: LabelPrinter = DEFAULT_L
  };
 }
 
-/** Refund (void) an unused label so its cost is credited back — used when an order is refunded before
+/** Refund (void) an unused label so its cost is credited back. Used when an order is refunded before
  *  it ships. Best-effort: Shippo rejects labels that were already used/scanned, which is fine. */
 export async function voidLabel(transactionId: string): Promise<boolean> {
  if (!transactionId) return false;
@@ -146,7 +146,7 @@ export type TrackingSnapshot = { status: string; eta: string | null; carrier: st
  *
  * Shippo needs the carrier token as well as the number; "shippo" is their own test/self-resolving
  * carrier and works as a fallback when we didn't record which carrier the label was bought from.
- * Returns null on any failure — a rental screen that can't reach a carrier should show the dates it
+ * Returns null on any failure. A rental screen that can't reach a carrier should show the dates it
  * already has, not an error.
  */
 export async function getTracking(trackingNumber: string, carrier?: string | null): Promise<TrackingSnapshot | null> {

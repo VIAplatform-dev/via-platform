@@ -36,7 +36,7 @@ type SourcingRequest = {
 };
 
 function fmt(date: string | null) {
- if (!date) return "—";
+ if (!date) return "-";
  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -69,7 +69,7 @@ function RequestRow({
  onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = ""; }}
  >
  <td style={{ padding: "12px 16px", fontSize: 13, color: "#09090b" }}>
- {req.userName || "—"}
+ {req.userName || "-"}
  <div style={{ fontSize: 11, color: "#a1a1aa", marginTop: 2 }}>{req.userEmail}</div>
  </td>
  <td style={{ padding: "12px 16px", fontSize: 13, color: "#71717a", maxWidth: 240 }}>

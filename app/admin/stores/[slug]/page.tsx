@@ -78,7 +78,7 @@ export default function AdminStorePortalPage() {
  >
  Open the store&apos;s live dashboard →
  </Link>
- <p style={{ fontSize: 11, color: "#9ca3af", margin: "6px 0 0" }}>The exact seller portal — Overview, Performance, Audience &amp; Market Insights — always up to date.</p>
+ <p style={{ fontSize: 11, color: "#9ca3af", margin: "6px 0 0" }}>The exact seller portal, Overview, Performance, Audience &amp; Market Insights. Always up to date.</p>
  </div>
  <div style={{ display: "flex", gap: 6 }}>
  {(["7d", "30d", "all"] as Range[]).map((r) => (
@@ -147,7 +147,7 @@ export default function AdminStorePortalPage() {
  {c.matched ? "Matched" : "Unmatched"}
  </span>
  </td>
- <td style={{ padding: "10px 16px", fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{c.viaClickId ?? "—"}</td>
+ <td style={{ padding: "10px 16px", fontSize: 11, color: "#9ca3af", fontFamily: "monospace" }}>{c.viaClickId ?? "-"}</td>
  </tr>
  ))}
  </tbody>
@@ -166,7 +166,7 @@ export default function AdminStorePortalPage() {
  ) : (
  data.analytics.topProducts.map((p, i) => (
  <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "10px 20px", borderBottom: "1px solid #f3f4f6" }}>
- <span style={{ fontSize: 13, color: "#374151" }}>{p.name || "—"}</span>
+ <span style={{ fontSize: 13, color: "#374151" }}>{p.name || "-"}</span>
  <span style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{p.count}</span>
  </div>
  ))

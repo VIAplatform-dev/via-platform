@@ -1,6 +1,6 @@
 // Screens where the text of the thing clicked is somebody else's personal data.
 //
-// Autocapture is worth keeping — knowing a seller pressed "Connect a marketplace" is exactly the
+// Autocapture is worth keeping. Knowing a seller pressed "Connect a marketplace" is exactly the
 // kind of thing this exists to learn. But it records the WORDS on the control, and on these screens
 // those words are a buyer's name, their email, their address, or what they paid. That is the
 // seller's customer's data, and neither of them agreed to it leaving the page.
@@ -14,7 +14,7 @@ export function redactOnPrivateScreens(props: Record<string, unknown>): Record<s
  if (!PRIVATE_SCREENS.test(path)) return props;
 
  if (typeof props.$el_text === "string") props.$el_text = REDACTED;
- // The chain is one long string PostHog parses later — redact inside it, don't drop it, or the
+ // The chain is one long string PostHog parses later. Redact inside it, don't drop it, or the
  // event loses the structure that makes it readable at all.
  if (typeof props.$elements_chain === "string") {
   props.$elements_chain = props.$elements_chain.replace(/text="[^"]*"/g, `text="${REDACTED}"`);

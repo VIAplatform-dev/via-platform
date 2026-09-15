@@ -146,7 +146,7 @@ export async function GET(
  const slug = storeMatch[1];
  const isProduct = /^\/stores\/[^/]+\/.+/.test(path);
  const storeName = slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
- return isProduct ? `Product — ${storeName}` : `Store — ${storeName}`;
+ return isProduct ? `Product: ${storeName}` : `Store: ${storeName}`;
  }
  if (pageType === "search" || path.startsWith("/search")) return "Search";
  if (pageType === "profile" || path.startsWith("/profile")) return "Profile";
@@ -267,13 +267,13 @@ export async function GET(
  .filter((o) => !o.returned)
  .reduce((sum, o) => sum + Number(o.order_total), 0);
 
- // Acquisition source — where this account FIRST found VYA. "direct" isn't a real
+ // Acquisition source, where this account FIRST found VYA. "direct" isn't a real
  // channel (it's the absence of a detectable one), so we surface the earliest REAL
  // channel (instagram, tiktok, substack, email…) and only fall back to "direct" when
  // that's genuinely all we captured. Form/import names ("waitlist","newsletter",
- // "mailchimp") aren't channels either — they describe HOW the email was captured,
+ // "mailchimp") aren't channels either. They describe HOW the email was captured,
  // so they're shown only as a last resort.
- // Alias resolution comes from app/lib/traffic-source.ts — this file used to carry its
+ // Alias resolution comes from app/lib/traffic-source.ts. This file used to carry its
  // own fifth copy of the map. NON_CHANNEL stays local because it is deliberately WIDER
  // than the shared list here: on a single customer's page a form name ("waitlist") is
  // worth showing as a last resort, so it is excluded from "real channel" but not from
@@ -291,7 +291,7 @@ export async function GET(
  ORDER BY timestamp ASC LIMIT 1`;
  acquisitionSource = norm(realRows[0]?.utm_source as string | undefined);
  if (!acquisitionSource) {
- // No social/referrer channel — was there at least an email-link visit, or only direct?
+ // No social/referrer channel: was there at least an email-link visit, or only direct?
  const anyRows = await sql`SELECT utm_source FROM utm_visits WHERE user_id = ${userId} AND utm_source IS NOT NULL ORDER BY timestamp ASC LIMIT 1`;
  const any = norm(anyRows[0]?.utm_source as string | undefined);
  if (any === "email") acquisitionSource = "email";
@@ -316,7 +316,7 @@ export async function GET(
 
  // ── Visit history ────────────────────────────────────────────────────────
  // Every recorded visit for this account, newest first, so the page can show
- // first-touch vs. every touch after it — "found us on TikTok, came back through
+ // first-touch vs. every touch after it. "found us on TikTok, came back through
  // Instagram". Only visits made while SIGNED IN carry a user_id, so this is the
  // attributable subset, not necessarily every visit they ever made; the page says so.
  const visitRows = userId
@@ -338,7 +338,7 @@ export async function GET(
  timestamp: v.timestamp instanceof Date ? v.timestamp.toISOString() : v.timestamp,
  }));
 
- // One row per distinct source, with how often and when — the "where do they keep
+ // One row per distinct source, with how often and when. The "where do they keep
  // coming back from" summary that sits above the raw list.
  const bySource = new Map<string, { source: string; channel: string; visits: number; firstAt: string; lastAt: string }>();
  for (const v of visits) {

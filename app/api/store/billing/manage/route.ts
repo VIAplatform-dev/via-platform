@@ -3,6 +3,7 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorePlan, setStorePlan } from "@/app/lib/store-plans-db";
 import { TIERS, priceIdFor, priceEnvName, type TierId, type Interval } from "@/app/lib/plans";
 import { stripePost, stripeGet, stripeConfigured } from "@/app/lib/stripe";
+import { ensureBillingCustomer } from "@/app/lib/store-card";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,10 @@ export const dynamic = "force-dynamic";
 // The portal is a hosted web page. These four actions are the whole of what a VYA seller ever went
 // there for, so they are here instead and the app never leaves itself:
 //
-//   card         — a SetupIntent + customer session for the native sheet, then set as the default.
-//   cancel       — at the END of the period she has paid for, never immediately. She bought the month.
-//   resume       — undo that, while the period is still running.
-//   change-plan  — swap the price on the existing subscription, prorated.
+//   card: a SetupIntent + customer session for the native sheet, then set as the default.
+//   cancel, at the END of the period she has paid for, never immediately. She bought the month.
+//   resume: undo that, while the period is still running.
+//   change-plan: swap the price on the existing subscription, prorated.
 //
 // change-plan REPLACES THE ITEM rather than adding one. A subscription can hold several prices at
 // once; appending would bill her for Studio AND Atelier every month, which is the kind of mistake
@@ -30,21 +31,25 @@ export async function POST(request: NextRequest) {
 
  try {
  if (action === "card") {
-  if (!plan.stripeCustomerId) return NextResponse.json({ error: "No billing account yet — start a plan first." }, { status: 400 });
+  // "Start a plan first" was a dead end for exactly the store that needed a card: shipping's
+  // absorb-the-postage modes are gated on holding one, and a store on the free trial had no
+  // customer to attach it to. One is created on demand now (store-card.ts).
+  const customerId = await ensureBillingCustomer(slug);
+  if (!customerId) return NextResponse.json({ error: "Card payments aren’t set up yet. Try again shortly." }, { status: 503 });
   const publishableKey = (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY)?.trim();
   if (!publishableKey) return NextResponse.json({ error: "Stripe publishable key isn’t configured." }, { status: 503 });
   const customerSession = await stripePost("customer_sessions", {
-  customer: plan.stripeCustomerId,
+  customer: customerId,
   components: { mobile_payment_element: { enabled: true, features: { payment_method_save: "enabled", payment_method_redisplay: "enabled", payment_method_remove: "enabled" } } },
   });
   const setupIntent = await stripePost("setup_intents", {
-  customer: plan.stripeCustomerId,
+  customer: customerId,
   usage: "off_session",
   automatic_payment_methods: { enabled: true },
   metadata: { type: "store_billing_card", store_slug: slug },
   });
   return NextResponse.json({
-  ok: true, publishableKey, customerId: plan.stripeCustomerId,
+  ok: true, publishableKey, customerId,
   customerSessionClientSecret: customerSession.client_secret,
   setupIntentClientSecret: setupIntent.client_secret,
   });
@@ -53,11 +58,14 @@ export async function POST(request: NextRequest) {
  if (action === "card-saved") {
   // Called after the sheet succeeds: make what she just entered the card future invoices use.
   // Read back from the SetupIntent rather than trusting an id posted by the client.
-  if (!plan.stripeCustomerId) return NextResponse.json({ error: "No billing account yet." }, { status: 400 });
+  // Re-read rather than trusting `plan`: the customer may have been created by the "card" call a
+  // few seconds ago, on a request that loaded its own copy of the plan.
+  const customerId = (await getStorePlan(slug)).stripeCustomerId;
+  if (!customerId) return NextResponse.json({ error: "No billing account yet." }, { status: 400 });
   const id = String(body?.setupIntentId ?? "");
   if (!id) return NextResponse.json({ error: "Missing setup intent." }, { status: 400 });
   const si = await stripeGet(`setup_intents/${id}`);
-  if ((si.customer as string) !== plan.stripeCustomerId) return NextResponse.json({ error: "Not this store's card." }, { status: 403 });
+  if ((si.customer as string) !== customerId) return NextResponse.json({ error: "Not this store's card." }, { status: 403 });
   const pm = si.payment_method as string | null;
   if (!pm) return NextResponse.json({ error: "That card didn't save. Try again." }, { status: 400 });
   await stripePost(`customers/${plan.stripeCustomerId}`, { invoice_settings: { default_payment_method: pm } });
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
   const priceId = priceIdFor(tier, interval);
   if (!priceId) return NextResponse.json({ error: `That plan isn’t priced yet. Set ${priceEnvName(tier, interval)} in Stripe.` }, { status: 503 });
 
-  // The id of the item we are replacing — without it Stripe ADDS a price and bills for both.
+  // The id of the item we are replacing, without it Stripe ADDS a price and bills for both.
   const current = await stripeGet(`subscriptions/${plan.stripeSubscriptionId}`);
   const itemId = (current as { items?: { data?: { id?: string }[] } }).items?.data?.[0]?.id;
   if (!itemId) return NextResponse.json({ error: "Couldn't read your current plan." }, { status: 502 });

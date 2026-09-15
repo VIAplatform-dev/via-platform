@@ -9,11 +9,11 @@ import { Loading } from "../../components/seller/Form";
 import { daySchedule, stillToCome, appointmentLine, clock, type Appointment } from "../../lib/seller/appointments";
 import { todayDay } from "../../lib/seller/rentals";
 
-// The diary — what is left today, and what tomorrow looks like.
+// The diary: what is left today, and what tomorrow looks like.
 //
 // A schedule is the surface where a phone genuinely beats a laptop: it is checked standing up,
-// between customers, with one hand. So the screen answers the standing-up question first — how many
-// are left and when is the next — and only then lists them.
+// between customers, with one hand. So the screen answers the standing-up question first. How many
+// are left and when is the next, and only then lists them.
 //
 // Cancelled and no-shows are filtered out in daySchedule, not here: a day with three bookings and
 // two cancellations reads as a busy day until you notice, and noticing is not the seller's job.
@@ -75,7 +75,7 @@ export default function AppointmentsScreen() {
             <Empty>Nothing in the diary {which === "today" ? "today" : "tomorrow"}.</Empty>
           ) : (
             schedule.map((a) => {
-              // A past appointment stays on the list — she may need to mark it or look it up — but
+              // A past appointment stays on the list, she may need to mark it or look it up, but
               // it steps back so the eye lands on what is still ahead.
               const done = which === "today" && !left.includes(a);
               return (

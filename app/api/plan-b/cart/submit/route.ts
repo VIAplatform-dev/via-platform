@@ -5,29 +5,29 @@ import { cartSubmitAction } from "@/app/lib/plan-b/cart-submit";
 
 export const dynamic = "force-dynamic";
 
-// POST /cart — the theme's own cart FORM, which is how a shopper actually reaches checkout.
+// POST /cart: the theme's own cart FORM, which is how a shopper actually reaches checkout.
 //
 // Shopify's cart page and cart drawer are one form with two submit buttons (`update` and
 // `checkout`) posting here. Unrouted, this POST fell through to Next, which took it for a Server
-// Action and answered "Server action not found." — so Checkout did nothing on 16 of 18 captured
+// Action and answered "Server action not found.", so Checkout did nothing on 16 of 18 captured
 // Shopify stores, and on 7 of them the drawer carrying that button is in the header of every page.
 //
 // Answered with 303 See Other, deliberately: it turns the POST into a GET, so the shopper lands on
 // a real page they can reload and go Back to, rather than a resubmit prompt.
 export async function POST(request: NextRequest) {
  const store = await resolveStore(request);
- // 404, not 403 — a request that isn't on a store origin has no business learning this route exists.
+ // 404, not 403: a request that isn't on a store origin has no business learning this route exists.
  if (!store) return new NextResponse("Not found", { status: 404 });
 
  const { token } = cartToken(request);
  const action = cartSubmitAction(await readBody(request));
 
  /**
-  * A RELATIVE Location, deliberately — not NextResponse.redirect(new URL(path, request.url)).
+  * A RELATIVE Location, deliberately, not NextResponse.redirect(new URL(path, request.url)).
   *
   * request.url is resolved from the server's own view of the request, which behind a rewrite is not
   * reliably the seller's domain: locally it comes back as localhost:3333. Redirecting there would
-  * walk the shopper off the store origin, and the cart cookie is scoped to that origin — so they
+  * walk the shopper off the store origin, and the cart cookie is scoped to that origin, so they
   * would land on checkout with an empty bag, one click from paying. A relative Location is resolved
   * by the browser against the page it is already on, so it cannot leave the origin.
   */
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
  }
 
  // An update. One-of-one stock means the only meaningful change is a removal, and the form
- // identifies lines by POSITION — so resolve each against the visitor's real bag rather than
+ // identifies lines by POSITION, so resolve each against the visitor's real bag rather than
  // trusting an index to mean anything on its own.
  if (action.removeLines.length) {
   const lines = await cartLines(token, store.sellerId).catch(() => []);

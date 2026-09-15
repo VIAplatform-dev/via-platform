@@ -55,7 +55,7 @@ export async function pushContacts(provider: EspProvider, auth: { headers: Recor
  for (const batch of batches(contacts)) {
   try {
    if (provider === "klaviyo") {
-    // Their bulk endpoint takes profiles and the list in one job, and answers 202 — accepted, not
+    // Their bulk endpoint takes profiles and the list in one job, and answers 202. Accepted, not
     // finished. There's nothing to poll for here: a profile that fails validation is dropped by
     // them, and re-running the sync is the fix.
     const r = await fetch(`${KLAVIYO}/profile-bulk-import-jobs/`, {
@@ -101,7 +101,7 @@ export async function pushContacts(provider: EspProvider, auth: { headers: Recor
  return { ok: failed === 0, sent, failed, reason };
 }
 
-/** Add or update ONE person — used when someone subscribes, so the other tool learns about them now. */
+/** Add or update ONE person. Used when someone subscribes, so the other tool learns about them now. */
 export async function pushOne(provider: EspProvider, auth: { headers: Record<string, string>; host: string | null }, listId: string, contact: Contact): Promise<boolean> {
  if (provider === "klaviyo") return (await pushContacts(provider, auth, listId, [contact])).ok;
  if (!auth.host) return false;
@@ -122,7 +122,7 @@ export async function pushOne(provider: EspProvider, auth: { headers: Record<str
  *
  * There is no way to know it from the token: their API host is built from a per-account datacentre
  * ("us21"), and this endpoint is the only place it's published. Called once, right after the code
- * exchange, and stored — every later call needs it.
+ * exchange, and stored. Every later call needs it.
  */
 export async function mailchimpMetadata(accessToken: string): Promise<{ dc: string; accountName: string | null } | null> {
  try {
@@ -209,7 +209,7 @@ export async function syncOrders(auth: Auth, slug: string, orders: CommerceOrder
 /**
  * An abandoned basket, and its removal once it converts.
  *
- * Deleting a cart when the order lands is not tidiness — a cart left behind keeps their recovery
+ * Deleting a cart when the order lands is not tidiness. A cart left behind keeps their recovery
  * automation chasing someone who has already paid.
  */
 export async function syncCart(auth: Auth, slug: string, cart: CommerceOrder): Promise<boolean> {

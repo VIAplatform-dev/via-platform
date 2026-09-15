@@ -1,19 +1,19 @@
 // Finding the page a captured store already has for one of its own products.
 //
-// THE BUG THIS FIXES. Every live item on a mirrored storefront links to `/products/{something}` —
+// THE BUG THIS FIXES. Every live item on a mirrored storefront links to `/products/{something}`,
 // the source's handle when the import recorded one, and the VYA item's uuid when it didn't. The
 // product route then looks for a captured page at exactly `/products/{that}`, and when there isn't
 // one it re-captures `{origin}/products/{that}` from the source. Both steps assume SHOPIFY's URL
 // shape. A Squarespace store keeps its product pages at `/shop/p/{slug}`, so for those stores the
 // lookup missed, the re-capture 404'd, and every product click on the mirrored site ended at
-// "Couldn't load that product." — even though the right page was already in our capture table.
+// "Couldn't load that product.". Even though the right page was already in our capture table.
 //
 // (The Squarespace feed reader is also where the missing identity comes from: it reads
 // `?format=json`, which carries `id`, `urlSlug` and `fullUrl` per product, and kept none of them.
-// That's fixed at the source too, but it only helps stores imported from now on — the pages of the
+// That's fixed at the source too, but it only helps stores imported from now on. The pages of the
 // ones already imported still have to be findable, which is what this module is for.)
 //
-// HOW. Not by enumerating each platform's URL scheme — the same reason productGrids() doesn't
+// HOW. Not by enumerating each platform's URL scheme. The same reason productGrids() doesn't
 // enumerate theme class names. We already hold the list of every path this store captured, so the
 // question "does this store have a page for this product?" is answered by looking for a captured
 // page whose LAST SEGMENT is the product's key (its source handle, or its title slugified the way
@@ -26,15 +26,15 @@
 
 /** Segments that mean "a product lives under here" on some platform's URLs.
  *
- *  `shop` is deliberately NOT one of them: Squarespace's product pages are `/shop/p/{slug}` — the
- *  marker is the `p` — while its CATEGORY pages are `/shop/{category}`, which would otherwise
+ *  `shop` is deliberately NOT one of them: Squarespace's product pages are `/shop/p/{slug}`: the
+ *  marker is the `p`, while its CATEGORY pages are `/shop/{category}`, which would otherwise
  *  qualify and could send a shopper to a category page in place of the piece they clicked. */
 const PRODUCT_SEGMENTS = new Set(["products", "product", "p", "item", "items", "listing"]);
 
 /**
  * A title as these platforms slugify it: lowercase, punctuation dropped, spaces to hyphens.
  *
- * Verified against the real thing rather than assumed — Squarespace's own `urlSlug` for "Dolce &
+ * Verified against the real thing rather than assumed. Squarespace's own `urlSlug` for "Dolce &
  * Gabbana Leopard Calf Hair Pointed-Toe Pumps" is "dolce-gabbana-leopard-calf-hair-pointed-toe-pumps",
  * which is exactly this. Shopify's handles are built the same way.
  */
@@ -50,7 +50,7 @@ export function slugifyTitle(title: string): string {
 /**
  * The captured page for a product, chosen from every path this store has.
  *
- * `keys` are the product's candidate identities, most trustworthy first — its source handle, then
+ * `keys` are the product's candidate identities, most trustworthy first. Its source handle, then
  * its slugified title. A page is a candidate when its last segment IS one of those keys and it sits
  * under a product-ish segment, so a top-level page (`/about`) or a collection (`/shop/shoes`) can
  * never be mistaken for one.
@@ -98,7 +98,7 @@ export function pageNamesProduct(html: string, title: string): boolean {
  return false;
 }
 
-/** The page's <h1>s, read off the raw HTML — these documents run to megabytes and are not worth a
+/** The page's <h1>s, read off the raw HTML. These documents run to megabytes and are not worth a
  *  full parse for one string. */
 function headings(html: string): string[] {
  return [...(html || "").matchAll(/<h1[^>]*>([\s\S]{0,400}?)<\/h1>/gi)]

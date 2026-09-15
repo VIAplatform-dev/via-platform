@@ -25,7 +25,7 @@ const SETUP = (shipFromDone: boolean) => [
  { id: "shipping", label: "Switch shipping on", href: "/admin/settings/shipping", done: false },
  { id: "first_listing", label: "List your first piece", href: "/admin/add-listing", done: true },
  { id: "returns", label: "Set your returns policy", href: "/admin/settings/general", done: false },
- { id: "domain", label: "Connect your own domain", hint: "Optional — your VYA address works today", href: "/admin/settings/domain", done: false, optional: true },
+ { id: "domain", label: "Connect your own domain", hint: "Optional: your VYA address works today", href: "/admin/settings/domain", done: false, optional: true },
 ];
 const ONBOARDING = (shipFromDone: boolean) => ({
  ok: true, onboarded: true, shipFromSet: shipFromDone, storeName: "Test store",
@@ -95,7 +95,7 @@ test.describe("Orders · labels need the address", () => {
 test.describe("The real routes", () => {
  test("publishing a draft without a ship-from address is refused with a 409 (single and bulk)", async ({ request }) => {
   // storefront-parity.e2e.ts lends the same store an address for its own tests, and the two files
-  // can run at once — so the verdict comes from the answer, not from a status read a moment earlier.
+  // can run at once, so the verdict comes from the answer, not from a status read a moment earlier.
   const created = await request.post(`/api/store/intake/publish?store=${STORE}`, { headers: cookie(), data: { title: "E2E gated draft", price: 10, condition: "Good", category: "knitwear", status: "draft" } });
   expect(created.status(), await created.text()).toBe(200);
   const id = (await created.json()).itemId as string;

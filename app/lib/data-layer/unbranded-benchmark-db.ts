@@ -1,13 +1,13 @@
 import { neon } from "@neondatabase/serverless";
-import { unstable_cache } from "next/cache";
 import { inferBrandFromTitle } from "../market-data-db";
+import { unstable_cache } from "next/cache";
 import { inferCategoryFromTitle } from "../loadStoreProducts";
 import { materialTier, type MaterialTier } from "../material-tier";
 
-// THE GOLDEN SET — how VYA's OWN unbranded + lesser-known pieces are actually priced, read straight
+// THE GOLDEN SET: how VYA's OWN unbranded + lesser-known pieces are actually priced, read straight
 // from live inventory and grouped by garment category × material tier. For a piece with no brand and
 // no exact comps, this is the strongest anchor there is: real prices set by ~45 curated stores for
-// the same kind of item — not model guesswork. Asking + sold, gated to a reliability floor per
+// the same kind of item, not model guesswork. Asking + sold, gated to a reliability floor per
 // segment. Computed live (pilot-scale items table); can move to the nightly snapshot when it grows.
 
 function db() {
@@ -18,19 +18,8 @@ function db() {
 
 const MIN_ITEMS = 5; // a segment below this is too thin to trust as an anchor
 const MIN_STORES = 2; // and it must span >1 store, so the anchor is a market signal, not one store's bias
-// Explicit "no brand" markers sellers type; everything else is checked against the canonical map.
-const UNBRANDED_RE = /^\s*(unbranded|no[\s-]?brand|no[\s-]?label|none|unknown|n\/?a|unmarked|handmade|vintage|generic)\s*$/i;
-
-export type BrandClass = "unbranded" | "lesser-known" | "known";
-
-/** unbranded (no/marker brand) · lesser-known (a real name, but not in the canonical designer map)
- *  · known (a curated well-known designer). The golden set is unbranded + lesser-known — the pieces
- *  that lack strong external comps and need an intrinsic anchor. */
-export function classifyBrand(brand: string | null | undefined): BrandClass {
- const b = (brand || "").trim();
- if (!b || UNBRANDED_RE.test(b)) return "unbranded";
- return inferBrandFromTitle(b) ? "known" : "lesser-known";
-}
+export { classifyBrand, type BrandClass } from "./unbranded-benchmark-core.ts";
+import { classifyBrand } from "./unbranded-benchmark-core.ts";
 
 function quantile(sorted: number[], q: number): number {
  if (!sorted.length) return 0;
@@ -39,15 +28,15 @@ function quantile(sorted: number[], q: number): number {
 
 type Row = { brand: string | null; material: string | null; category: string; priceCents: number; sellerId: string };
 
-// Category is INFERRED from the title (the codebase convention — brand/category are inferred, not
-// stored — using the same canonical inferrer the pricing engine keys on, so buckets line up with
+// Category is INFERRED from the title (the codebase convention: brand/category are inferred, not
+// stored. Using the same canonical inferrer the pricing engine keys on, so buckets line up with
 // the benchmark lookup). Falls back to the synced product_type, then "other".
 function categoryOf(title: string, stored: string | null): string {
  const inferred = inferCategoryFromTitle(title || "");
  return String(inferred || (stored || "").trim() || "other").toLowerCase();
 }
 
-// Read the GOLDEN SET from the MARKETPLACE catalog (`products`) — ~65 stores of live listings, far
+// Read the GOLDEN SET from the MARKETPLACE catalog (`products`). ~65 stores of live listings, far
 // richer than the pilot OS `items` table. Cached for an hour: the set barely moves minute-to-minute
 // and this scan feeds both the report and the per-price benchmark lookup. Prices are ASKING (live
 // listings), which is exactly "how the stores price these pieces".
@@ -88,7 +77,7 @@ export type UnbrandedSegment = {
  p75Cents: number;
 };
 
-/** The full golden-set breakdown for review — every category × material-tier segment with enough
+/** The full golden-set breakdown for review. Every category × material-tier segment with enough
  *  pieces to be meaningful, most-populated first. This is the "go look at how they're priced" view. */
 export async function getUnbrandedPricingReport(): Promise<{
  segments: UnbrandedSegment[];
@@ -123,7 +112,7 @@ export async function getUnbrandedPricingReport(): Promise<{
  unbranded: rows.filter((r) => classifyBrand(r.brand) === "unbranded").length,
  lesserKnown: rows.filter((r) => classifyBrand(r.brand) === "lesser-known").length,
  thinSegments: thin,
- note: `Asking prices across VYA marketplace's unbranded & lesser-known listings (~65 stores), grouped by category × material tier (segments ≥${MIN_ITEMS} pieces; storeCount shows how many stores back each — the pricing anchor additionally requires >1).`,
+ note: `Asking prices across VYA marketplace's unbranded & lesser-known listings (~65 stores), grouped by category × material tier (segments ≥${MIN_ITEMS} pieces; storeCount shows how many stores back each. The pricing anchor additionally requires >1).`,
  };
 }
 
@@ -140,7 +129,7 @@ export async function getUnbrandedBenchmark(opts: { category: string | null; mat
  const inCat = rows.filter((r) => r.category === cat);
  const tiered = inCat.filter((r) => (materialTier(r.material).tier ?? "unknown") === tier);
  const storesOf = (rs: Row[]) => new Set(rs.map((r) => r.sellerId)).size;
- // Prefer the material-tiered segment, then the whole category — each only if it's both deep
+ // Prefer the material-tiered segment, then the whole category. Each only if it's both deep
  // enough AND spans >1 store (else it's just one store's pricing, not a market anchor).
  const pick = tiered.length >= MIN_ITEMS && storesOf(tiered) >= MIN_STORES
  ? { rows: tiered, seg: `unbranded ${cat} · ${tier === "unknown" ? "unspecified fiber" : `${tier} fiber`}` }

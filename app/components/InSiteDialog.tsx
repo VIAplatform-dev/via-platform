@@ -2,10 +2,10 @@
 
 // In-site replacements for window.confirm / window.alert / window.prompt.
 //
-// The browser's own boxes ("localhost:3333 says — Delete this page?") look like a crash, can't be
+// The browser's own boxes ("localhost:3333 says. Delete this page?") look like a crash, can't be
 // styled, block every other tab event, and on the phone app's web views don't appear at all. This
 // gives an editor one hook with the same three verbs, each returning a promise so a call site reads
-// exactly like the native one did — `if (!(await dialog.confirm(...))) return;` — and one node to
+// exactly like the native one did, `if (!(await dialog.confirm(...))) return;`, and one node to
 // render anywhere in its tree (it portals to <body>, so placement is irrelevant).
 //
 // Styling matches ConfirmDialog in app/infrastructure/admin/ui.tsx (wine primary, rounded card) so

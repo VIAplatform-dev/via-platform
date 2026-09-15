@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   // Load cached Collabs data
   const rows = await sql`SELECT value FROM app_settings WHERE key = 'collabs_data'`;
   if (rows.length === 0 || !rows[0].value) {
-    return NextResponse.json({ error: "No Collabs data cached — run a Collabs sync first" }, { status: 404 });
+    return NextResponse.json({ error: "No Collabs data cached. Run a Collabs sync first" }, { status: 404 });
   }
 
   type Partnership = {

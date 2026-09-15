@@ -1,19 +1,19 @@
 import { neon } from "@neondatabase/serverless";
 
-// Instagram buzz — a LEADING cultural-momentum signal for the Trends tab. Social heat runs ahead of
+// Instagram buzz: a LEADING cultural-momentum signal for the Trends tab. Social heat runs ahead of
 // resale demand (an archival label blows up on IG weeks before eBay volume moves), so this catches
 // surges the price/search signals miss. Persisted daily like the other trend snapshots.
 //
 // Reality of the Instagram Graph API (be honest about the limits):
 //   • It does NOT expose a hashtag's total post count. So "buzz" = summed engagement (likes +
-//     comments) across the tag's TOP media — a real proxy for how much traction the tag is getting.
+//     comments) across the tag's TOP media. A real proxy for how much traction the tag is getting.
 //   • Hashtag queries are capped at 30 UNIQUE hashtags per 7 days per user. Re-querying the same
 //     tag daily counts once, so we track a stable top-N set (IG_MAX_BRANDS) to stay well under it.
 //   • Needs a Meta app + a Business/Creator IG account: IG_ACCESS_TOKEN + IG_BUSINESS_ACCOUNT_ID.
 // Fully dormant (no calls) until those env vars are set.
 
 const IG_API = "https://graph.facebook.com/v21.0";
-const IG_MAX_BRANDS = 12; // unique hashtags/week ceiling is 30 — stay well under it
+const IG_MAX_BRANDS = 12; // unique hashtags/week ceiling is 30. Stay well under it
 
 export function igConfigured(): boolean {
  return Boolean(process.env.IG_ACCESS_TOKEN && process.env.IG_BUSINESS_ACCOUNT_ID);

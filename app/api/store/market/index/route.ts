@@ -5,7 +5,7 @@ import { indexStatus, indexItems } from "@/app/lib/market/embeddings-db";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// GET — how much of this store's inventory the camera can find. POST — index a batch now.
+// GET: how much of this store's inventory the camera can find. POST: index a batch now.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

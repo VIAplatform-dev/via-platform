@@ -3,8 +3,8 @@
  *
  * WHY THIS IS THE ONE THAT MATTERS. Abandoned-cart flows are most of the reason a vintage shop pays
  * for Klaviyo or Mailchimp at all: somebody put a £400 jacket in a bag and walked away, and one
- * email brings a good share of them back. VYA had the whole client for it — syncCart, deleteCart,
- * the Mailchimp cart shape — written, tested and called by absolutely nothing.
+ * email brings a good share of them back. VYA had the whole client for it. SyncCart, deleteCart,
+ * the Mailchimp cart shape. Written, tested and called by absolutely nothing.
  *
  * A CART WITH NO NAME CANNOT BE EMAILED. The bag is a cookie; the shopper is only a person once she
  * has signed in to that store. So this returns null without an email rather than inventing an
@@ -12,7 +12,7 @@
  * before store accounts existed there was nobody to send to.
  *
  * ONE CART PER SHOPPER PER STORE. The id is derived from both, so a second bag does not appear every
- * time a cookie rotates — an inbox with four "you left something behind" emails for one jacket is
+ * time a cookie rotates. An inbox with four "you left something behind" emails for one jacket is
  * worse than none.
  */
 import type { CommerceOrder } from "./esp-commerce";
@@ -50,7 +50,7 @@ export function bagToCart(
   customer: {
    email: who,
    name: opts.name ?? null,
-   // Her customer at this store, and a cart is not consent to market — the subscription state comes
+   // Her customer at this store, and a cart is not consent to market. The subscription state comes
    // from the contact record, not from having a bag.
    subscribed: opts.subscribed === true,
   },

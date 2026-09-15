@@ -1,5 +1,5 @@
 /**
- * What a collection page on a hosted store is allowed to show — and, just as important, what it is
+ * What a collection page on a hosted store is allowed to show, and, just as important, what it is
  * NOT allowed to show when it doesn't know.
  *
  * The cascade used to end like this:
@@ -12,7 +12,7 @@
  * "Blumarine", and "Fendi", and 44 others. ange-archive did it on 4. Fourteen of twenty-three stores
  * were doing it, and it graded clean because nothing compared the page to the seller's own.
  *
- * Those collections are empty on the sellers' own sites too — alaia, blumarine, fendi-1 and brands
+ * Those collections are empty on the sellers' own sites too. Alaia, blumarine, fendi-1 and brands
  * all return zero products from blummier's own store. So the honest answer, and the 1:1 one, is an
  * empty collection. "Something rather than nothing" is only kind when the something is true.
  *
@@ -30,12 +30,12 @@ export type CollectionSources<T> = {
   * We have READ this collection from the seller's own site and know what is in it.
   *
   * The difference between "never read" and "read, and it is empty" is the whole of this module.
-  * shop-vintage-charm had fifteen collections showing six pieces each where her site shows none —
+  * shop-vintage-charm had fifteen collections showing six pieces each where her site shows none,
   * the six that happened to be in them on the day we photographed the page. Without this flag the
   * cascade answered both situations with the stale snapshot.
   */
  membershipKnown?: boolean;
- /** `/collections/all` — the whole catalogue by definition. */
+ /** `/collections/all`: the whole catalogue by definition. */
  isShopAll?: boolean;
 };
 
@@ -43,7 +43,7 @@ export type CollectionContents<T> = {
  items: T[];
  /**
   * Clear the captured grid and show an empty collection. Without this the page keeps the frozen
-  * cards from capture day, which advertise pieces we may no longer be able to sell — the opposite
+  * cards from capture day, which advertise pieces we may no longer be able to sell. The opposite
   * of rendering grids from live inventory.
   */
  renderEmpty: boolean;
@@ -56,7 +56,7 @@ export function chooseCollectionItems<T>(s: CollectionSources<T>): CollectionCon
  if (s.membershipKnown && !s.isShopAll) return { items: [], renderEmpty: true };
  if (s.fromCapturedGrid.length) return { items: s.fromCapturedGrid, renderEmpty: false };
  // Nothing resolved. On a real collection that means it is empty, and we say so. On the catch-all
- // it means we have no live inventory at all — a data problem, not a statement to make to a
- // shopper — so leave the captured page as it is rather than declaring the shop empty.
+ // it means we have no live inventory at all. A data problem, not a statement to make to a
+ // shopper, so leave the captured page as it is rather than declaring the shop empty.
  return { items: [], renderEmpty: !s.isShopAll };
 }

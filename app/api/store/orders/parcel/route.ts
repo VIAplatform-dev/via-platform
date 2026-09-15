@@ -8,11 +8,11 @@ import { logError } from "@/app/lib/error-log";
 
 export const dynamic = "force-dynamic";
 
-// POST { orderIds, action: "posted" | "delivered" | "collected" } — one transition for the whole bag.
+// POST { orderIds, action: "posted" | "delivered" | "collected" }: one transition for the whole bag.
 //
 // Orders are per piece; she posts one parcel. Every id is checked to be this store's, the status
 // flips in ONE statement (all or none), and a "posted" parcel gets ONE tracking email listing every
-// piece — never one per order. `tracking` is accepted for parity with the brief but ignored:
+// piece, never one per order. `tracking` is accepted for parity with the brief but ignored:
 // tracking comes from the label VYA bought, and a typed number would be a second source of truth.
 const ACTIONS = ["posted", "delivered", "collected"] as const;
 type Action = (typeof ACTIONS)[number];
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
  if (!ACTIONS.includes(action)) return NextResponse.json({ error: "Invalid action" }, { status: 400 });
  if (!orderIds.length) return NextResponse.json({ error: "No orders" }, { status: 400 });
 
- // Ownership, every id — never act on another store's order because it shared a list with ours.
+ // Ownership, every id, never act on another store's order because it shared a list with ours.
  const details = await Promise.all(orderIds.map((id) => getOrderDetail(id).catch(() => null)));
  if (details.some((d) => !d || d.sellerId !== seller.id)) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
  }
 
  const changed = await markOrdersShipped(seller.id, orderIds);
- // The bag is every order on the payment, not just the ids sent — a seller who ticked two of three
+ // The bag is every order on the payment, not just the ids sent. A seller who ticked two of three
  // pieces still posts one parcel, and the buyer must still get one email.
  const pi = details.find((d) => d?.stripePaymentIntent)?.stripePaymentIntent ?? null;
  const parcel = pi ? await listParcelOrders(seller.id, pi).catch(() => []) : details.filter((d): d is NonNullable<typeof d> => !!d).map((d) => ({ id: String(d.id), status: String(d.status), itemTitle: d.itemTitle, buyerEmail: d.buyerEmail, trackingNumber: d.trackingNumber, trackingUrl: d.trackingUrl, trackingEmailSentAt: null }));

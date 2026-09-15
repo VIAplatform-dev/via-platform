@@ -1,7 +1,7 @@
 // One "it's on its way" per bag. Sending is injected so this runs under test with fakes.
 //
 // Orders are per piece; the buyer's email should be per parcel. The seller can press Mark posted
-// on the whole bag (orders/parcel route) or on one piece (orders/[id] mark_shipped) — both come
+// on the whole bag (orders/parcel route) or on one piece (orders/[id] mark_shipped). Both come
 // through here, and whichever is pressed first sends the one email that lists every piece.
 
 import { shouldSendParcelEmail } from "./parcels-core.ts";

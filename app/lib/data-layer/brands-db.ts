@@ -3,11 +3,11 @@ import { brands as BRAND_DEFS } from "../brandData";
 import type { BrandRef } from "./brands";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — canonical brand reference table (seeded like era_buckets).
+// Data Layer: canonical brand reference table (seeded like era_buckets).
 //
 // `brand_aliases` is the alias/synonym → canonical map the events ETL resolves
 // brands through. Seeded from brandData (the single brand source), but living in
-// a table so an alias can be added to fix coverage WITHOUT a code deploy — driven
+// a table so an alias can be added to fix coverage WITHOUT a code deploy. Driven
 // by the unresolved-titles coverage report.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ export async function loadBrandRef(): Promise<BrandRef[]> {
 }
 
 // Idempotent re-seed: upsert EVERY alias from BRAND_SEED into brand_aliases. New
-// brands/aliases are added and existing rows are refreshed (label/slug/order) —
+// brands/aliases are added and existing rows are refreshed (label/slug/order),
 // nothing is wiped. Run after brandData gains brands so the live table catches up.
 // Safe to run repeatedly. Returns counts for the response.
 export async function reseedBrandAliases(): Promise<{ brands: number; aliases: number }> {

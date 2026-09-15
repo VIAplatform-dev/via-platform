@@ -27,7 +27,7 @@ type Order = {
  trackingNumber: string | null;
  trackingUrl: string | null;
  internalNote: string | null;
- // Delivered or collected in store. Absent on every order placed before collection existed — those
+ // Delivered or collected in store. Absent on every order placed before collection existed. Those
  // are deliveries, so anything but "pickup" reads as one.
  deliveryMethod?: "ship" | "pickup";
  collectFrom?: string | null;
@@ -161,7 +161,7 @@ export default function OrderDetailPage() {
  try {
  const r = await fetch(`/api/store/orders/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "reject_return", note: rejNote.trim() || null, evidence: rejPhotos, shipBack: rejShipBack }) });
  const d = await r.json();
- if (r.ok) { setRejMsg(`Return rejected — the buyer was notified${d.shipBackUrl ? " and the item is on its way back" : ""}.`); setRejecting(false); }
+ if (r.ok) { setRejMsg(`Return rejected. The buyer was notified${d.shipBackUrl ? " and the item is on its way back" : ""}.`); setRejecting(false); }
  else setRejMsg(d.error || "Couldn’t reject the return.");
  } catch { setRejMsg("Couldn’t reject the return."); }
  setRejBusy(false);
@@ -213,7 +213,7 @@ export default function OrderDetailPage() {
  <Card>
  <CardHeader title={isPickup ? "Collection" : "Fulfillment"} />
  <div className="px-5 py-4">
- {/* Private working note — the buyer never sees this. Sits above fulfilment
+ {/* Private working note: the buyer never sees this. Sits above fulfilment
      because it applies whether the piece ships or is collected. */}
  <div className="mb-5 rounded-xl border border-stone-200 bg-white p-4">
   <div className="mb-2 flex items-baseline justify-between">
@@ -232,22 +232,22 @@ export default function OrderDetailPage() {
  {isPickup ? (
  // Collected in store: no label, no tracking, nothing to post. Just hand it over.
  <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
- <p className="text-[13px] font-medium text-stone-900">Collect in store — no label to print.</p>
+ <p className="text-[13px] font-medium text-stone-900">Collect in store, no label to print.</p>
  <p className="mt-1 text-[13px] text-stone-600">{order.buyerName || order.buyerEmail || "The buyer"} is picking this up{order.collectFrom ? <> at <b className="text-stone-900">{order.collectFrom}</b></> : null}. Mark it delivered when they’ve taken it.</p>
  {order.instructions && <p className="mt-1.5 text-xs text-stone-500">You told them: “{order.instructions}”</p>}
  </div>
  ) : order.labelUrl ? (
  <div className="mb-4">
- {order.status !== "shipped" && order.status !== "delivered" && <p className="mb-2 text-[13px] text-stone-600">✓ Prepaid label ready — print it, drop off, then <b>Mark shipped</b>.</p>}
+ {order.status !== "shipped" && order.status !== "delivered" && <p className="mb-2 text-[13px] text-stone-600">✓ Prepaid label ready. Print it, drop off, then <b>Mark shipped</b>.</p>}
  <a href={order.labelUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-md bg-[#5D0F17] px-4 text-[13px] font-medium text-white transition hover:bg-[#4a0c12]">Print label ↗</a>
  {order.trackingNumber && <p className="mt-2.5 text-[13px] text-stone-500">Tracking: {order.trackingUrl ? <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[#5D0F17] underline">{order.trackingNumber}</a> : order.trackingNumber}</p>}
  </div>
  ) : quote ? (
  <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
- <p className="text-[13px] text-stone-700">{quote.provider} {quote.service}{quote.sellerPays ? <> — <b className="text-stone-900">{money(quote.costCents, cur)}</b></> : ""}{quote.estDays ? ` · ~${quote.estDays}d` : ""}</p>
- <p className="mt-1 text-xs text-stone-500">{quote.sellerPays ? "This label cost will be charged to your card on file." : "The buyer already paid shipping — no charge to you."}</p>
+ <p className="text-[13px] text-stone-700">{quote.provider} {quote.service}{quote.sellerPays ? <> · <b className="text-stone-900">{money(quote.costCents, cur)}</b></> : ""}{quote.estDays ? ` · ~${quote.estDays}d` : ""}</p>
+ <p className="mt-1 text-xs text-stone-500">{quote.sellerPays ? "This label cost will be charged to your card on file." : "The buyer already paid shipping, no charge to you."}</p>
  <div className="mt-3 flex gap-2">
- <Button size="sm" onClick={buyLabelNow} disabled={labelBusy}>{labelBusy ? (quote.sellerPays ? "Buying…" : "Generating…") : (quote.sellerPays ? `Buy label — ${money(quote.costCents, cur)}` : "Generate prepaid label")}</Button>
+ <Button size="sm" onClick={buyLabelNow} disabled={labelBusy}>{labelBusy ? (quote.sellerPays ? "Buying…" : "Generating…") : (quote.sellerPays ? `Buy label: ${money(quote.costCents, cur)}` : "Generate prepaid label")}</Button>
  <Button size="sm" variant="ghost" onClick={() => setQuote(null)}>Cancel</Button>
  </div>
  </div>
@@ -267,7 +267,7 @@ export default function OrderDetailPage() {
  {rejecting && (
  <div className="mt-3 space-y-2 rounded-lg border border-stone-200 p-3">
  <p className="text-[13px] font-medium text-stone-700">Reject this return</p>
- <textarea value={rejNote} onChange={(e) => setRejNote(e.target.value)} rows={2} placeholder="Reason (shown to the buyer) — e.g. came back worn, or not the item that was sent" className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] outline-none focus:border-stone-400" />
+ <textarea value={rejNote} onChange={(e) => setRejNote(e.target.value)} rows={2} placeholder="Reason (shown to the buyer). E.g. came back worn, or not the item that was sent" className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] outline-none focus:border-stone-400" />
  <div className="flex flex-wrap items-center gap-2">
  {/* eslint-disable-next-line @next/next/no-img-element */}
  {rejPhotos.map((u, i) => <img key={i} src={u} alt="" className="h-12 w-12 rounded border border-stone-200 object-cover" />)}
@@ -307,10 +307,10 @@ export default function OrderDetailPage() {
  <Card>
  <CardHeader title="Customer" />
  <div className="px-5 py-4">
- {/* A collection has no delivery address — say so, rather than showing a bare dash. */}
+ {/* A collection has no delivery address, say so, rather than showing a bare dash. */}
  {isPickup
- ? <p className="text-[13px] leading-relaxed text-stone-700">{order.buyerName || "—"}<br /><span className="text-stone-500">Collecting in store — no delivery address.</span></p>
- : <p className="text-[13px] leading-relaxed text-stone-700">{addrLines.length ? addrLines.map((l, i) => <span key={i}>{l}<br /></span>) : "—"}</p>}
+ ? <p className="text-[13px] leading-relaxed text-stone-700">{order.buyerName || "-"}<br /><span className="text-stone-500">Collecting in store, no delivery address.</span></p>
+ : <p className="text-[13px] leading-relaxed text-stone-700">{addrLines.length ? addrLines.map((l, i) => <span key={i}>{l}<br /></span>) : "-"}</p>}
  <div className="mt-3 space-y-1 text-[13px] text-stone-500">
  {order.buyerEmail && <p className="truncate">{order.buyerEmail}</p>}
  {order.buyerPhone && <p>{order.buyerPhone}</p>}

@@ -75,7 +75,7 @@ function SearchResultsContent({ q }: { q: string }) {
  const router = useRouter();
  const [refine, setRefine] = useState(q);
  const [storesOpen, setStoresOpen] = useState(false);
- // Price, size and colour — the same three the category pages offer. Applied SERVER-side (they
+ // Price, size and colour. The same three the category pages offer. Applied SERVER-side (they
  // are part of the query key below), because the results are paged and filtering the downloaded
  // page would silently hide matches further down.
  const [sizes, setSizes] = useState<string[]>([]);
@@ -90,7 +90,7 @@ function SearchResultsContent({ q }: { q: string }) {
  const [sort, setSort] = useState<SortOption>(() => readSearchFilter(q).sort);
 
  // When the query changes (a new search in the same mount), load that query's
- // saved filter (or reset). Skips the first render — the lazy initializers above
+ // saved filter (or reset). Skips the first render. The lazy initializers above
  // already restored it, which is what makes back-navigation keep the filter.
  const prevQ = useRef(q);
  useEffect(() => {
@@ -125,7 +125,7 @@ function SearchResultsContent({ q }: { q: string }) {
 
  // Responses do not arrive in the order they were sent. Without this guard a slow
  // reply for an older query (or an older page) lands last and overwrites the results
- // that are actually on screen — which is how a search with hundreds of matches ends
+ // that are actually on screen, which is how a search with hundreds of matches ends
  // up reporting none.
  const reqSeq = useRef(0);
 
@@ -192,12 +192,12 @@ function SearchResultsContent({ q }: { q: string }) {
  .finally(() => { if (seq === reqSeq.current) setLoadingMore(false); });
  };
 
- // Filter chips come from the API, counted over every match — so they are complete on
+ // Filter chips come from the API, counted over every match, so they are complete on
  // page one and their counts don't grow as you load more.
  const productStores = storeFacets;
  // Filtering and sorting already happened in SQL.
  const displayProducts = products;
- // Everything narrowing the results right now — the button has to say so, or a filter left on
+ // Everything narrowing the results right now. The button has to say so, or a filter left on
  // from a previous search silently explains a thin page.
  const activeFilterCount =
   (selectedStore ? 1 : 0) + sizes.length + colors.length + (price.min || price.max ? 1 : 0);
@@ -341,12 +341,12 @@ function SearchResultsContent({ q }: { q: string }) {
  </div>
  )}
 
- {/* Toolbar — the same shape as a category page: refine, count, Filter, Sort.
+ {/* Toolbar: the same shape as a category page: refine, count, Filter, Sort.
      The store list used to sit here as a chip for EVERY store that had a hit, which for
      a query like "bags" is 53 of them: two full screens of chips before a single product. */}
  {!loading && products.length > 0 && (
  <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full mb-8">
- {/* Refine — runs a new search rather than filtering what's loaded */}
+ {/* Refine: runs a new search rather than filtering what's loaded */}
  <form
  onSubmit={(e) => { e.preventDefault(); const t = refine.trim(); if (t) router.push(`/search?q=${encodeURIComponent(t)}`); }}
  className="relative w-full sm:max-w-xs"
@@ -371,7 +371,7 @@ function SearchResultsContent({ q }: { q: string }) {
  {total.toLocaleString()} product{total !== 1 ? "s" : ""}
  </span>
 
- {/* Store filter — a scrolling list in a popover, not a wall */}
+ {/* Store filter: a scrolling list in a popover, not a wall */}
  {productStores.length > 1 && (
  <div className="relative">
  <button

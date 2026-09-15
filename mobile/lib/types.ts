@@ -1,4 +1,4 @@
-// Shapes returned by the VYA API. Kept deliberately close to what the routes actually send —
+// Shapes returned by the VYA API. Kept deliberately close to what the routes actually send,
 // see app/api/public/* and app/api/mobile/* in the web repo, which are the source of truth.
 
 export type Product = {
@@ -46,7 +46,7 @@ export type SavedSearch = {
   createdAt?: string;
 };
 
-/** One line in the cart. The cart is local to the device — see lib/cart.tsx for why. */
+/** One line in the cart. The cart is local to the device. See lib/cart.tsx for why. */
 export type CartLine = {
   productId: number;
   name: string;

@@ -8,13 +8,13 @@ import type { DraftFields } from "./intake";
 // serialise them into the URL. It is also the thing that has to survive her backing up one screen
 // to fix a brand, which is the single most likely detour in this flow.
 //
-// Deliberately NOT persisted. A half-finished piece belongs in Drafts on the server — that is what
-// "Draft" on the Details screen is for — not in a local cache that quietly diverges from it.
+// Deliberately NOT persisted. A half-finished piece belongs in Drafts on the server. That is what
+// "Draft" on the Details screen is for, not in a local cache that quietly diverges from it.
 
 type Draft = {
   photos: string[];
   setPhotos: (p: string[]) => void;
-  /** What SHE typed. Authoritative — the AI only fills what is missing from this. */
+  /** What SHE typed. Authoritative: the AI only fills what is missing from this. */
   typed: Record<string, string>;
   setTyped: (t: Record<string, string>) => void;
   /** What came back from /api/store/intake, merged over what she typed. */

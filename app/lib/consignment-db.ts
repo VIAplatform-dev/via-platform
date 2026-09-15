@@ -5,7 +5,7 @@ import { resolveSplitPct, consignorCutCents, type SplitRule } from "./consignmen
 import { canTransition, ledgerEffect, type PayoutStatus } from "./consignment-payout-core";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Consignment core — native to VYA (no Shopify). A thin layer over the existing products +
+// Consignment core: native to VYA (no Shopify). A thin layer over the existing products +
 // orders: six tables (settings, consignors, split rules, items, ledger, payouts). Pure business
 // logic lives in consignment-logic.ts.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ export async function ensureConsignmentTables(): Promise<void> {
  await sql`CREATE INDEX IF NOT EXISTS idx_ledger_consignor ON consignor_ledger(consignor_id, created_at)`;
  // Where the sale happened, and what the marketplace kept. Without the channel nothing downstream
  // can tell money that came through VYA from money that went straight to the seller's own eBay
- // account — and the auto-payout transfers from VYA's balance, so it must be able to tell.
+ // account, and the auto-payout transfers from VYA's balance, so it must be able to tell.
  await sql`ALTER TABLE consignor_ledger ADD COLUMN IF NOT EXISTS channel TEXT`;
  await sql`ALTER TABLE consignor_ledger ADD COLUMN IF NOT EXISTS fee_cents INT`;
  await sql`ALTER TABLE consignment_settings ADD COLUMN IF NOT EXISTS marketplace_fee TEXT NOT NULL DEFAULT 'store'`;
@@ -123,7 +123,7 @@ export async function ensureConsignmentTables(): Promise<void> {
  await sql`CREATE INDEX IF NOT EXISTS idx_payouts_consignor ON consignor_payouts(consignor_id)`;
  // The ACH debit that funds an off-platform payout. Held here rather than in a side table because
  // the webhook only ever knows the PaymentIntent, and it has to find THIS row to settle or release
- // it — an unfindable row is a hold that never comes off someone's balance.
+ // it: an unfindable row is a hold that never comes off someone's balance.
  await sql`ALTER TABLE consignor_payouts ADD COLUMN IF NOT EXISTS payment_intent_id TEXT`;
  await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_intent ON consignor_payouts(payment_intent_id) WHERE payment_intent_id IS NOT NULL`;
  ensured = true;
@@ -143,7 +143,7 @@ export type ConsignmentSettings = {
  agreementTerms: string | null;
  collectW9: boolean;
  /** Who absorbs eBay's / Depop's cut on an off-platform sale. Defaults to the store, which is what
-  *  the code did before there was a choice — so no existing store's numbers move. */
+  *  the code did before there was a choice, so no existing store's numbers move. */
  marketplaceFee: FeePolicy;
 };
 
@@ -232,7 +232,7 @@ export async function createConsignor(storeSlug: string, data: { name: string; e
  return toConsignor(rows[0]);
 }
 
-/** Active consignors with a connected Stripe account — candidates for the auto-payout cron. */
+/** Active consignors with a connected Stripe account. Candidates for the auto-payout cron. */
 export async function listStripeConnectedConsignors(): Promise<Array<{ id: number; storeSlug: string; stripeAccountId: string }>> {
  await ensureConsignmentTables();
  const sql = db();
@@ -264,7 +264,7 @@ export async function updateConsignor(id: number, patch: Partial<{ name: string;
  await sql`UPDATE consignors SET name=${m.name}, email=${m.email}, phone=${m.phone}, default_split_pct=${m.defaultSplitPct}, payout_method=${m.payoutMethod}, stripe_account_id=${m.stripeAccountId}, agreement_accepted_at=${m.agreementAcceptedAt}, status=${m.status} WHERE id=${id}`;
 }
 
-/** Hard-delete a consignor and all their consignment records. For cleanup / mistaken adds —
+/** Hard-delete a consignor and all their consignment records. For cleanup / mistaken adds,
  *  their ledger + payout history goes with them, so use deactivate (status) to just hide one. */
 export async function deleteConsignor(id: number): Promise<void> {
  await ensureConsignmentTables();
@@ -291,7 +291,7 @@ export type ConsignorImportRow = {
  *  duplicating, and only ever FILLS blank fields (never clobbers data the store already curated).
  *
  *  Balances are the delicate part: a carried-over balance is money the store ALREADY owes, so we
- *  record it as a single `opening_balance` ledger entry — the stated figure — and never replay the
+ *  record it as a single `opening_balance` ledger entry, the stated figure, and never replay the
  *  sales that produced it. Writing it once (guarded) means a re-import can't stack it, and a future
  *  VYA sale credits on TOP of it. This is what keeps the same debt from being counted twice. */
 export async function importConsignors(
@@ -306,7 +306,7 @@ export async function importConsignors(
  const name = (r.name || "").trim();
  if (!name) continue;
 
- // Match an existing consignor by email first (stable), then by name — scoped to this store.
+ // Match an existing consignor by email first (stable), then by name. Scoped to this store.
  let existing: Consignor | null = null;
  if (r.email) {
  const m = (await sql`SELECT * FROM consignors WHERE store_slug = ${storeSlug} AND LOWER(email) = LOWER(${r.email}) LIMIT 1`) as Array<Record<string, unknown>>;
@@ -319,7 +319,7 @@ export async function importConsignors(
 
  let consignor: Consignor;
  if (existing) {
- // Fill-if-missing only — the import never overwrites contact/split data the store already has.
+ // Fill-if-missing only: the import never overwrites contact/split data the store already has.
  await updateConsignor(existing.id, {
  email: existing.email ?? r.email ?? null,
  phone: existing.phone ?? r.phone ?? null,
@@ -333,7 +333,7 @@ export async function importConsignors(
  added++;
  }
 
- // Opening balance — recorded ONCE per consignor (guarded), never a replay of past sales.
+ // Opening balance: recorded ONCE per consignor (guarded), never a replay of past sales.
  if (r.balanceCents > 0) {
  const has = (await sql`SELECT 1 FROM consignor_ledger WHERE consignor_id = ${consignor.id} AND type = 'opening_balance' LIMIT 1`) as unknown[];
  if (!has.length) {
@@ -371,7 +371,7 @@ export async function setSplitRules(storeSlug: string, rules: SplitRule[]): Prom
  }
 }
 
-/** The split % to freeze onto an item at intake — the consignor's rate, else a store rule, else default. */
+/** The split % to freeze onto an item at intake. The consignor's rate, else a store rule, else default. */
 export async function resolveSplitForIntake(storeSlug: string, consignorId: number, priceCents: number, category: string | null): Promise<number> {
  const [consignor, rules, settings] = await Promise.all([getConsignor(consignorId), getSplitRules(storeSlug), getConsignmentSettings(storeSlug)]);
  return resolveSplitPct({
@@ -414,7 +414,7 @@ export async function getConsignmentItemByProduct(productId: string): Promise<Co
 }
 
 /**
- * Unassign a piece from its consignor — "this one is mine after all".
+ * Unassign a piece from its consignor. "this one is mine after all".
  *
  * ONLY WHILE THE ROW IS STILL `active`. Once a consigned piece sells, the sale is ledgered against
  * that consignor (creditConsignedSale) and may already be part of a balance or a payout; dropping
@@ -427,16 +427,16 @@ export async function removeConsignmentItemByProduct(productId: string): Promise
  const existing = await getConsignmentItemByProduct(productId);
  if (!existing) return { ok: true };
  if (existing.status !== "active") {
- return { ok: false, reason: "This piece has already sold as a consignment — its record has to stay with the sale." };
+ return { ok: false, reason: "This piece has already sold as a consignment. Its record has to stay with the sale." };
  }
  await sql`DELETE FROM consignment_items WHERE product_id = ${productId} AND status = 'active'`;
  return { ok: true };
 }
 
 /** The consignor cut to ROUTE INTO VYA's balance at checkout (added to the Stripe application fee).
- *  Nonzero ONLY when the consignor is paid by Stripe direct-deposit — then VYA holds the cut and
+ *  Nonzero ONLY when the consignor is paid by Stripe direct-deposit, then VYA holds the cut and
  *  disburses it. For cash / check / store credit the store keeps the FULL proceeds and settles with
- *  the consignor directly, so VYA holds nothing (returns 0) — which also keeps that path clear of
+ *  the consignor directly, so VYA holds nothing (returns 0), which also keeps that path clear of
  *  any money-transmission question. Either way the sale is ledgered for bookkeeping (creditConsignedSale). */
 export async function consignorCutToHold(productId: string, salePriceCents: number): Promise<number> {
  const ci = await getConsignmentItemByProduct(productId).catch(() => null);
@@ -458,7 +458,7 @@ export async function listConsignmentItemsByConsignor(consignorId: number): Prom
 }
 
 /**
- * Sale hook — when a VYA order sells a consigned item, mark it sold and credit the consignor
+ * Sale hook, when a VYA order sells a consigned item, mark it sold and credit the consignor
  * their split. Idempotent: only an item still 'active' is credited, so a re-delivered webhook
  * won't double-pay.
  */
@@ -484,7 +484,7 @@ export async function creditConsignedSale(opts: { productId: string; orderId: st
 }
 
 /**
- * Refund hook — undo a consigned sale: return the item to 'active' (it's relisted) and DEBIT back the
+ * Refund hook: undo a consigned sale: return the item to 'active' (it's relisted) and DEBIT back the
  * consignor's credit, so a refunded sale is never paid out. Idempotent: only a 'sold' item matching
  * this order reverses (the guarded UPDATE means a repeated refund can't double-debit).
  */
@@ -504,10 +504,10 @@ export async function reverseConsignedSale(opts: { productId: string; orderId: s
 }
 
 /**
- * Expiry sweep — flip every still-'active' consigned item whose agreed end date (`expires_at`) has
+ * Expiry sweep: flip every still-'active' consigned item whose agreed end date (`expires_at`) has
  * passed to 'expired' (surfaces as "Ended" in the consignor portal), and return the affected pieces
  * (with title + consignor name) so the caller can email each store a "these consignments ended" digest.
- * Does NOT pull the item from sale — the store decides whether to return the piece or renew the terms.
+ * Does NOT pull the item from sale. The store decides whether to return the piece or renew the terms.
  * Idempotent: the guarded UPDATE means an item is only ever swept once.
  */
 export async function expireOverdueConsignments(): Promise<
@@ -544,7 +544,7 @@ export async function getConsignorBalanceCents(consignorId: number): Promise<num
  return Number(rows[0]?.bal ?? 0);
 }
 
-// ── Dashboard summary — real balances, 8-week sales volume, and a payout activity feed ──
+// ── Dashboard summary: real balances, 8-week sales volume, and a payout activity feed ──
 export type ConsignmentSummary = {
  availableCents: number; // payable now (past the return hold), store-wide
  owedCents: number; // total owed to all consignors
@@ -622,11 +622,11 @@ export async function getConsignmentSummary(storeSlug: string): Promise<Consignm
 
 /** Balance eligible for payout now: sale credits older than the store's return-hold, minus payouts. */
 /**
- * What can be paid out AUTOMATICALLY — which is not the same as what is owed.
+ * What can be paid out AUTOMATICALLY, which is not the same as what is owed.
  *
  * The auto-payout is a Stripe transfer from VYA's own balance. That balance holds the consignor's
  * cut only for sales that came through VYA: her storefront, or Market Mode. When a cross-listed
- * piece sells on eBay, eBay pays the SELLER directly and VYA is given nothing — so transferring
+ * piece sells on eBay, eBay pays the SELLER directly and VYA is given nothing, so transferring
  * against that credit would be VYA sending its own money for a sale it never processed.
  *
  * Off-platform credits are therefore excluded here. The consignor is still owed every cent of them;
@@ -644,7 +644,7 @@ export async function getPayableBalanceCents(consignorId: number, holdDays: numb
 }
 
 /**
- * Owed for sales that happened somewhere else — real debt, just not VYA's to transfer.
+ * Owed for sales that happened somewhere else. Real debt, just not VYA's to transfer.
  *
  * Broken out by channel so the store can reconcile it against the eBay or Depop payout that landed
  * in its own account, which is where that money actually is.
@@ -712,7 +712,7 @@ export async function getConsignorStatement(consignorId: number): Promise<{ item
 //
 // recordPayout debits the consignor's ledger the moment the row exists, which RESERVES the money so
 // two payouts can't be started for the same $50. For an ACH-funded payout that reservation is held
-// for days while the debit clears, and if the debit bounces it has to come back — see
+// for days while the debit clears, and if the debit bounces it has to come back. See
 // consignment-payout-core.ts, which owns the rules; this half just applies them to the database.
 
 /** Money already reserved by a debit that hasn't cleared. Subtracted before starting another. */
@@ -762,7 +762,7 @@ export async function settlePayoutByIntent(
 
  if (ledgerEffect(from, to) === "release") {
   // Give the money back. A positive entry rather than deleting the debit, so the history still
-  // shows that a payout was attempted and bounced — she can see why the balance moved twice.
+  // shows that a payout was attempted and bounced. She can see why the balance moved twice.
   const note = to === "failed" ? "bank debit didn’t clear" : "payout cancelled";
   await sql`
   INSERT INTO consignor_ledger (store_slug, consignor_id, type, amount_cents, payout_id, note)

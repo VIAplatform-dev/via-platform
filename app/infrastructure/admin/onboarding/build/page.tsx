@@ -1,7 +1,7 @@
 "use client";
 
-// Guided "build from scratch" onboarding — a Squarespace-style flow with a fully INTERACTIVE preview
-// (VYA's real Blocks renderer — scroll it, click the nav to move between pages) on the left and one
+// Guided "build from scratch" onboarding. A Squarespace-style flow with a fully INTERACTIVE preview
+// (VYA's real Blocks renderer. Scroll it, click the nav to move between pages) on the left and one
 // decision per step on the right: look → pages → colours → fonts. In VYA a "look" IS the personality
 // (layout + colours + type as one kit), so there's a single look step. On finish it writes the theme +
 // pages and hands off to the Canva-style studio.
@@ -16,16 +16,16 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 
 const ACCENT = "#5D0F17";
 
-// In VYA the "personality" and the "template" are the same choice — each look IS a curated kit
+// In VYA the "personality" and the "template" are the same choice. Each look IS a curated kit
 // (layout + colours + type + the pages that come with it). So there's ONE look step, not two.
 //
 // The personality word IS the template's name, read from storefront-templates. This page used to
-// keep its own map of them — a second set of words for the same eight looks, which is precisely the
+// keep its own map of them. A second set of words for the same eight looks, which is precisely the
 // drift the note below warns about: a seller met "Collector" here and "Heirloom" in the gallery for
 // the same template. One name, one place.
 
 // The font pairings, the sell-categories and their presets all live in storefront-tailoring so the
-// signup wizard, this build wizard and the one-shot auto-build can't drift apart — this page carried
+// signup wizard, this build wizard and the one-shot auto-build can't drift apart. This page carried
 // its own copy of all three until the eight-template rewrite, and every one of them went stale.
 const FONT_PAIRS = TAILOR_FONT_PAIRS.map((f) => ({ ...f, name: `${f.heading} / ${f.body}` }));
 
@@ -44,13 +44,13 @@ const SAMPLE = [
 ];
 
 // The look IS the first decision. "What do you sell" used to lead, but it asks a seller to
-// describe their inventory before they've seen anything — and signup already asked. Categories
+// describe their inventory before they've seen anything, and signup already asked. Categories
 // still arrive from signup via the URL and still pick the recommended template; they're just not
 // a question here any more.
 const STEPS = ["Design", "Pages", "Colours", "Fonts"];
 const ff = (name: string) => `'${name}', ${SERIF_FONTS.has(name) ? "Georgia, serif" : "system-ui, sans-serif"}`;
 
-// Every font any picker or the preview might show — loaded once so previews render in the real face.
+// Every font any picker or the preview might show. Loaded once so previews render in the real face.
 const ALL_WIZARD_FONTS = Array.from(new Set([
  ...FONT_PAIRS.flatMap((f) => [f.heading, f.body]),
  ...STOREFRONT_TEMPLATES.flatMap((t) => [t.fonts.heading, t.fonts.body]),
@@ -58,7 +58,7 @@ const ALL_WIZARD_FONTS = Array.from(new Set([
 
 /**
  * Exported so /admin/onboarding can render this INLINE once the store exists, rather than
- * navigating to it. Onboarding asks one question first — bring a site, or build one — and a
+ * navigating to it. Onboarding asks one question first, bring a site, or build one, and a
  * full page navigation there meant a white flash between the fork and the builder.
  *
  * Props win over the URL when given; the search-param path stays for direct visits to
@@ -69,7 +69,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  initialCats?: string[];
  /**
   * Runs before anything is written, with the name the seller typed on the Look step.
-  * Onboarding uses it to CREATE the store at that moment — the slug is derived from the
+  * Onboarding uses it to CREATE the store at that moment. The slug is derived from the
   * name, so the store cannot be created earlier with a placeholder without locking in a
   * wrong address. Return false to abort (the error is shown by the caller).
   */
@@ -77,14 +77,14 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
 } = {}) {
  const router = useRouter();
  const [step, setStep] = useState(0);
- // Which way the last move went, so the incoming step slides in from the side it came from —
+ // Which way the last move went, so the incoming step slides in from the side it came from,
  // Next enters from the right, Back from the left. Without this every step animates the same
  // way and going Back feels like going forward.
  const [dir, setDir] = useState<1 | -1>(1);
  const goStep = (n: number) => {
   setDir(n > step ? 1 : -1);
   setStep(n);
-  // Arriving at Pages, show one of the pages being discussed rather than the home page —
+  // Arriving at Pages, show one of the pages being discussed rather than the home page,
   // otherwise the step talks about pages while the preview shows a hero.
   if (n === 1) setPreviewPage((cur) => (cur === "home" || cur === "shop" ? (firstSelectedPage() ?? cur) : cur));
   // Leaving Pages, come back to Home so Colours and Fonts are judged on the page that matters.
@@ -93,18 +93,18 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  // Empty, not "Your store": a prefilled default is something to delete before you can type,
  // and it shows up in the preview as if it were a real decision the seller had made.
  const [name, setName] = useState(initialName || "");
- const [cats, setCats] = useState<string[]>([]); // what they sell (ordered — first pick leads the look)
- // Free-typed categories from signup. Nothing adds to them here — the look, not the inventory,
- // is what this wizard asks about — but they still shape the starting content.
+ const [cats, setCats] = useState<string[]>([]); // what they sell (ordered. First pick leads the look)
+ // Free-typed categories from signup. Nothing adds to them here. The look, not the inventory,
+ // is what this wizard asks about, but they still shape the starting content.
  const [customs] = useState<string[]>([]);
  // A live id, not a retired one. "editorial-luxe" only resolved because getTemplate falls through
- // the legacy map — a default should name something that exists.
+ // the legacy map: a default should name something that exists.
  const [templateId, setTemplateId] = useState("elegant");
  const [pages, setPages] = useState<Set<string>>(new Set(["about", "faq"]));
  const [paletteId, setPaletteId] = useState<string | null>(null);
  const [fontIdx, setFontIdx] = useState<number | null>(null);
  const [previewPage, setPreviewPage] = useState("home"); // which page the live preview is showing
- // Replaying an animation needs a NEW key, not a class swap — so a counter drives the remount and
+ // Replaying an animation needs a NEW key, not a class swap, so a counter drives the remount and
  // `animKind` picks how big the move is. A whole template is a real change and gets the full
  // fade-up; a palette, a font pairing or a page change is a smaller one and gets a quick fade,
  // otherwise clicking through swatches feels sluggish.
@@ -112,7 +112,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  const [animKind, setAnimKind] = useState<"template" | "tone">("template");
  const prevTemplate = useRef(templateId);
  const [busy, setBusy] = useState(false);
- // The storefront already supports a logo — StoreHeader draws it in place of the store name — so
+ // The storefront already supports a logo, StoreHeader draws it in place of the store name, so
  // this only needs somewhere to put one. Same upload path the studio uses.
  const [logo, setLogo] = useState("");            // preview src: an object URL until uploaded
  const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -122,8 +122,8 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  /**
   * Preview immediately from an object URL and defer the real upload to finish().
   *
-  * When onboarding runs this wizard the STORE DOES NOT EXIST YET — it is created from the name
-  * typed on this very step — so /api/store/assets would 401 and the logo would silently vanish.
+  * When onboarding runs this wizard the STORE DOES NOT EXIST YET. It is created from the name
+  * typed on this very step, so /api/store/assets would 401 and the logo would silently vanish.
   * Holding the File and uploading once the store exists works in both cases; standalone visits
   * just upload a few seconds later than they used to.
   */
@@ -146,7 +146,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
   finally { setUploadingLogo(false); }
  }
 
- // Signup hands over what it already asked — the store name and what they sell — so the seller
+ // Signup hands over what it already asked, the store name and what they sell, so the seller
  // isn't asked the same questions twice on the way into the builder.
  const params = useSearchParams();
  useEffect(() => {
@@ -166,7 +166,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
 
  // The first selected category with a known preset leads the look; falling back to the raw first pick.
  const primary = cats.map((k) => CATEGORY_PRESET[k]).find(Boolean) || null;
- // Selecting categories tailors the whole kit — the look (template/palette/fonts) + content. This runs
+ // Selecting categories tailors the whole kit. The look (template/palette/fonts) + content. This runs
  // when the picks change; the seller can still override every choice in the later steps.
  useEffect(() => {
  if (!primary) return;
@@ -183,7 +183,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  const fonts = fontIdx != null ? { heading: FONT_PAIRS[fontIdx].heading, body: FONT_PAIRS[fontIdx].body } : tmpl.fonts;
  const fontHref = useMemo(() => storefrontFontsHref(ALL_WIZARD_FONTS), []);
  // Every page the store will actually get, tailored to what they sell. Built once per template so the
- // preview and the store written on finish come from the same call — they used to be assembled
+ // preview and the store written on finish come from the same call. They used to be assembled
  // separately, which is how the preview could show a page the finished store didn't have.
  const tailored = useMemo(() => ({
  home: tailorBlocks(templateBlocks(templateId), cats, customs),
@@ -195,7 +195,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
 
  /**
   * The first page the seller has ticked, for the preview to land on when the Pages step opens.
-  * A function declaration (not a const) so goStep — defined above — can call it; it only ever
+  * A function declaration (not a const) so goStep, defined above. Can call it; it only ever
   * runs on a click, by which point pageOptions and pages are initialised.
   */
  function firstSelectedPage(): string | null {
@@ -244,7 +244,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [activePages.length, step]);
 
- // The name field is on step 0 ("Name & look"), not step 1 ("Pages") — the old guard blocked the
+ // The name field is on step 0 ("Name & look"), not step 1 ("Pages"). The old guard blocked the
  // wrong step. It went unnoticed while the name defaulted to "Your store", because that always
  // satisfied the length check; the moment the default became empty it locked Next on Pages while
  // leaving the step that actually asks for a name unguarded.
@@ -262,8 +262,8 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  // store, so there is nothing useful to do if this fails.
  if (onBeforeFinish && !(await onBeforeFinish(name.trim()))) return;
  const logoUrl = await commitLogo();
- // Only the pages the seller kept ticked. Everything else — sections, palette, type, corners,
- // header, catalogue density — is the template as previewed, so the store they land in is the
+ // Only the pages the seller kept ticked. Everything else: sections, palette, type, corners,
+ // header, catalogue density: is the template as previewed, so the store they land in is the
  // store they just spent four steps looking at.
  const extraPages = tailored.pages.filter((p) => pages.has(p.slug));
  await fetch("/api/store/storefront/design", {
@@ -272,7 +272,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  template: templateId, applyContent: false,
  colors, fonts, radius: tmpl.radius, headerLayout: tmpl.headerLayout, shopGrid: tmpl.grid, productLayout: tmpl.productLayout,
  blocks: tailored.home, shopBlocks: tailored.shop, extraPages,
- // The name typed on the Look step was previously preview-only — nothing ever persisted it,
+ // The name typed on the Look step was previously preview-only. Nothing ever persisted it,
  // so it was discarded the moment the wizard closed. It is the store's wordmark; send it.
  storeName: name.trim() || undefined,
  ...(logoUrl ? { logo: logoUrl } : {}),
@@ -291,7 +291,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  <div className="flex min-h-0 flex-1">
  {/* ── Live preview ─────────────────────────────────────────────── */}
  {step === 1 ? (
- /* PAGES STEP — big page previews side by side (Squarespace-style). Ticking a page mounts a new
+ /* PAGES STEP: big page previews side by side (Squarespace-style). Ticking a page mounts a new
     card that slides in, and the strip scrolls right to reveal it; unticking removes it. Each card
     is large and readable, and the row scrolls horizontally for as many pages as you add. */
  <div ref={stripRef} className="hidden min-w-0 flex-1 items-start gap-8 overflow-x-auto p-10 lg:flex">
@@ -325,15 +325,15 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  <span className="ml-2 truncate text-[10px] text-stone-400">{name.trim() ? `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.vyaplatform.com` : "your-store.vyaplatform.com"}</span>
  </div>
  {/* Interactive: `zoom` (not transform) scales AND resizes the box, so it scrolls and clicks map
- correctly — you can scroll the page and click the nav to move between pages, like a real site. */}
+ correctly: you can scroll the page and click the nav to move between pages, like a real site. */}
  <div className="h-[70dvh] overflow-y-auto overscroll-contain">
  {/* 0.64 needs a 755px frame, which only exists from 1280 up; between 1024 and 1280 the frame is
      ~520px, so the page scrolled sideways inside it. 0.44 fits the whole page width there. */}
  <div className="lg:[zoom:0.44] xl:[zoom:0.64]" style={{ width: 1180 } as React.CSSProperties}>
- {/* Keyed by a counter so EVERY change replays — template, palette, type, or moving to
+ {/* Keyed by a counter so EVERY change replays. Template, palette, type, or moving to
      another page. The class decides how much movement that change deserves. */}
  <div key={pulse} className={animKind === "template" ? "vya-preview-in" : "vya-preview-tone"} style={{ background: colors.bg, color: colors.text, fontFamily: ff(fonts.body) }}>
- {/* The store name lands here as the wordmark — the branding shows on the page, not just the URL. */}
+ {/* The store name lands here as the wordmark. The branding shows on the page, not just the URL. */}
  <StoreHeader storeName={name} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} onNav={goPreview} />
  <Blocks blocks={previewBlocks} colors={colors} fonts={fonts} radius="sharp" products={SAMPLE} shopHref="#" />
  <StoreFooter storeName={name} logo={logo || null} nav={navItems} colors={colors} headingFontFamily={ff(fonts.heading)} year={2026} onNav={goPreview} newsletter={<div className="mx-auto flex max-w-sm items-center gap-2"><input disabled placeholder="Email address" className="h-10 flex-1 rounded-md border border-current/20 bg-transparent px-3 text-[13px] opacity-60" /><span className="grid h-10 place-items-center rounded-md px-4 text-[12px] font-medium uppercase tracking-wide text-white" style={{ background: colors.accent }}>Subscribe</span></div>} />
@@ -350,25 +350,25 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  <span className="grid h-7 w-7 place-items-center rounded-lg" style={{ background: ACCENT }}><span className="text-[13px] font-bold text-white">V</span></span>
  <div className="min-w-0">
  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">Build your storefront</p>
- {/* Sellers hesitate here because it reads as permanent. It isn't — every one of these is a
+ {/* Sellers hesitate here because it reads as permanent. It isn't: every one of these is a
      token they can change in the editor afterwards, so say so before they stall. */}
  <p className="mt-0.5 text-[11px] text-stone-400">You can change all of this later.</p>
  </div>
  </div>
 
  <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
- {/* Keyed by step so React remounts on every change and the animation actually replays —
+ {/* Keyed by step so React remounts on every change and the animation actually replays,
      a class swap alone would only fire the first time. */}
  <div key={step} className={dir === 1 ? "vya-step-in-right" : "vya-step-in-left"}>
  {step === 0 && (
- <Step title="Choose your store name and design" sub="Nothing here is final — you can change your name, design, colours, fonts, and every word later in the editor.">
+ <Step title="Choose your store name and design" sub="Nothing here is final. You can change your name, design, colours, fonts, and every word later in the editor.">
  <label className="mb-1 block text-[12px] font-medium text-stone-500">Store name</label>
- <p className="mb-1.5 text-[11px] text-stone-400">This is the name of your store — you can change it later.</p>
+ <p className="mb-1.5 text-[11px] text-stone-400">This is the name of your store. You can change it later.</p>
  <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Aurora Vintage" className="mb-4 w-full rounded-xl border border-black/10 bg-white px-3.5 py-2.5 text-[14px] outline-none placeholder:text-stone-300 focus:border-[#5D0F17]/50" />
 
  {/* Optional. With no logo the store name shows in the template's own type, which for most of
-     these is the better answer — so this never blocks getting to the design. */}
- <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Logo <span className="font-normal text-stone-400">— optional</span></label>
+     these is the better answer, so this never blocks getting to the design. */}
+ <label className="mb-1.5 block text-[12px] font-medium text-stone-500">Logo <span className="font-normal text-stone-400"> optional</span></label>
  {/* Both paths land on stageLogo: click opens the file picker; drag-and-drop reads the dropped
      file. onDragOver must preventDefault or the browser just opens the image in the tab. */}
  <label
@@ -390,7 +390,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  </label>
 
  <label className="mb-1 block text-[12px] font-medium text-stone-500">Choose a design</label>
- <p className="mb-2 text-[11px] text-stone-400">Pick your store&rsquo;s design — you can always change it later.</p>
+ <p className="mb-2 text-[11px] text-stone-400">Pick your store&rsquo;s design. You can always change it later.</p>
  <div className="space-y-2">
  {STOREFRONT_TEMPLATES.map((t) => (
  <button key={t.id} type="button" onClick={() => setTemplateId(t.id)} className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition ${templateId === t.id ? "border-[#5D0F17] ring-1 ring-[#5D0F17]/20" : "border-black/10 hover:border-black/25"}`}>
@@ -409,7 +409,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  )}
 
  {step === 1 && (
- <Step title="Add pages" sub="Home and Shop come standard. Add anything else — you can change it later.">
+ <Step title="Add pages" sub="Home and Shop come standard. Add anything else: you can change it later.">
  <div className="space-y-2">
  <PageRow label="Home" locked />
  <PageRow label="Shop" locked />
@@ -483,7 +483,7 @@ export function BuildWizardInner({ initialName, initialCats, onBeforeFinish }: {
  {busy ? "Building…" : isLast ? "Create my store" : "Next"} {!busy && (isLast ? <Check size={15} /> : <ArrowRight size={15} />)}
  </button>
  </div>
- <p className="mt-3 text-center text-[11px] leading-relaxed text-stone-400">Nothing here is final — you can change your look, colours, fonts, pages, and every word later in the studio.</p>
+ <p className="mt-3 text-center text-[11px] leading-relaxed text-stone-400">Nothing here is final. You can change your look, colours, fonts, pages, and every word later in the studio.</p>
  </div>
  </div>
  </div>
@@ -515,7 +515,7 @@ function PageRow({ label, checked, onToggle, locked }: { label: string; checked?
 }
 
 // `useSearchParams` opts the tree into client rendering, and Next refuses to prerender a page that
-// does so without a boundary — it fails the production BUILD, not just the request. The wizard is
+// does so without a boundary. It fails the production BUILD, not just the request. The wizard is
 // behind a login and renders instantly, so a plain tinted ground is a truthful fallback rather than
 // a spinner that would flash for a frame.
 export default function BuildWizard() {

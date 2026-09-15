@@ -4,7 +4,7 @@ import { getConversation, getMessages, markReadByStore } from "@/app/lib/message
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/store/messages/[id] — one conversation's thread for the acting
+/** GET /api/store/messages/[id]: one conversation's thread for the acting
  * store. Marks customer messages as read (clears the store's unread badge). */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const slug = await resolveStoreSlugAny(request);

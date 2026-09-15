@@ -7,12 +7,12 @@ export const runtime = "nodejs";
 // A delivery awaits the store's sale sync (capped at 20s inside) before answering eBay.
 export const maxDuration = 60;
 
-// eBay sale notifications — "sold on eBay" reaching VYA in seconds instead of on the hour.
+// eBay sale notifications. "sold on eBay" reaching VYA in seconds instead of on the hour.
 //
 // GET  = eBay's endpoint-verification challenge (answered from EBAY_NOTIFY_VERIFICATION_TOKEN).
 // POST = a signed notification (Commerce Notification API, topic ORDER_CONFIRMATION; or a legacy
 //        Trading platform notification). Verified, matched to a store, then that store's recent
-//        eBay orders are pulled through syncMarketplaceSalesForStore — the same code the hourly
+//        eBay orders are pulled through syncMarketplaceSalesForStore. The same code the hourly
 //        cron runs, which stays as the backstop. Every delivery lands in ebay_notifications.
 //
 // Reachable without a session: /api/webhooks is allowlisted in proxy.ts. All the logic is in

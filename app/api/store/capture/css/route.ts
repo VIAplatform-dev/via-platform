@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ css, theme: await theme });
 }
 
-/** How this store's captured theme sets its colours — so the Design tab writes into the variables the
+/** How this store's captured theme sets its colours, so the Design tab writes into the variables the
  *  theme actually paints with. Best-effort: without it the design falls back to body-level rules. */
 async function themeOf(slug: string): Promise<ThemeModel | null> {
  try {
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
  const body = await request.json().catch(() => null);
  if (typeof body?.css !== "string") return NextResponse.json({ error: "Missing css." }, { status: 400 });
  // `base` is the css this editor last read or wrote. Required: without it a save can't prove it isn't
- // overwriting something it never saw — an empty design autosaved over a real one, or over CSS the VYA
+ // overwriting something it never saw. An empty design autosaved over a real one, or over CSS the VYA
  // assistant added while the editor was open.
  if (typeof body.base !== "string") return NextResponse.json({ error: "Reload the editor to save your design." }, { status: 400 });
  // Refuse rather than truncate: cutting the blob mid-rule would silently drop the tail of the seller's CSS.

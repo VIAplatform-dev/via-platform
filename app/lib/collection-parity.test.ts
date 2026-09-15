@@ -69,7 +69,7 @@ test("a read that hit our page cap is not reported as a difference", () => {
  assert.equal(r.collections, 0);
 });
 
-test("a collection on their site that we never created is missing here — except Shopify's catch-all", () => {
+test("a collection on their site that we never created is missing here. Except Shopify's catch-all", () => {
  const r = compareCollections({
   source: [{ handle: "gucci", count: 24 }, { handle: "all", count: 900 }],
   ours: new Map(),
@@ -110,7 +110,7 @@ test("a rail that serves exactly what was filed in it is not flagged", () => {
  assert.deepEqual(r.collectionsInflated, []);
 });
 
-test("a rail serving FEWER pieces than were filed is flagged too — a rail can go missing as well as bloat", () => {
+test("a rail serving FEWER pieces than were filed is flagged too. A rail can go missing as well as bloat", () => {
  const r = compareCollections({
   source: [{ handle: "tops", count: 3 }],
   ours: new Map([["tops", ["a", "b", "c"]]]),
@@ -132,7 +132,7 @@ test("a page whose size we could not read is not accused of anything", () => {
 });
 
 test("served counts are compared against everything filed, not just what the seller still lists", () => {
- // The page serves sold and vanished pieces too, so the comparison is against raw membership —
+ // The page serves sold and vanished pieces too, so the comparison is against raw membership,
  // otherwise every rail holding a sold piece would look inflated.
  const r = compareCollections({
   source: [{ handle: "resort", count: 2 }],
@@ -140,7 +140,7 @@ test("served counts are compared against everything filed, not just what the sel
   liveSourceIds: live,
   served: new Map([["resort", 3]]),
  });
- assert.deepEqual(r.collectionsInflated, [], "3 served, 3 filed — correct");
+ assert.deepEqual(r.collectionsInflated, [], "3 served, 3 filed. Correct");
  assert.equal(r.collectionsExact, 1, "…and against their site it is still an exact match");
 });
 
@@ -200,7 +200,7 @@ test("an older page with no declared source is still checked against our filing"
 test("a page serving the captured copy is compared on what it SHOWS, not on what we filed", () => {
  // blummier's Gucci: her site has 24, we filed 0 (the sync could not read it), and the page serves
  // the 16 the captured copy named. Reporting "0 of 24" told her the page was empty when a shopper
- // sees 16 — an overstatement of her problem by 16 pieces. The gap is 8, and that is what to say.
+ // sees 16: an overstatement of her problem by 16 pieces. The gap is 8, and that is what to say.
  const r = compareCollections({
   source: [{ handle: "gucci", count: 24 }],
   ours: new Map([["gucci", []]]),
@@ -222,7 +222,7 @@ test("a page serving our filing is still compared on the filing, like for like",
   served: new Map([["resort", 4]]),
   servedSource: new Map([["resort", "filed"]]),
  });
- assert.equal(r.collectionsExact, 1, "3 of theirs, 3 of ours still listed — a match");
+ assert.equal(r.collectionsExact, 1, "3 of theirs, 3 of ours still listed. A match");
 });
 
 // ── comparing pieces, not counts ─────────────────────────────────────────────────────────────────
@@ -266,7 +266,7 @@ test("a piece on their page that we do not have is a real gap", () => {
 
 test("a LIVE piece we show that their page does not is a real extra", () => {
  // Still for sale on their site, just not in this collection any more. A shopper sees it here and
- // not there — the drift that matters.
+ // not there: the drift that matters.
  const r = compareCollections({
   source: [{ handle: "dresses", count: 1, handles: ["a"] }],
   ours: new Map([["dresses", ["a", "moved-away"]]]),
@@ -300,7 +300,7 @@ test("with no handles from their feed, the old count comparison still runs", () 
 test("a piece the seller shows but does not sell is not counted against us", () => {
  // blummier's john-galliano-fall-2005-pink-floral-silk-dress and fall-1994-black-maxi-dress: nine
  // and seven photos each, £0.00, available:false. Archive display pieces. The importer skips them on
- // purpose and the CATALOGUE check excludes them on purpose ("0 missing") — but the collection
+ // purpose and the CATALOGUE check excludes them on purpose ("0 missing"), but the collection
  // comparison counted them, so her archive read 42/44 and clothing 110/112 for pieces that are not
  // for sale and never should have been imported.
  const r = compareCollections({
@@ -327,12 +327,12 @@ test("a sellable piece missing from a collection is still a real gap", () => {
 
 test("a rail that drops sold pieces is not 'inflated' for serving fewer than we filed", () => {
  // Sellers differ, so we now mirror each collection's own behaviour: where she drops sold pieces
- // from a rail, ours drops them too. The filing keeps them — it is the record of what belongs in
- // the collection — so the page legitimately serves FEWER than we filed, by exactly the sold count.
+ // from a rail, ours drops them too. The filing keeps them. It is the record of what belongs in
+ // the collection, so the page legitimately serves FEWER than we filed, by exactly the sold count.
  //
  // This check compared the served size against raw membership and called that gap a fault. It put
  // feathers on the blocking list for three rails (all-bottoms 16/17, designer 45/48, festival-vibes
- // 29/32) whose gaps were 1, 3 and 3 — precisely their sold pieces. The page was right and the
+ // 29/32) whose gaps were 1, 3 and 3. Precisely their sold pieces. The page was right and the
  // check was wrong, and it told the seller her collections were "showing pieces you didn't put in
  // them" while they were showing exactly what she puts in them.
  const ours = new Map([["all-bottoms", ["a", "b", "c"]]]);
@@ -350,7 +350,7 @@ test("a rail keeping its sold pieces is still held to the whole filing", () => {
  const r = compareCollections({
   source: [], ours, liveSourceIds: new Set(["a", "b", "c"]),
   ourActive: new Set(["a", "b"]),
-  served: new Map([["resort", 3]]),         // keeps the sold piece — matches the filing
+  served: new Map([["resort", 3]]),         // keeps the sold piece. Matches the filing
   servedSource: new Map([["resort", "filed"]]),
  });
  assert.deepEqual(r.collectionsInflated, []);

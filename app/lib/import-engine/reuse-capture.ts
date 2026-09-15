@@ -7,7 +7,7 @@
 //
 // So a seller's import is idempotent. Press it once and her site is copied; press it again and she
 // is handed the site she already has, reported exactly like a finished import. She is never shown a
-// separate "you already did this" state, because from where she stands there isn't one — her site
+// separate "you already did this" state, because from where she stands there isn't one. Her site
 // is on VYA either way, which is the only thing she asked for.
 //
 // The owner is exempt: re-importing IS the repair path, and the admin import page warns that it
@@ -19,7 +19,7 @@
 export type ReuseInput = {
  /** How many pages this store already has captured. */
  captured: number;
- /** Owner/admin — allowed to re-crawl deliberately. */
+ /** Owner/admin: allowed to re-crawl deliberately. */
  isOwner: boolean;
  /** Explicit opt-in to re-crawl anyway (scripts). */
  force?: boolean;
@@ -27,7 +27,7 @@ export type ReuseInput = {
 
 /** True when the request must NOT re-crawl, and should be answered with the existing capture. */
 export function shouldReuseExistingCapture({ captured, isOwner, force }: ReuseInput): boolean {
- if (!(captured > 0)) return false; // nothing to protect — this is a first import
+ if (!(captured > 0)) return false; // nothing to protect: this is a first import
  if (force === true) return false;
  return !isOwner;
 }

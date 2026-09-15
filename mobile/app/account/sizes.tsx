@@ -3,7 +3,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { loadSizes, saveSizes, SIZE_GROUPS } from "../../lib/sizes";
 import { colors, fonts, spacing } from "../../lib/theme";
 
-// My Sizes. Saved as you tap — there is no Save button, because a preference screen that can be
+// My Sizes. Saved as you tap. There is no Save button, because a preference screen that can be
 // left in an unsaved state is a preference screen that silently does nothing.
 
 export default function SizesScreen() {

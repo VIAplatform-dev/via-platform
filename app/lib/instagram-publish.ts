@@ -6,13 +6,13 @@ import { BASE_URL } from "@/app/lib/base-url";
 //
 // When an OS store publishes a new item, VYA posts a 9:16 story card
 // (/api/story/{itemId}) to THAT store's Instagram Story via Meta's Content Publishing
-// API. The story drives buyers to the store's OWN storefront product page — VYA monetizes
+// API. The story drives buyers to the store's OWN storefront product page. VYA monetizes
 // the checkout rails (1% + shipping), not a marketplace click, so no attribution link is
 // involved. The card is just the product photo + "Shop now".
 //
 // Reality of Meta's API (be honest about the limits):
 //   • Publishing an IMAGE to Stories (media_type=STORIES) is supported.
-//   • A clickable link STICKER is NOT available via the API — so the product link is
+//   • A clickable link STICKER is NOT available via the API, so the product link is
 //     delivered either by the store adding a native link sticker by hand, or by the
 //     Messaging auto-DM-on-story-reply flow (built separately).
 //   • Auto-publish needs Advanced Access (App Review + Business Verification).
@@ -122,7 +122,7 @@ export function storyCardUrl(itemId: string, cta?: string): string {
 }
 
 // The destination a story drives to: the store's OWN storefront product page. VYA monetizes
-// the checkout on these rails (1% + shipping), so there's no marketplace/attribution link —
+// the checkout on these rails (1% + shipping), so there's no marketplace/attribution link,
 // the buyer lands on the seller's own shop. Prefers a connected custom domain, then the
 // branded {handle}.vyaplatform.com subdomain, then the canonical path.
 export async function storefrontProductUrl(storeSlug: string, itemId: string): Promise<string> {
@@ -178,13 +178,13 @@ export async function publishItemStory(
 }
 
 // Best-effort trigger for the item-publish hook: only posts when the store is connected
-// AND has auto_post enabled. Never throws — a failed story must not break item publishing.
+// AND has auto_post enabled. Never throws. A failed story must not break item publishing.
 export async function maybeAutoPostStory(storeSlug: string, itemId: string): Promise<void> {
  try {
   const conn = await getStoreIgConnection(storeSlug);
   if (!conn || !conn.autoPost) return;
   await publishItemStory(storeSlug, itemId);
  } catch {
-  /* swallow — auto-post is non-critical */
+  /* swallow: auto-post is non-critical */
  }
 }

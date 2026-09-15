@@ -106,7 +106,7 @@ test.describe("The real routes", () => {
    // A one-day hold lapses within the week, and "today" is a subset of it.
    expect([...body.today, ...body.thisWeek].some((h: { itemId: string }) => h.itemId === id)).toBe(true);
 
-   // Holding it again is refused — it is already held.
+   // Holding it again is refused. It is already held.
    const again = await request.post(`/api/store/items/${id}?store=${STORE}`, { headers: cookie(), data: { action: "hold", name: "Someone else", days: 1 } });
    expect(again.status()).toBe(409);
   } finally {

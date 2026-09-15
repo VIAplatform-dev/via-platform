@@ -1,4 +1,4 @@
-// Homepage "Styling Guide" — shoppable looks. Each look is an editorial photo
+// Homepage "Styling Guide": shoppable looks. Each look is an editorial photo
 // (in /public/styling-guide/ or /public/y2k-edit/) plus the pieces in it, linked
 // to their product pages. Add more looks here and they'll render automatically.
 // Product links are validated against the live catalog; dead (sold/removed) items

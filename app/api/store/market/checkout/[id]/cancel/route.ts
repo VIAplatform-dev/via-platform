@@ -4,7 +4,7 @@ import { getCheckout, closeCheckout } from "@/app/lib/market/checkout-db";
 
 export const dynamic = "force-dynamic";
 
-// POST — seller cancels before payment. Releases the item. Idempotent.
+// POST: seller cancels before payment. Releases the item. Idempotent.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

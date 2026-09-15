@@ -4,7 +4,7 @@ import { getQrScanTotals } from "./qr-scans-db.ts";
 
 // How each printed flyer is doing: how many people scanned it, and how many of those joined.
 //
-// Two tables answer this, and neither is only about flyers — qr_scans is shared with the printed
+// Two tables answer this, and neither is only about flyers. Qr_scans is shared with the printed
 // business cards (/q/{code}), and pilot_access.source with the waitlist and every other signup
 // path. So both are filtered to the `flyer:` prefix before anything is counted; the alternative
 // is a report where 500 waitlist signups appear to have come from a lamppost.
@@ -22,7 +22,7 @@ export type FlyerStat = {
 /**
  * Pure so the arithmetic is testable without a database.
  *
- * EVERY FLYER APPEARS, including ones with no scans at all — that row is the most useful one on
+ * EVERY FLYER APPEARS, including ones with no scans at all. That row is the most useful one on
  * the page, because it is the flyer nobody is walking past. Showing only what has data would read
  * as "too early to tell" when the truth is "this one is not working".
  */

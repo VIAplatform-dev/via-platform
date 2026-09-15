@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THROWAWAY design preview of the hosted storefront. Hardcoded sample data, no
-// DB — so the look can be seen on localhost while the real /s/[handle] route
+// DB, so the look can be seen on localhost while the real /s/[handle] route
 // (which needs the database) can't run in this environment. Safe to delete.
 // ─────────────────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 //
 // Shopify keeps a collection at `/collections/{handle}`. Squarespace keeps its shop at `/shop` and a
 // category at `/shop/{category}`, with products under `/shop/p/{slug}`. The serve route only knew the
-// Shopify shape, so a Squarespace store's shop pages were served exactly as crawled — pieces that had
+// Shopify shape, so a Squarespace store's shop pages were served exactly as crawled. Pieces that had
 // sold since still for sale, new pieces missing. See the builder spec, finding F5.
 //
 // The Squarespace shape is only trusted on a Squarespace page: `/shop` on any other platform is

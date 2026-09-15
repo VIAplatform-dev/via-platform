@@ -11,7 +11,7 @@ async function seller(request: NextRequest) {
  return getSellerBySlug(slug);
 }
 
-// GET — one collection + the items in it (management view: all statuses except removed).
+// GET: one collection + the items in it (management view: all statuses except removed).
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const s = await seller(request);
  if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  return NextResponse.json({ collection: { id: col.id, title: col.title, slug: col.slug }, items });
 }
 
-// PATCH { title?, imageUrl? } — rename, and/or set the cover photo shoppers see on a collection
+// PATCH { title?, imageUrl? }: rename, and/or set the cover photo shoppers see on a collection
 // tile. `imageUrl: null` clears the photo, which is why presence is tested rather than truthiness.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const s = await seller(request);
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
  return NextResponse.json({ ok: true, collection: { id: col.id, title: col.title, slug: col.slug, imageUrl: col.imageUrl ?? null } });
 }
 
-// DELETE — remove the collection (items and their other collections are untouched).
+// DELETE: remove the collection (items and their other collections are untouched).
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const s = await seller(request);
  if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

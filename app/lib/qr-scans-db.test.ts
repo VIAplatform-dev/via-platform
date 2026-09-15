@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { scanLocationFromHeaders } from "./qr-scans-db.ts";
 
 // The location on a scan row is only ever as good as what we pull out of Vercel's edge
-// headers. Nothing downstream can fix a header read wrong, and the mistake is invisible —
+// headers. Nothing downstream can fix a header read wrong, and the mistake is invisible,
 // it looks like a scan that simply had no location. So the extraction is pinned here.
 
 const headers = (h: Record<string, string>) => new Headers(h);
@@ -34,7 +34,7 @@ test("a city with non-ASCII characters is decoded, not stored percent-encoded", 
 });
 
 test("a local scan has no location and does not blow up", () => {
- // No edge headers off Vercel. Every field must come back null rather than throwing —
+ // No edge headers off Vercel. Every field must come back null rather than throwing,
  // a scan with unknown location still has to be recorded.
  const loc = scanLocationFromHeaders(headers({}));
  assert.deepEqual(loc, { city: null, region: null, country: null, latitude: null, longitude: null });
@@ -46,7 +46,7 @@ test("an empty or malformed header reads as unknown, not as a bad value", () => 
  );
  assert.equal(loc.city, null);
  assert.equal(loc.country, null);
- // Undecodable, but it is a latitude-shaped field — kept as-is rather than crashing the scan.
+ // Undecodable, but it is a latitude-shaped field. Kept as-is rather than crashing the scan.
  assert.equal(loc.latitude, "%E0%A4%A");
 });
 

@@ -1,13 +1,13 @@
-// Holds — a piece kept back for a named customer.
+// Holds: a piece kept back for a named customer.
 //
 // A hold IS a reservation: same table, same "not for sale while it stands" semantics, same sweep
 // that releases it when it lapses. The only thing that makes it a hold is the owner tag, so nothing
-// here touches the database — just the tag, the arithmetic and the words.
+// here touches the database, just the tag, the arithmetic and the words.
 
 export const HOLD_PREFIX = "hold:";
 export const MAX_HOLD_DAYS = 30;
 
-/** The four lengths a hold is offered at — the same chips on the web and the phone. */
+/** The four lengths a hold is offered at. The same chips on the web and the phone. */
 export const HOLD_LENGTHS = [
  { days: 1, label: "Tonight" },
  { days: 3, label: "3 days" },
@@ -57,7 +57,7 @@ export function holdsDueSoon<T extends { expiresAt: string }>(holds: T[], now = 
  return { today, thisWeek };
 }
 
-/** "until tonight" · "until tomorrow" · "3 days left" · "lapsed" — the clock half of every hold line. */
+/** "until tonight" · "until tomorrow" · "3 days left" · "lapsed". The clock half of every hold line. */
 export function holdTiming(h: { expiresAt: string }, now = new Date()): string {
  const left = Date.parse(h.expiresAt) - now.getTime();
  const endOfToday = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
@@ -78,7 +78,7 @@ export function describeHold(h: { name: string; expiresAt: string }, now = new D
 
 /**
  * The status pill: "On hold · Ana · 3 days left". Starts with the state so it reads in the same
- * column as "Live" and "Sold", then who, then how long — and a piece a BUYER is mid-checkout on is
+ * column as "Live" and "Sold", then who, then how long, and a piece a BUYER is mid-checkout on is
  * not a hold at all: that pill stays "Reserved", which is what `hold === null` means here.
  */
 export function holdPill(h: { name: string; expiresAt: string } | null | undefined, now = new Date()): string {

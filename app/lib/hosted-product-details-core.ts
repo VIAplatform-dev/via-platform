@@ -1,7 +1,7 @@
-// What a hosted product page says about a piece beyond its title, price and photos. Pure — no I/O.
+// What a hosted product page says about a piece beyond its title, price and photos. Pure, no I/O.
 //
 // A store served from its own captured theme (/site/[slug]/products/[handle]) prints the page the
-// crawler saw: the theme's own description block and nothing VYA has learned since — no flaws, no
+// crawler saw: the theme's own description block and nothing VYA has learned since, no flaws, no
 // grade, no measurements, no "Ships to". The classic product page (app/s/[handle]/p/[id]/page.tsx)
 // prints all of those. A shopper must read the same words whichever renderer she landed on, so the
 // sections here are built from the SAME cores that page uses, in the same order of reading:
@@ -36,7 +36,7 @@ export type HostedDetailItem = {
 };
 
 /** The store's shipping, as the classic page reads it: zones null when the store never saved
- *  shipping (say nothing — the Buy button does the talking), else its zones and home country. */
+ *  shipping (say nothing. The Buy button does the talking), else its zones and home country. */
 export type HostedDetailStore = { zones: ZoneConfig | null | undefined; country: string | null | undefined };
 
 const measurementsOf = (raw: unknown): Measurement[] =>

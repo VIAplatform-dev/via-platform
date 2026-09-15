@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
  }
  const ok = await ebayExchangeCode(slug, code).catch(() => false);
  // On a fresh connect, auto-opt into Business Policies + create default payment/shipping/return
- // policies so the seller can list immediately (best-effort — never fail the connect over it).
+ // policies so the seller can list immediately (best-effort, never fail the connect over it).
  if (ok) await ensureEbayReady(slug).catch(() => null);
  back.searchParams.set("ebay", ok ? "connected" : "error");
  return NextResponse.redirect(back);

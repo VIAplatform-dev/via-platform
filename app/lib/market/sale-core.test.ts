@@ -18,7 +18,7 @@ test("cart totals: list, sale, discount across items", () => {
 test("change due from tendered cash, never negative, null when not tendered", () => {
  assert.equal(changeDue(11650, 12000), 350);
  assert.equal(changeDue(11650, 11650), 0);
- assert.equal(changeDue(11650, 10000), null); // short — not a valid tender
+ assert.equal(changeDue(11650, 10000), null); // short, not a valid tender
  assert.equal(changeDue(11650, null), null);
 });
 

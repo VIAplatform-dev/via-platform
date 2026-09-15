@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
  for (const charge of succeeded) {
  const email = charge.billing_details?.email || charge.receipt_email;
  // Key on the payment-intent so this backfill sync and the live Stripe webhook
- // produce the SAME conversion_id + order_id per order — otherwise the same sale
+ // produce the SAME conversion_id + order_id per order. Otherwise the same sale
  // lands twice (ch_… from here, py_… from the webhook) and deleting one leaves the
  // other to reappear. payment_intent is the stable shared id; fall back to charge id.
  const orderKey = charge.payment_intent || charge.id;
@@ -264,7 +264,7 @@ function extractProductsFromJS(js: string): SupabaseRow[] {
  // Build variable→URL map once for the whole bundle
  const varMap = buildVarUrlMap(js);
 
- // Strategy A: anchor on {id:N,name:" — precise format Carroll Street uses
+ // Strategy A: anchor on {id:N,name:": precise format Carroll Street uses
  const idNameRe = /\{id\s*:\s*(\d+)\s*,\s*name\s*:\s*"([^"]{2,100})"/g;
  for (const anchor of js.matchAll(idNameRe)) {
  const pos = anchor.index!;
@@ -409,7 +409,7 @@ export async function GET(request: NextRequest) {
  let rows: SupabaseRow[] | null = null;
  let foundTable = "";
 
- // 1. Try Supabase tables (skip sold_items — it only tracks past sales, not current inventory)
+ // 1. Try Supabase tables (skip sold_items. It only tracks past sales, not current inventory)
  const discoveredTables = await discoverTables(anonKey);
  const tablesToTry = (discoveredTables.length > 0
  ? [...new Set([...discoveredTables, ...FALLBACK_TABLES])]

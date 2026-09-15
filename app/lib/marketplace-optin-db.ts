@@ -48,7 +48,7 @@ export async function setMarketplaceOptIn(storeSlug: string, listed: boolean): P
  return { listed, decidedAt };
 }
 
-/** Every store that has said yes — what a marketplace query filters on. */
+/** Every store that has said yes. What a marketplace query filters on. */
 export async function listedStoreSlugs(): Promise<string[]> {
  try {
   await ensure();

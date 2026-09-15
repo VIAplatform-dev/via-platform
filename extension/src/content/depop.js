@@ -1,9 +1,9 @@
-// VYA Cross-Lister — Depop adapter (content script).
+// VYA Cross-Lister: Depop adapter (content script).
 // Runs on depop.com in the seller's own logged-in session and fills the "create listing" form with
 // the item VYA hands it: photos, caption (+hashtags), price. Category / size / condition are left
 // for the seller to confirm (Depop uses custom pickers), then they hit Publish.
 //
-// ⚠️ SELECTORS BELOW ARE BEST-EFFORT and MUST be verified against Depop's live sell page — Depop
+// ⚠️ SELECTORS BELOW ARE BEST-EFFORT and MUST be verified against Depop's live sell page. Depop
 //    changes its UI, so treat these as the starting point. Everything else (photo injection, React
 //    value setting, message plumbing) is production-grade and reusable across marketplaces.
 
@@ -16,7 +16,7 @@ const SEL = {
 };
 
 // Map a VYA condition (canonical OR freeform, e.g. "Great") to a Depop condition search query +
-// the option text to match. Returns null for anything unrecognizable — better blank than wrong.
+// the option text to match. Returns null for anything unrecognizable. Better blank than wrong.
 function depopConditionQuery(cond) {
   const c = String(cond || "").toLowerCase();
   if (/nwt|bnwt|nib|deadstock|dead ?stock|new with tag|brand ?new|unworn|never worn/.test(c)) return { q: "Brand new", match: "brand new" };
@@ -37,7 +37,7 @@ function canonicalBrand(b) { const k = String(b || "").toLowerCase().trim(); ret
 
 // Fill a Depop Downshift autocomplete (#<field>-input + #<field>-menu): type the query, wait for
 // options, then click the best text match. `strict` = only click a real text match (never a wrong
-// fallback like "Other"). Best-effort — returns false if nothing suitable was found.
+// fallback like "Other"). Best-effort: returns false if nothing suitable was found.
 async function fillAutocomplete(inputId, query, matchText, strict) {
   if (!query) return false;
   const input = document.querySelector(`#${inputId}`);
@@ -155,7 +155,7 @@ async function fillListing(item) {
   };
 }
 
-// After the seller publishes, Depop routes to the product page — capture that URL and report it.
+// After the seller publishes, Depop routes to the product page. Capture that URL and report it.
 function watchForPublish() {
   let last = location.href;
   setInterval(() => {
@@ -184,8 +184,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 watchForPublish();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Engagement scraping (likes). Reads the like count off the seller's OWN Depop pages — a product
-// page shows one item's likes; the seller's profile page shows every item's card — and reports it to
+// Engagement scraping (likes). Reads the like count off the seller's OWN Depop pages. A product
+// page shows one item's likes; the seller's profile page shows every item's card, and reports it to
 // VYA, attributed to the matching VYA item. Passive: runs whenever the seller lands on such a page.
 // ⚠️ The LIKE-COUNT SELECTORS below are best-effort and MUST be verified against Depop's live DOM.
 // Everything else (URL→item attribution, message plumbing, SPA-nav triggering) is production-grade.
@@ -217,7 +217,7 @@ function parseCount(text) {
 
 function readProductLikes() {
   // ✅ Verified against live Depop product DOM (2026-07): the count sits in <p data-testid="like-count">,
-  // and the like button's aria-label reads "Like product. N likes for this product." — use both.
+  // and the like button's aria-label reads "Like product. N likes for this product.". Use both.
   const cnt = document.querySelector('[data-testid="like-count"]');
   if (cnt) { const n = parseCount(cnt.textContent); if (n != null) return n; }
   const btn = document.querySelector('[data-testid^="productInteraction__likeButton"]');
@@ -225,7 +225,7 @@ function readProductLikes() {
   return null;
 }
 // Depop offers happen in DMs, not on the product page, so a per-item offer count usually isn't on
-// screen — conservative: only report when a clear "N offers" appears (keeps the pipeline uniform).
+// screen: conservative: only report when a clear "N offers" appears (keeps the pipeline uniform).
 function readProductOffers() {
   const m = document.body.innerText.match(/([\d,]+)\s+offers?\b/i);
   return m ? parseCount(m[1]) : null;
@@ -246,7 +246,7 @@ async function scrapeProductPage() {
 
 function readCardLikes(anchor) {
   // Best-effort: on the seller's own profile grid a card may carry the same like-count testid or the
-  // like-button aria-label. (Public profiles lazy-load and hid this from verification — needs a
+  // like-button aria-label. (Public profiles lazy-load and hid this from verification. Needs a
   // logged-in-owner check; the product-page path above is the verified/primary source.)
   const scope = anchor.closest("li, article, div") || anchor;
   const el = scope.querySelector('[data-testid="like-count"], [data-testid^="productInteraction__likeButton"], [aria-label*="likes for this product" i]');
@@ -275,7 +275,7 @@ function runStatsScan() {
   scrapeProductPage().catch(() => {});
   scrapeShopPage().catch(() => {});
 }
-// Depop is a SPA — re-scan on navigation, after a beat so the new page's content has rendered.
+// Depop is a SPA. Re-scan on navigation, after a beat so the new page's content has rendered.
 let _lastScan = "";
 setInterval(() => {
   if (location.href === _lastScan) return;

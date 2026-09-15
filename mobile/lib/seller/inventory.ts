@@ -5,7 +5,7 @@
 
 export type InventoryFilter = "all" | "live" | "drafts" | "sold";
 
-/** The dot beside a piece. `null` means no dot — a sold piece is finished, not a state to watch. */
+/** The dot beside a piece. `null` means no dot. A sold piece is finished, not a state to watch. */
 export type ItemDot = "live" | "pending" | null;
 
 const LIVE = new Set(["active"]);
@@ -26,7 +26,7 @@ export function filterItems<T extends { status: string }>(items: T[], filter: In
 }
 
 /**
- * A `reserved` piece — one Market Mode is mid-sale on — is deliberately NOT live and NOT sold.
+ * A `reserved` piece, one Market Mode is mid-sale on. Is deliberately NOT live and NOT sold.
  * It carries the same amber dot as a draft: something is unfinished about it.
  */
 export function itemDot(status: string): ItemDot {
@@ -37,7 +37,7 @@ export function itemDot(status: string): ItemDot {
 
 /**
  * The state word beside a reserved piece: "on hold" when a PERSON is holding it (it is in the
- * store's holds list), "reserved" when a buyer is mid-checkout. Null for every other status —
+ * store's holds list), "reserved" when a buyer is mid-checkout. Null for every other status,
  * the dot already says live/draft, and "sold" has its own chip. Same rule as the web pill.
  */
 export function reservedWord(status: string, held: boolean): string | null {
@@ -48,10 +48,10 @@ export function reservedWord(status: string, held: boolean): string | null {
 /**
  * Home's "Needs you" rows deep-link here with ?missing=…; the rules are the web Inventory's
  * (app/infrastructure/admin/inventory/page.tsx `lacks`) so the same pieces answer on both.
- *   photo       — no images
- *   price       — price is zero or missing
- *   cost        — no cost on a LIVE piece (a draft has not been costed yet; a sold one is history)
- *   confidence  — the ids /api/store/attention says intake was unsure about
+ *   photo, no images
+ *   price: price is zero or missing
+ *   cost, no cost on a LIVE piece (a draft has not been costed yet; a sold one is history)
+ *   confidence: the ids /api/store/attention says intake was unsure about
  */
 export type MissingFilter = "photo" | "price" | "cost" | "confidence";
 export const MISSING_FILTERS: MissingFilter[] = ["photo", "price", "cost", "confidence"];

@@ -21,8 +21,8 @@ function estimateFromPrices(pricesCents: number[], confidence: number, rationale
 // Always-on price check for the listing form. Prices the item WITHOUT needing the AI fill, and is
 // accurate on a MANUAL entry because it looks at the PHOTO, not just the typed title:
 //   1. TEXT / owned reference (fast; has its own live-text fallback)
-//   2. VISUAL — visually-similar pieces in the store's own sold/intake data (the manual-entry unlock)
-//   3. NOVEL — reverse-image the photo across the web when it isn't in our data (cached ~1.5¢)
+//   2. VISUAL: visually-similar pieces in the store's own sold/intake data (the manual-entry unlock)
+//   3. NOVEL: reverse-image the photo across the web when it isn't in our data (cached ~1.5¢)
 // Then it CONFIDENCE-GATES the flag: no hard over/under verdict unless real comps back it, so a thin
 // entry gets a rough range + an honest "not enough comps", never a false "1500% overpriced".
 export async function POST(request: NextRequest) {
@@ -47,11 +47,11 @@ export async function POST(request: NextRequest) {
  const textEst = query.trim() ? await getMarketReferenceFast({ query, brand: brand || null }).catch(() => null) : null;
  const textN = textEst?.comps?.length ?? (textEst?.marketCents ? 3 : 0);
 
- // Embed the photo ONCE — it powers both the owned-data visual match and the reverse-image
+ // Embed the photo ONCE. It powers both the owned-data visual match and the reverse-image
  // verification below (so a wrong-model web result never sets the price).
  const embedding = imageUrl ? await embedImage(imageUrl).catch(() => null) : null;
 
- // 2) VISUAL — price off what the item LOOKS like, from the store's own data. Makes a manual
+ // 2) VISUAL: price off what the item LOOKS like, from the store's own data. Makes a manual
  //    entry accurate even when the typed title is thin, because it identifies the piece visually.
  let visualEst: PriceEstimate | null = null, visualN = 0;
  if (embedding) {
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   );
  }
 
- // 3) NOVEL — not in our data. Reverse-image the photo across the web, then VISUALLY VERIFY each
+ // 3) NOVEL, not in our data. Reverse-image the photo across the web, then VISUALLY VERIFY each
  //    match against the photo: Google Lens returns look-alikes (a different bag of the same brand),
  //    and pricing off those is exactly how a $1,800 piece comes back as $685. Only verified-same
  //    matches set the price; if too few verify, we stay low-confidence instead of guessing wrong.
@@ -88,12 +88,12 @@ export async function POST(request: NextRequest) {
  const marketCents = chosen?.e?.marketCents ?? null;
 
  if (!chosen || !marketCents) {
-  // Nothing to say — don't guess, don't flag.
+  // Nothing to say: don't guess, don't flag.
   return NextResponse.json({ estimate: null, priceFlag: null, lowConfidence: true });
  }
  const est = chosen.e as PriceEstimate;
 
- // Confidence gate — only a hard over/under verdict when we truly have the comps to back it.
+ // Confidence gate, only a hard over/under verdict when we truly have the comps to back it.
  const confident = est.confidence >= 0.5 && chosen.n >= 3;
  const sellerCents = Math.round(price * 100);
  const priceFlag = confident && sellerCents > 0 ? computePriceFlag(sellerCents, marketCents, est.lowCents, est.highCents) : null;

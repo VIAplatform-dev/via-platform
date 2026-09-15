@@ -6,12 +6,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 // Daily: embed the photos of items that recently SOLD so the visual price-comp corpus grows from
-// real transactions ("pieces that look like this sold for $X"). Cheap — a handful of items/day,
+// real transactions ("pieces that look like this sold for $X"). Cheap: a handful of items/day,
 // one Voyage call each. Dormant if VOYAGE_API_KEY isn't set. Manual run: ?key=<CRON_SECRET>.
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
  const url = new URL(request.url);
- // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ // Header only: a query-string secret leaks into Vercel/CDN access logs and Referer headers.
  const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

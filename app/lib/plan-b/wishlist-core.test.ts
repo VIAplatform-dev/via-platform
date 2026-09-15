@@ -7,7 +7,7 @@ test("a product link gives up its piece, by handle or by id", () => {
  assert.equal(productRef("/products/black-velvet-jacket"), "black-velvet-jacket");
  // A piece added on VYA: its own id.
  assert.equal(productRef("/products/2f6d6d68-9b11-438f-8fd5-864d87dd6566"), "2f6d6d68-9b11-438f-8fd5-864d87dd6566");
- // Served from her own domain, and from a VYA path — the same page is used on both.
+ // Served from her own domain, and from a VYA path. The same page is used on both.
  assert.equal(productRef("https://blummier.com/products/silk-slip"), "silk-slip");
  assert.equal(productRef("/site/blummier/products/silk-slip"), "silk-slip");
 });

@@ -1,17 +1,17 @@
-// THE MENU ON HER CAPTURED HEADER — read, reordered, and applied to every copy of it.
+// THE MENU ON HER CAPTURED HEADER. Read, reordered, and applied to every copy of it.
 //
 // F3 of the builder survey: a theme ships the same menu TWICE. Shopify has the desktop list plus the
 // drawer the phone opens; Squarespace has the desktop nav plus the mobile overlay. An order applied
-// to one of them is an order the phone ignores, so everything here runs over EVERY copy — on purpose,
+// to one of them is an order the phone ignores, so everything here runs over EVERY copy, on purpose,
 // rather than by the accident of matching old values.
 //
 // THE TWO COPIES ARE NOT IDENTICAL MARKUP. A Dawn drawer opens a dropdown with a <summary> that has
-// no link at all, where the desktop list has a real one — so an item is recognised by being an item,
+// no link at all, where the desktop list has a real one, so an item is recognised by being an item,
 // and matched across copies by its address OR, failing that, by its words.
 //
 // Sparse by design. Until she drags something there is no stored menu at all: the panel and the serve
 // path read it off the header (`detectMenus`). Once she has one, it is applied only to copies whose
-// own href sequence still matches the one it was learned from — a landing page with its own header is
+// own href sequence still matches the one it was learned from. A landing page with its own header is
 // left exactly as it is, rather than rewritten to a menu that was never on it.
 //
 // Pure: cheerio in, cheerio out. Nothing here reads the database or the request.
@@ -47,7 +47,7 @@ const ACTIVE_CLASS = /(^|[\s-])(is-)?active$|--active$|(^|\s)current(-menu-item)
  * into every link (`/site/lei-vintage/shop`), Plan B leaves them root-relative, and the two must
  * compare equal or a Squarespace menu would never match its own stored order.
  *
- * Anything that leaves her site (an Instagram link) keeps its whole address as the key, lowercased —
+ * Anything that leaves her site (an Instagram link) keeps its whole address as the key, lowercased,
  * it is still an item that can be moved, just never a page that can be hidden. A link that goes
  * nowhere at all ("#", a country picker, `javascript:`) is not an address and returns null.
  */
@@ -69,7 +69,7 @@ export function isInternalMenuKey(key: string | null | undefined): key is string
 }
 
 /** An item's words, reduced so the desktop list and the drawer agree on them. This is how a dropdown
- *  parent — which has a link in one copy and a bare <summary> in the other — is matched across both. */
+ *  parent, which has a link in one copy and a bare <summary> in the other. Is matched across both. */
 function labelKey(label: string): string {
  return `label:${label.toLowerCase().replace(/\s+/g, " ").trim()}`;
 }
@@ -86,7 +86,7 @@ export function menuSignature(keys: (string | null | undefined)[]): string {
  * Are these two lists the same menu?
  *
  * NOT string equality, because the two copies a theme ships are not identical. A Dawn drawer turns a
- * dropdown parent into a bare <summary> with no link, where the desktop list has a real one — so the
+ * dropdown parent into a bare <summary> with no link, where the desktop list has a real one, so the
  * drawer's addresses are the desktop's MINUS that one, in the same order. One being a subsequence of
  * the other is exactly that relationship, and it is still precise: a landing page carrying its own
  * different menu shares a prefix at most, and is left alone.
@@ -121,8 +121,8 @@ function itemsOf($: cheerio.CheerioAPI, list: DomElement): MenuEntry[] {
  *
  * The test is what the links DO, not what they are called: a menu is mostly links to pages of her
  * own site. That is what separates the real menu from the two lists sitting beside it in a Dawn
- * header — a 28-country picker whose every href is "#", and a row of social icons pointing at
- * Instagram — without hard-coding either theme's class names.
+ * header: a 28-country picker whose every href is "#", and a row of social icons pointing at
+ * Instagram, without hard-coding either theme's class names.
  */
 export function menuLists($: cheerio.CheerioAPI): Candidate[] {
  const seen = new Set<DomElement>();
@@ -144,7 +144,7 @@ export function menuLists($: cheerio.CheerioAPI): Candidate[] {
 }
 
 /**
- * Her main menu, as the header currently has it — the shape the panel shows before she has ever
+ * Her main menu, as the header currently has it. The shape the panel shows before she has ever
  * changed anything, and the shape a stored menu is checked against.
  *
  * The menu is the one with the most COPIES (F3: the real menu is the one shipped twice), then the
@@ -158,7 +158,7 @@ export function detectMenus($: cheerio.CheerioAPI): DetectedMenu | null {
  }
  const best = groups.sort((a, b) => b.length - a.length || b[0].items.length - a[0].items.length)[0];
  if (!best) return null;
- // The copy that names the most ADDRESSES describes the menu best — not the one with the most items.
+ // The copy that names the most ADDRESSES describes the menu best, not the one with the most items.
  // Both copies carry the same five items; only the desktop list says where the dropdown parent goes,
  // because the drawer renders it as a wordless <summary>. Sorting by item count would be a coin toss
  // between them, and losing it costs that item its address.
@@ -198,7 +198,7 @@ export function sanitizeMenuItems(raw: unknown): MenuItem[] {
  *
  * A theme wraps its label in its own element as often as not (Dawn's inline items put it in a
  * `<span>`), and that element may be what its CSS and its script are addressing. So the words are
- * replaced on the DEEPEST element that holds them and nothing else is touched — never the anchor
+ * replaced on the DEEPEST element that holds them and nothing else is touched, never the anchor
  * itself when the anchor has structure inside it.
  */
 function setItemLabel($: cheerio.CheerioAPI, entry: MenuEntry, label: string): boolean {
@@ -238,7 +238,7 @@ function cloneItem($: cheerio.CheerioAPI, from: readonly MenuEntry[], item: Menu
 /**
  * Her order, and her hidden pages, applied to every copy of the menu.
  *
- * Only whole item ELEMENTS are moved or removed — never their insides. A mega-menu's markup, the ids
+ * Only whole item ELEMENTS are moved or removed, never their insides. A mega-menu's markup, the ids
  * its script binds to and the submenu it opens all travel with the item, which is what keeps this
  * safe on themes that index their own menu items.
  *
@@ -256,13 +256,13 @@ export function applyMenu(
 
  let copies = 0, changed = false;
  for (const list of menuLists($)) {
-  // 1. Links to pages she has hidden, gone — from EVERY copy, whether or not this header is the one
+  // 1. Links to pages she has hidden, gone, from EVERY copy, whether or not this header is the one
   //    her order was learned from. A hidden page must not be linked from any menu at all.
   let entries = list.items;
   for (const i of entries) if (isInternalMenuKey(i.key) && hidden.has(i.key)) { $(i.el).remove(); changed = true; }
   entries = entries.filter((i) => !(isInternalMenuKey(i.key) && hidden.has(i.key)));
 
-  // 2. A page she RENAMED wears its new name in the menu — in every copy, and whether or not she has
+  // 2. A page she RENAMED wears its new name in the menu, in every copy, and whether or not she has
   //    ever dragged anything. The name comes from the page's own row, so this needs no stored menu;
   //    renaming is one write, and both the tab title and the menu label follow from it.
   for (const i of entries) {
@@ -289,7 +289,7 @@ export function applyMenu(
   for (const it of wanted) {
    // THE PAGE'S OWN ROW IS THE NEWER TRUTH ABOUT ITS NAME. Her stored menu remembers the name an item
    // had when she last arranged the order; renaming the page writes only the page's row. For a page
-   // she ADDED, this copy has no element of its own and one is cloned below — so without this the
+   // she ADDED, this copy has no element of its own and one is cloned below, so without this the
    // clone would arrive wearing the name she just changed, and renaming would look like it did
    // nothing. Renaming stays ONE write.
    const named = (isInternalMenuKey(it.href) ? labels.get(it.href) : undefined) || it.label;
@@ -310,7 +310,7 @@ export function applyMenu(
   }
 
   // 3. An item her stored menu KNOWS and no longer wants (she took it out of the menu). An item the
-  //    stored menu has never heard of is left alone — it arrived with a re-crawl, and dropping it
+  //    stored menu has never heard of is left alone. It arrived with a re-crawl, and dropping it
   //    would silently delete something from her site.
   for (const i of entries) {
    if (used.has(i)) continue;

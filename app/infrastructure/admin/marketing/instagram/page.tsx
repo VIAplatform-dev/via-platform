@@ -16,9 +16,9 @@ const NOTICE: Record<string, string> = {
  connected: "Instagram connected ✓",
  denied: "Connection cancelled.",
  no_ig_account: "No Instagram Business account was found on that login. Instagram must be a Business/Creator account linked to a Facebook Page.",
- token_failed: "Couldn’t finish connecting — try again.",
- unconfigured: "One-click connect isn’t set up on the server yet — paste a token instead.",
- error: "Something went wrong — try again.",
+ token_failed: "Couldn’t finish connecting. Try again.",
+ unconfigured: "One-click connect isn’t set up on the server yet. Paste a token instead.",
+ error: "Something went wrong: try again.",
 };
 
 export default function InstagramPage() {
@@ -90,7 +90,7 @@ export default function InstagramPage() {
  });
  const d = await r.json().catch(() => ({}));
  setBusy(false);
- setTestMsg(r.ok && d.ok ? "Posted to your Story ✓" : `Couldn’t post${d.detail ? ` — ${d.detail}` : d.reason ? ` — ${d.reason}` : ""}.`);
+ setTestMsg(r.ok && d.ok ? "Posted to your Story ✓" : `Couldn’t post${d.detail ? `: ${d.detail}` : d.reason ? `: ${d.reason}` : ""}.`);
  }
 
  const tokenForm = (
@@ -119,7 +119,7 @@ export default function InstagramPage() {
   <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-stone-500">
    Automatic Instagram posting is built but not live, so there is nothing to connect an account to
    yet. When it ships you&rsquo;ll be able to choose whether each piece posts on its own or waits as a
-   draft for you to look at first — nothing will ever post without that choice being yours.
+   draft for you to look at first. Nothing will ever post without that choice being yours.
   </p>
   <p className="mt-3 text-[12px] text-stone-400">Meanwhile, <a href="/admin/marketing/share-links" className="underline underline-offset-2 hover:text-stone-600">Share links</a> gives you a tagged link to put in your Instagram bio today.</p>
  </TechCard>
@@ -127,13 +127,13 @@ export default function InstagramPage() {
  {isPlatformAdmin === null && <TechCard className="p-6 text-[13px] text-stone-400">Loading…</TechCard>}
  {isPlatformAdmin && (<>
  <div className="mb-4 rounded-lg bg-amber-50 px-4 py-2.5 text-[12.5px] font-medium text-amber-900 ring-1 ring-amber-200">
-  Platform admin only — this is hidden from sellers until auto-posting actually posts.
+  Platform admin only: this is hidden from sellers until auto-posting actually posts.
  </div>
  {notice && <div className="mb-4 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-4 py-2.5 text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]">{notice}</div>}
 
  {/* How it works */}
  <div className="mb-5 rounded-xl border border-stone-200/70 bg-stone-50/70 px-4 py-3 text-[12.5px] leading-relaxed text-stone-500">
- When you publish a new piece, VYA posts it to your Instagram Story automatically — a clean photo card with a <span className="font-medium text-stone-600">Shop now</span> prompt. Buyers land on <span className="font-medium text-stone-600">your own storefront</span>, so the sale and the customer stay yours. Keep renting, keep selling — this just turns every new listing into a story.
+ When you publish a new piece, VYA posts it to your Instagram Story automatically. A clean photo card with a <span className="font-medium text-stone-600">Shop now</span> prompt. Buyers land on <span className="font-medium text-stone-600">your own storefront</span>, so the sale and the customer stay yours. Keep renting, keep selling. This just turns every new listing into a story.
  </div>
 
  <TechCard className="p-5">
@@ -170,7 +170,7 @@ export default function InstagramPage() {
  </div>
  ) : (
  <div className="mt-5 space-y-4">
- <div className="flex items-center gap-2 rounded-lg bg-stone-50 px-3 py-2.5 text-[13px] text-stone-600"><Check size={14} className="text-stone-400" /> Connect once — then new pieces post themselves.</div>
+ <div className="flex items-center gap-2 rounded-lg bg-stone-50 px-3 py-2.5 text-[13px] text-stone-600"><Check size={14} className="text-stone-400" /> Connect once, then new pieces post themselves.</div>
  {s?.oauthAvailable ? (
  <div className="space-y-2">
  <a href="/api/store/instagram/connect" className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-medium text-white transition hover:opacity-90" style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }}><Instagram size={15} /> Connect Instagram</a>
@@ -183,7 +183,7 @@ export default function InstagramPage() {
  )}
  </TechCard>
 
- <p className="mt-4 text-[12px] leading-relaxed text-stone-400">Instagram must be a Business or Creator account. VYA only posts the pieces you publish — it never reads your DMs or posts anything else.</p>
+ <p className="mt-4 text-[12px] leading-relaxed text-stone-400">Needs a Business or Creator account. VYA posts the pieces you publish, and nothing else.</p>
  </>)}
  </AdminPage>
  );

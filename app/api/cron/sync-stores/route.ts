@@ -92,7 +92,7 @@ export async function GET(request: Request) {
  const rawProducts = fetchResult.products.map(toRSSProductFormat);
 
  // Scrape product pages to pull condition/measurements from tab sections not in body_html.
- // Only scrape products whose body_html is sparse (< 600 plain-text chars) — stores that
+ // Only scrape products whose body_html is sparse (< 600 plain-text chars). Stores that
  // already write rich descriptions won't be hit, keeping sync time reasonable.
  if (store.scrapeProductPage) {
  const toScrape = rawProducts.filter((p) => {
@@ -257,7 +257,7 @@ export async function GET(request: Request) {
  // Squarespace
  let rawProducts;
  if (store.shopUrls && store.shopUrls.length > 0) {
- // Multi-URL store — fetch each, merge, dedupe by title
+ // Multi-URL store: fetch each, merge, dedupe by title
  const seen = new Set<string>();
  const merged: SquarespaceProduct[] = [];
  for (const url of store.shopUrls) {
@@ -300,7 +300,7 @@ export async function GET(request: Request) {
 
  if (products.length === 0) {
  console.warn(`[Sync Stores] ${store.name}: 0 products from feed, skipping sync to avoid data loss`);
- results.push({ store: store.name, success: false, error: "0 products returned — skipped to prevent data loss" });
+ results.push({ store: store.name, success: false, error: "0 products returned. Skipped to prevent data loss" });
  continue;
  }
 
@@ -319,11 +319,11 @@ export async function GET(request: Request) {
  const succeeded = results.filter((r) => r.success).length;
  const failed = results.filter((r) => !r.success).length;
 
- console.log(`[Sync Stores] Done — ${succeeded} succeeded, ${failed} failed`);
+ console.log(`[Sync Stores] Done: ${succeeded} succeeded, ${failed} failed`);
 
  // Learn from the sync: every newly-synced listing becomes a labeled training example
  // (idempotent), then trigger the reference-index embedder so the pieces are visually
- // searchable right away — coupling "pull Shopify over" to "learn + cache" in one pass.
+ // searchable right away: coupling "pull Shopify over" to "learn + cache" in one pass.
  try {
  const added = await backfillFromProducts();
  const baseUrl = getBaseUrl();

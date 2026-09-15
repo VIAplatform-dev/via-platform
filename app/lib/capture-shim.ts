@@ -1,28 +1,28 @@
 // Capture shim: recovers the INTERACTIVITY that stripping the source's JavaScript takes away
-// (site-capture.ts strips all <script> tags — see the comment there on why: re-hosting a third
+// (site-capture.ts strips all <script> tags. See the comment there on why: re-hosting a third
 // party's JS on our origin is an XSS risk we're not taking). This is the "behavioral reconstruction,
-// not code execution" half of that trade-off — a small, VYA-authored, defensive script + CSS
+// not code execution" half of that trade-off. A small, VYA-authored, defensive script + CSS
 // fallback, built from the REAL markup of themes we've profiled across the seller list.
 //
 // Every rule here is defensive (guarded by existence checks) so it safely no-ops on pages that
-// don't have the element it targets — this is injected on EVERY captured page, unconditionally,
+// don't have the element it targets. This is injected on EVERY captured page, unconditionally,
 // exactly like CART_UI in site-capture.ts.
 //
 // Carousels in the wild come in three flavours, and each needs its own treatment:
-//   1. Dawn's custom elements  — <slideshow-component>/<slideshow-slides>, plus ".slider" rows.
+//   1. Dawn's custom elements. <slideshow-component>/<slideshow-slides>, plus ".slider" rows.
 //      Its ANNOUNCEMENT BAR is also a <slideshow-component>, but must show ONE message at a time
 //      and rotate, whereas a category/product ".slider" row shows several side by side.
-//   2. Theme-authored sliders  — hand-rolled hero carousels. Found by SHAPE, not class name: a
+//   2. Theme-authored sliders. Hand-rolled hero carousels. Found by SHAPE, not class name: a
 //      flex track that animates transform, holding full-width slides. The theme's own CSS already
 //      animates it; only the JS that set translateX is missing, so that's all we supply.
-//   3. Third-party libraries   — swiper/slick/flickity/splide/owl markup that never initialises
+//   3. Third-party libraries. Swiper/slick/flickity/splide/owl markup that never initialises
 //      because we don't load the library. We lay these out with scroll-snap and wire their arrows.
 //
 // Squarespace (section 7) is a different problem from all three. On Shopify the theme's CSS has
 // already laid the page out and only the behaviour is missing; on Squarespace the CSS deliberately
 // ships content INVISIBLE (opacity:0 / display:none) and the gallery reel entirely UNSIZED, because
 // site-bundle.js is expected to reveal and measure it. So a captured Squarespace store doesn't lose
-// its interactivity — it loses its content. Those rules have to reveal, not just wire.
+// its interactivity: it loses its content. Those rules have to reveal, not just wire.
 
 export const CAPTURE_SHIM = `
 <style data-vya-shim="1">
@@ -30,7 +30,7 @@ export const CAPTURE_SHIM = `
       page, so the theme still lays itself out: Dawn's ".slider--everywhere/--tablet" already set
       overflow-x:auto + scroll-snap, and ".grid--4-col-desktop" already sizes items to 25%. What's
       missing is only the JS. An earlier version of this shim restyled those rows anyway and broke
-      them — flattening the 4-up product grid to 3-up and making the one-at-a-time announcement bar
+      them: flattening the 4-up product grid to 3-up and making the one-at-a-time announcement bar
       show all three messages at once. Rule of thumb: only add what the theme genuinely CANNOT do
       without its JavaScript. ── */
 
@@ -55,7 +55,7 @@ li:hover>mega-menu,li:focus-within>mega-menu,mega-menu.vya-open{display:block}
       different failure mode. Its markup ships HIDDEN AND UNSIZED and leans on site-bundle.js to
       finish the render: content sits at opacity:0 (or display:none) until that script adds
       .loaded/.is-loaded/.animation-loaded/[data-visible], and the gallery reel's slides get their
-      width and position from JS alone. Strip the script — as Plan A always does — and a captured
+      width and position from JS alone. Strip the script, as Plan A always does, and a captured
       Squarespace store is a working header above a blank white page. So unlike the Dawn rules
       above, which only WIRE markup the theme already laid out, these must also REVEAL it. ── */
 .product-list .product-list-item,.blog-basic-grid--container,.blog-single-column--container,
@@ -67,11 +67,11 @@ li:hover>mega-menu,li:focus-within>mega-menu,mega-menu.vya-open{display:block}
 .sqs-block-summary-v2 .summary-thumbnail-container img{opacity:1!important}
 
 /* The gallery reel is a horizontal filmstrip whose slides the stylesheet gives NO width and NO
-   height at all — Squarespace's JS measures each image and sets both, plus the translateX that
+   height at all: Squarespace's JS measures each image and sets both, plus the translateX that
    scrolls the strip. Without it every slide is a 0x0 absolutely-positioned box whose wrapper also
    sits at z-index:-1 (behind the page), so an 80vh hero renders as pure white with two working
-   arrows under it. Rebuild it as a scroll-snap strip — the same treatment section 3 gives library
-   carousels — and let the JS below turn each image's real dimensions into a slide width.
+   arrows under it. Rebuild it as a scroll-snap strip. The same treatment section 3 gives library
+   carousels, and let the JS below turn each image's real dimensions into a slide width.
    Deliberately NO position override on the list: it is absolute when the arrows overlay the reel
    and relative when they sit below it, and a flex row lays out correctly either way. Height comes
    from flex:1 1 auto inside .gallery-reel-wrapper (a full-height flex column) so the slides'
@@ -85,7 +85,7 @@ li:hover>mega-menu,li:focus-within>mega-menu,mega-menu.vya-open{display:block}
 /* Squarespace ships EVERY candidate image in a product card inline-hidden and lets its JS pick the
    one to show; the losers also carry .grid-item-additional-image/.grid-image-not-selected, whose
    opacity:0 is !important. So the reveal has to out-rank both the inline style and that important
-   rule — hence a dedicated class rather than setting style.opacity from JS. */
+   rule: hence a dedicated class rather than setting style.opacity from JS. */
 img.vya-sqs-img{display:block!important;opacity:1!important}
 </style>
 <script data-vya-shim="1">
@@ -123,7 +123,7 @@ ready(function(){
     ships exactly that pair:
       .no-js.page-loading .loading-overlay, html:not(.page-loading) .loading-overlay {opacity:0}
     Dropping "no-js" above (which we must, to un-gate content) kills the FIRST selector, and the
-    theme's JS that would satisfy the second is stripped on a VYA origin — so a fixed, full-viewport
+    theme's JS that would satisfy the second is stripped on a VYA origin, so a fixed, full-viewport
     z-index:99999 overlay stayed over every page and the whole site rendered as a solid colour.
     Removing the flag here satisfies the second selector, which is what the theme's own JS does. */
  root.classList.remove("page-loading");
@@ -161,7 +161,7 @@ ready(function(){
   if(kids.length<2)return;
   var box=track.getBoundingClientRect().width;
   if(!box)return;
-  /* every slide must fill the track — that's what makes it a one-at-a-time slider */
+  /* every slide must fill the track. That's what makes it a one-at-a-time slider */
   for(var i=0;i<kids.length;i++){ if(kids[i].getBoundingClientRect().width < box*0.9) return; }
   track.__vyaTrack=1;
   var stage=track.parentElement||track, idx=0;
@@ -174,7 +174,7 @@ ready(function(){
 
  /* ── 3a. The OTHER hand-rolled slider shape: slides hidden with display:none, one shown via an
         "active" class (Bootstrap's carousel and many bespoke ones work this way). The flex-track
-        detector above can't see these — nothing is laid out in a row — so without this only the
+        detector above can't see these, nothing is laid out in a row, so without this only the
         first slide is ever visible. Detected by shape again: a container whose element children are
         mostly hidden with exactly one showing. */
  document.querySelectorAll("div, ul, section").forEach(function(box){
@@ -212,7 +212,7 @@ ready(function(){
  }
 
  /* ── 3c. Search. Captured search boxes are inert: the theme's predictive-search widget owned the
-        input (11 of 20 stores). Submitting to the store's own /search URL keeps the box working —
+        input (11 of 20 stores). Submitting to the store's own /search URL keeps the box working,
         and the serving route already logs that query for the seller's analytics. */
  document.querySelectorAll("input[type='search'], input[name='q'], input[name='query']").forEach(function(input){
   if(input.__vyaSearch)return;input.__vyaSearch=1;
@@ -223,7 +223,7 @@ ready(function(){
    e.preventDefault();
    var q=(input.value||"").trim();
    /* NOTE the doubled backslash: this whole shim lives in a template literal, and \/ is not an
-      escape sequence there — it collapses to a bare /, which turned this regex into a // line
+      escape sequence there: it collapses to a bare /, which turned this regex into a // line
       comment and threw "Unexpected token }" that killed the ENTIRE shim on every captured page. */
    if(q)location.href=location.pathname.replace(/\\/$/,"")+"/search?q="+encodeURIComponent(q);
   });
@@ -240,7 +240,7 @@ ready(function(){
  });
 
  /* ── 3e. Product-image zoom / lightbox (5 of 20 stores). The theme's JS opened an overlay; the
-        markup that's left is a dead cursor:zoom-in image. Give it a real lightbox of our own —
+        markup that's left is a dead cursor:zoom-in image. Give it a real lightbox of our own,
         clicking the main product image opens it full-size, Escape or a click closes it. */
  var lb=null;
  document.querySelectorAll("[data-zoom], [class*='js-zoom'], [class*='lightbox'], [class*='product__media'] img, [class*='product-single__photo'] img").forEach(function(node){
@@ -324,8 +324,8 @@ ready(function(){
  });
 
  /* ── 7. Squarespace gallery reel: supply the per-slide width its JS would have computed.
-        CSS alone can't do this — the width is the image's aspect ratio scaled to the reel's
-        height, and no stylesheet can read data-image-dimensions — so set an aspect-ratio here
+        CSS alone can't do this. The width is the image's aspect ratio scaled to the reel's
+        height, and no stylesheet can read data-image-dimensions, so set an aspect-ratio here
         and let the strip rules above resolve it into a width. */
  document.querySelectorAll(".gallery-reel").forEach(function(reel){
   var list=reel.querySelector(".gallery-reel-list");
@@ -348,12 +348,12 @@ ready(function(){
  });
 
  /* ── 8. Squarespace's image loader (data-loader="sqs"). Its JS is what finally SHOWS a grid image:
-        it clears the inline display:none on the one candidate to display, and swaps sizes="0" — a
-        placeholder meaning "slot not measured yet" — for the slot's real width. Left alone a product
+        it clears the inline display:none on the one candidate to display, and swaps sizes="0". A
+        placeholder meaning "slot not measured yet", for the slot's real width. Left alone a product
         grid is a row of empty boxes, and any image that does appear downloads the 100w thumbnail
         because a 0px slot selects the smallest srcset candidate. */
  /* Batched deliberately: every read below is done before any write. Interleaving them made the
-        browser re-layout once per image — 1400+ forced reflows on a big catalogue page, which took
+        browser re-layout once per image. 1400+ forced reflows on a big catalogue page, which took
         the shop page ~30s to settle. Read all, then write all, and it is one layout. */
  var cards=[].slice.call(document.querySelectorAll(".product-list-item-image, .grid-item .grid-image, .summary-thumbnail"));
  var reveal=[];

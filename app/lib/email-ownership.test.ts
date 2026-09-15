@@ -21,7 +21,7 @@ test("an order email is never handed over, however connected the store is", () =
  }
 });
 
-test("marketing moves to their tool once connected — that's the whole point", () => {
+test("marketing moves to their tool once connected. That's the whole point", () => {
  // Both sending the same abandoned-basket email is the failure this exists to prevent.
  assert.equal(sender("abandoned-basket", on), "esp");
  assert.equal(sender("new-arrivals", on), "esp");

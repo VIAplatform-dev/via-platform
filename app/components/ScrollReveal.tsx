@@ -27,7 +27,7 @@ export default function ScrollReveal({
       return;
     }
 
-    // Below fold — set up animated reveal
+    // Below fold: set up animated reveal
     el.classList.add("scroll-reveal");
 
     const observer = new IntersectionObserver(

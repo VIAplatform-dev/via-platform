@@ -22,12 +22,12 @@ export function depopConfigured(): boolean {
 // ── Auth: bearer token OR captured session ───────────────────────────────────────────────────────
 //
 // The partner API authenticates with `Authorization: Bearer`. A session captured on the seller's
-// phone authenticates with cookies instead — same seller, same account, different credential shape.
+// phone authenticates with cookies instead. Same seller, same account, different credential shape.
 // Both land in the same `access_token` column, so this decides which it is by looking at the value.
 //
 // The heuristic, and why: a JWT is three base64 segments separated by dots and contains no "=" in
 // the middle; a cookie header is `name=value; name=value`. So a "=" means cookie. It is a guess made
-// deliberately loose because we have not yet seen a completed Depop login — once we have, this
+// deliberately loose because we have not yet seen a completed Depop login. Once we have, this
 // becomes a stored `kind` column rather than a sniff.
 type DepopAuth = { kind: "session"; cookie: string } | { kind: "bearer"; token: string };
 
@@ -45,7 +45,7 @@ async function depopAuth(storeSlug: string): Promise<DepopAuth | null> {
 /**
  * One request to Depop, authenticated however this seller is connected.
  *
- * A session is only accepted by Depop if the request also LOOKS like the browser it was born in —
+ * A session is only accepted by Depop if the request also LOOKS like the browser it was born in,
  * a bare fetch with a Node user-agent gets the same Cloudflare 403 the server-side login got. So
  * session requests carry browser headers. This is not evasion: it is the seller's own live session,
  * presented the way the client that created it presents it.
@@ -65,7 +65,7 @@ export async function depopFetch(storeSlug: string, url: string, init: RequestIn
  return fetch(url, { ...init, headers, redirect: "follow" }).catch(() => null);
 }
 
-/** Which base a seller's requests go to — the partner API, or Depop's own, for a session. */
+/** Which base a seller's requests go to. The partner API, or Depop's own, for a session. */
 export async function depopApiBase(storeSlug: string): Promise<string> {
  const auth = await depopAuth(storeSlug);
  return auth?.kind === "session" ? (process.env.DEPOP_WEB_API || "https://webapi.depop.com") : PARTNER_API;
@@ -78,7 +78,7 @@ async function accessToken(storeSlug: string): Promise<string | null> {
  if (!t) return null;
  if (!t.expiresAt || new Date(t.expiresAt).getTime() > Date.now()) return t.accessToken;
  const tokenUrl = process.env.DEPOP_TOKEN_URL;
- if (!t.refreshToken || !tokenUrl) return t.accessToken; // best effort — may still be valid
+ if (!t.refreshToken || !tokenUrl) return t.accessToken; // best effort: may still be valid
  const res = await fetch(tokenUrl, {
  method: "POST",
  headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -148,16 +148,16 @@ export type DepopResult = { ok: boolean; listingUrl?: string; error?: string };
 export async function listOnDepop(storeSlug: string, item: DepopItem): Promise<DepopResult> {
  if (!depopConfigured()) return { ok: false, error: "Depop isn’t configured on the server." };
  const token = await accessToken(storeSlug);
- if (!token) return { ok: false, error: "Depop isn’t connected — reconnect the account." };
+ if (!token) return { ok: false, error: "Depop isn’t connected. Reconnect the account." };
  // 8 is DEPOP's cap, not ours (VYA allows MAX_ITEM_IMAGES). A listing with more
- // photos sends Depop its first 8 rather than failing — don't raise this to match.
+ // photos sends Depop its first 8 rather than failing. Don't raise this to match.
  const images = (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 8);
  if (!images.length) return { ok: false, error: "Depop needs at least one hosted image." };
 
  const cat = await resolveCategory(item);
  const pictures = images.map((url, i) => ({ url: i === 0 ? `${url}#type=cover-image` : url }));
  const body: Record<string, any> = {
- description: `${item.brand ? item.brand + " — " : ""}${item.title}${item.description ? "\n\n" + item.description : ""}`.slice(0, 1000),
+ description: `${item.brand ? item.brand + ": " : ""}${item.title}${item.description ? "\n\n" + item.description : ""}`.slice(0, 1000),
  price_currency: item.currency || "USD",
  price_amount: (item.priceCents / 100).toFixed(2),
  national_shipping_cost: "0.00",
@@ -192,18 +192,18 @@ export type DepopSoldResult = { sales: DepopSale[]; status: "ok" | "unmapped" | 
  * Recent Depop sales for one store.
  *
  * THE ENDPOINT IS NOT HARDCODED, ON PURPOSE. Depop's partner API is closed to us and its own web API
- * is undocumented — we have never completed a login, so we have never seen a sold-items response.
+ * is undocumented. We have never completed a login, so we have never seen a sold-items response.
  * Writing a plausible URL here would produce code that looks finished, returns nothing, and gives no
  * clue why. So the path comes from DEPOP_SOLD_PATH and, unset, this reports `unmapped` rather than
  * an empty list: the cron then says "not mapped yet" instead of "no sales", which are very different
  * facts. Point the probe route at a live session, read the real shape, set the env var.
  *
- * The parse is deliberately tolerant for the same reason — several plausible key names for the same
+ * The parse is deliberately tolerant for the same reason. Several plausible key names for the same
  * field, so the first real response has a good chance of being understood without a code change.
  */
 export async function getRecentDepopSoldSkus(storeSlug: string, sinceIso: string): Promise<DepopSoldResult> {
  const path = process.env.DEPOP_SOLD_PATH;
- if (!path) return { sales: [], status: "unmapped", detail: "DEPOP_SOLD_PATH is not set — the sold-items endpoint hasn't been mapped yet." };
+ if (!path) return { sales: [], status: "unmapped", detail: "DEPOP_SOLD_PATH is not set. The sold-items endpoint hasn't been mapped yet." };
 
  const base = await depopApiBase(storeSlug);
  const url = path.startsWith("http") ? path : `${base}${path.startsWith("/") ? "" : "/"}${path}`;
@@ -220,7 +220,7 @@ export async function getRecentDepopSoldSkus(storeSlug: string, sinceIso: string
  const since = new Date(sinceIso).getTime();
  const sales: DepopSale[] = [];
  for (const r of Array.isArray(rows) ? rows : []) {
-  // The SKU is our itemId — whatever we set when the listing was created.
+  // The SKU is our itemId. Whatever we set when the listing was created.
   const sku = String(r?.sku ?? r?.external_id ?? r?.reference ?? r?.seller_sku ?? "").trim();
   if (!sku) continue;
   const soldAt = r?.sold_at ?? r?.date_sold ?? r?.updated_at ?? r?.created_at;
@@ -233,7 +233,7 @@ export async function getRecentDepopSoldSkus(storeSlug: string, sinceIso: string
  return { sales, status: "ok" };
 }
 
-// Pull a Depop listing (delete by SKU) — used when it sells elsewhere.
+// Pull a Depop listing (delete by SKU): used when it sells elsewhere.
 export async function endOnDepop(storeSlug: string, itemId: string): Promise<boolean> {
  if (!depopConfigured()) return false;
  const token = await accessToken(storeSlug);

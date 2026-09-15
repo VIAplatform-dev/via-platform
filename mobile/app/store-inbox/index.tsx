@@ -9,7 +9,7 @@ import { colors, fonts, spacing } from "../../lib/theme";
 // The other side of the messages screen: customer enquiries for a store the signed-in person runs.
 //
 // It works from the app because resolveStoreSlugAny accepts the mobile JWT as well as the web
-// cookie — one login covers both roles, and store owners don't need a second account.
+// cookie: one login covers both roles, and store owners don't need a second account.
 
 type StoreConversation = {
   id: number;

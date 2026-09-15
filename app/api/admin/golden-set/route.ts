@@ -38,11 +38,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => ({}));
- // AI proposes labels for a photo — POST { draft: "<imageUrl>" }.
+ // AI proposes labels for a photo. POST { draft: "<imageUrl>" }.
  if (typeof body?.draft === "string" && body.draft) {
  try {
- // Phase 1 — labels only, so they render instantly. The price (reverse-image + full pricer) is a
- // separate, slower call (priceFor) that fills in after — the way the inventory upload does it.
+ // Phase 1: labels only, so they render instantly. The price (reverse-image + full pricer) is a
+ // separate, slower call (priceFor) that fills in after. The way the inventory upload does it.
  const d = await draftListing([body.draft]);
  return NextResponse.json({ ok: true, proposed: {
   brand: d?.brand?.value ?? null, era: d?.era?.value ?? null, material: d?.material?.value ?? null,
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "AI draft failed" }, { status: 502 });
  }
  }
- // Phase 2 — the REAL blind price for a photo: reverse-image + the full comp-based pricer, same as a
+ // Phase 2: the REAL blind price for a photo: reverse-image + the full comp-based pricer, same as a
  // live listing. Split from the draft so labels show instantly and the price fills in after.
  if (body?.priceFor && typeof body.priceFor === "object" && typeof body.priceFor.image === "string") {
  try {
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "Pricing failed" }, { status: 502 });
  }
  }
- // Save a human-verified label as golden — POST { saveGolden: {...} }.
+ // Save a human-verified label as golden. POST { saveGolden: {...} }.
  if (body?.saveGolden && typeof body.saveGolden === "object") {
  try {
  await saveGoldenLabel(body.saveGolden);
@@ -83,12 +83,12 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: e instanceof Error ? e.message : "Save failed" }, { status: 500 });
  }
  }
- // Demote the bad auto-seeded rows — POST { clearSeeded: true }.
+ // Demote the bad auto-seeded rows. POST { clearSeeded: true }.
  if (body?.clearSeeded === true) {
  const cleared = await clearSeededGolden().catch(() => 0);
  return NextResponse.json({ ok: true, cleared, stats: await getGoldenStats() });
  }
- // Seed the golden set from the most-trusted rows (no manual review) — POST { seed: true, limit? }.
+ // Seed the golden set from the most-trusted rows (no manual review): POST { seed: true, limit? }.
  if (body?.seed === true) {
  try {
  const { promoted, goldenCount } = await seedGolden(Number(body?.limit) || 150);

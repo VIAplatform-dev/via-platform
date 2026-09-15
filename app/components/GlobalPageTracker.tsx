@@ -77,7 +77,7 @@ export default function GlobalPageTracker() {
  sessionStorage.setItem("via_session_id", sid);
  }
  } catch {
- // sessionStorage blocked (e.g. TikTok in-app browser) — keep in memory only
+ // sessionStorage blocked (e.g. TikTok in-app browser): keep in memory only
  if (!sessionIdRef.current) {
  sid = randomId();
  }
@@ -88,11 +88,11 @@ export default function GlobalPageTracker() {
 
  // Step 1: Capture UTM/referrer data on first page load.
  // Store in both the in-memory ref and sessionStorage (as a cross-navigation fallback).
- // We don't send the beacon yet because auth hasn't resolved — user_id would be null.
+ // We don't send the beacon yet because auth hasn't resolved. User_id would be null.
  useEffect(() => {
  if (typeof window === "undefined") return;
 
- // sessionStorage guard — skip if already captured this session.
+ // sessionStorage guard: skip if already captured this session.
  // Wrapped in try/catch because some WebViews (TikTok) block storage access.
  try {
  if (sessionStorage.getItem("via_utm_data")) return;
@@ -105,7 +105,7 @@ export default function GlobalPageTracker() {
 
  // The gated homepage server-redirects unauthenticated visitors to
  // /login?callbackUrl=/%3Futm_source%3Dinstagram, which buries the UTM params
- // one level deep — so a tagged bio link (vyaplatform.com/?utm_source=instagram)
+ // one level deep, so a tagged bio link (vyaplatform.com/?utm_source=instagram)
  // arrives with no TOP-LEVEL utm_source and was being recorded as "direct". Recover
  // them from the redirect-carrier param before reading.
  const carrier = params.get("callbackUrl") || params.get("callback") || params.get("next") || params.get("redirect");
@@ -162,7 +162,7 @@ export default function GlobalPageTracker() {
  }
 
  // Infer source from User-Agent for social in-app browsers that strip referrer
- // (TikTok and Instagram both do this — no document.referrer, no UTM params)
+ // (TikTok and Instagram both do this, no document.referrer, no UTM params)
  if (!utmSource) {
  const ua = navigator.userAgent;
  if (/BytedanceWebview|musical_ly|TikTok/i.test(ua)) {
@@ -176,7 +176,7 @@ export default function GlobalPageTracker() {
  }
  }
 
- // Still no tagged source — classify the REFERRER (search engines, referral hosts).
+ // Still no tagged source. Classify the REFERRER (search engines, referral hosts).
  //
  // This used to label the visit by browser instead: Chrome, Safari, Edge, Samsung.
  // A browser is not a traffic source, and because this branch ran BEFORE search was
@@ -186,7 +186,7 @@ export default function GlobalPageTracker() {
  //
  // The social REFERRER_MAP above still runs first (it handles l.instagram.com and the
  // other short/mobile hosts); classifySource picks up everything else. When there is
- // genuinely no referrer, the honest answer is "direct" — not the browser name.
+ // genuinely no referrer, the honest answer is "direct", not the browser name.
  if (!utmSource) {
  // The user-agent recovers in-app taps (Instagram, TikTok, Facebook), which arrive
  // with no referrer at all and would otherwise be filed as "direct".
@@ -204,11 +204,11 @@ export default function GlobalPageTracker() {
  landing_path: window.location.pathname,
  };
 
- // Primary: in-memory ref — always works regardless of browser storage policy.
+ // Primary: in-memory ref: always works regardless of browser storage policy.
  utmPayloadRef.current = utmPayload;
 
  // Window global so acquisitionSource() (called from signup forms) can read the
- // real source even when session/localStorage is blocked — the case for the
+ // real source even when session/localStorage is blocked. The case for the
  // Instagram & TikTok in-app browsers that /IG and /TT bio links open in.
  try {
  (window as unknown as { __viaUtmSource?: string }).__viaUtmSource = utmSource;
@@ -219,7 +219,7 @@ export default function GlobalPageTracker() {
  sessionStorage.setItem("via_utm_data", JSON.stringify(utmPayload));
  } catch {}
 
- // Tertiary: a first-party cookie — survives full-page redirects, OAuth round-trips,
+ // Tertiary: a first-party cookie: survives full-page redirects, OAuth round-trips,
  // and new tabs (where sessionStorage/in-memory are lost), so the source still links
  // to the account at sign-up.
  try {
@@ -227,7 +227,7 @@ export default function GlobalPageTracker() {
  } catch {}
 
  // Also persist to localStorage for click attribution (30-day window).
- // May fail silently in TikTok browser — click attribution is best-effort.
+ // May fail silently in TikTok browser. Click attribution is best-effort.
  try {
  localStorage.setItem("via_utm", JSON.stringify({
  utm_source: utmSource,
@@ -254,7 +254,7 @@ export default function GlobalPageTracker() {
  } catch {}
  }
  if (!data) {
- // Cookie fallback — the one store that survives OAuth redirects + new tabs.
+ // Cookie fallback: the one store that survives OAuth redirects + new tabs.
  try {
  const m = document.cookie.match(/(?:^|;\s*)via_utm=([^;]+)/);
  if (m) data = JSON.parse(decodeURIComponent(m[1]));
@@ -267,10 +267,10 @@ export default function GlobalPageTracker() {
  : null;
 
  // Send at most once anonymously and once with a user_id. The user_id send is
- // what links the source to the account — critical when someone lands logged
+ // what links the source to the account. Critical when someone lands logged
  // out (no user_id yet) and signs up later: we keep the captured source around
  // and re-send it, tied to the user, once auth resolves. (Previously it fired
- // once — usually anonymously — then locked, so most signups had no linked source.)
+ // once, usually anonymously, then locked, so most signups had no linked source.)
  if (userId) {
  if (sentWithUser.current) return;
  sentWithUser.current = true;
@@ -304,12 +304,12 @@ export default function GlobalPageTracker() {
 
  // Step 3: Track page views for authenticated users
  useEffect(() => {
- // Wait until session has resolved — never fire with a null user_id
+ // Wait until session has resolved, never fire with a null user_id
  if (status !== "authenticated") return;
  const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
  if (!userId) return;
 
- // Don't track admin activity — it would inflate WAU/MAU metrics
+ // Don't track admin activity. It would inflate WAU/MAU metrics
  if (pathname.startsWith("/admin")) return;
 
  const pageType = inferPageType(pathname);

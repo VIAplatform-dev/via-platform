@@ -6,13 +6,13 @@ import { ensureSizeKeysColumn, type DBProduct } from "./db";
 // ---------------------------------------------------------------------------
 // products.size_keys backfill.
 //
-// The web grid filters on the DERIVED display size (deriveSize — which reads the
+// The web grid filters on the DERIVED display size (deriveSize, which reads the
 // seller's fit note, so "best fits US 2-4" becomes the shown size). The SQL list
 // endpoints (new-arrivals, feed) used to filter on the RAW Shopify variant size,
 // so they could neither see the derived fit size nor handle ranges.
 //
 // This computes, for every product, the set of bare size tokens it should match
-// a filter on — the derived size expanded over its range ("US 2-4" → {2,3,4}) —
+// a filter on, the derived size expanded over its range ("US 2-4" → {2,3,4}),
 // and stores it in products.size_keys. The endpoints then filter with a GIN
 // array-overlap, matching the EXACT sizes shoppers see, ranges included.
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ export async function backfillSizeKeys(
  const sql = db();
  await ensureSizeKeysColumn();
 
- // Cap rows per run so the nightly job stays bounded as the catalog grows — this was a
+ // Cap rows per run so the nightly job stays bounded as the catalog grows. This was a
  // full, unbounded table scan+rewrite every night. With onlyMissing it only touches rows
  // that don't have size_keys yet (new/re-synced items), draining any backlog over a few runs.
  const cap = opts.limit ?? 1_000_000;
@@ -47,7 +47,7 @@ export async function backfillSizeKeys(
  // of statements (most items share a size) rather than one query per row.
  const groups = new Map<string, { keys: string[]; ids: number[] }>();
  // Separately, fix the stored `size` column when it's a GENERIC letter (or null)
- // but the title/description yields a real size — e.g. shoes mislabeled "M" by a
+ // but the title/description yields a real size. E.g. shoes mislabeled "M" by a
  // stray Squarespace tag. We only touch generic/null sizes, never a real numeric
  // one, so this can't clobber correct data. Keyed by the value to set (or null).
  const sizeFixes = new Map<string | null, number[]>();

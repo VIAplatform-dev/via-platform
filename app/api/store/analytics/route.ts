@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
  const analytics = await getStoreAnalytics(storeSlug, range);
 
  // For Shopify Collabs stores, the authoritative all-time VYA commission is the number
- // Collabs itself reports (synced into collabs_partnerships_snapshot) — not our tracked-
+ // Collabs itself reports (synced into collabs_partnerships_snapshot), not our tracked-
  // conversions estimate, which misses orders for stores without order webhooks. Use it
  // for the all-time view (the Collabs total is cumulative, so it only maps to "all").
  const store = stores.find((s) => s.slug === storeSlug);

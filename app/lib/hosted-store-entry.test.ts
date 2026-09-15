@@ -11,7 +11,7 @@ test("no capture and no import: say so plainly, and offer no edit button", () =>
  assert.match(v.headline, /haven’t brought your site over|no hosted store/i);
 });
 
-test("a failed import is still 'no hosted store' — never an edit button on nothing", () => {
+test("a failed import is still 'no hosted store', never an edit button on nothing", () => {
  const v = describeHostedStore({ captured: 0, url: null, slug: "s", pages: [], job: { status: "failed", counts: { pages: 0 } } });
  assert.equal(v.state, "none");
  assert.equal(v.canEdit, false);
@@ -42,7 +42,7 @@ test("a captured store is editable, page by page, on a same-origin edit URL", ()
  assert.deepEqual(v.pages.map((p) => p.label), ["Home page", "All pieces", "About Us"]);
 });
 
-test("product pages are NOT offered for editing — they render live inventory, not frozen HTML", () => {
+test("product pages are NOT offered for editing. They render live inventory, not frozen HTML", () => {
  const v = describeHostedStore({
   captured: 4, url: "https://x.com", slug: "s",
   pages: ["/", "/products/a-dress", "/products/b-bag", "/cart"], job: null,
@@ -58,7 +58,7 @@ test("a store of nothing but product pages has nothing to edit here", () => {
  assert.equal(v.productPages, 2);
 });
 
-test("pages still arrive while an import is running — those are editable already", () => {
+test("pages still arrive while an import is running. Those are editable already", () => {
  const v = describeHostedStore({ captured: 5, url: "/site/s", slug: "s", pages: ["/"], job: { status: "running", counts: { pages: 5 } } });
  assert.equal(v.state, "importing");
  assert.equal(v.canEdit, true);
@@ -79,7 +79,7 @@ test("no status at all (the fetch failed) is not 'ready'", () => {
 
 const READY = { captured: 2, url: "https://x.com", slug: "s", pages: ["/", "/pages/about-us"], job: null };
 
-test("a capture she has not reviewed yet is shown, but not editable — and says it is a step", () => {
+test("a capture she has not reviewed yet is shown, but not editable, and says it is a step", () => {
  const v = describeHostedStore(READY, { screens: ["/", "/pages/about-us"], answered: [] });
  assert.equal(v.state, "review-first");
  assert.equal(v.canEdit, false);

@@ -1,6 +1,6 @@
 // Where a seller goes after signing in.
 //
-// The answer isn't knowable on the client — it depends on whether this email already has a store —
+// The answer isn't knowable on the client, it depends on whether this email already has a store,
 // so it's one question to the server, asked in exactly one place. Both the sign-in page (for a
 // seller who is ALREADY signed in and shouldn't be shown a form) and /store/continue (for one who
 // just signed in) call this. That's why signing up a second time doesn't push an existing seller
@@ -11,7 +11,7 @@
 //
 // The onboarding page lives at app/infrastructure/admin/onboarding and is served as
 // getvya.ai/admin/onboarding by the host rewrite. There is no app/admin/onboarding, so on
-// VYAPLATFORM.COM — where /store/signup actually is — that path is nothing at all. A new seller
+// VYAPLATFORM.COM, where /store/signup actually is. That path is nothing at all. A new seller
 // signed up, the magic link worked, /store/continue sent her to /admin/onboarding, and she got
 // Next's 404. Logged out the proxy bounces to /admin/login first, which is why this never showed
 // up in testing: it only breaks for someone who just successfully signed in.
@@ -20,7 +20,7 @@
 // because this path is easy to get wrong.
 export const STORE_ONBOARDING = "/onboarding";
 
-/** Every path that IS onboarding, on either host. Refused as a `next` — see safeNext. */
+/** Every path that IS onboarding, on either host. Refused as a `next`. See safeNext. */
 const ONBOARDING_PATHS = ["/onboarding", "/admin/onboarding", "/infrastructure/admin/onboarding"];
 
 export type StoreWhoAmI = { admin?: boolean; slug?: string; needsOnboarding?: boolean; dev?: boolean };
@@ -40,12 +40,12 @@ export function safeNext(next: string | null | undefined): string | null {
  const v = (next || "").trim();
  if (!v.startsWith("/") || v.startsWith("//")) return null;
  // Onboarding is a ROUTER, not a destination: it asks whoami and sends you wherever you belong.
- // Honouring it as a `next` can only fight that decision — and did, as an infinite loop in
+ // Honouring it as a `next` can only fight that decision, and did, as an infinite loop in
  // production. Onboarding bounced the owner here, this returned her there, and round it went.
  // Anyone who genuinely needs onboarding is sent there by destinationAfterAuth anyway.
  //
  // BOTH SPELLINGS. The page is /onboarding on vyaplatform.com and /admin/onboarding on
- // getvya.ai (the host rewrite), so a `next` arriving from either host has to be refused — a
+ // getvya.ai (the host rewrite), so a `next` arriving from either host has to be refused. A
  // link built on one and followed on the other is exactly how the loop started.
  if (ONBOARDING_PATHS.some((base) => v === base || v.startsWith(`${base}/`) || v.startsWith(`${base}?`))) return null;
  return v;
@@ -70,7 +70,7 @@ export function loginHref(next?: string | null, mode: "login" | "signup" = "logi
  * Why the sign-in didn't land, when it didn't.
  *
  * `signed-out` means whoami never saw a session: the browser is not sending one back on this host.
- * That is the shape a cross-host cookie problem takes, and it used to be invisible — the seller was
+ * That is the shape a cross-host cookie problem takes, and it used to be invisible. The seller was
  * returned to the form with no message, which reads as "it didn't submit" and tells nobody anything.
  */
 export type AuthStall = "signed-out" | "unreachable" | null;
@@ -88,7 +88,7 @@ export async function destinationAfterAuth(next?: string | null, retryOn401 = fa
   const who: StoreWhoAmI = await res.json().catch(() => ({}) as StoreWhoAmI);
   // On `next dev`, whoami answers "owner" from NODE_ENV alone, with no session behind it. The proxy
   // does not honour that shortcut, so acting on it here means redirecting into the workspace, being
-  // redirected straight back, and doing it again — a reload loop on the sign-in page. A shortcut
+  // redirected straight back, and doing it again. A reload loop on the sign-in page. A shortcut
   // identity is not a sign-in: show the form, and let a real one replace it.
   if (who.dev) return STORE_LOGIN;
   // Signed in with no store yet → the wizard, and NOT wherever they were originally headed.

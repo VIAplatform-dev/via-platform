@@ -78,7 +78,7 @@ export async function listInvites(): Promise<SellerInvite[]> {
 }
 
 /**
- * The store held for this email, if any — and only while it's genuinely unclaimed.
+ * The store held for this email, if any, and only while it's genuinely unclaimed.
  *
  * Checked against store_users rather than trusted from the invite, so a slug that someone else has
  * since taken can never be handed over a second time.

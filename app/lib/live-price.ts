@@ -2,7 +2,7 @@
  * Put the piece's REAL price on a captured product page.
  *
  * A captured product page is frozen the day we crawled it, price markup included. The cart and the
- * checkout read the item record. So the moment a price changes — or the currency does — the page a
+ * checkout read the item record. So the moment a price changes, or the currency does. The page a
  * shopper reads and the amount they are charged part company. On blummier, whose prices were
  * repaired from dollars to pounds, 12 of 12 sampled pages advertised a dollar figure while the
  * record held a different number in pounds: "$3,169.00" on the page, £2,295.00 at the till.
@@ -34,7 +34,7 @@ export type PricedItem = {
  *
  *  The TAG names matter as much as the classes. Shopify's newer themes mark a price up as
  *  <price-list><sale-price>$200.00</sale-price></price-list>, where the element actually holding the
- *  money carries `class="h4 text-on-sale"` — nothing that says "price" at all. Matching on class
+ *  money carries `class="h4 text-on-sale"`. Nothing that says "price" at all. Matching on class
  *  alone missed it entirely, and feathers served a dress at its crawl-day $200 while the cart
  *  charged $125. `price-list` matches by class but its direct children are elements, not text, so
  *  the money was never reached. */
@@ -61,13 +61,13 @@ function format(cents: number, currency: string | null, decimals: number, showCo
 
 // ── Deriving the price slot, instead of recognising it ───────────────────────────────────────────
 //
-// Everything above finds the price by NAME, from PRICE_HOST — a list that has grown after every
+// Everything above finds the price by NAME, from PRICE_HOST. A list that has grown after every
 // theme that broke it, and will grow again. There is no end to it: a theme is arbitrary markup, and
 // a shop owner can rename any of it. The list already missed the one element holding the money on a
 // newer Shopify theme, and feathers served a dress at $200 that the cart charged $125 for.
 //
 // So ask a different question. At the moment we capture a product page we ALREADY KNOW what the
-// piece costs — the same import that stored the page read the price from the seller's own feed. The
+// piece costs. The same import that stored the page read the price from the seller's own feed. The
 // element whose text is that amount is the price slot, whatever it calls itself. Mark it once, at
 // capture; from then on the rewrite lands on the mark and no name is involved.
 //
@@ -101,7 +101,7 @@ function statedCurrency(text: string): string | null {
 /**
  * Mark the elements that hold this piece's price, by matching the amount we already know.
  *
- * Call at CAPTURE time, while the stored page and the item record still agree — that agreement is
+ * Call at CAPTURE time, while the stored page and the item record still agree. That agreement is
  * the answer key. `data-vya-price` is the live price; `data-vya-was` is the seller's markdown, told
  * apart by its value rather than by which tag a theme happened to use for it.
  *
@@ -139,7 +139,7 @@ export function markPriceSlots(html: string, item: PricedItem): string {
 
 export function applyLivePrice(html: string, item: PricedItem): string {
  // No price on the record is not the same as a price of zero. Say nothing rather than something
- // false — the seller's own page is a better answer than "£0.00".
+ // false: the seller's own page is a better answer than "£0.00".
  if (item.priceCents == null) return html;
  const $ = cheerio.load(html);
 
@@ -151,7 +151,7 @@ export function applyLivePrice(html: string, item: PricedItem): string {
  const hosts = marked.length ? marked : $(PRICE_HOST);
 
  $(marked.length ? "[data-vya-was]" : NOT_OURS_TO_CLAIM).filter((_: number, el: DomElement) => {
-  if (marked.length) return true; // marked by value at capture — no context test needed
+  if (marked.length) return true; // marked by value at capture, no context test needed
   // Only inside a price context: a theme's <s> in its copy is not a compare-at price.
   return $(el).is(PRICE_HOST) || $(el).parents(PRICE_HOST).length > 0;
  }).remove();
@@ -173,7 +173,7 @@ export function applyLivePrice(html: string, item: PricedItem): string {
   }
  }
 
- // A page can be captured with its price block EMPTY — the theme fills it in the browser, or the
+ // A page can be captured with its price block EMPTY. The theme fills it in the browser, or the
  // crawl caught the piece mid-render. sourcedbyscottie had one showing no price at all while the
  // seller's own page showed $115.00, and nothing flagged it because nothing looked at the page.
  // Only when the page shows no price anywhere: never a second price beside a real one.
@@ -224,7 +224,7 @@ export function applyLivePrice(html: string, item: PricedItem): string {
   if ($host.length) $host.after(pill); else $("body").first().append(pill);
  }
 
- // The page states its own price, so a check never has to work out which element is the price —
+ // The page states its own price, so a check never has to work out which element is the price,
  // the same reason a collection page states its size. See scripts/parity-check.mts.
  $('meta[name="vya:product-price"]').remove();
  const tag = `<meta name="vya:product-price" content="${item.priceCents} ${code}">`

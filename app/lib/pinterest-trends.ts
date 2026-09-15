@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 
-// Pinterest Trends — a CLEAN, official signal for what's rising in fashion CULTURE, from outside
+// Pinterest Trends. A CLEAN, official signal for what's rising in fashion CULTURE, from outside
 // VYA's own walls. Pinterest is where resale/vintage taste forms weeks before it shows up in resale
 // demand, so this is a LEADING discovery signal to complement VYA's own (what buyers already do here).
 //   • a daily cron CAPTURES the top growing fashion keywords → snapshots
@@ -10,7 +10,7 @@ import { neon } from "@neondatabase/serverless";
 
 const PINTEREST_API = "https://api.pinterest.com/v5";
 const REGION = process.env.PINTEREST_REGION || "US";
-// Fashion facets in Pinterest's taxonomy, so we get style trends — not recipes or home decor.
+// Fashion facets in Pinterest's taxonomy, so we get style trends, not recipes or home decor.
 const INTERESTS = "womens_fashion,mens_fashion";
 
 export function isPinterestConfigured(): boolean {

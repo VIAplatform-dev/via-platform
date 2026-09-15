@@ -8,15 +8,15 @@
 //
 // THE THREE THINGS A DECLARATION NEEDS, and the three things sellers get wrong:
 //
-//   1. WHAT IT IS — an HS tariff code. Customs charges duty by code, not by description, and
+//   1. WHAT IT IS: an HS tariff code. Customs charges duty by code, not by description, and
 //      "vintage dress" is not a code. We derive one from the category the seller already picked,
 //      because asking a vintage dealer for a tariff number gets you an empty field.
 //
-//   2. WHERE IT WAS MADE — the country of ORIGIN, which for resale is where the garment was
+//   2. WHERE IT WAS MADE. The country of ORIGIN, which for resale is where the garment was
 //      manufactured, not where the seller is standing. A 1990s Prada coat posted from London is
 //      Italian, and declaring it British is a false declaration.
 //
-//   3. WHO PAYS THE DUTY — the incoterm. This is the one that actually bites. A store can say
+//   3. WHO PAYS THE DUTY. The incoterm. This is the one that actually bites. A store can say
 //      "duties covered" on its website and still ship DAP, in which case the courier bills the
 //      buyer at the door regardless of the promise, and the seller refunds it and pays twice. The
 //      promise lives in the declaration, not in the copy.
@@ -42,7 +42,7 @@ export function isDutyMode(v: unknown): v is DutyMode {
 /**
  * The incoterm for a duty mode.
  *
- * DDP — delivered duty paid — bills the duty back to the shipper's carrier account. DDU (which
+ * DDP, delivered duty paid. Bills the duty back to the shipper's carrier account. DDU (which
  * EasyPost still calls DDU, and the rest of the world now calls DAP) leaves it with the buyer.
  *
  * A seller who absorbs duty in her prices MUST ship DDP. Otherwise she has paid for the duty twice:
@@ -59,7 +59,7 @@ export function incotermFor(mode: DutyMode): "DDP" | "DDU" {
  *
  * Postage and duty look alike and behave nothing alike. Postage is known the moment the label is
  * bought, so VYA buys it and charges the seller's card in the same breath. Duty is invoiced by the
- * carrier WEEKS later, once customs has cleared, in an amount nobody knew at label time — on a $761
+ * carrier WEEKS later, once customs has cleared, in an amount nobody knew at label time, on a $761
  * dress it was $189. Shipping DDP on VYA's own wallet would mean VYA taking on an unknown debt, for
  * a third party, payable long after the seller has been paid out and possibly left.
  *
@@ -85,7 +85,7 @@ export function isInternational(fromCountry: unknown, toCountry: unknown): boole
 }
 
 /* ── HS tariff codes ───────────────────────────────────────────────────────
- * Six-digit headings, which are harmonised worldwide — the further digits vary by country and
+ * Six-digit headings, which are harmonised worldwide. The further digits vary by country and
  * customs will accept six. Keyed on the SAME category slugs as tax-codes.ts so the two mappings
  * can't drift into disagreeing about what a thing is.
  *
@@ -94,7 +94,7 @@ export function isInternational(fromCountry: unknown, toCountry: unknown): boole
  * seller can override per item.
  */
 const HS_BY_CATEGORY: Record<string, string> = {
- // Chapter 62 — woven apparel (the safer default for vintage; knits are chapter 61)
+ // Chapter 62: woven apparel (the safer default for vintage; knits are chapter 61)
  dresses: "6204.43",
  skirts: "6204.53",
  pants: "6204.63",
@@ -108,7 +108,7 @@ const HS_BY_CATEGORY: Record<string, string> = {
  swimwear: "6112.41",
  "other-clothing": "6204.43",
 
- // Chapter 64 — footwear
+ // Chapter 64: footwear
  boots: "6403.91",
  heels: "6403.99",
  shoes: "6403.99",
@@ -116,7 +116,7 @@ const HS_BY_CATEGORY: Record<string, string> = {
  sandals: "6403.99",
  sneakers: "6404.11",
 
- // Chapter 42 — leather goods
+ // Chapter 42: leather goods
  handbags: "4202.21",
  totes: "4202.21",
  clutches: "4202.21",
@@ -133,7 +133,7 @@ const HS_BY_CATEGORY: Record<string, string> = {
  home: "6304.92",
 };
 
-/** Titles that mean a different code than their category implies — a watch is filed under jewelry. */
+/** Titles that mean a different code than their category implies. A watch is filed under jewelry. */
 const HS_TITLE_HINTS: { test: RegExp; code: string }[] = [
  { test: /\bwatch(es)?\b/i, code: "9102.11" },
  { test: /\bwallet\b|\bcard\s?holder\b|\bcoin\s?purse\b/i, code: "4202.31" },
@@ -147,7 +147,7 @@ const HS_TITLE_HINTS: { test: RegExp; code: string }[] = [
 /**
  * A tariff code for a listing.
  *
- * The title only overrides where it names something the category genuinely can't express — never
+ * The title only overrides where it names something the category genuinely can't express, never
  * to second-guess a category the seller chose deliberately.
  */
 export function hsCodeFor(category: unknown, title?: unknown): string {
@@ -172,7 +172,7 @@ export function hsCodeFor(category: unknown, title?: unknown): string {
  * The US export-filing exemption code.
  *
  * A US shipment worth more than $2,500 per commodity needs an AES filing and an ITN, which is a
- * thing a seller does themselves — we can't invent one. Below that, this exemption applies and is
+ * thing a seller does themselves. We can't invent one. Below that, this exemption applies and is
  * what nearly every resale parcel uses. Returned null above the threshold so the caller can stop
  * and TELL the seller rather than file something untrue.
  */
@@ -189,7 +189,7 @@ export function eelPfc(valueCents: number, fromCountry: unknown): string | null 
  * Materials that can have a parcel seized, however old the piece is.
  *
  * CITES covers the exotic skins and furs that vintage designer resale is full of, and age is NOT a
- * defence — a 1970s crocodile Kelly needs paperwork exactly like a new one. Ivory is close to
+ * defence: a 1970s crocodile Kelly needs paperwork exactly like a new one. Ivory is close to
  * absolutely banned in the US and UK. Getting this wrong doesn't cost a fee, it costs the item.
  *
  * Detection is by name, so it is a WARNING to show the seller, never an automatic block: "crocodile
@@ -199,7 +199,7 @@ export const RESTRICTED_MATERIALS: { test: RegExp; material: string; note: strin
  { test: /\bcrocodile\b|\bcroc\b(?!\s*embossed)|\balligator\b/i, material: "Crocodile / alligator", note: "CITES-listed. Needs a permit to cross most borders, whatever its age." },
  { test: /\bpython\b|\bsnakeskin\b|\bwatersnake\b/i, material: "Python / snakeskin", note: "CITES-listed. Needs a permit, and is refused outright by some couriers." },
  { test: /\blizard\b(?!\s*embossed)/i, material: "Lizard", note: "CITES-listed. Needs a permit to cross most borders." },
- { test: /\bostrich\b/i, material: "Ostrich", note: "CITES-listed in some forms — check before shipping abroad." },
+ { test: /\bostrich\b/i, material: "Ostrich", note: "CITES-listed in some forms. Check before shipping abroad." },
  { test: /\bstingray\b|\bshagreen\b/i, material: "Stingray / shagreen", note: "CITES-listed. Needs a permit." },
  { test: /\btortoise\s?shell\b/i, material: "Tortoiseshell", note: "Effectively banned from international trade." },
  { test: /\bivory\b/i, material: "Ivory", note: "Banned or near-banned in the US and UK regardless of age." },
@@ -244,7 +244,7 @@ export type CustomsDeclaration = {
  /**
   * The exporter's tax identifier, when the store gave us one (Settings → Store details).
   *
-  * VAT only — a company registration number is not a tax id, and putting one in this field is a
+  * VAT only: a company registration number is not a tax id, and putting one in this field is a
   * wrong answer on a legal declaration rather than a harmless extra. See legal-identity.ts.
   */
  exporterTaxId: { number: string; type: "VAT" } | null;
@@ -257,7 +257,7 @@ export type CustomsDeclaration = {
  * Build the declaration for one order.
  *
  * `originCountry` falls back to where it ships from, which is what a seller who doesn't know would
- * put — but the item's own origin is preferred wherever it's recorded, because that is the truthful
+ * put, but the item's own origin is preferred wherever it's recorded, because that is the truthful
  * answer and the one that decides the duty rate.
  */
 export function buildDeclaration(opts: {

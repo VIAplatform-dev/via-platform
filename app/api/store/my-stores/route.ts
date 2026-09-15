@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-// POST { slug } — she picked a shop. Remembered in a cookie so the next page load stays put; the
+// POST { slug }: she picked a shop. Remembered in a cookie so the next page load stays put; the
 // membership check runs here AND on every request that reads it, because a cookie is a claim.
 export async function POST(request: NextRequest) {
  const session = await auth();

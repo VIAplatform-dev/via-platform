@@ -9,7 +9,7 @@ type Item = { status: string };
 type Order = { amountCents: number };
 
 const BASE_CARDS: { href: string; icon: LucideIcon; title: string; body: string }[] = [
- { href: "/import", icon: Upload, title: "Import your store", body: "Bring everything over from your existing site — products, photos, and branding — in one paste." },
+ { href: "/import", icon: Upload, title: "Import your store", body: "Bring everything over from your existing site, products, photos, and branding, in one paste." },
  { href: "/storefront", icon: Store, title: "Set up your storefront", body: "Choose your look, claim your URL, and flip it live." },
  { href: "/payments", icon: CreditCard, title: "Get ready to accept payments", body: "Connect Stripe so sales settle straight to your own bank." },
 ];
@@ -76,7 +76,7 @@ export default function StoreHome() {
  <input
  value={q}
  onChange={(e) => setQ(e.target.value)}
- placeholder="Ask VYA anything — “write a description”, “make my store elegant”, “how do I get paid?”"
+ placeholder="Ask VYA anything. “write a description”, “make my store elegant”, “how do I get paid?”"
  className="flex-1 bg-transparent text-[14px] text-stone-900 outline-none placeholder:text-stone-400"
  />
  <button type="submit" disabled={!q.trim()} className="shrink-0 rounded-md bg-[#5D0F17] p-2 text-white transition hover:bg-[#4a0c12] disabled:opacity-40"><ArrowUp size={15} /></button>

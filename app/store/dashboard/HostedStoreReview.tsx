@@ -79,7 +79,7 @@ export default function HostedStoreReview({ previewStore }: { previewStore: stri
     <section className="space-y-8">
      <div>
       <h2 className="font-serif text-xl text-[#5D0F17]">Does it look right?</h2>
-      <p className="text-sm text-[#5D0F17]/60">Your site on the left, our hosted copy on the right. You know what your store should look like — tell us if something is off.</p>
+      <p className="text-sm text-[#5D0F17]/60">Your site on the left, our copy of it on the right. Tell us if anything looks wrong.</p>
      </div>
      {health.screens.map((s) => {
       const done = latest.get(s.page);

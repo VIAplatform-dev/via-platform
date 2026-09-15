@@ -22,7 +22,7 @@ import { colors, eyebrow, spacing } from "../lib/theme";
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
-  // Browse links here with a designer preselected — the API has a `designers` filter, which is not
+  // Browse links here with a designer preselected. The API has a `designers` filter, which is not
   // the same as a category, and routing a brand through `categories` matches on title keywords and
   // returns the wrong things.
   const params = useLocalSearchParams<{ designer?: string }>();
@@ -94,7 +94,7 @@ export default function SearchScreen() {
       ) : (
         <View style={{ flex: 1, alignItems: "center", paddingTop: spacing.xxl }}>
           <Text style={{ fontSize: 15, color: colors.textMuted, textAlign: "center", paddingHorizontal: spacing.xxl }}>
-            Search across every store on VYA — by designer, category, era or just what it looks like.
+            Search across every store on VYA, by designer, category, era or just what it looks like.
           </Text>
         </View>
       )}

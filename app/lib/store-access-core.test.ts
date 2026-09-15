@@ -26,7 +26,7 @@ test("what she chose last time is remembered", () => {
  assert.deepEqual(chooseStore(null, "bea", ["tess", "bea"]), { slug: "bea", reason: "remembered", shouldAsk: false });
 });
 
-test("the URL beats the memory — a link she was sent wins over where she was", () => {
+test("the URL beats the memory. A link she was sent wins over where she was", () => {
  assert.equal(chooseStore("tess", "bea", ["tess", "bea"]).slug, "tess");
 });
 

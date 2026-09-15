@@ -15,8 +15,8 @@ function isAuthorized(request: NextRequest): boolean {
  return false;
 }
 
-// GET — THE GOLDEN SET: how VYA's own unbranded + lesser-known pieces are actually priced, by
-// category × material tier. Review this to sanity-check (and calibrate) unbranded pricing — it's the
+// GET: THE GOLDEN SET: how VYA's own unbranded + lesser-known pieces are actually priced, by
+// category × material tier. Review this to sanity-check (and calibrate) unbranded pricing. It's the
 // same data the pricing engine now anchors an unbranded piece to. Dollars for readability.
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

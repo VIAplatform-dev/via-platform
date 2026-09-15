@@ -70,7 +70,7 @@ export default function AdminUsersPage() {
  <div key={a.id} className="flex items-center justify-between gap-3 py-3">
  <div>
  <p className="text-sm">{a.email}</p>
- <p className="text-xs text-[#5D0F17]/45">{a.active ? "Active" : a.hasPassword ? "Set up" : "Invited — pending password"}</p>
+ <p className="text-xs text-[#5D0F17]/45">{a.active ? "Active" : a.hasPassword ? "Set up" : "Invited. Pending password"}</p>
  </div>
  <button onClick={() => remove(a.email)} className="text-[11px] uppercase tracking-[0.14em] text-[#5D0F17]/40 hover:text-red-700">Remove</button>
  </div>

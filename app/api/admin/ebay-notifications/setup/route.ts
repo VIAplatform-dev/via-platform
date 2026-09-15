@@ -7,7 +7,7 @@ export const maxDuration = 120;
 
 // Subscribe every eBay-connected store (or one, ?store=<slug>) to instant sale notifications:
 // creates/reuses the app's destination at ${BASE_URL}/api/webhooks/ebay, then an ORDER_CONFIRMATION
-// subscription per store with her token. Idempotent — re-run it after every deploy and whenever a
+// subscription per store with her token. Idempotent: re-run it after every deploy and whenever a
 // store connects eBay. Reports what it did; a "no" from eBay is a sentence in the report, not a 500.
 //
 //   curl -X POST -b via_admin_token=<sha256 of ADMIN_PASSWORD> https://vyaplatform.com/api/admin/ebay-notifications/setup

@@ -1,7 +1,7 @@
 /**
  * Version history for a captured page.
  *
- * `site_captures` holds ONE row per (store, path) and every write overwrites it in place — a
+ * `site_captures` holds ONE row per (store, path) and every write overwrites it in place. A
  * re-crawl, an editor save, or the asset-rehosting pass that runs over every page on every repair.
  * There is no copy anywhere, so a bad re-import (her site mid-redesign, a cookie wall served instead
  * of the page, a truncated response) destroys the good version with no way back. That is the hole
@@ -11,7 +11,7 @@
  * storage lives in capture-versions-db.ts.
  */
 
-/** Why a version was kept — which is what makes pruning safe. */
+/** Why a version was kept, which is what makes pruning safe. */
 export type VersionReason = "crawl" | "edit" | "rewrite";
 
 export type VersionRow = {
@@ -24,7 +24,7 @@ export type VersionRow = {
 /**
  * How many versions of a page we keep.
  *
- * Three, not one: a page can be overwritten twice before anyone notices it broke — a repair rewrites
+ * Three, not one: a page can be overwritten twice before anyone notices it broke. A repair rewrites
  * assets across every page, and a re-import may follow it the same day. One slot would mean the last
  * good copy is already gone by the time a seller says "my homepage looks wrong".
  */
@@ -56,7 +56,7 @@ function time(v: string | Date): number {
 /**
  * Which versions of one page should be deleted, given everything currently stored for it.
  *
- * Newest `keep` survive — and so does the most recent `crawl`, ALWAYS, even when it falls outside
+ * Newest `keep` survive, and so does the most recent `crawl`, ALWAYS, even when it falls outside
  * that window. Without that exception the rule is worse than useless: the rehosting pass touches
  * every page on every repair, so three mechanical rewrites would evict the actual capture of her
  * site and leave three near-identical copies of the same broken page.
@@ -67,10 +67,10 @@ export function versionsToDrop(rows: VersionRow[], keep: number = KEEP_VERSIONS,
  if (keep < 1) return []; // a caller asking to keep nothing is a bug, not an instruction
  // `id` breaks the tie, and it has to: Postgres handed back whole-second timestamps in practice, so
  // three rewrites of one page in the same second are indistinguishable by time alone. The id is a
- // BIGSERIAL — the order the rows were actually written.
+ // BIGSERIAL: the order the rows were actually written.
  const sorted = [...rows].sort((a, b) => (time(b.createdAt) - time(a.createdAt)) || (Number(b.id) - Number(a.id)));
  const survivors = new Set(sorted.slice(0, keep).map((r) => r.id));
- // Her newest saves, beyond the shared window — the history the top-bar Undo walks back through.
+ // Her newest saves, beyond the shared window. The history the top-bar Undo walks back through.
  for (const r of sorted.filter((x) => x.reason === "edit").slice(0, Math.max(0, keepEdits))) survivors.add(r.id);
  const newestCrawl = sorted.find((r) => r.reason === "crawl");
  if (newestCrawl) survivors.add(newestCrawl.id);
@@ -81,7 +81,7 @@ export function versionsToDrop(rows: VersionRow[], keep: number = KEEP_VERSIONS,
  * Is this new content worth a version at all?
  *
  * The rehosting pass often rewrites a page to exactly what it already was. Storing that would spend
- * one of three slots to record that nothing happened, so identical content is skipped — compared on
+ * one of three slots to record that nothing happened, so identical content is skipped. Compared on
  * a hash the caller already has, never on the megabyte of HTML itself.
  */
 export function worthVersioning(previousHash: string | null | undefined, nextHash: string): boolean {

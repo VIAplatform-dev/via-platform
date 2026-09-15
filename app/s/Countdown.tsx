@@ -8,7 +8,7 @@ export default function Countdown({ target, accent, headingFontFamily, paused }:
  const [now, setNow] = useState<number | null>(null);
  useEffect(() => {
  const raf = requestAnimationFrame(() => setNow(Date.now())); // first paint (async, not a sync setState in the effect body)
- // In the editor we DON'T tick every second — the constant re-render fights the section drag-reorder,
+ // In the editor we DON'T tick every second. The constant re-render fights the section drag-reorder,
  // and a preview doesn't need a live clock. The live storefront ticks.
  const id = paused ? null : setInterval(() => setNow(Date.now()), 1000);
  return () => { cancelAnimationFrame(raf); if (id) clearInterval(id); };

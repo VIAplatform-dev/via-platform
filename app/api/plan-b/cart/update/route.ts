@@ -4,7 +4,7 @@ import { resolveStore, cartToken, currentCart, cartResponse, errorResponse, read
 
 export const dynamic = "force-dynamic";
 
-// POST /cart/update.js — the theme's bulk update (`updates: { "<line key>": 0, … }`), plus cart
+// POST /cart/update.js. The theme's bulk update (`updates: { "<line key>": 0, … }`), plus cart
 // note/attributes. Same one-of-one rule as /cart/change: 0 removes, anything else is a no-op that
 // answers with the true cart.
 export async function POST(request: NextRequest) {

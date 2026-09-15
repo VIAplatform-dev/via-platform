@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import StoreAuthClient from "@/app/store/StoreAuthClient";
 
 export const metadata: Metadata = {
- title: "Create your store — VYA",
+ title: "Create your store: VYA",
  description: "Set up your VYA store: list your inventory, take orders, and run your own storefront.",
  robots: { index: false, follow: false },
 };

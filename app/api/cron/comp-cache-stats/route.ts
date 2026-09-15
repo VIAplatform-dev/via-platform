@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 
 // Read-only, CRON_SECRET-gated: how full is the comp cache? Shows total comps saved, how many
 // are fresh (reusable), how many distinct item-queries / brands are covered, and the biggest
-// brands by comp count — so you can watch each paid lookup turn into reusable, cost-saving data.
+// brands by comp count, so you can watch each paid lookup turn into reusable, cost-saving data.
 //   /api/cron/comp-cache-stats
 export const maxDuration = 30;
 
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
  const topBrands = (await sql`SELECT brand, COUNT(*)::int AS comps FROM comp_cache WHERE brand IS NOT NULL GROUP BY brand ORDER BY comps DESC LIMIT 10`) as Array<Record<string, unknown>>;
  return NextResponse.json({ ...stats, topBrands });
  } catch {
- // Table not created yet — no pricing has run since deploy.
+ // Table not created yet, no pricing has run since deploy.
  return NextResponse.json({ total_comps: 0, note: "comp_cache is empty (no pricing run yet)" });
  }
 }

@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
  fav_counts AS (SELECT user_id::text AS uid, COUNT(*) AS cnt, MAX(created_at) AS last_at FROM product_favorites WHERE user_id IS NOT NULL GROUP BY user_id::text),
  cart_counts AS (SELECT user_id::text AS uid, COUNT(*) AS cnt, MAX(added_at) AS last_at FROM user_cart_items WHERE user_id IS NOT NULL GROUP BY user_id::text),
  -- The high-volume event tables (clicks, views, page-views) are bounded to the last year so the
- -- aggregate uses the timestamp index instead of scanning the whole history on every request —
+ -- aggregate uses the timestamp index instead of scanning the whole history on every request,
  -- otherwise this page gets slower as those tables grow and eventually hangs.
  click_counts AS (SELECT user_id::text AS uid, COUNT(*) AS cnt, MAX(timestamp) AS last_at FROM clicks WHERE user_id IS NOT NULL AND timestamp >= now() - interval '365 days' GROUP BY user_id::text),
  view_counts AS (SELECT user_id::text AS uid, COUNT(*) AS cnt, MAX(timestamp) AS last_at FROM product_views WHERE user_id IS NOT NULL AND timestamp >= now() - interval '365 days' GROUP BY user_id::text),

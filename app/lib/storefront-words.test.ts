@@ -13,7 +13,7 @@ test("only what a store actually overrode changes", () => {
  assert.equal(w.viewAll, DEFAULT_WORDS.viewAll);
 });
 
-test("whitespace is not an override — a blank box keeps the standard word", () => {
+test("whitespace is not an override. A blank box keeps the standard word", () => {
  assert.equal(resolveWords({ sold: "   " }).sold, DEFAULT_WORDS.sold);
 });
 

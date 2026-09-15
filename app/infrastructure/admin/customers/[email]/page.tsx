@@ -15,7 +15,7 @@ type Conv = { id: number; itemTitle: string | null; lastMessage: string | null; 
 type Data = { profile: Profile; orders: Order[]; offers: Offer[]; conversations: Conv[]; allTags?: string[] };
 
 const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : "—");
+const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : "-");
 const initials = (n: string) => (n || "?").trim().split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
 const orderTone = (s: string): "live" | "pending" | "info" | "down" | "neutral" =>
@@ -75,7 +75,7 @@ export default function CustomerDetailPage() {
  title={
  <span className="flex items-center gap-3">
  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] text-[13px] font-semibold text-[var(--accent-ink,#0b7a5c)]">{initials(name)}</span>
- {/* A long email is one unbreakable word — let it wrap instead of running off a phone. */}
+ {/* A long email is one unbreakable word. Let it wrap instead of running off a phone. */}
  <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
  </span>
  }
@@ -83,7 +83,7 @@ export default function CustomerDetailPage() {
  actions={<StatusPill tone={p.subscribed ? "live" : "neutral"} dot={p.subscribed}>{p.subscribed ? "Subscribed" : "Not subscribed"}</StatusPill>}
  />
 
- {/* Four across only once each card is wide enough for "CONVERSATIONS" — at 640–767 it was cut off. */}
+ {/* Four across only once each card is wide enough for "CONVERSATIONS", at 640–767 it was cut off. */}
  <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
  <MetricCard label="Orders" value={orders.length} sub={p.lastOrderAt ? `Last ${date(p.lastOrderAt)}` : "None yet"} />
  <MetricCard label="Total spent" value={money(p.spentCents)} sub="Lifetime" />
@@ -91,13 +91,13 @@ export default function CustomerDetailPage() {
  <MetricCard label="Conversations" value={conversations.length} sub={conversations.reduce((s, c) => s + c.storeUnread, 0) ? "Unread replies" : "All read"} />
  </div>
 
- {/* Notes + tags — what she knows about this person, in her words. */}
+ {/* Notes + tags. What she knows about this person, in her words. */}
  <TechCard className="mb-5 p-5" data-testid="customer-memory">
  <div className="grid gap-4 sm:grid-cols-2">
  <div>
  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3">
  <label htmlFor="customer-notes" className="text-[12px] font-medium text-stone-700">Notes</label>
- <span className="text-[11px] text-stone-400">{saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Couldn’t save" : "Private — saves when you click away"}</span>
+ <span className="text-[11px] text-stone-400">{saved === "saving" ? "Saving…" : saved === "saved" ? "Saved" : saved === "error" ? "Couldn’t save" : "Private: saves when you click away"}</span>
  </div>
  <textarea id="customer-notes" value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => { if (notes !== (data.profile.notes || "")) void saveMemory({ notes }); }} rows={4}
  placeholder="Size 8, loves 70s prints, asked about a Chloé bag…" className={cn(inputCls, "h-auto py-2.5 text-[13px]")} />
@@ -210,7 +210,7 @@ export default function CustomerDetailPage() {
  <Link key={c.id} href="/admin/inbox" className="flex items-center gap-3 px-5 py-3 transition hover:bg-stone-50/70">
  <div className="min-w-0 flex-1">
  {c.itemTitle && <p className="truncate text-[12px] text-stone-400">Re: {c.itemTitle}</p>}
- <p className="truncate text-[13px] text-stone-700">{c.lastMessage || "—"}</p>
+ <p className="truncate text-[13px] text-stone-700">{c.lastMessage || "-"}</p>
  </div>
  {c.storeUnread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--accent,#0e9f76)]" />}
  <span className="shrink-0 text-[11px] text-stone-400">{date(c.lastMessageAt)}</span>

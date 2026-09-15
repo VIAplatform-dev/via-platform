@@ -15,7 +15,7 @@ export type InboxSettings = {
  offersEnabled: boolean;
  offersBinding: boolean;
  minOfferPct: number; // auto-decline offers below this % of list price; 0 = no floor
- notifyPhone: string | null; // seller's mobile — texted (via Linq) on a new buyer message
+ notifyPhone: string | null; // seller's mobile: texted (via Linq) on a new buyer message
  notifySms: boolean; // whether to send that text notification
 };
 

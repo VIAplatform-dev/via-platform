@@ -21,7 +21,7 @@ test("when the buyer funded shipping, the line reassures", () => {
 test("when SHE pays, that is the first thing said", () => {
   // This is the only case that can cost her money she wasn't expecting.
   const line = labelQuoteLine({ ...base, sellerPays: true, buyerPaidCents: 0 }, "USD");
-  assert.match(line, /^\$8\.12 — charged to your card/);
+  assert.match(line, /^\$8\.12: charged to your card/);
 });
 
 test("an international parcel says who settles duty", () => {
@@ -31,7 +31,7 @@ test("an international parcel says who settles duty", () => {
   assert.match(ddp, /duty covered/);
 });
 
-test("pennies are kept — a label is not a round number", () => {
+test("pennies are kept: a label is not a round number", () => {
   assert.match(labelQuoteLine(base, "GBP"), /£8\.12/);
 });
 

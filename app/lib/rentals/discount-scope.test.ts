@@ -12,7 +12,7 @@ function split(scope: "none" | "rent" | "rent_waiver", rent: number, waiver: num
  return { rentOff, waiverOff: scope === "rent_waiver" ? Math.min(waiver, off - rentOff) : 0 };
 }
 
-test("a store that hasn't chosen takes no codes — which is what rentals did before", () => {
+test("a store that hasn't chosen takes no codes, which is what rentals did before", () => {
  assert.equal(DEFAULT_SETTINGS.discountApplies, "none");
  assert.deepEqual(split("none", 20_000, 2_000, 15), { rentOff: 0, waiverOff: 0 });
 });
@@ -44,7 +44,7 @@ test("rent-only never touches the waiver even when the discount exceeds the rent
 });
 
 test("the deposit is not in the arithmetic at all", () => {
- // It has no term in any branch — the renter's money can't be discounted back to her.
+ // It has no term in any branch. The renter's money can't be discounted back to her.
  const deposit = 50_000;
  const before = 20_000 + 2_000 + deposit;
  const { rentOff, waiverOff } = split("rent_waiver", 20_000, 2_000, 15);
@@ -54,7 +54,7 @@ test("the deposit is not in the arithmetic at all", () => {
 test("the setting survives a round trip and refuses nonsense", () => {
  assert.equal(resolveSettings({ discountApplies: "rent" }).discountApplies, "rent");
  assert.equal(resolveSettings({ discountApplies: "rent_waiver" }).discountApplies, "rent_waiver");
- // A bad value falls back rather than throwing — this is seller-entered JSON.
+ // A bad value falls back rather than throwing. This is seller-entered JSON.
  assert.equal(resolveSettings({ discountApplies: "deposit" as never }).discountApplies, "none");
  assert.equal(resolveSettings(null).discountApplies, "none");
 });

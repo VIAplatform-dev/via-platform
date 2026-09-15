@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
+import { coerceLayout, type LayoutSection } from "./description-layout";
 
-// The store owner's OWN brief — what they explicitly tell VYA about how they run
+// The store owner's OWN brief. What they explicitly tell VYA about how they run
 // their store: pricing stance, goals, description voice, and positioning. This
 // complements what VYA infers from their catalog (see store-voice.ts and
 // getStorePricingSignal). Owner intent takes precedence: it steers the AI drafter's
@@ -19,12 +20,19 @@ export type StoreBrief = {
  pricing: { stance: PricingStance | ""; targetPct: number | null; goal: PricingGoal | ""; notes: string };
  voice: { tone: string; rules: string[]; notes: string };
  about: string;
+ /**
+  * The order her listings are written in, chosen by her. Empty until she sets one, and then it
+  * beats the template VYA read off her catalogue: the learned one can only ever repeat what she has
+  * already published, so it is the wrong place to go to CHANGE how her listings read.
+  */
+ layout: LayoutSection[];
 };
 
 export const EMPTY_BRIEF: StoreBrief = {
  pricing: { stance: "", targetPct: null, goal: "", notes: "" },
  voice: { tone: "", rules: [], notes: "" },
  about: "",
+ layout: [],
 };
 
 let ensured = false;
@@ -59,6 +67,7 @@ function coerce(raw: any): StoreBrief {
    notes: typeof v.notes === "string" ? v.notes.slice(0, 1000) : "",
   },
   about: typeof raw?.about === "string" ? raw.about.slice(0, 2000) : "",
+  layout: coerceLayout(raw?.layout),
  };
 }
 
@@ -80,7 +89,7 @@ export async function saveStoreBrief(storeSlug: string, brief: StoreBrief): Prom
 /** Whether the owner has actually filled in anything meaningful. */
 export function briefHasContent(b: StoreBrief | null): boolean {
  if (!b) return false;
- return Boolean(b.pricing.stance || b.pricing.notes || b.voice.tone || b.voice.rules.length || b.voice.notes || b.about);
+ return Boolean(b.pricing.stance || b.pricing.notes || b.voice.tone || b.voice.rules.length || b.voice.notes || b.about || b.layout.length);
 }
 
 /**
@@ -103,7 +112,7 @@ export function briefPricingTarget(b: StoreBrief | null): number | null {
 }
 
 /**
- * An authoritative voice-instruction block the drafter must follow — built from the
+ * An authoritative voice-instruction block the drafter must follow. Built from the
  * owner's stated tone, hard rules, notes, and positioning. Prepended to the learned
  * voice guide so what the owner SAYS overrides what we inferred. "" if nothing set.
  */

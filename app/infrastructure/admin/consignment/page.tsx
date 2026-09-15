@@ -61,7 +61,7 @@ export default function ConsignmentPage() {
     <TechEmpty
      icon={<Users size={28} strokeWidth={1.5} />}
      title="No consignors yet"
-     body="Add your consignors and mark their pieces sold. You’ll see what each one is owed, what you’ve paid, and how much they’ve sold. If you already track this somewhere else, you can import the whole list at once."
+     body="Track what each consignor is owed, what you’ve paid, and what they’ve sold. Import your existing list in one go."
      action={
       <div className="flex flex-wrap items-center justify-center gap-2">
        <TechButtonLink href="/admin/consignment/consignors">Add a consignor</TechButtonLink>
@@ -71,7 +71,7 @@ export default function ConsignmentPage() {
     />
    ) : (
     <>
-     {/* Consignors — shown whenever there are any, so the owner sees who's on their roster
+     {/* Consignors: shown whenever there are any, so the owner sees who's on their roster
          even before the first sale (which is when the metrics/chart below light up). */}
      {consignors.length > 0 && (
       <TechCard className="mb-5 overflow-hidden">
@@ -82,7 +82,7 @@ export default function ConsignmentPage() {
         </div>
         <TechButtonLink variant="secondary" href="/admin/consignment/consignors" className="text-[12px]">Manage →</TechButtonLink>
        </div>
-       {/* Phones: a row per consignor — the four columns ran off a 390px card. */}
+       {/* Phones: a row per consignor. The four columns ran off a 390px card. */}
        <ul className="divide-y divide-stone-100 sm:hidden">
         {consignors.map((c) => (
          <li key={c.id} className="flex items-center gap-3 px-5 py-3">
@@ -130,14 +130,14 @@ export default function ConsignmentPage() {
 
      {hasData && (
       <>
-       {/* Balances — all real, from the consignor ledger + payouts. */}
+       {/* Balances: all real, from the consignor ledger + payouts. */}
        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard label="Available balance" value={money(sum!.availableCents)} sub="Cleared the return hold" />
         <MetricCard label="Paid · 7 days" value={money(sum!.paid7dCents)} delta={sum!.paidDeltaPct != null ? `${Math.abs(sum!.paidDeltaPct)}%` : undefined} up={sum!.paidDeltaPct == null || sum!.paidDeltaPct >= 0} sub="Payouts made" />
         <MetricCard label="Pending" value={money(sum!.onHoldCents)} sub="Owed, still within hold" />
        </div>
 
-       {/* Sales volume — net-to-consignor by week (more meaningful early than payout volume). */}
+       {/* Sales volume: net-to-consignor by week (more meaningful early than payout volume). */}
        <TechCard className="mb-5 p-5">
         <div className="mb-3 flex items-baseline justify-between gap-3">
          <div>
@@ -157,7 +157,7 @@ export default function ConsignmentPage() {
        <TechCard className="overflow-hidden">
         <div className="border-b border-stone-100 px-5 py-4">
          <h3 className="text-[13px] font-semibold text-stone-900">Recent payouts</h3>
-         <p className="mt-0.5 text-[12px] text-stone-500">Each sold consignment piece — the consignor’s cut and whether it’s cleared to pay.</p>
+         <p className="mt-0.5 text-[12px] text-stone-500">Each sold consignment piece. The consignor’s cut and whether it’s cleared to pay.</p>
         </div>
         {sum!.activity.length === 0 ? (
          <div className="px-5 py-10 text-center text-[13px] text-stone-400">No sold consignment pieces yet.</div>

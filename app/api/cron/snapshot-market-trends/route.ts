@@ -13,16 +13,16 @@ export const maxDuration = 300;
 // Manual first run: curl -H "Authorization: Bearer $CRON_SECRET" ... so you can populate it right after enabling.
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
- // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ // Header only: a query-string secret leaks into Vercel/CDN access logs and Referer headers.
  const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
- // SerpApi (Google + eBay), Instagram, and Pinterest are independent — run whichever is configured.
+ // SerpApi (Google + eBay), Instagram, and Pinterest are independent. Run whichever is configured.
  if (!isMarketTrendsConfigured() && !igConfigured() && !isPinterestConfigured()) {
  return NextResponse.json({ ok: true, skipped: "No external sources enabled (set SERPAPI_ENABLED=true, IG_ACCESS_TOKEN, and/or PINTEREST_ACCESS_TOKEN).", google: 0, resale: 0, instagram: 0, pinterest: 0 });
  }
 
- // Pinterest needs no brand list — it returns the top growing fashion keywords globally, so capture
+ // Pinterest needs no brand list. It returns the top growing fashion keywords globally, so capture
  // it independently (it's the "what's rising in culture" signal, not a per-brand lookup).
  const pinterest = isPinterestConfigured()
  ? await capturePinterestTrends().catch((e) => { console.error("snapshot-market-trends (pinterest):", e); return 0; })

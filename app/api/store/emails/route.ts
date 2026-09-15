@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-/** DELETE ?id= — call off something scheduled. A draft is deleted the same way. */
+/** DELETE ?id= call off something scheduled. A draft is deleted the same way. */
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

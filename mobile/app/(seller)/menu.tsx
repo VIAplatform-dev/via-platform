@@ -10,12 +10,12 @@ import { SellerScreen } from "../../components/seller/Screen";
 // The settings drawer, grouped by what she came for: selling, shop, money, account.
 //
 // EVERY ROW OPENS SOMETHING. Nothing here is a label that goes nowhere. Market Mode is the one
-// exception and it is a switch rather than a link — it is how she starts a market, not a page.
+// exception and it is a switch rather than a link. It is how she starts a market, not a page.
 //
 // WHAT USED TO BE MISSING IS NOW HERE. Shipping, returns, domain, tax and consignors were left off
 // on the theory that they are set once, fiddly, and wrong on a phone. Two of those are true and one
 // is not: they ARE set once and they ARE fiddly, but "wrong on a phone" turned out to mean "wrong on
-// the desktop, reached from a phone" — a seller tapped Set your returns policy on Home and landed on
+// the desktop, reached from a phone". A seller tapped Set your returns policy on Home and landed on
 // vyaplatform.com in a browser sheet. Set-once is an argument for a plain screen, not for no screen.
 //
 // What is still NOT here: storefront editing, the full P&L, cost imports, bulk editing, seats. Those
@@ -23,7 +23,7 @@ import { SellerScreen } from "../../components/seller/Screen";
 
 type Me = { storeName: string; currency: string };
 type MarketMode = { enabled: boolean };
-// /api/store/payments reports Stripe Connect STATUS and the payout schedule — it has no "next
+// /api/store/payments reports Stripe Connect STATUS and the payout schedule. It has no "next
 // payout" amount, so the drawer row cannot show one. The Payouts screen states the schedule instead.
 type Payments = { connected: boolean; payoutsEnabled: boolean };
 
@@ -68,7 +68,7 @@ export default function SettingsScreen() {
     queryFn: () => apiGet<MarketMode>("/api/store/market/mode"),
     enabled: !!storeSlug,
   });
-  // The two opt-in modes. Null until loaded, which reads as off — the same rule the web sidebar uses.
+  // The two opt-in modes. Null until loaded, which reads as off. The same rule the web sidebar uses.
   const rentals = useQuery({
     queryKey: ["store", "rentals", "settings"],
     queryFn: () => apiGet<{ settings?: { enabled?: boolean } }>("/api/store/rentals/settings"),
@@ -89,7 +89,7 @@ export default function SettingsScreen() {
     mutationFn: (enabled: boolean) => apiPost("/api/store/market/mode", { enabled }),
     onSuccess: (_r, enabled) => {
       void qc.invalidateQueries({ queryKey: ["store", "market", "mode"] });
-      // Switching it on IS starting a market — go straight there rather than leaving her
+      // Switching it on IS starting a market. Go straight there rather than leaving her
       // on a settings row wondering what the toggle did.
       if (enabled) router.push("/market");
     },
@@ -115,7 +115,7 @@ export default function SettingsScreen() {
           />
         </View>
         <Row icon="archive" label="Consignment" href="/(seller)/consignment" />
-        {/* Both are modes a store opts into, exactly as the web's sidebar treats them — a shop that
+        {/* Both are modes a store opts into, exactly as the web's sidebar treats them. A shop that
             doesn't rent should not carry a Rentals row it can only find empty. */}
         {rentalsOn ? <Row icon="repeat" label="Rentals" href="/(seller)/rentals" /> : null}
         {apptsOn ? <Row icon="calendar" label="Appointments" href="/(seller)/appointments" /> : null}
@@ -147,7 +147,7 @@ export default function SettingsScreen() {
 
       <Group label="ACCOUNT">
         {/* BOTH WAYS BETWEEN THE TWO SIDES. She is a seller and a shopper on one login, and the only
-            route out of the workspace used to be a 36pt unlabelled bag icon on Home — findable if
+            route out of the workspace used to be a 36pt unlabelled bag icon on Home. Findable if
             you already knew, which is the definition of not findable. The way back is the "My store"
             row on the marketplace's own Account tab, so the pair matches. */}
         <Row icon="shopping-bag" label="Exit to Marketplace" value="Shop" onPress={() => router.push("/(tabs)")} />
@@ -159,7 +159,7 @@ export default function SettingsScreen() {
       </Group>
 
       <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
-        Storefront design, the full profit report and bulk editing are on the desktop — they need a
+        Storefront design, the full profit report and bulk editing are on the desktop. They need a
         canvas or a table, not a phone.
       </Text>
     </SellerScreen>

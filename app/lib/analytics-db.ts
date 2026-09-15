@@ -29,7 +29,7 @@ export async function initAnalyticsTables() {
  await sql`CREATE INDEX IF NOT EXISTS idx_product_views_timestamp ON product_views(timestamp)`;
  await sql`ALTER TABLE product_views ADD COLUMN IF NOT EXISTS user_id TEXT`;
  await sql`CREATE INDEX IF NOT EXISTS idx_product_views_user_id ON product_views(user_id) WHERE user_id IS NOT NULL`;
- // How long the piece was actually on screen. A view is a weak signal on its own — a scroll past
+ // How long the piece was actually on screen. A view is a weak signal on its own. A scroll past
  // and a two-minute study of the measurements look identical without this.
  await sql`ALTER TABLE product_views ADD COLUMN IF NOT EXISTS dwell_ms INT`;
 
@@ -71,7 +71,7 @@ export async function initAnalyticsTables() {
  await sql`CREATE INDEX IF NOT EXISTS idx_conversions_store ON conversions(store_slug)`;
  await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_conversions_order_store ON conversions(order_id, store_slug)`;
 
- // Tombstones for manually-deleted conversions — so a re-sync never re-creates
+ // Tombstones for manually-deleted conversions, so a re-sync never re-creates
  // an order an admin intentionally removed.
  await sql`
  CREATE TABLE IF NOT EXISTS suppressed_conversions (
@@ -101,7 +101,7 @@ export async function initAnalyticsTables() {
  // Buyer email for the store's sales list (Square sends it on the payment object;
  // Shopify/Wix via the order webhook). Stored per-conversion so every source is covered.
  await sql`ALTER TABLE conversions ADD COLUMN IF NOT EXISTS customer_email TEXT`;
- // Refund/return flag — created here (canonical) so the events ETL and admin market
+ // Refund/return flag: created here (canonical) so the events ETL and admin market
  // queries that filter on it never hit a missing column on a fresh DB.
  await sql`ALTER TABLE conversions ADD COLUMN IF NOT EXISTS returned BOOLEAN`;
  analyticsTablesInitialized = true;
@@ -238,7 +238,7 @@ export async function saveConversion(conversion: ConversionRecord): Promise<{ du
 
  // Suppression tombstone: if an admin manually deleted this order, never re-create it.
  // Re-syncs (Carroll/Nello/Square order pulls, webhooks) call saveConversion again on
- // every run — without this check a deleted conversion silently reappears.
+ // every run, without this check a deleted conversion silently reappears.
  const suppressed = await sql`
  SELECT 1 FROM suppressed_conversions WHERE order_id = ${conversion.orderId} AND store_slug = ${storeSlug} LIMIT 1
  `;
@@ -260,7 +260,7 @@ export async function saveConversion(conversion: ConversionRecord): Promise<{ du
  if (existing.length > 0) {
  // If the first webhook saved with total=0 (a placeholder, before the real total was known)
  // and we now have the real (USD) total, correct it once. Deliberately NOT "any higher total
- // wins" — this endpoint is reachable from untrusted store-side callers (see /api/conversion),
+ // wins". This endpoint is reachable from untrusted store-side callers (see /api/conversion),
  // and an unbounded upgrade would let a replayed request with an inflated orderTotal overwrite
  // an already-real total. Only a genuine $0→real correction is allowed; a real total is final.
  const existingTotal = Number(existing[0].order_total ?? 0);
@@ -304,11 +304,11 @@ let confirmedColEnsured = false;
 /**
  * A confirmed order is the truest price label there is: what a piece ACTUALLY sold for. The matching
  * sold_items row (captured when the piece dropped off the store feed) already carries the LISTED
- * price PLUS the photo + embedding the price eval needs — so we upgrade THAT row in place to the real
+ * price PLUS the photo + embedding the price eval needs, so we upgrade THAT row in place to the real
  * sold price and flag it `confirmed`. That turns the price answer-key from a guess into a receipt.
  *
  * Deliberately UPDATE-only (never an INSERT): the rows worth correcting are the ones with photos, and
- * they already exist. It's fully isolated — its own try/catch per line, it only ever touches an
+ * they already exist. It's fully isolated. Its own try/catch per line, it only ever touches an
  * unconfirmed row it matches by store + title, writes columns known to exist, and never blocks the
  * order/conversion flow. A sale of something never in our feed simply counts as `unmatched`.
  */
@@ -328,7 +328,7 @@ export async function recordConfirmedSales(o: {
  if (!title || !(priceUsd > 0)) continue;
  try {
  // Upgrade the most-recent matching inferred row to the REAL sold price (keeps its photo+embedding).
- // original_price is left alone — it's the listed price; final_price now holds what it truly sold for.
+ // original_price is left alone. It's the listed price; final_price now holds what it truly sold for.
  const up = await sql`
   UPDATE sold_items SET final_price = ${priceUsd}, confirmed = true, sold_at = ${o.soldAt}
   WHERE id = (
@@ -339,7 +339,7 @@ export async function recordConfirmedSales(o: {
   RETURNING id
  `;
  if (up.length) upgraded++; else unmatched++;
- } catch { /* isolated — one bad line never breaks the order flow */ }
+ } catch { /* isolated. One bad line never breaks the order flow */ }
  }
  return { upgraded, unmatched };
 }
@@ -420,14 +420,14 @@ let productViewsReady = false;
 /**
  * Record that a piece was looked at, and for how long.
  *
- * `dwellMs` arrives on a SECOND call, when the screen is left — the first call records the view
+ * `dwellMs` arrives on a SECOND call, when the screen is left. The first call records the view
  * immediately so a view is never lost if the app is killed. Clamped at 10 minutes: a phone left
  * unlocked on a product page is not ten minutes of interest, and one such row would otherwise
  * outweigh a hundred real ones in the ranking.
  */
 export async function saveProductView(productId: string, userId?: string | null, dwellMs?: number | null): Promise<void> {
  const sql = neon(getDatabaseUrl());
- // Ensure schema once per lambda instance — not 3 DDL statements on every single page view.
+ // Ensure schema once per lambda instance, not 3 DDL statements on every single page view.
  if (!productViewsReady) {
  await sql`
  CREATE TABLE IF NOT EXISTS product_views (
@@ -446,7 +446,7 @@ export async function saveProductView(productId: string, userId?: string | null,
   : null;
 
  // A dwell update attaches to the most recent view of this piece by this viewer rather than
- // inserting a second row — otherwise every product page would count as two views.
+ // inserting a second row. Otherwise every product page would count as two views.
  if (dwell != null) {
  const updated = (await sql`
   UPDATE product_views SET dwell_ms = ${dwell}
@@ -548,7 +548,7 @@ export async function getProductPopularityScores(
  }
  }
 
- // Page view scores (lower weight than clicks — interest signal only)
+ // Page view scores (lower weight than clicks. Interest signal only)
  for (const row of viewRows) {
  const dbId = compositeIdMap.get((row as { product_id: string; score: number }).product_id);
  if (dbId != null) {
@@ -589,7 +589,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
  cutoff
  ? sql`SELECT item->>'productName' AS product_name, SUM((item->>'quantity')::int)::int AS total_qty FROM conversions, jsonb_array_elements(items) AS item WHERE REGEXP_REPLACE(store_slug, '[^a-z0-9-]', '', 'g') = ${storeSlug} AND order_total > 0 AND (returned IS NULL OR returned = false) AND timestamp >= ${cutoff} GROUP BY item->>'productName' ORDER BY total_qty DESC LIMIT 100`
  : sql`SELECT item->>'productName' AS product_name, SUM((item->>'quantity')::int)::int AS total_qty FROM conversions, jsonb_array_elements(items) AS item WHERE REGEXP_REPLACE(store_slug, '[^a-z0-9-]', '', 'g') = ${storeSlug} AND order_total > 0 AND (returned IS NULL OR returned = false) GROUP BY item->>'productName' ORDER BY total_qty DESC LIMIT 100`,
- // Top searches are site-wide — useful context for stores regardless of range.
+ // Top searches are site-wide. Useful context for stores regardless of range.
  // Normalise (trim/lower) and drop sub-3-char fragments so noisy keystroke
  // prefixes don't outrank real queries; merge case/spacing variants.
  cutoff
@@ -609,7 +609,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
  const totalRevenue = conversions.reduce((sum, c) => sum + c.orderTotal, 0);
  const recentConversions = conversions.slice(0, 20);
 
- // VYA commission for this store — computed from each order's total in the
+ // VYA commission for this store. Computed from each order's total in the
  // conversions table, tiered PER ORDER (not on cumulative revenue). Per-order is
  // correct because each sale's rate depends on that order's size, and it lines up
  // with what stores actually earn (e.g. Shopify Collabs payouts).
@@ -634,7 +634,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
  count: r.count,
  }));
 
- // AOV across the WHOLE platform (all stores' orders), not just this store —
+ // AOV across the WHOLE platform (all stores' orders), not just this store,
  // a benchmark every store sees. Aggregate only, never per-store.
  const aovRows = (await sql`
  SELECT COUNT(*)::int AS n, COALESCE(SUM(order_total), 0)::float AS gmv
@@ -643,7 +643,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
  const aov = (aovRows[0]?.n ?? 0) > 0 ? aovRows[0].gmv / aovRows[0].n : 0;
 
  // What shoppers currently have in their carts from this store (active = added
- // in the last 14 days). Aggregated per product — never a shopper's identity.
+ // in the last 14 days). Aggregated per product, never a shopper's identity.
  const cartRows = (await sql`
  SELECT product_id, MAX(product_title) AS product_title, MAX(product_image) AS product_image,
   MAX(price) AS price, MAX(currency) AS currency, COUNT(*)::int AS in_carts
@@ -654,7 +654,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
  ORDER BY in_carts DESC, MAX(added_at) DESC
  LIMIT 50
  `.catch(() => [])) as Array<{ product_id: number; product_title: string; product_image: string; price: number; currency: string; in_carts: number }>;
- // Cart prices are shown to the store in USD — convert from each item's own
+ // Cart prices are shown to the store in USD. Convert from each item's own
  // currency (a no-op for USD), so non-US stores see USD just like their revenue.
  const cartItems = cartRows.map((r) => ({
  productId: r.product_id,
@@ -669,7 +669,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
 
  // Per-sale list for the store portal: item(s), buyer email, total, and the VYA
  // commission on that order. Buyer email comes from the order cache (captured on the
- // Shopify/Wix order webhook) joined by order_id — the store sees the email only for
+ // Shopify/Wix order webhook) joined by order_id. The store sees the email only for
  // its OWN sales (it fulfils the order), never another store's data.
  const emailRows = (await sql`
  SELECT order_id, email FROM shopify_order_cache
@@ -677,7 +677,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
  `.catch(() => [])) as Array<{ order_id: string; email: string }>;
  const emailByOrder = new Map(emailRows.map((r) => [String(r.order_id), r.email]));
 
- // The matched buyer's VYA account is the most reliable email source — resolve it for
+ // The matched buyer's VYA account is the most reliable email source. Resolve it for
  // every order that attributed to a logged-in shopper. (Buyer of this store's own sale.)
  const userIds = [...new Set(conversions.map((c) => c.userId).filter(Boolean))] as string[];
  const userRows = userIds.length
@@ -690,7 +690,7 @@ export async function getStoreAnalytics(storeSlug: string, range: string) {
  // (orders synced without line items still know which piece was bought).
  // When Collabs didn't itemize the order, the line item is a generic placeholder
  // ("Item via Shopify Collabs"). If we matched the buyer's click, that click knows
- // the real piece — prefer it over the placeholder.
+ // the real piece: prefer it over the placeholder.
  const GENERIC_ITEM = "Item via Shopify Collabs";
  const clickProduct = c.matchedClickData?.productName ?? null;
  const items = (c.items ?? []).length

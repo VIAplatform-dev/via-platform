@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { NOTIFY_TOPIC, setupNotifications, type ApiRes, type NotifyState, type SetupDeps } from "./ebay-notify-setup.ts";
 
 // The subscribe flow, with eBay and the database faked. It is run by the owner after every deploy
-// and again whenever a store connects, so what matters is that it is IDEMPOTENT — a second run
-// creates nothing — and that every way eBay can say no comes back as a sentence, not a stack trace.
+// and again whenever a store connects, so what matters is that it is IDEMPOTENT. A second run
+// creates nothing, and that every way eBay can say no comes back as a sentence, not a stack trace.
 
 const ENDPOINT = "https://vyaplatform.com/api/webhooks/ebay";
 const TOKEN = "v".repeat(40);
@@ -81,7 +81,7 @@ test("first run: one destination for the app, one subscription per connected sto
  assert.equal(r.topic.scope, "https://api.ebay.com/oauth/api_scope/sell.fulfillment");
 });
 
-test("second run: everything is reused — not one POST", async () => {
+test("second run: everything is reused, not one POST", async () => {
  const f = fakes({ destinationId: "dest-1", states: { scottie: { subscriptionId: "sub-1", status: "active", since: "2026-09-01T00:00:00.000Z", lastError: null } } });
  const r = await setupNotifications({}, f.deps);
  assert.equal(r.ok, true);
@@ -110,7 +110,7 @@ test("a destination eBay no longer has (404) is created afresh", async () => {
  assert.equal(f.destination(), "dest-new");
 });
 
-test("a destination that fails the challenge stops the run with eBay's reason — no subscriptions are attempted", async () => {
+test("a destination that fails the challenge stops the run with eBay's reason, no subscriptions are attempted", async () => {
  const f = fakes({ respond: (c) => (c.method === "POST" && c.path.endsWith("/destination") ? { ok: false, status: 400, json: { errors: [{ errorId: 195020, message: "Challenge verification failed for the endpoint" }] }, location: null } : undefined) });
  const r = await setupNotifications({}, f.deps);
  assert.equal(r.ok, false);

@@ -3,7 +3,7 @@ import { isAdminRequest } from "@/app/lib/storeAuth";
 import { runAblation } from "@/app/lib/eval-ablation";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300; // two model drafts per item — keep the sample modest
+export const maxDuration = 300; // two model drafts per item. Keep the sample modest
 
 // Does the learning loop actually work? Runs the same items with memory OFF vs ON and
 // returns the accuracy lift. POST { sample?, goldenOnly? }. Costs ~2 drafts + 1 embedding

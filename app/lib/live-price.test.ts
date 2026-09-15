@@ -109,7 +109,7 @@ test("an empty element that is hidden, or is a sale badge, is not where the pric
 
 // ── the guard ────────────────────────────────────────────────────────────────────────────────────
 // The stamp is written FROM the item record, so comparing the two proves nothing. What has to be
-// checked is that the price a shopper reads is the stamped one — i.e. that the rewrite above
+// checked is that the price a shopper reads is the stamped one. I.e. that the rewrite above
 // actually reached the theme's own element on this particular theme.
 import { pageShowsPrice } from "./live-price.ts";
 
@@ -117,7 +117,7 @@ test("the live price being visible on the page is what passes", () => {
  assert.equal(pageShowsPrice("Valentino Dress £2,295.00 Add to cart", 229500, "GBP"), true);
 });
 
-test("a theme we failed to rewrite is caught — the stale price is there and ours is not", () => {
+test("a theme we failed to rewrite is caught. The stale price is there and ours is not", () => {
  assert.equal(pageShowsPrice("Valentino Dress $3,169.00 Add to cart", 229500, "GBP"), false);
 });
 
@@ -144,7 +144,7 @@ test("a whole-pound price still matches a page that prints decimals, and the rev
 // ── a markdown the seller is running ─────────────────────────────────────────────────────────────
 // we-thieves shows "Kon Dangle Earrings £82.60" struck through from £120. Her feed carries both
 // numbers and the client already parses them; they were then dropped, so her hosted store showed a
-// flat price and she lost the markdown — a selling tool, and a visible difference from her own shop.
+// flat price and she lost the markdown. A selling tool, and a visible difference from her own shop.
 
 test("a piece on sale shows both prices, the way the seller's own page does", () => {
  const html = `<div class="price"><span class="price-item price-item--regular">$50.00</span></div>`;
@@ -178,7 +178,7 @@ test("the markdown is stated in the page too, so a check can read it", () => {
 
 test("a theme that names its price with custom ELEMENTS, not classes, is still rewritten", () => {
  // Shopify's newer themes mark the price up as <price-list><sale-price>…</sale-price>. Our selectors
- // looked only at class names, and `class="h4 text-on-sale"` says nothing about price — so the one
+ // looked only at class names, and `class="h4 text-on-sale"` says nothing about price, so the one
  // element holding the money was never matched. feathers served a Karl Lagerfeld dress at $200 with
  // a $498 markdown beside it, frozen at crawl day, while the cart charged $125 and her own site said
  // $125. The page contradicted our own record and nothing on it was true.
@@ -208,7 +208,7 @@ test("a live markdown on such a theme is kept, and restated from the feed", () =
 // name is involved. Same trick as derive-cart-template.ts, which says why enumerating themes fails.
 
 test("the price slot identifies itself by holding the price we already know", () => {
- // Nothing here says "price" — not a class, not a tag, not an attribute. This is the shape that
+ // Nothing here says "price", not a class, not a tag, not an attribute. This is the shape that
  // costs us: on 2nd Street's Broadcast theme, and on the newer Shopify themes generally, the
  // element actually holding the money describes its typography and nothing else.
  const html = `<div class="pd__money"><span class="h4 text-on-sale">$340.00</span></div>`;
@@ -234,7 +234,7 @@ test("value, not position, tells the live price from the markdown", () => {
 
 test("only a text node that is ENTIRELY money is a price slot", () => {
  // A sentence that happens to contain the number is not the price. Neither is a size, an order
- // number, or a shipping threshold — all of which have cost us before.
+ // number, or a shipping threshold. All of which have cost us before.
  const html = `<p>Free shipping on orders over $340</p><span class="note">Style 34000</span><b>$340.00</b>`;
  const $ = cheerio.load(markPriceSlots(html, { priceCents: 34000, currency: "USD" }));
  assert.equal($("[data-vya-price]").length, 1);
@@ -251,14 +251,14 @@ test("the theme's own way of writing the number is read, whichever it is", () =>
  assert.equal(at("€2 295,00", 229500, "EUR"), 1, "space grouping, comma decimal");
  assert.equal(at("¥12,000", 1200000, "JPY"), 1, "no decimals at all");
  assert.equal(at("$2,295.00", 229400), 0, "a different amount is not this price");
- // KNOWN GAPS, both PRE-EXISTING in WHOLE_MONEY rather than introduced here — the same two shapes
+ // KNOWN GAPS, both PRE-EXISTING in WHOLE_MONEY rather than introduced here. The same two shapes
  // applyLivePrice has always refused to rewrite, so a page using either falls back to PRICE_HOST
  // exactly as it does today. Recorded rather than guessed at: neither has been seen on a real store
  // in this fleet, and loosening a regex the rewrite path shares on speculation is how it starts
  // matching sizes and order numbers again.
  assert.equal(at("USD $2,295.00", 229500), 0, "a LEADING currency code is not recognised");
  assert.equal(at("€2.295,00", 229500, "EUR"), 0, "a DOT thousands separator is not recognised");
- // An explicit code that contradicts the record is a different currency, not this price — the
+ // An explicit code that contradicts the record is a different currency, not this price. The
  // blummier failure was exactly the same digits under the wrong symbol.
  assert.equal(at("CAD $2,295.00", 229500, "USD"), 0);
 });
@@ -284,7 +284,7 @@ test("a marked page rewrites ONLY its own price, not a neighbour's", () => {
 
 test("an unmarked page still behaves exactly as it did before", () => {
  // Every store captured before this existed has no marks. They must keep working off the selector
- // list until they are re-captured — this is an addition, not a replacement.
+ // list until they are re-captured. This is an addition, not a replacement.
  const html = `<div class="price"><span class="price-item">$3,169.00</span></div>`;
  assert.match(applyLivePrice(html, GBP), /£2,295\.00/);
 });

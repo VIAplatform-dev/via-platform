@@ -45,7 +45,7 @@ export default function RemovedItemsClient({ stores }: { stores: StoreOpt[] }) {
 
  async function remove(title: string) {
  if (!confirm(`Permanently remove "${title}" from ${storeName(store)}?\n\nIt will be deleted now and blocked from re-importing on every future sync.`)) return;
- const reason = prompt("Reason (optional) — e.g. counterfeit, off-brand, duplicate:", "") || null;
+ const reason = prompt("Reason (optional): e.g. counterfeit, off-brand, duplicate:", "") || null;
  setBusy(title);
  setMsg(null);
  try {

@@ -5,7 +5,7 @@ import { inferColorFromTitle, inferCategoryFromTitle } from "@/app/lib/loadStore
 import type { CategorySlug } from "@/app/lib/categoryMap";
 
 // Category → representative title keywords for SQL matching.
-// Kept intentional — broad enough to catch most items in a category,
+// Kept intentional: broad enough to catch most items in a category,
 // narrow enough not to match unrelated things.
 const CATEGORY_SQL_KEYWORDS: Record<string, string[]> = {
   shoes:           ["heel", "pump", "sandal", "boot", "bootie", "mule", "loafer", "sneaker", "flat", "slide", "wedge", "slingback", "oxford", "blahnik", "louboutin", "stiletto", "shoe"],
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Build ILIKE pattern arrays for SQL
-  // Patterns are lowercase — used with lower(p.title) LIKE ANY(...)
+  // Patterns are lowercase: used with lower(p.title) LIKE ANY(...)
   const colorPatterns = Array.from(colors).map((c) => `%${c}%`);
 
   const catKeywords = new Set<string>();
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
   }
   const categoryPatterns = Array.from(catKeywords).map((k) => `%${k}%`);
 
-  // 4. Fallback: no signals at all — return globally popular items
+  // 4. Fallback: no signals at all. Return globally popular items
   if (colorPatterns.length === 0 && categoryPatterns.length === 0) {
     const rows = await sql`
       SELECT p.id, p.store_slug, p.store_name, p.title, p.price, p.currency,
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ products: rows });
   }
 
-  // 5. Scored query — all stores, no store filter.
+  // 5. Scored query: all stores, no store filter.
   //    Score = color_match×3 + category_match×2 + popularity bonus (capped at 1).
   //    A placeholder pattern that never matches is used when an array is empty
   //    so we can always pass both arrays to the same query shape.

@@ -1,4 +1,4 @@
-// Which store (if any) a request's Host header belongs to — the foundation of "Plan B".
+// Which store (if any) a request's Host header belongs to. The foundation of "Plan B".
 //
 // Plan B serves a captured storefront from a SEPARATE REGISTRABLE DOMAIN so the browser's
 // same-origin policy isolates the seller's JavaScript from VYA. That lets us keep their theme's own
@@ -7,13 +7,13 @@
 //
 // A SUBDOMAIN OF vyaplatform.com WOULD NOT WORK. `store.vyaplatform.com` and `vyaplatform.com` are
 // *same-site*, so a hostile script on a store page could set cookies for the parent domain
-// ("cookie tossing") — isolation requires a different registrable domain, not a different host.
+// ("cookie tossing"). Isolation requires a different registrable domain, not a different host.
 //
 // The suffix is configuration, not a constant, so the same code runs against `.vyasites.test`
 // locally (an /etc/hosts entry; `.test` is reserved by RFC 6761 and never resolves publicly) and
 // `.vyasites.com` in production. Everything here is pure and unit tested.
 
-/** Hosts that are VYA itself — never a store origin, whatever else is configured. */
+/** Hosts that are VYA itself, never a store origin, whatever else is configured. */
 const VYA_HOSTS = ["vyaplatform.com", "getvya.ai"];
 
 /** The configured store-origin suffix, e.g. ".vyasites.com". Empty when Plan B is switched off. */
@@ -32,7 +32,7 @@ export function normalizeHost(host: string | null | undefined): string {
  * The store slug this host serves, or null when the host is VYA itself (or unconfigured).
  *
  * Deliberately strict: only a DIRECT child of the suffix is a store. `a.b.vyasites.com` returns
- * null rather than treating "a.b" as a slug — a wildcard certificate only covers one label anyway,
+ * null rather than treating "a.b" as a slug. A wildcard certificate only covers one label anyway,
  * and accepting deeper names would let an attacker-shaped hostname masquerade as a store.
  */
 export function storeSlugForHost(host: string | null | undefined, env: Record<string, string | undefined> = process.env): string | null {
@@ -60,7 +60,7 @@ export function isStoreHost(host: string | null | undefined, env: Record<string,
  *
  * The INVERSE of storeSlugForHost: that answers "which store is this host?", this answers "which
  * host is this store?". One function so the address a seller is shown is the same one the proxy
- * will honour — they drifted before, and a seller was handed three different addresses for one
+ * will honour: they drifted before, and a seller was handed three different addresses for one
  * store depending on which screen she was looking at.
  *
  * Returns null when Plan B is switched off (no suffix configured); the caller falls back to the
@@ -78,18 +78,18 @@ export function storePublicOrigin(slug: string | null | undefined, env: Record<s
 }
 
 /**
- * The origin to put in a link we EMAIL to a shopper — her store's own address.
+ * The origin to put in a link we EMAIL to a shopper. Her store's own address.
  *
  * Never `new URL(request.url).origin`. Next resolves that from the server's own view of the
  * request, which is `http://localhost:3000` even when the Host header is the seller's domain
- * (measured, not assumed) — so every sign-in email carried a link to a host the shopper could not
+ * (measured, not assumed), so every sign-in email carried a link to a host the shopper could not
  * reach, and clicking it answered "Unknown store." because no store lives on that host.
  *
  * And never the Host HEADER in production, however tempting: a header is attacker-controlled, and a
  * link minted from one is the classic way a magic-link email gets pointed at somebody else's server
  * with a live token on the end. Production always uses the canonical address for the slug we
- * already resolved. Development is allowed to use the header — but only when it really is this
- * store's own host — because the canonical origin (https, no port) isn't reachable on a laptop.
+ * already resolved. Development is allowed to use the header, but only when it really is this
+ * store's own host, because the canonical origin (https, no port) isn't reachable on a laptop.
  */
 export function storeEmailLinkOrigin(
  slug: string,
@@ -146,7 +146,7 @@ export function isAllowedStoreApi(pathname: string): boolean {
   p.startsWith("/api/track") ||
   p.startsWith("/api/auth/") ||
   // "You may also like". The seller's own theme fetches this from the shopper's browser, so it is
-  // a storefront surface — but it lives under /api/plan-b/, which this list does not cover, so
+  // a storefront surface, but it lives under /api/plan-b/, which this list does not cover, so
   // every request from a hosted store was refused before reaching the handler and the strip
   // rendered empty for ever. Exactly ONE route, not the /api/plan-b/ prefix: the rest of that
   // namespace is internal and must stay refused on 45 sellers' domains.
@@ -156,7 +156,7 @@ export function isAllowedStoreApi(pathname: string): boolean {
   p === "/api/plan-b/section" ||
   // A storefront BUILT from sections talks to these from the shopper's browser: booking a time,
   // pricing a rental, holding dates, the contact form, the newsletter. They're public by design
-  // (they're in PUBLIC_ROUTES too) — but they live under /api/store/, a namespace that is otherwise
+  // (they're in PUBLIC_ROUTES too), but they live under /api/store/, a namespace that is otherwise
   // seller-authenticated, so they're listed ONE PATH AT A TIME. Never the prefix: `/api/store/` also
   // holds settings, inventory and orders.
   BUILT_STOREFRONT_APIS.has(p) ||
@@ -171,7 +171,7 @@ export function isAllowedStoreApi(pathname: string): boolean {
  * A Shopify theme's own endpoints → VYA's implementations of them.
  *
  * Themes call both the bare and the `.js`/`.json` forms depending on theme version, so both are
- * mapped — missing one shows up to a shopper as a dead Add-to-cart button. These are exactly the
+ * mapped. Missing one shows up to a shopper as a dead Add-to-cart button. These are exactly the
  * five routes the theme publishes into the page as relative paths, which is what makes Plan B work.
  */
 export function shopifyThemeRoute(pathname: string): string | null {
@@ -184,10 +184,10 @@ export function shopifyThemeRoute(pathname: string): string | null {
  // Every theme's product page asks for a "You may also like" strip here. Left unrouted it 404s, and
  // the theme logs `Product recommendations error: Server returned 404` on every product view.
  if (p === "/recommendations/products") return "/api/plan-b/recommendations";
- // A theme rendering ONE SECTION for a variant — Shopify's `?section_id=` convention. bag-crush's
+ // A theme rendering ONE SECTION for a variant. Shopify's `?section_id=` convention. bag-crush's
  // theme asks for the in-store-pickup widget here on every product view. Answering 404 does not
  // merely omit a widget: the theme parses our response, calls .querySelector() on the result, gets
- // null and THROWS — and every line of its startup after that never runs, the image loader
+ // null and THROWS, and every line of its startup after that never runs, the image loader
  // included. 29 of 32 images on her product pages sit at a blank placeholder because of this.
  // Numeric ids only: /variants/<anything-else> is a page, not a route we own.
  if (/^\/variants\/\d+$/.test(p)) return "/api/plan-b/section";
@@ -195,14 +195,14 @@ export function shopifyThemeRoute(pathname: string): string | null {
 }
 
 /**
- * The theme's cart FORM — a POST to /cart, which is a different thing from the GET that renders the
+ * The theme's cart FORM. A POST to /cart, which is a different thing from the GET that renders the
  * cart page, so this is deliberately method-aware where shopifyThemeRoute is not.
  *
  * Shopify's cart page and cart drawer are one form with two submit buttons, `update` and `checkout`,
  * both posting here. That makes this the route a shopper actually reaches checkout through: an audit
  * of the stored captures found the form on 16 of 18 Shopify stores, and on 7 of them the drawer
  * carrying it sits in the header of EVERY page. Unrouted, the POST fell through to Next, which
- * answered "Server action not found" — a dead Checkout button at the moment of buying.
+ * answered "Server action not found". A dead Checkout button at the moment of buying.
  *
  * Which button was pressed is decided in cart-submit.ts, not here.
  */
@@ -215,8 +215,8 @@ export function shopifyCartSubmitRoute(pathname: string, method: string): string
 /**
  * The same thing for a SQUARESPACE theme's own route table.
  *
- * Squarespace's storefront bundle is one file shared by every Squarespace store, so — like the
- * Shopify table above — one mapping covers every Squarespace seller. Its cart lives behind
+ * Squarespace's storefront bundle is one file shared by every Squarespace store, so, like the
+ * Shopify table above: one mapping covers every Squarespace seller. Its cart lives behind
  * /api/commerce/shopping-cart (verified in commerce-*.js, which posts there from the product page's
  * Add-to-cart button); the entry-level PUT carries an entry id in the path, hence the prefix match.
  */
@@ -228,11 +228,11 @@ export function squarespaceThemeRoute(pathname: string): string | null {
 }
 
 /**
- * Where Squarespace's own Checkout buttons send a shopper — VYA's checkout, with their VYA cart.
+ * Where Squarespace's own Checkout buttons send a shopper. VYA's checkout, with their VYA cart.
  *
  * Its bundle hard-codes `window.top.location = "/commerce/goto-checkout"` (from the mini-cart's
  * Checkout button and the cart page's), which on the source store is a redirector into Squarespace's
- * hosted checkout. VYA is the checkout now, so it lands on ours instead — a REDIRECT rather than a
+ * hosted checkout. VYA is the checkout now, so it lands on ours instead. A REDIRECT rather than a
  * rewrite, because the shopper is leaving the seller's captured site for a VYA-rendered page and the
  * address bar should say so.
  */
@@ -257,34 +257,34 @@ export function isVyaOwnedPath(pathname: string): boolean {
  * When a requested path is a SECOND copy of a storefront, the one address it should be at instead.
  *
  * ONE PUBLIC ADDRESS PER STORE. A storefront is the seller's and it has one address:
- * {slug}.vyasites.com. VYA renders it internally at two paths — /s/{handle} for a storefront built
- * from sections, /site/{slug} for an imported capture — and both were reachable on the marketplace's
+ * {slug}.vyasites.com. VYA renders it internally at two paths. /s/{handle} for a storefront built
+ * from sections, /site/{slug} for an imported capture, and both were reachable on the marketplace's
  * own host. That is three things at once, all bad:
  *
  *   • a second copy of every shop competing with the real one in search, and turning up in links
  *     people share;
- *   • her shop served from vyaplatform.com, which is the marketplace's origin — the very thing Plan
+ *   • her shop served from vyaplatform.com, which is the marketplace's origin. The very thing Plan
  *     B exists to avoid. Isolation is why a store gets its own registrable domain (see the header of
  *     this file); an address that puts her theme back on VYA's origin gives that up, which is why
  *     everything served there has to have its scripts stripped to be safe at all;
  *   • cookies set on that page are VYA's cookies, shared with the marketplace, rather than hers.
  *
- * /s/ already redirected. /site/ did not, and imported captures are most of the shops — so the
+ * /s/ already redirected. /site/ did not, and imported captures are most of the shops, so the
  * majority of storefronts had a live duplicate on the marketplace. This answers for both.
  *
  * A PREVIEW OF A DRAFT IS STILL HER ADDRESS. ?preview=1 used to be exempt here, on the reasoning
  * that an unpublished store has no public address to be sent to. That was wrong: the store origin
- * serves a draft perfectly well when asked — it is ?preview= that lifts the publish gate, and the
+ * serves a draft perfectly well when asked. It is ?preview= that lifts the publish gate, and the
  * host has nothing to do with it. Left exempt, the studio's View button opened
  * `getvya.ai/s/hanas-store?preview=1`, handing a seller a VYA address for her own shop. So a preview
  * moves too, carrying its query.
  *
  * WHAT DOES NOT REDIRECT:
- *   • `editing` — the captured-site editor loads /site/{slug}?edit=1 in a SAME-ORIGIN iframe and
+ *   • `editing`. The captured-site editor loads /site/{slug}?edit=1 in a SAME-ORIGIN iframe and
  *     reads into it. Sending that frame to another origin would leave the editor unable to see the
  *     page it is editing. This is the one exemption, and it is about the browser, not about drafts;
  *   • /site on the OS host, which is where that iframe lives;
- *   • anything at all when Plan B is unconfigured (storePublicOrigin returns null) — locally there
+ *   • anything at all when Plan B is unconfigured (storePublicOrigin returns null): locally there
  *     is no store host to send anyone to, and these paths are the only way in.
  *
  * A store's own origin never reaches this: the proxy handles that host and returns first.
@@ -305,7 +305,7 @@ export function canonicalStoreRedirect(
  const origin = storePublicOrigin(slug, env);
  if (!origin) return null;
  // A preview lands on the readable path the store origin serves it at, not on the query string it
- // arrived as — one address for a draft, the same one the editor hands out. The caller drops the
+ // arrived as. One address for a draft, the same one the editor hands out. The caller drops the
  // now-redundant ?preview= from what it appends.
  const path = rest.slice(slug.length);
  return { origin, tail: opts.previewing ? `/preview${path}` : path };
@@ -314,8 +314,8 @@ export function canonicalStoreRedirect(
 /**
  * The address a shopper reaches this store on, or NULL when it has none.
  *
- * THE ONLY WAY TO NAME A STORE'S ADDRESS. Four places used to end with the same fallback —
- * `https://vyaplatform.com/s/{handle}` or `/site/{slug}` — for the case where Plan B is
+ * THE ONLY WAY TO NAME A STORE'S ADDRESS. Four places used to end with the same fallback,
+ * `https://vyaplatform.com/s/{handle}` or `/site/{slug}`, for the case where Plan B is
  * unconfigured. Each was locally reasonable and collectively they meant a seller's shop could be
  * advertised at a path on the marketplace: in the assistant's replies, in her share links, in the
  * editor's "View live", and in the canonical tag that tells Google where her shop lives.

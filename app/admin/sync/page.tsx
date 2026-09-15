@@ -562,7 +562,7 @@ export default function SyncAdminPage() {
  )}
  </div>
 
- {/* Carroll Street Vintage — Stripe Orders */}
+ {/* Carroll Street Vintage: Stripe Orders */}
  <div style={{ marginBottom: 32 }}>
  <h2 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "#a1a1aa", fontWeight: 500, marginBottom: 16 }}>Stripe Stores</h2>
  <div style={{ background: "#fff", border: "1px solid #e4e4e7", borderRadius: 8, padding: 20 }}>
@@ -620,7 +620,7 @@ export default function SyncAdminPage() {
  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
  <div>
  <h3 style={{ fontSize: 14, fontWeight: 600, color: "#09090b", marginBottom: 2 }}>Velvet Archive</h3>
- <p style={{ fontSize: 12, color: "#71717a" }}>Removed from VIA — purge remaining products from the database</p>
+ <p style={{ fontSize: 12, color: "#71717a" }}>Removed from VIA. Purge remaining products from the database</p>
  </div>
  <button
  onClick={() => handlePurge("velvet-archive")}

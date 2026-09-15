@@ -20,7 +20,7 @@ type Offer = {
  status: "pending" | "accepted" | "declined" | "expired" | "withdrawn";
  lastActor: "buyer" | "store"; binding: boolean;
 };
-// An appointment waiting on the shop. Only ever the pending ones — the diary itself lives on its
+// An appointment waiting on the shop. Only ever the pending ones. The diary itself lives on its
 // own page; what belongs in an inbox is the thing someone is waiting for an answer to.
 type Appt = {
  id: string; kind: string; day: string; start: string;
@@ -116,7 +116,7 @@ export default function InboxPage() {
  fetch("/api/store/inbox").then((r) => (r.ok ? r.json() : null)).catch(() => null),
  fetch("/api/store/offers").then((r) => (r.ok ? r.json() : null)).catch(() => null),
  fetch("/api/store/inbox-settings").then((r) => (r.ok ? r.json() : null)).catch(() => null),
- // 404s for a shop that doesn't take appointments — then the tab simply never appears.
+ // 404s for a shop that doesn't take appointments, then the tab simply never appears.
  fetch("/api/store/appointments/pending?list=1").then((r) => (r.ok ? r.json() : null)).catch(() => null),
  ]);
  if (!active) return;
@@ -197,7 +197,7 @@ export default function InboxPage() {
  </div>
  ))}
  {settings.notifySms && settings.smsAvailable === false && (
- <p className="py-2 text-[12px] leading-relaxed text-amber-700">Text notifications aren’t switched on yet — we’ll start sending to your number once texting goes live. Your preference is saved.</p>
+ <p className="py-2 text-[12px] leading-relaxed text-amber-700">Text notifications aren’t switched on yet. We’ll start sending to your number once texting goes live. Your preference is saved.</p>
  )}
  {settings.notifySms && (
  <div className="py-3.5">
@@ -221,7 +221,7 @@ export default function InboxPage() {
  {([
  { key: "messages" as const, label: "Messages", icon: MessageCircle, badge: convs.reduce((s, c) => s + (c.storeUnread > 0 ? 1 : 0), 0) },
  { key: "offers" as const, label: "Offers", icon: Tag, badge: pending },
- // Only for a shop with someone waiting — an empty tab is a tab nobody ever needs to press.
+ // Only for a shop with someone waiting. An empty tab is a tab nobody ever needs to press.
  ...(appts.length ? [{ key: "appointments" as const, label: "Appointments", icon: CalendarClock, badge: appts.length }] : []),
  ]).map((t) => {
  const on = tab === t.key;
@@ -379,7 +379,7 @@ export default function InboxPage() {
  className="ml-auto px-2 py-2 text-[12.5px] text-stone-400 transition hover:text-rose-600">Decline</button>
  </div>
  ))}
- {waiting && <p className="mt-3 border-t border-stone-100 pt-3 text-[12px] text-stone-400">You countered at {money(o.amountCents)} — waiting on the buyer.</p>}
+ {waiting && <p className="mt-3 border-t border-stone-100 pt-3 text-[12px] text-stone-400">You countered at {money(o.amountCents)}: waiting on the buyer.</p>}
  </div>
  </div>
  </div>
@@ -417,7 +417,7 @@ export default function InboxPage() {
  <p className="mt-2.5 text-[15px] font-semibold text-stone-900">{apptDay(a.day)}<span className="ml-2 tabular-nums text-stone-500">{apptTime(a.start)}</span></p>
  {a.note && <p className="mt-1.5 text-[12.5px] leading-relaxed text-stone-600">&ldquo;{a.note}&rdquo;</p>}
  {a.depositCents > 0 && (
- <p className="mt-1.5 text-[12px] text-stone-400">Deposit {money(a.depositCents)} — {a.depositPaid ? "paid" : "not yet paid"}.</p>
+ <p className="mt-1.5 text-[12px] text-stone-400">Deposit {money(a.depositCents)}: {a.depositPaid ? "paid" : "not yet paid"}.</p>
  )}
 
  <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3.5">
@@ -426,7 +426,7 @@ export default function InboxPage() {
  <button onClick={() => answerAppt(a.id, "cancelled")}
  className="ml-auto px-2 py-2 text-[12.5px] text-stone-400 transition hover:text-rose-600">Decline</button>
  </div>
- <p className="mt-2 text-[11.5px] text-stone-400">Either way we email them — you don&rsquo;t have to.</p>
+ <p className="mt-2 text-[11.5px] text-stone-400">Either way we email them. You don&rsquo;t have to.</p>
  </div>
  </div>
  </div>

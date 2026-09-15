@@ -96,7 +96,7 @@ function generateAlerts(
         severity: "warning",
         category: "Session Quality",
         title: `${(summary.bounceRate * 100).toFixed(0)}% bounce rate`,
-        detail: "More than half of sessions end after just one page — users aren't finding a reason to keep browsing.",
+        detail: "More than half of sessions end after just one page. Users aren't finding a reason to keep browsing.",
         action: "Review session paths",
         href: "/admin/session-flows",
       });
@@ -118,7 +118,7 @@ function generateAlerts(
           severity: "warning",
           category: "Funnel Drop-off",
           title: `Only ${(browseRate * 100).toFixed(0)}% of sessions reach the browse page`,
-          detail: "Most visitors leave before exploring inventory — consider improving the landing page CTA.",
+          detail: "Most visitors leave before exploring inventory. Consider improving the landing page CTA.",
           action: "Analyze session flows",
           href: "/admin/session-flows",
         });
@@ -132,7 +132,7 @@ function generateAlerts(
             severity: "warning",
             category: "Funnel Drop-off",
             title: `Only ${(viewRate * 100).toFixed(0)}% of browsers open a product`,
-            detail: "Product cards aren't generating enough clicks — check images, pricing, and grid layout.",
+            detail: "Product cards aren't generating enough clicks. Check images, pricing, and grid layout.",
             action: "Review top products",
             href: "/admin/analytics",
           });
@@ -198,7 +198,7 @@ function generateAlerts(
           severity: "warning",
           category: "Attribution",
           title: `${kpis.unmatchedConversions} orders not attributed to VYA clicks`,
-          detail: `${(unmatchedPct * 100).toFixed(0)}% of orders have no matching click — we can't prove our impact to stores or investors.`,
+          detail: `${(unmatchedPct * 100).toFixed(0)}% of orders have no matching click. We can't prove our impact to stores or investors.`,
           action: "Match manually",
           href: "/admin/conversions?filter=unmatched",
         });
@@ -243,7 +243,7 @@ function generateAlerts(
           id: "retention",
           severity: "info",
           category: "Retention",
-          title: `Low repeat-purchase rate — avg M+1 retention is ${avgM1.toFixed(0)}%`,
+          title: `Low repeat-purchase rate: avg M+1 retention is ${avgM1.toFixed(0)}%`,
           detail: "Less than 1 in 5 buyers returns the following month. Explore email nudges, new arrivals alerts, or loyalty mechanics.",
           action: "View cohort curves",
           href: "/admin/analytics",
@@ -253,7 +253,7 @@ function generateAlerts(
           id: "retention-good",
           severity: "good",
           category: "Retention",
-          title: `Strong M+1 retention — ${avgM1.toFixed(0)}% of buyers return`,
+          title: `Strong M+1 retention: ${avgM1.toFixed(0)}% of buyers return`,
           detail: "This is a diligence-ready number. Flag it in investor decks.",
           action: "View cohort curves",
           href: "/admin/analytics",
@@ -481,36 +481,36 @@ export default function SummaryPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             <PulseCard
               label="Revenue"
-              value={kpis ? fmt$(kpis.totalRevenue) : "—"}
+              value={kpis ? fmt$(kpis.totalRevenue) : "-"}
               href="/admin/key-metrics"
             />
             <PulseCard
               label="Orders"
-              value={kpis ? kpis.totalConversions.toString() : "—"}
+              value={kpis ? kpis.totalConversions.toString() : "-"}
               sub={kpis && kpis.unmatchedConversions > 0 ? `${kpis.unmatchedConversions} unmatched` : undefined}
               trend={kpis && kpis.unmatchedConversions > 0 ? "down" : undefined}
               href="/admin/conversions"
             />
             <PulseCard
               label="Store Clicks"
-              value={kpis ? kpis.totalClicks.toLocaleString() : "—"}
+              value={kpis ? kpis.totalClicks.toLocaleString() : "-"}
               href="/admin/analytics"
             />
             <PulseCard
               label="New Signups"
-              value={kpis ? kpis.newSignupsThisWeek.toString() : "—"}
+              value={kpis ? kpis.newSignupsThisWeek.toString() : "-"}
               href="/admin/customers"
             />
             <PulseCard
               label="Sessions"
-              value={session ? session.summary.totalSessions.toLocaleString() : "—"}
+              value={session ? session.summary.totalSessions.toLocaleString() : "-"}
               sub={session ? `${(session.summary.bounceRate * 100).toFixed(0)}% bounce` : undefined}
               trend={session && session.summary.bounceRate > 0.6 ? "down" : undefined}
               href="/admin/session-flows"
             />
             <PulseCard
               label="M+1 Retention"
-              value={avgM1 != null ? `${avgM1.toFixed(0)}%` : "—"}
+              value={avgM1 != null ? `${avgM1.toFixed(0)}%` : "-"}
               sub={avgM1 != null ? (avgM1 >= 30 ? "healthy" : "needs work") : "collecting data"}
               trend={avgM1 != null ? (avgM1 >= 30 ? "up" : "down") : undefined}
               href="/admin/analytics"
@@ -594,13 +594,13 @@ export default function SummaryPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div>
               <p style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED, margin: 0 }}>
-                Homepage — How Far Do People Scroll?
+                Homepage: How Far Do People Scroll?
               </p>
               <p style={{ fontSize: 11, color: MUTED, margin: "4px 0 0" }}>% of homepage visitors who reach each section (last 30 days)</p>
             </div>
           </div>
           {scrollReport.length === 0 || scrollReport.every(s => s.unique === 0) ? (
-            <p style={{ fontSize: 13, color: MUTED }}>No data yet — will populate after first homepage visits post-deploy.</p>
+            <p style={{ fontSize: 13, color: MUTED }}>No data yet. Will populate after first homepage visits post-deploy.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {scrollReport.map((s, i) => {
@@ -667,8 +667,8 @@ export default function SummaryPage() {
                         <td style={{ padding: "9px 10px", fontWeight: 500, color: DARK }}>{s.store}</td>
                         <td style={{ padding: "9px 10px", textAlign: "right", color: GRAY }}>{s.clicks.toLocaleString()}</td>
                         <td style={{ padding: "9px 10px", textAlign: "right", color: GRAY }}>{s.conversions}</td>
-                        <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 600, color: s.revenue > 0 ? DARK : MUTED }}>{s.revenue > 0 ? fmt$(s.revenue) : "—"}</td>
-                        <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 600, color: rateColor }}>{s.clicks > 0 ? fmtPct(convRate) : "—"}</td>
+                        <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 600, color: s.revenue > 0 ? DARK : MUTED }}>{s.revenue > 0 ? fmt$(s.revenue) : "-"}</td>
+                        <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: 600, color: rateColor }}>{s.clicks > 0 ? fmtPct(convRate) : "-"}</td>
                       </tr>
                     );
                   })}

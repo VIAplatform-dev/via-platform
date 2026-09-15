@@ -29,6 +29,6 @@ test("extracts footwear measurements (heel height, filler words)", () => {
 });
 
 test("does not treat a size as a measurement", () => {
- assert.equal(extractMeasurements("Size medium — recommended to fit US 4-6."), null);
+ assert.equal(extractMeasurements("Size medium: recommended to fit US 4-6."), null);
  assert.equal(extractMeasurements("Recommended to fit size US 7 (EU 37.5)."), null);
 });

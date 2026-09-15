@@ -13,7 +13,7 @@ test("the ordinary case: a link whose own text is the product name", () => {
 test("an invisible overlay link takes its name from what it points at", () => {
  // hachi-archive's theme: the whole tile is covered by an empty <a>, and the product name lives
  // outside it, referenced by aria-labelledby. The old rule ("a link with text") saw nothing here,
- // so parity reported 0 products on BOTH sides and graded the store "couldn't compare" — a pass by
+ // so parity reported 0 products on BOTH sides and graded the store "couldn't compare". A pass by
  // way of not looking.
  const out = productsFromLinks([link({
   href: "/products/prada-2000s-pink-bow-slingback-heels",
@@ -37,7 +37,7 @@ test("failing all of those, the name comes from the tile, with the price strippe
 });
 
 test("the same product linked twice is one product", () => {
- // Themes routinely emit a mobile link and a desktop link for the same tile — `block lg:hidden`
+ // Themes routinely emit a mobile link and a desktop link for the same tile. `block lg:hidden`
  // beside `hidden lg:block`. Counting both doubled every product on the page.
  const out = productsFromLinks([
   link({ href: "/products/city-bag", ownText: "", labelledByText: "denim city bag" }),
@@ -54,7 +54,7 @@ test("a variant link is the same product", () => {
  assert.deepEqual(out.map((p) => p.handle), ["city-bag"]);
 });
 
-test("grid order is preserved — it is what the order comparison measures", () => {
+test("grid order is preserved. It is what the order comparison measures", () => {
  const out = productsFromLinks([
   link({ href: "/products/c", ownText: "Third" }),
   link({ href: "/products/a", ownText: "First" }),
@@ -75,7 +75,7 @@ test("links that are not a product are ignored", () => {
 
 test("a hidden link is skipped, but an overlay one is not", () => {
  // `display:none` markup a shopper never sees should not count. A transparent overlay covering a
- // tile IS seen — it is the thing you click.
+ // tile IS seen: it is the thing you click.
  const out = productsFromLinks([
   link({ href: "/products/ghost", ownText: "Ghost", visible: false }),
   link({ href: "/products/overlay", labelledByText: "Overlay Bag", visible: true }),
@@ -93,7 +93,7 @@ test("a product reachable ONLY through a hidden link still counts once a visible
 
 test("a tile with nothing but a price yields no usable name, and is still counted as a product", () => {
  // The handle is the identity; the title is only for quoting back to the seller. A product with no
- // readable name must not vanish from the count — that is how a page silently compares as empty.
+ // readable name must not vanish from the count. That is how a page silently compares as empty.
  const out = productsFromLinks([link({ href: "/products/mystery", tileText: "$1,200.00" })]);
  assert.deepEqual(out, [{ handle: "mystery", title: "" }]);
 });
@@ -104,7 +104,7 @@ test("names are trimmed of whitespace and absurd length", () => {
 });
 
 test("markup is never a product name", () => {
- // Reading a tile's textContent picks up the source of any <noscript> inside it — themes put a
+ // Reading a tile's textContent picks up the source of any <noscript> inside it. Themes put a
  // fallback <img> there for JS-less browsers. bag-crush's names came back as
  // '<img src="//mybagcrush.com/cdn/shop/file…' until this rule existed.
  const out = productsFromLinks([link({
@@ -128,7 +128,7 @@ test("an ordinary name containing an angle bracket is not thrown away", () => {
  assert.equal(out[0].title, "Size < 8 Vintage Boot");
 });
 
-test("a badge is not a name — whichever source it came from", () => {
+test("a badge is not a name. Whichever source it came from", () => {
  // bag-crush quoted two pieces back to the seller as "SOLD OUT". The noise filter only ran on the
  // tile fallback; a theme that puts the badge in the link's own text slipped straight past it.
  const out = productsFromLinks([
@@ -143,7 +143,7 @@ import { sectionHeadings } from "./product-links.ts";
 
 test("a heading that is a product's name is not a section heading", () => {
  // bag-crush's theme marks product titles as <h2> (class product-item__title). So the featured strip
- // showing different pieces was reported as "2 section headings missing" — on top of already being
+ // showing different pieces was reported as "2 section headings missing", on top of already being
  // reported as different products, and as a different order. One difference, counted three times.
  const heads = ["Featured Crushes", "Louis Vuitton Looping GM", "Guaranteed Authenticity"];
  const products = [{ handle: "lv-looping", title: "Louis Vuitton Looping GM" }];
@@ -168,7 +168,7 @@ test("with no products on the page every heading is a section", () => {
 });
 
 test("a heading is judged against the products on BOTH pages, not one", () => {
- // we-thieves: their collection page and ours are identical — 14 headings, 13 of them product
+ // we-thieves: their collection page and ours are identical. 14 headings, 13 of them product
  // names. But their theme labels a product differently in its link than in its heading, so the
  // names matched on our side and not on theirs: ours filtered down to 1 heading, theirs kept 12,
  // and a page that matched perfectly reported "11 section headings missing".

@@ -40,7 +40,7 @@ test("handles offers as an array and as an AggregateOffer", () => {
 });
 
 test("marks a sold-out product unavailable rather than dropping it", () => {
- // Sold pieces are the archive of a vintage store — they belong in the import, flagged.
+ // Sold pieces are the archive of a vintage store. They belong in the import, flagged.
  const p = productFromJsonLd(wrap({ "@type": "Product", name: "Sold Dress", image: "i.jpg", offers: { price: "99", priceCurrency: "USD", availability: "https://schema.org/OutOfStock" } }), "https://s.com/x");
  assert.equal(p!.available, false);
 });
@@ -66,7 +66,7 @@ test("a Product with no usable price still parses (price is optional, name is no
 });
 
 test("sitemap candidates are platform-specific", () => {
- // BigCommerce's entry point is the bare xmlsitemap.php index — "?type=products" returns an empty
+ // BigCommerce's entry point is the bare xmlsitemap.php index. "?type=products" returns an empty
  // document, which is why the first implementation discovered nothing on those stores.
  assert.equal(sitemapCandidates("https://s.com", "bigcommerce")[0], "https://s.com/xmlsitemap.php");
  assert.equal(sitemapCandidates("https://s.com", "woocommerce")[0], "https://s.com/wp-sitemap.xml");

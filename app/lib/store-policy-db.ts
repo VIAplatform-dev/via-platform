@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { getStoreProfile, updateStoreProfile } from "./store-profile-db";
 import { resolveReturnsText } from "./returns-policy";
 
-// A store's return / refund policy — the "some stores are all-sales-final, some accept returns"
+// A store's return / refund policy. The "some stores are all-sales-final, some accept returns"
 // choice. Buyer-facing (shown on the storefront + order emails) and the store's own setting. The
 // store issuing a manual refund is always allowed; this governs what buyers are TOLD to expect.
 
@@ -39,7 +39,7 @@ export type RefundPolicy = {
  /**
   * The store's own words, shown to buyers.
   *
-  * ONE RECORD, and it is `store_profiles.policies.returns` — the page the storefront links to.
+  * ONE RECORD, and it is `store_profiles.policies.returns`. The page the storefront links to.
   * This used to be a second, unrelated paragraph in `store_policies.policy_text`, written on a
   * different screen, so a store could have two contradicting returns policies and no way to tell
   * which a buyer was owed. The old column is still READ, so nothing a seller wrote is lost, and
@@ -54,7 +54,7 @@ export async function getRefundPolicy(storeSlug: string): Promise<RefundPolicy> 
  try {
  await ensure();
  // Both records, resolved to one. Done HERE rather than at each call site because there are
- // several — the storefront product page, the order emails, the settings screens — and one of
+ // several, the storefront product page, the order emails, the settings screens, and one of
  // them reading the other record is exactly the bug this merge exists to end.
  const [rows, profile] = await Promise.all([
  db()`SELECT refunds_enabled, return_window_days, restocking_fee_pct, return_shipping_paid_by, policy_text FROM store_policies WHERE store_slug = ${storeSlug} LIMIT 1` as Promise<Array<Record<string, unknown>>>,
@@ -75,7 +75,7 @@ export async function getRefundPolicy(storeSlug: string): Promise<RefundPolicy> 
  }
 }
 
-/** Has the store DECIDED its returns policy? A saved row, whichever way it went — all-sales-final
+/** Has the store DECIDED its returns policy? A saved row, whichever way it went. All-sales-final
  *  is a policy too. getRefundPolicy returns a default for a store that never chose, which is
  *  right for buyers and wrong for "Set up your store". */
 export async function hasRefundPolicy(storeSlug: string): Promise<boolean> {
@@ -98,8 +98,8 @@ export async function setRefundPolicy(storeSlug: string, p: Partial<RefundPolicy
  // THE TEXT GOES TO THE ONE RECORD, whichever screen typed it.
  //
  // Saving here used to write a second copy into this table's own column, which is how two policies
- // came to exist. It now lands in store_profiles.policies.returns — the same field the Policies
- // page edits — so the rules screen and the policy page are two views of one thing.
+ // came to exist. It now lands in store_profiles.policies.returns. The same field the Policies
+ // page edits, so the rules screen and the policy page are two views of one thing.
  //
  // Only when the caller actually sent text. A save of just the window or the fee must not touch her
  // policy, and `p.policyText === undefined` is the difference between "left alone" and "cleared".
@@ -118,13 +118,13 @@ export async function setRefundPolicy(storeSlug: string, p: Partial<RefundPolicy
  `;
  // policy_text is deliberately absent from the UPDATE. It is the legacy copy: left exactly as the
  // seller last left it, still read as a fallback for a store that has not saved since the merge,
- // and never written again. Clearing it here would delete words a store wrote — see returns-policy.ts.
+ // and never written again. Clearing it here would delete words a store wrote. See returns-policy.ts.
  return next;
 }
 
-/** One-line, buyer-facing summary of the policy — for the storefront + emails. */
+/** One-line, buyer-facing summary of the policy, for the storefront + emails. */
 export function policySummary(p: RefundPolicy): string {
  if (!p.refundsEnabled) return "All sales final.";
- const base = p.returnWindowDays > 0 ? `Returns accepted within ${p.returnWindowDays} days` : "Returns accepted — contact the store";
+ const base = p.returnWindowDays > 0 ? `Returns accepted within ${p.returnWindowDays} days` : "Returns accepted. Contact the store";
  return p.restockingFeePct > 0 ? `${base} · ${p.restockingFeePct}% restocking fee.` : `${base}.`;
 }

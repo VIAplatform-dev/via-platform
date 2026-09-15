@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
  }
 
  // Paginate through ALL partnerships. Collabs returns 50 per page; previously only the first
- // page was read, so the total commission summed just the top 50 — and wobbled (e.g. dropped a
+ // page was read, so the total commission summed just the top 50, and wobbled (e.g. dropped a
  // few dollars) whenever Collabs reordered which 50 came back first, with no refund involved.
  // Follow the cursor so every partnership is counted and the total is stable.
  const buildHeaders = (csrf: string) => ({
@@ -122,10 +122,10 @@ export async function GET(request: NextRequest) {
  break; // keep the pages we already gathered
  }
  if (!res.ok) {
- if (page === 0) return NextResponse.json({ error: `Shopify Collabs returned ${res.status}. Your session may have expired — please refresh your credentials.` }, { status: res.status });
+ if (page === 0) return NextResponse.json({ error: `Shopify Collabs returned ${res.status}. Your session may have expired. Please refresh your credentials.` }, { status: res.status });
  break;
  }
- // Rotate the CSRF token — Shopify returns a fresh one with each response; the next page needs it.
+ // Rotate the CSRF token. Shopify returns a fresh one with each response; the next page needs it.
  const rotated = res.headers.get("x-csrf-token");
  if (rotated) { activeCsrf = rotated; await saveSetting("collabs_csrf_token", rotated); }
  const json = await res.json();
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
  };
  });
 
- // Save for analytics display only — do NOT touch collabs_data or collabs_last_synced_at
+ // Save for analytics display only. Do NOT touch collabs_data or collabs_last_synced_at
  // which are used exclusively by the cron job to detect delta orders for conversion recording.
  await saveSetting("collabs_analytics_synced_at", new Date().toISOString());
  // Persist the per-store snapshot so each store's own dashboard can show its authoritative

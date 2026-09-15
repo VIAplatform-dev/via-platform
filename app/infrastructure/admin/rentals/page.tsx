@@ -8,7 +8,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, StatusPill, Ta
 //
 // A seller with rentals out has four questions and they're all about time: what leaves today, what's
 // with a customer, what's late, what came back and needs checking. So the tabs are those questions,
-// not the underlying statuses — "Out" quietly covers both `out` and `due`, because a piece being
+// not the underlying statuses. "Out" quietly covers both `out` and `due`, because a piece being
 // late doesn't move it anywhere physical.
 //
 // Applications live here too. A request holding dates is inventory the store can't sell, so leaving
@@ -22,7 +22,7 @@ type Booking = {
  renterName?: string | null; renterEmail?: string | null; renterPhone?: string | null;
  delivery?: "ship" | "pickup";
  returnLabelUrl?: string | null; returnTracking?: string | null;
- /** Where the carrier says it is — the estimate corrected by a real scan. Null when nothing is known. */
+ /** Where the carrier says it is. The estimate corrected by a real scan. Null when nothing is known. */
  whereabouts?: { stage: string; line: string; expected: string | null; runningLate: boolean } | null;
  title?: string | null; image?: string | null;
 };
@@ -35,8 +35,8 @@ type Request = {
 const TABS = ["today", "upcoming", "out", "inspect", "requests"] as const;
 type Tab = (typeof TABS)[number];
 // Named for the STAGE THE PIECE IS AT, in the order it travels: pack it, it's booked, it's away,
-// it's back. The old set mixed three vocabularies — "Today" and "Upcoming" are times, "With
-// customers" is a place, "To check" is a job — so nothing told you they were one sequence.
+// it's back. The old set mixed three vocabularies. "Today" and "Upcoming" are times, "With
+// customers" is a place, "To check" is a job, so nothing told you they were one sequence.
 const TAB_LABEL: Record<Tab, string> = {
  today: "Pack today",
  upcoming: "Booked ahead",
@@ -46,7 +46,7 @@ const TAB_LABEL: Record<Tab, string> = {
 };
 /** One line under the row, so a tab never has to carry the whole explanation in two words. */
 const TAB_HINT: Record<Tab, string> = {
- today: "Going out today — pack these and get them posted or ready to collect.",
+ today: "Going out today: pack these and get them posted or ready to collect.",
  upcoming: "Paid and dated, leaving another day. Nothing to do yet.",
  out: "Out with a customer now. Anything past its return date is marked overdue.",
  inspect: "Returned by the renter and waiting on you. Check them over, then put them back on the rack.",
@@ -59,11 +59,11 @@ function withStore(path: string): string {
  return s ? `${path}${path.includes("?") ? "&" : "?"}store=${encodeURIComponent(s)}` : path;
 }
 
-const usd = (c: number | null | undefined) => (c == null ? "—" : `$${(c / 100).toFixed(c % 100 === 0 ? 0 : 2)}`);
-const day = (d?: string | null) => (d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "—");
+const usd = (c: number | null | undefined) => (c == null ? "-" : `$${(c / 100).toFixed(c % 100 === 0 ? 0 : 2)}`);
+const day = (d?: string | null) => (d ? new Date(`${d}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "-");
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
-/** What the seller does next, per state. One action per row — a queue with choices isn't a queue. */
+/** What the seller does next, per state. One action per row. A queue with choices isn't a queue. */
 const NEXT: Record<string, { to: string; label: string } | undefined> = {
  booked: { to: "picking", label: "Start picking" },
  picking: { to: "out", label: "Mark sent" },
@@ -136,8 +136,8 @@ export default function RentalsQueuePage() {
   const r = await fetch(withStore(`/api/store/rentals/bookings/${id}/return-label`), { method: "POST" })
    .then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
   setBusy(null);
-  // The reasons are things a seller can act on — a missing ship-from, a setting that says the
-  // renter pays — so they're shown as written rather than collapsed into "something went wrong".
+  // The reasons are things a seller can act on. A missing ship-from, a setting that says the
+  // renter pays, so they're shown as written rather than collapsed into "something went wrong".
   if (!r?.ok) { setErr(r?.d?.error || "Couldn't buy a label just now."); return; }
   await load();
  }
@@ -168,7 +168,7 @@ export default function RentalsQueuePage() {
       </p>
      )}
      {/* One line saying where it actually is. Only when a carrier has told us something the dates
-         didn't already say — repeating "due back Sep 10" under a pill that says the same is noise. */}
+         didn't already say: repeating "due back Sep 10" under a pill that says the same is noise. */}
      {w && (w.stage === "coming-back" || w.stage === "back" || w.runningLate) && (
       <p className={cn("mt-1 text-[12px] leading-relaxed", w.runningLate ? "text-amber-700" : "text-stone-500")}>
        {w.line}
@@ -178,7 +178,7 @@ export default function RentalsQueuePage() {
     </div>
     <div className="flex shrink-0 items-center gap-2">
      {/* The label "a prepaid return label is in the box" promises. Offered once a piece is with
-         someone and only when it was posted — there's nothing to post back to a collection. */}
+         someone and only when it was posted. There's nothing to post back to a collection. */}
      {(b.status === "out" || b.status === "due") && b.delivery !== "pickup" && (
       b.returnLabelUrl
        ? <a href={b.returnLabelUrl} target="_blank" rel="noreferrer" className="rounded-lg border border-stone-200 px-2.5 py-1 text-[12px] font-medium text-stone-600 transition hover:bg-stone-50">Return label</a>
@@ -211,7 +211,7 @@ export default function RentalsQueuePage() {
 
     {damaging === b.id && (
      <div className="flex w-full flex-wrap items-center gap-3 border-t border-stone-100 pt-3">
-      <p className="text-[12.5px] text-stone-600">Charge for damage — this goes on the card saved at booking.</p>
+      <p className="text-[12.5px] text-stone-600">Charge for damage. This goes on the card saved at booking.</p>
       <span className="flex items-center gap-1.5">
        <span className="text-[13px] text-stone-400">$</span>
        <input
@@ -266,7 +266,7 @@ export default function RentalsQueuePage() {
     actions={
      <div className="flex items-center gap-2">
       <TechButton variant="secondary" onClick={() => { void load(); }}>Refresh</TechButton>
-      {/* The terms this queue runs on — timelines, late fees, deposits — reachable from the thing
+      {/* The terms this queue runs on, timelines, late fees, deposits. Reachable from the thing
           they govern rather than only from the settings index. */}
       <a href={withStore("/admin/settings/rentals")}
        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-[12.5px] font-medium text-stone-600 transition hover:bg-stone-50">
@@ -300,7 +300,7 @@ export default function RentalsQueuePage() {
     <TechCard className="px-5 py-10 text-center text-[13px] text-stone-400">Loading…</TechCard>
    ) : tab === "requests" ? (
     (requests ?? []).length === 0
-     ? <TechEmpty icon={<Inbox size={20} />} title="No applications waiting" body="Anyone asking to rent a piece lands here for you to approve or decline. Whether their dates are held while they wait is your call — Rental settings › Who can book." />
+     ? <TechEmpty icon={<Inbox size={20} />} title="No applications waiting" body="Approve or decline rental requests. Choose whether dates are held while they wait under Rental settings › Who can book." />
      : <div className="flex flex-col gap-3">{(requests ?? []).map(reqRow)}</div>
    ) : shown.length === 0 ? (
     <TechEmpty

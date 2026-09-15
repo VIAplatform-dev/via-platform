@@ -1,10 +1,10 @@
 import { marketTag, normalizeReceiptEmail, receiptCopy, type ReceiptInput } from "./receipt-core.ts";
 
-// After a cash sale: the receipt, and the customer record. Both best-effort — a receipt that
+// After a cash sale: the receipt, and the customer record. Both best-effort: a receipt that
 // fails must never fail the sale it describes, so nothing here throws.
 //
 // The order already carries the email (finalizeMarketSale writes receipt_email onto the order as
-// buyer_email), which is how the customer list attaches purchases to a person — the tag is what
+// buyer_email), which is how the customer list attaches purchases to a person. The tag is what
 // remembers WHERE they were met.
 
 export type ReceiptDeps = {

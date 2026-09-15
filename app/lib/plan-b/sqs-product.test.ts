@@ -34,7 +34,7 @@ test("an ordinary captured page is not a product page", () => {
 });
 
 test("the buy button posts the VYA item's id, so the bridge can resolve it", () => {
- // Squarespace's Add-to-cart sends `{itemId}` straight from this blob — captured, that id is the
+ // Squarespace's Add-to-cart sends `{itemId}` straight from this blob. Captured, that id is the
  // SOURCE store's product, which means nothing to VYA and is why the button did nothing at all.
  const $ = cheerio.load(applySqsProductIdentity(PDP, VYA_ID));
  const $detail = $(".product-detail");
@@ -49,7 +49,7 @@ test("the buy button posts the VYA item's id, so the bridge can resolve it", () 
 
 test("the page's own bootstrap stops naming the source's product too", () => {
  // Squarespace repeats the id in `Static.SQUARESPACE_CONTEXT.item`, which its quick view and its
- // analytics read — left alone, half the page would still be describing the wrong piece.
+ // analytics read: left alone, half the page would still be describing the wrong piece.
  const withCtx = PDP.replace("</body>", `<script>Static.SQUARESPACE_CONTEXT = {"item":{"id":"${SOURCE_ID}","title":"Fendi Beaded Baguette"}};</script></body>`);
  const out = applySqsProductIdentity(withCtx, VYA_ID);
  assert.match(out, new RegExp(`"item":\\{"id":"${VYA_ID}"`));

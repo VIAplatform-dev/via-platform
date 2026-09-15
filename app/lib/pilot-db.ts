@@ -146,7 +146,7 @@ export async function approvePilotUser(email: string) {
 }
 
 /**
- * Returns the next batch of users to approve — 50 a week, run by the Monday cron.
+ * Returns the next batch of users to approve. 50 a week, run by the Monday cron.
  * Includes both pilot_access rows with status='pending' AND waitlist-only users
  * (those not yet in pilot_access). Priority: most referrals first, then oldest signup.
  */
@@ -198,7 +198,7 @@ export async function getApprovedPilotEmails(): Promise<string[]> {
 }
 
 /**
- * Returns emails of "insider" users — anyone who has done at least one of:
+ * Returns emails of "insider" users. Anyone who has done at least one of:
  *  - made a purchase (conversions)
  *  - successfully invited a friend (someone signed up with their referral_code)
  *  - clicked through to a store (clicks)
@@ -295,7 +295,7 @@ export async function getReferralInfo(email: string): Promise<{
   if (rows.length === 0) return { referralCode: null, referralCount: 0 };
   let referralCode = rows[0].referral_code as string | null;
   if (!referralCode) {
-    // User exists but never got a referral code — assign one now
+    // User exists but never got a referral code. Assign one now
     referralCode = await createUniqueReferralCode();
     await sql`UPDATE pilot_access SET referral_code = ${referralCode} WHERE email = ${email.toLowerCase().trim()}`;
   }
@@ -390,7 +390,7 @@ export async function getPilotIsInsider(email: string): Promise<boolean> {
 
 /**
  * After a new referral signup, returns the referrer's info so a notification
- * email can be sent. No longer instantly approves — the cron picks them up
+ * email can be sent. No longer instantly approves. The cron picks them up
  * sooner based on their referral tier (1=5d, 2=4d, 3+=3d).
  */
 export async function checkAndApproveReferrer(referralCode: string): Promise<{

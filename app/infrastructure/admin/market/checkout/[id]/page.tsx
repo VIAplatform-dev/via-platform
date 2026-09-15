@@ -15,7 +15,7 @@ type Resp = { checkout: Checkout; item: MarketItem | null; items: Line[] };
 const stillOpen = (d: Resp) => d.checkout.status === "awaiting_payment";
 
 // The Checkout screen is driven ENTIRELY by server state: refresh, back, a second tab, a dead
-// battery — none of them can lose or duplicate a sale. It polls while the checkout is open.
+// battery: none of them can lose or duplicate a sale. It polls while the checkout is open.
 function CheckoutInner() {
  const { id } = useParams<{ id: string }>();
  const router = useRouter();
@@ -105,7 +105,7 @@ function CheckoutInner() {
  {!c && !poll.error && <p className="pt-6 text-center text-[13px] text-stone-400">Loading…</p>}
  {c && (
  <>
- {/* Band: state, amount, item. Colour carries the state — wine while live, green once sold. */}
+ {/* Band: state, amount, item. Colour carries the state. Wine while live, green once sold. */}
  <div className="-mx-4 px-5 pb-12 pt-6 text-white transition-colors sm:-mx-6 sm:rounded-b-[28px] sm:px-7 sm:pt-8" style={{ background: bandBg }}>
  <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-white/70">{bandLabel}</p>
  <p className="mt-2 text-[40px] font-medium leading-none tracking-tight" style={{ fontFamily: "var(--font-display)" }}>{money(c.amountCents, c.currency)}</p>
@@ -130,7 +130,7 @@ function CheckoutInner() {
  {tenderedCents != null && (liveChange != null
  ? <p className="mt-3 text-center text-[15px] text-stone-700">Change due: <b className="text-[20px]" style={{ fontFamily: "var(--font-display)" }}>{money(liveChange, c.currency)}</b></p>
  : <p className="mt-3 text-center text-[13px] text-red-700">That’s {money(c.amountCents - tenderedCents, c.currency)} short.</p>)}
- {/* A receipt, if they want one — and they join Customers tagged with this market. */}
+ {/* A receipt, if they want one, and they join Customers tagged with this market. */}
  <input type="email" inputMode="email" autoComplete="off" value={receiptEmail} onChange={(e) => setReceiptEmail(e.target.value)} placeholder="Email a receipt (optional)" aria-label="Email a receipt"
  className="mt-3 min-h-[44px] w-full rounded-2xl border border-stone-200 px-3 text-[14px] outline-none focus:border-stone-400" />
  </div>
@@ -175,7 +175,7 @@ function CheckoutInner() {
  <p className="mt-3 text-[15px] font-medium text-stone-900">Hand {data && data.items.length > 1 ? "the items" : "the item"} to the customer.</p>
  </div>
  )}
- {c.status === "paid_conflict" && <Notice tone="danger">Payment received but this item had already sold elsewhere. No sale was recorded here — the payment is being refunded; check Sales today.</Notice>}
+ {c.status === "paid_conflict" && <Notice tone="danger">Payment received but this item had already sold elsewhere. No sale was recorded here. The payment is being refunded; check Sales today.</Notice>}
  {(c.status === "canceled" || c.status === "expired" || c.status === "failed") && (
  <div className="py-4 text-center">
  <p className="text-[18px] font-semibold text-stone-900">{c.status === "canceled" ? "Nothing was charged" : c.status === "expired" ? "The hold ran out" : "Payment unsuccessful"}</p>
@@ -188,7 +188,7 @@ function CheckoutInner() {
  <ActionBar>
  {c.status === "awaiting_payment" && (c.tender === "cash" ? (
  <>
- <BigButton onClick={cash} disabled={busy !== null} className="min-h-[64px] text-[17px]">{busy === "cash" ? "Recording…" : "Cash received — mark sold"}</BigButton>
+ <BigButton onClick={cash} disabled={busy !== null} className="min-h-[64px] text-[17px]">{busy === "cash" ? "Recording…" : "Cash received. Mark sold"}</BigButton>
  <BigButton variant="ghost" onClick={cancel} disabled={busy !== null}>{busy === "cancel" ? "…" : "Cancel"}</BigButton>
  </>
  ) : (
@@ -197,7 +197,7 @@ function CheckoutInner() {
  <BigButton variant="ghost" onClick={cancel} disabled={busy !== null}>{busy === "cancel" ? "…" : "Cancel"}</BigButton>
  </div>
  ))}
- {c.status === "paid" && <BigLink href={href(`${B}/find`)} className="min-h-[64px] text-[17px]">Done — next customer</BigLink>}
+ {c.status === "paid" && <BigLink href={href(`${B}/find`)} className="min-h-[64px] text-[17px]">Done: next customer</BigLink>}
  {(c.status === "canceled" || c.status === "expired" || c.status === "failed") && (
  <div className="grid grid-cols-2 gap-2">
  <BigButton onClick={() => router.push(href(`${B}/item/${c.itemId}`))}>Try again</BigButton>
@@ -213,7 +213,7 @@ function CheckoutInner() {
 }
 
 // The seller types the customer's card. Confirms on the connected account; the same webhook / poll
-// finalizes the sale — this form never marks anything sold itself.
+// finalizes the sale: this form never marks anything sold itself.
 function KeyedForm({ amountLabel, onDone }: { amountLabel: string; onDone: () => void }) {
  const stripe = useStripe();
  const elements = useElements();

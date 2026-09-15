@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-// SHOPIFY APP PROXIES — answered cheaply, because we do not host the seller's Shopify apps.
+// SHOPIFY APP PROXIES: answered cheaply, because we do not host the seller's Shopify apps.
 //
 // `/apps/{app}/…` is Shopify's app-proxy namespace: an installed app's own JavaScript and JSON
 // endpoints, served on the shop's domain and forwarded by Shopify to the app's server. Those apps
 // stay on Shopify; they do not come over with the site, and nothing here can answer for them.
 //
-// The problem was never the 404 — it was WHAT the 404 was. These paths carry a file extension, so
+// The problem was never the 404. It was WHAT the 404 was. These paths carry a file extension, so
 // they skip middleware (the matcher excludes dotted paths) and fell through to Next's own not-found
 // page: 103KB of HTML, returned for a request for a script. The browser then refused it with
 // "MIME type ('text/html') is not executable", and an app fetching JSON parsed `<!DOCTYPE` and

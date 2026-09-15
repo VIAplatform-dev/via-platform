@@ -31,12 +31,12 @@ import { colors, fonts, spacing } from "../../lib/theme";
 // the interaction here; tapping the link opens auth/callback, which finishes the sign-in.
 //
 // WHY THE COLLAGE IS BUNDLED AND NOT FETCHED. This screen renders before anybody has a token, and
-// every catalogue route — /api/public/* included — answers 403 without one (see the note at the top
+// every catalogue route, /api/public/* included. Answers 403 without one (see the note at the top
 // of lib/api.ts: for the app, a valid login IS the approval). These seven ship with the app, so the
 // wall is there the instant it opens rather than after a cold-start round trip.
 
 const GAP = 6;
-const DRIFT_MS = 48_000; // one full cycle. Linear, never eased — an eased loop pulses.
+const DRIFT_MS = 48_000; // one full cycle. Linear, never eased. An eased loop pulses.
 const TILES_PER_COLUMN = 9; // enough to fill a column taller than the screen
 
 // The photographs stop this many points above the wordmark. Measured against the wordmark's real
@@ -45,23 +45,23 @@ const TILES_PER_COLUMN = 9; // enough to fill a column taller than the screen
 const CLEARANCE = 5;
 
 // How much of the wall above that line is spent fading. 0.42 puts the first hint of cream a little
-// under halfway up the picture area — high enough to be gradual, low enough to keep the top sharp.
+// under halfway up the picture area. High enough to be gradual, low enough to keep the top sharp.
 const FADE_SPAN = 0.42;
 
 // THE TWO COLUMNS SHARE NO PHOTOGRAPHS. This is the only arrangement that guarantees the same
 // piece never appears on both sides at once. An offset into one shared list cannot do it: the
 // columns drift in OPPOSITE directions, so their alignment changes continuously and every
-// photograph eventually meets itself — an offset only decides when, not whether.
+// photograph eventually meets itself. An offset only decides when, not whether.
 const LEFT_SET = [
- require("../../assets/collage/01.jpg"), // Fendi gold/green sandals, orchids — pale
- require("../../assets/collage/04.jpg"), // silk scarf stack — colour
- require("../../assets/collage/05.jpg"), // Dior / LV / Prada on the sink — busy
- require("../../assets/collage/07.jpg"), // Gucci bag and wine, convertible — warm
+ require("../../assets/collage/01.jpg"), // Fendi gold/green sandals, orchids. Pale
+ require("../../assets/collage/04.jpg"), // silk scarf stack: colour
+ require("../../assets/collage/05.jpg"), // Dior / LV / Prada on the sink. Busy
+ require("../../assets/collage/07.jpg"), // Gucci bag and wine, convertible. Warm
 ];
 const RIGHT_SET = [
- require("../../assets/collage/02.jpg"), // Manolo / Jimmy Choo flat-lay — pale
- require("../../assets/collage/03.jpg"), // pink Fendi baguette, held — colour
- require("../../assets/collage/06.jpg"), // purple houndstooth suit — studio
+ require("../../assets/collage/02.jpg"), // Manolo / Jimmy Choo flat-lay. Pale
+ require("../../assets/collage/03.jpg"), // pink Fendi baguette, held. Colour
+ require("../../assets/collage/06.jpg"), // purple houndstooth suit: studio
 ];
 
 // The cost of disjoint sets is repetition WITHIN a column: four on the left recur every fourth
@@ -143,12 +143,12 @@ export default function LoginScreen() {
  // The dev API signs a token immediately instead of mailing; if that happened we're already in.
  //
  // <Redirect>, NOT router.replace(). Calling replace() here ran during render, so React re-rendered,
- // which called it again — an infinite navigation loop that shows up as the screen thrashing, and as
+ // which called it again. An infinite navigation loop that shows up as the screen thrashing, and as
  // "Cannot update a component while rendering a different component" in the console.
  //
  // A store owner goes to her own tabs; `storeSlug` is null for shoppers.
  // isFocused matters MORE here than anywhere: this screen is a modal, so it stays mounted after
- // sign-in and would re-fire this redirect on every render — the app blinks between blank and
+ // sign-in and would re-fire this redirect on every render. The app blinks between blank and
  // the destination forever.
  if (user && isFocused) return <Redirect href={storeSlug ? "/(seller)" : "/(tabs)"} />;
 
@@ -173,7 +173,7 @@ export default function LoginScreen() {
  // SIGNING IN AS A STORE HAS ITS OWN DOOR.
  //
  // This used to be the same email box with a different label: press it, type an address, and if
- // that address had no shop you landed in the shopper marketplace with nothing said — which reads
+ // that address had no shop you landed in the shopper marketplace with nothing said, which reads
  // as the app being broken. A link that looks like its own door should open one.
  //
  // Still one magic link underneath (there is no separate store credential), but the screen says
@@ -185,7 +185,7 @@ export default function LoginScreen() {
    <View style={{ flex: 1, backgroundColor: colors.bg, padding: spacing.xl, justifyContent: "center" }}>
     <Text style={{ fontFamily: fonts.serif, fontSize: 26, color: colors.text }}>Check your email</Text>
     <Text style={{ marginTop: spacing.md, fontSize: 15, lineHeight: 22, color: colors.textMuted }}>
-     We sent a link to {email.trim()}. Open it on this phone — it signs you straight into the app, and
+     We sent a link to {email.trim()}. Open it on this phone. It signs you straight into the app, and
      if that address runs a shop it opens your store.
     </Text>
     <Pressable onPress={() => { setSent(false); setError(null); }} style={{ marginTop: spacing.xl }}>
@@ -213,7 +213,7 @@ export default function LoginScreen() {
     </View>
    </View>
 
-   {/* Exactly as tall as the wall, so it reaches full cream on the wall's last row of pixels —
+   {/* Exactly as tall as the wall, so it reaches full cream on the wall's last row of pixels,
        the photographs meet the ground rather than stopping at a visible edge. */}
    <LinearGradient
     pointerEvents="none"
@@ -223,7 +223,7 @@ export default function LoginScreen() {
    />
 
    {/* The form is anchored to the bottom, which is precisely where the keyboard
-       appears — so the email field was hidden behind it the moment you tapped in and
+       appears, so the email field was hidden behind it the moment you tapped in and
        you typed blind. "padding" is the iOS-correct behaviour; the wrapper keeps
        flex:1 so the layout is unchanged with the keyboard down. */}
    <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
@@ -301,7 +301,7 @@ export default function LoginScreen() {
      }}
     >
      {devMode
-      ? "Development build — signing in automatically. If you're seeing this, check EXPO_PUBLIC_DEV_ADMIN_PASSWORD in mobile/.env.local."
+      ? "Development build: signing in automatically. If you're seeing this, check EXPO_PUBLIC_DEV_ADMIN_PASSWORD in mobile/.env.local."
       : "We'll email you a link. No password to remember."}
     </Text>
    </View>

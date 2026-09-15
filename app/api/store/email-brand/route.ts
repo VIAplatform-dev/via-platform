@@ -6,10 +6,10 @@ import { getStoreEmailBrand, getStorefrontEmailBrand, sanitizeBrand } from "@/ap
 
 export const dynamic = "force-dynamic";
 
-// The store's saved email design (colours, type, logo, button, footer) — reusable across every
+// The store's saved email design (colours, type, logo, button, footer). Reusable across every
 // campaign and automation. Inherits the storefront brand until the store saves a custom one.
 
-// GET — the effective brand, the storefront brand it can snap back to, and whether it's customized.
+// GET: the effective brand, the storefront brand it can snap back to, and whether it's customized.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, brand, storefront, custom: !!saved, storeName: sender.fromName, canUndo });
 }
 
-// PUT — { brand } saves a custom design · { reset:true } reverts to the storefront brand ·
+// PUT: { brand } saves a custom design · { reset:true } reverts to the storefront brand ·
 // { undo:true } undoes the last change (swaps back; a second undo redoes it).
 export async function PUT(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

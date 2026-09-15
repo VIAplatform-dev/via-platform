@@ -5,7 +5,7 @@ import type { MetricWindow } from "@/app/lib/data-layer/config";
 
 export const dynamic = "force-dynamic";
 
-// Whitespace: rising, under-supplied market segments this store doesn't carry yet — the sourcing
+// Whitespace: rising, under-supplied market segments this store doesn't carry yet. The sourcing
 // gap. Aggregated + privacy-gated in getStoreWhitespace; never exposes an individual store.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

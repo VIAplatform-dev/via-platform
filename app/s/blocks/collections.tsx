@@ -1,9 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
-// Shop-by-category tiles — the section that gets a shopper to what they came for in one click.
+// Shop-by-category tiles. The section that gets a shopper to what they came for in one click.
 //
 // Note on the catalog: an earlier sketch of this family included a "counts" layout (tiles showing how
-// many pieces sit in each category). There is no per-category count available to this renderer —
-// BlockProduct carries title/price/image/href and nothing else — so rather than print a fabricated
+// many pieces sit in each category). There is no per-category count available to this renderer,
+// BlockProduct carries title/price/image/href and nothing else, so rather than print a fabricated
 // number, that slot is a typographic index ("list"), which is a real pattern and honest about the
 // data we have. If counts become available, it's a new variant, not a retrofit of this one.
 import { FreeField, emptyHint, ff, tileHref, type EditKit, type Item, ArrangeHandle } from "./kit";
@@ -14,7 +14,7 @@ const S = ITEM_SCHEMAS.collections;
 // The caption on a tile is the only type in this section a merchant can't otherwise reach: it isn't
 // the heading (that's a FreeField with its own toolbar) and it isn't body copy, so the section's
 // Headings/Subtext controls both miss it. These three props give the labels their own font, size, and
-// colour across every layout at once — one set of tiles, one typographic decision.
+// colour across every layout at once. One set of tiles, one typographic decision.
 //
 // Unset means "whatever the layout already did", so a storefront saved before this renders identically.
 function captionStyle(kit: EditKit, fallbackColor?: string): React.CSSProperties {
@@ -46,7 +46,7 @@ function panTileImage(e: React.PointerEvent, pos: string | undefined, commit: (v
  if (e.button !== 0) return;
  const frame = e.currentTarget as HTMLElement;
  // The handler may be on the image's own box (circles) or on a click-target overlaying it (grid
- // tiles, where the img is a sibling under the <a>) — find the img either way, and measure ITS box.
+ // tiles, where the img is a sibling under the <a>). Find the img either way, and measure ITS box.
  const img = frame.querySelector("img") || frame.closest("a")?.querySelector("img");
  if (!img) return;
  e.preventDefault(); e.stopPropagation();
@@ -70,7 +70,7 @@ function panTileImage(e: React.PointerEvent, pos: string | undefined, commit: (v
 }
 
 // A little ✕ in the corner of a tile (edit mode only): one click removes the tile. It used to clear
-// the photo first and only delete the tile on a second click — so a seller trying to get rid of six
+// the photo first and only delete the tile on a second click, so a seller trying to get rid of six
 // template tiles clicked ✕ six times, watched the photos vanish, and reported she couldn't delete
 // them. Clearing just the photo is its own "Remove" pill beside "Replace" (see Tile / circles).
 function TileDelete({ onRemove }: { onRemove: () => void }) {
@@ -90,7 +90,7 @@ function Heading({ kit, className }: { kit: EditKit; className: string }) {
  return <FreeField b={b} ctx={ctx} fieldKey="heading" tag="h2" value={p.heading} className={`vya-heading ${className}`} style={{ fontFamily: ctx.head }} />;
 }
 
-// One tile: photo (or a tinted block), a scrim for legibility, and its label — editable in place.
+// One tile: photo (or a tinted block), a scrim for legibility, and its label. Editable in place.
 function Tile({ kit, t, i, setLabel, setImg, ratio, rounded }: { kit: EditKit; t: Item; i: number; setLabel: (i: number, v: string) => void; setImg: (i: number, v: string) => void; ratio: string; rounded?: string }) {
  const { ctx } = kit;
  return (
@@ -165,7 +165,7 @@ function CollectionsRow({ kit }: { kit: EditKit }) {
 
 // ── duo ─────────────────────────────────────────────────────────────────────────────────────────
 // Two categories at full width, side by side and tall. For a store with a real split in what it
-// sells — womenswear/menswear, clothing/objects — where three tiles would dilute the choice.
+// sells, womenswear/menswear, clothing/objects, where three tiles would dilute the choice.
 function CollectionsDuo({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { tiles, setLabel, setImg } = useTiles(kit);
@@ -181,7 +181,7 @@ function CollectionsDuo({ kit }: { kit: EditKit }) {
 }
 
 // ── circles ─────────────────────────────────────────────────────────────────────────────────────
-// Round tiles in a row — the compact, friendly treatment fashion stores use for a quick category
+// Round tiles in a row. The compact, friendly treatment fashion stores use for a quick category
 // jump near the top of a page. Reads as navigation rather than as a feature.
 function CollectionsCircles({ kit }: { kit: EditKit }) {
  const { ctx } = kit;

@@ -7,14 +7,14 @@ import { resolveStoreSender } from "@/app/lib/email-settings-db";
 export const maxDuration = 300;
 
 // Daily: for each store that published new listings in the last 24h, send a single
-// new-arrivals digest to its subscribed customers — if "new arrivals" (built-in) or a
+// new-arrivals digest to its subscribed customers, if "new arrivals" (built-in) or a
 // custom "new_listing" automation is on. Batched, so a whole drop is one email.
 export async function GET(request: Request) {
  const { searchParams } = new URL(request.url);
  const testEmail = searchParams.get("testEmail");
  const testSlug = searchParams.get("slug");
  const cronSecret = process.env.CRON_SECRET;
- // The secret is required unconditionally — testEmail is just which mode of an already-
+ // The secret is required unconditionally. TestEmail is just which mode of an already-
  // authenticated call this is, never a way to skip authentication. (Previously `!testEmail &&`
  // let anyone bypass the secret entirely by passing any testEmail value, turning this into an
  // open, unauthenticated email relay off our sending domain.)
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
  return NextResponse.json({ ok: true, test: true, slug, products: products.length, sent: res?.sent ?? 0 });
  }
 
- // Newly published pieces per store in the last day — with photo + price for a real email.
+ // Newly published pieces per store in the last day, with photo + price for a real email.
  const rows = (await sql`
   SELECT s.slug AS slug, i.id AS id, i.title AS title, i.price_cents AS price_cents,
    i.currency AS currency, i.images AS images

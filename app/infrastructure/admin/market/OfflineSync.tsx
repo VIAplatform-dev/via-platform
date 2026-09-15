@@ -43,7 +43,7 @@ export default function OfflinePill() {
  return (
  <button onClick={syncNow} className="mb-3 flex w-full items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-left text-[13px] text-amber-900">
  <span className="h-2 w-2 rounded-full bg-amber-500" />
- {syncing ? "Syncing offline sales…" : `${pending} cash sale${pending === 1 ? "" : "s"} saved offline — will sync when you're back online. Tap to retry.`}
+ {syncing ? "Syncing offline sales…" : `${pending} cash sale${pending === 1 ? "" : "s"} saved offline: will sync when you're back online. Tap to retry.`}
  </button>
  );
 }

@@ -12,7 +12,7 @@ import type { Flyer } from "@/app/lib/flyers";
 // What a scanned flyer lands on: the real homepage, with the flyer's own line, and the gate on top.
 //
 // THE GLIMPSE IS THE REAL THING. These sections read the database on the server rather than
-// calling /api/public, which answers 403 to anyone unapproved — so a total stranger sees genuine
+// calling /api/public, which answers 403 to anyone unapproved, so a total stranger sees genuine
 // pieces at genuine prices. That is also why there is no separate "preview" version to keep in
 // step with the real site: there is only the real site.
 //
@@ -28,7 +28,7 @@ export default async function FlyerLanding({ flyer }: { flyer: Flyer }) {
  // address rather than a /q redirect, so this page is the only place it can be counted.
  //
  // EVERY ARRIVAL COUNTS, including people who are already members. An earlier version skipped
- // anyone holding the access cookie, to avoid double-counting a post-signup refresh — but the
+ // anyone holding the access cookie, to avoid double-counting a post-signup refresh, but the
  // signup now follows a sign-in link that lands on "/", so the flyer page is never re-rendered
  // and there is nothing to dedupe. What that guard actually did was make a whole poster look
  // unscanned the moment one person signed up and then walked past the other five.
@@ -36,7 +36,7 @@ export default async function FlyerLanding({ flyer }: { flyer: Flyer }) {
   const h = await headers();
   const ua = h.get("user-agent");
   if (!isBotScanningAFlyer(ua)) {
-   // Awaited, not fire-and-forget — the serverless instance can freeze once the response is
+   // Awaited, not fire-and-forget: the serverless instance can freeze once the response is
    // returned, which would drop the write.
    try {
     await recordQrScan({
@@ -46,7 +46,7 @@ export default async function FlyerLanding({ flyer }: { flyer: Flyer }) {
      referrerHost: null, // a printed scan has no referrer
     });
    } catch (err) {
-    // A scan must never cost someone the page — losing the row beats losing the visit. But it is
+    // A scan must never cost someone the page. Losing the row beats losing the visit. But it is
     // LOGGED, not swallowed: a silent catch here is why six scans could go missing without a
     // single sign that anything had failed.
     console.error(`[flyer] scan not recorded for ${flyer.slug}:`, err);

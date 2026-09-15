@@ -76,7 +76,7 @@ export default function ConsignmentSettingsPage() {
  return <button key={m.key} onClick={() => toggleMethod(m.key)} className={`rounded-lg border px-3 py-1.5 text-[12.5px] transition max-sm:py-2.5 ${on ? "border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] text-white" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}>{m.label}</button>;
  })}
  </div>
- {/* One field per row on a phone — two across cut "Direct deposit" off inside its select. */}
+ {/* One field per row on a phone. Two across cut "Direct deposit" off inside its select. */}
  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
  <div>
  <label className={label}>Default method</label>
@@ -93,9 +93,9 @@ export default function ConsignmentSettingsPage() {
  <div><label className={label}>Pay out after (days)</label><input className={input} value={settings.holdDays} onChange={(e) => set("holdDays", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" placeholder="0 = final sale" /></div>
  <div><label className={label}>Store-credit bonus %</label><input className={input} value={settings.storeCreditBonusPct ?? ""} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); set("storeCreditBonusPct", v ? Number(v) : null); }} inputMode="numeric" placeholder="none" /></div>
  </div>
- <p className="mt-2 text-[11px] text-stone-400">Your return window. A sale becomes payable this many days after it sells — set 0 for final sale (immediate).</p>
+ <p className="mt-2 text-[11px] text-stone-400">Your return window. A sale becomes payable this many days after it sells. Set 0 for final sale (immediate).</p>
  <div className="mt-4 flex items-center justify-between border-t border-stone-100 pt-4">
- <div><p className="text-[13px] font-medium text-stone-800">Auto-pay via direct deposit</p><p className="mt-0.5 text-[12px] text-stone-500">Once a sale clears the window above, automatically send connected consignors&rsquo; balances to their bank &mdash; no clicking. Cash, check, and store credit stay manual.</p></div>
+ <div><p className="text-[13px] font-medium text-stone-800">Auto-pay via direct deposit</p><p className="mt-0.5 text-[12px] text-stone-500">Pay connected consignors to their bank automatically once a sale clears the window above. Cash, cheque and store credit stay manual.</p></div>
  <Toggle on={settings.autoPayout} onClick={() => set("autoPayout", !settings.autoPayout)} className="ml-4" />
  </div>
  </TechCard>
@@ -109,7 +109,7 @@ export default function ConsignmentSettingsPage() {
  <input className="w-16 rounded border border-stone-200 px-2 py-1 text-[13px] tabular-nums outline-none focus:border-stone-400 max-sm:h-10" value={settings.storeDefaultSplitPct} onChange={(e) => set("storeDefaultSplitPct", Number(e.target.value.replace(/[^0-9]/g, "")) || 0)} inputMode="numeric" />
  <span className="text-[12.5px] text-stone-400">% to the consignor</span>
  </div>
- {/* Phones: each band is a small card of labelled fields — the five-column row of inputs was
+ {/* Phones: each band is a small card of labelled fields. The five-column row of inputs was
      ~480px wide and scrolled sideways inside a 310px card. */}
  {rules.length > 0 && (
  <div className="space-y-2 sm:hidden">
@@ -159,9 +159,9 @@ export default function ConsignmentSettingsPage() {
  <div><SectionLabel>Consignor agreement</SectionLabel><p className="mt-2 text-[12px] text-stone-500">The terms a consignor accepts before you take their items.</p></div>
  <Toggle on={settings.requireAgreement} onClick={() => set("requireAgreement", !settings.requireAgreement)} />
  </div>
- <textarea className={`${input} mt-4 min-h-[120px]`} value={settings.agreementTerms ?? ""} onChange={(e) => set("agreementTerms", e.target.value || null)} placeholder="Your consignment terms — ownership stays with the consignor until sold, the split, who bears loss, what happens to unsold goods, payment timing…" />
+ <textarea className={`${input} mt-4 min-h-[120px]`} value={settings.agreementTerms ?? ""} onChange={(e) => set("agreementTerms", e.target.value || null)} placeholder="Your consignment terms. Ownership stays with the consignor until sold, the split, who bears loss, what happens to unsold goods, payment timing…" />
  <div className="mt-4 flex items-center justify-between gap-4 border-t border-stone-100 pt-4">
- <div><p className="text-[13px] font-medium text-stone-800">Collect a W-9 at signup</p><p className="mt-0.5 text-[12px] text-stone-500">Stay 1099-ready — Stripe gathers this automatically.</p></div>
+ <div><p className="text-[13px] font-medium text-stone-800">Collect a W-9 at signup</p><p className="mt-0.5 text-[12px] text-stone-500">Stay 1099-ready: Stripe gathers this automatically.</p></div>
  <Toggle on={settings.collectW9} onClick={() => set("collectW9", !settings.collectW9)} />
  </div>
  </TechCard>

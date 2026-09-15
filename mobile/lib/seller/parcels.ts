@@ -1,4 +1,4 @@
-// Parcels, not pieces — the phone's mirror of app/lib/parcels-core.ts. Pure.
+// Parcels, not pieces. The phone's mirror of app/lib/parcels-core.ts. Pure.
 //
 // VYA records one order per piece; she posts one bag. Orders bought together share a payment id,
 // and that is the key. Rows without one (recorded before it was kept) fall back to the same buyer,
@@ -87,12 +87,12 @@ export function parcelsToPost<T extends ParcelOrder>(parcels: Parcel<T>[]): Parc
   return parcels.filter((p) => p.status === "paid" && p.deliveryMethod === "ship");
 }
 
-/** Paid and waiting to be picked up at the counter — the Orders screen's Collections tab. */
+/** Paid and waiting to be picked up at the counter. The Orders screen's Collections tab. */
 export function parcelsToCollect<T extends ParcelOrder>(parcels: Parcel<T>[]): Parcel<T>[] {
   return parcels.filter((p) => p.status === "paid" && p.deliveryMethod === "pickup");
 }
 
-// "Packages", not "parcels" — the seller reading this is American and said so. The unit is
+// "Packages", not "parcels". The seller reading this is American and said so. The unit is
 // unchanged: one bag for one buyer, however many pieces are in it.
 export function parcelsToPostLabel(count: number): string {
   if (count === 0) return "Nothing to ship";

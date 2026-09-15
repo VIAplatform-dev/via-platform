@@ -4,7 +4,7 @@ import { currentStripeMode, type StripeMode } from "./stripe-mode.ts";
 // ───────────────────────────────────────────────────────────────────────────
 // A store's payment-acceptance state. Each store gets a Stripe Connect *Express*
 // account so it can accept card payments and have the money settle to its own
-// bank — the SELLER is the merchant of record. VYA's revenue is the subscription,
+// bank: the SELLER is the merchant of record. VYA's revenue is the subscription,
 // not the sale, so VYA is not in this money flow (beyond an optional future fee).
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ export type SellerPayments = {
  chargesEnabled: boolean; // can accept payments
  payoutsEnabled: boolean; // can receive payouts to bank
  detailsSubmitted: boolean; // finished Stripe onboarding
- /** Which Stripe world this account lives in. Null on rows saved before the stamp existed — see
+ /** Which Stripe world this account lives in. Null on rows saved before the stamp existed. See
   *  stripe-mode.ts, which treats those as live (production has only ever run one key). */
  stripeMode: StripeMode | null;
 };
@@ -45,14 +45,14 @@ function ensureTable(): Promise<void> {
  // Shipping sub-account per store (EasyPost Forge Child-User key / Shippo managed-account id).
  // Self-healing add so existing rows get the column with no migration step.
  await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS ship_account_id TEXT`;
- // 'test' or 'live' — a connected account id looks identical in both, so the only way to know
+ // 'test' or 'live': a connected account id looks identical in both, so the only way to know
  // which world it belongs to is to record it when we save it. See stripe-mode.ts.
  await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS stripe_mode TEXT`;
  // The store's authorisation for VYA to DEBIT its bank (ACH), used to fund consignor payouts for
  // sales that settled off VYA. This is the opposite direction to everything else in this table:
  // stripe_account_id is where money goes TO the store, these columns are where it comes FROM.
  // The customer and payment method live on VYA's own platform account, not the store's connected
- // account — VYA is the merchant of record for a debit it initiates. See store-debit.ts.
+ // account: VYA is the merchant of record for a debit it initiates. See store-debit.ts.
  await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_customer_id TEXT`;
  await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_payment_method_id TEXT`;
  await sql`ALTER TABLE seller_payments ADD COLUMN IF NOT EXISTS debit_bank_last4 TEXT`;
@@ -98,7 +98,7 @@ export async function getStoreSlugByStripeAccount(accountId: string): Promise<st
 export async function saveStripeAccount(storeSlug: string, accountId: string): Promise<void> {
  await ensureTable();
  const sql = neon(getDatabaseUrl());
- // Stamped with the mode of the key that made it — the account id itself cannot tell us later.
+ // Stamped with the mode of the key that made it. The account id itself cannot tell us later.
  const mode = currentStripeMode();
  await sql`
  INSERT INTO seller_payments (store_slug, stripe_account_id, stripe_mode, updated_at)
@@ -144,7 +144,7 @@ export async function updateSellerStatus(
 // ── ACH debit mandate ─────────────────────────────────────────────────────────
 //
 // A consigned piece sells on eBay. eBay pays the STORE. To pay the consignor, VYA pulls the money
-// out of the store's bank and forwards it — which it may only do because the store signed a mandate
+// out of the store's bank and forwards it, which it may only do because the store signed a mandate
 // authorising exactly that, collected once through Stripe's hosted bank-connect flow.
 //
 // The mandate is a saved us_bank_account PaymentMethod on a Customer that belongs to VYA's PLATFORM

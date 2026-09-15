@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
 
-// Remove SYNTHETIC Collabs conversions — the estimated `collabs-<partnershipId>-order-<n>` rows the
+// Remove SYNTHETIC Collabs conversions. The estimated `collabs-<partnershipId>-order-<n>` rows the
 // revenue sync fabricated when it first surfaced a partnership and backfilled its whole history
 // (now prevented by baselining). Dry-run by default; ?apply=1 deletes. Scope to one store with
 // ?store=<slug>. Admin-gated.
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
  dryRun: true, store,
  syntheticToDelete: synthetic,
  allCollabsForStore: allCollabs,
- note: "Re-run with &apply=1 to delete only the synthetic rows above. Check allCollabsForStore first — the real orders should remain.",
+ note: "Re-run with &apply=1 to delete only the synthetic rows above. Check allCollabsForStore first: the real orders should remain.",
  });
  }
 

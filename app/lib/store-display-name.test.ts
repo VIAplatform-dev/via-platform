@@ -14,7 +14,7 @@ test("the slug wearing a hat is recognised as a placeholder", () => {
  assert.equal(isPlaceholderName("Love Again Vintage", "love-again-vintage"), false, "spaced out, it is a real name");
  // Real rows this was run against: both are correct names that merely resemble their slug, and
  // renaming either would have been a regression.
- assert.equal(isPlaceholderName("Blummier", "blummier"), false, "differs only in case — still their name");
+ assert.equal(isPlaceholderName("Blummier", "blummier"), false, "differs only in case. Still their name");
  assert.equal(isPlaceholderName("The Niche Shop", "thenicheshop"), false);
  assert.equal(isPlaceholderName("", "x"), true);
  assert.equal(isPlaceholderName(null, "x"), true);

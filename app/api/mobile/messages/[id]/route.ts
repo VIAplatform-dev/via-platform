@@ -4,7 +4,7 @@ import { getConversation, getMessages, markReadByCustomer } from "@/app/lib/mess
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/mobile/messages/[id] — messages in one of the customer's threads.
+/** GET /api/mobile/messages/[id]: messages in one of the customer's threads.
  * Marks store messages as read (clears the customer's unread badge). */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
  const userId = getMobileUserId(request);

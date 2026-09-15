@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { neon } from "@neondatabase/serverless";
 
 /**
- * Mobile auth helpers — issues and verifies app session JWTs, and manages
+ * Mobile auth helpers. Issues and verifies app session JWTs, and manages
  * one-time magic link tokens. Sessions are 1 year, auto-renewed on every
  * /api/mobile/auth/me call.
  *

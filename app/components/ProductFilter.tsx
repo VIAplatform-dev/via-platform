@@ -90,7 +90,7 @@ export default function ProductFilter({
 }: ProductFilterProps) {
   const { data: session } = useSession();
 
-  // Saved sizes — null = not yet loaded
+  // Saved sizes. Null = not yet loaded
   const [savedSizes, setSavedSizes] = useState<string[] | null>(null);
   const [showSizePicker, setShowSizePicker] = useState(false);
   const [pickerSizes, setPickerSizes] = useState<string[]>([]);
@@ -325,7 +325,7 @@ export default function ProductFilter({
           <input
             type="text"
             // The placeholder is the only thing naming this field, and a placeholder disappears the
-            // moment you type — a screen reader reaches it as an unnamed "edit text".
+            // moment you type: a screen reader reaches it as an unnamed "edit text".
             aria-label="Search products"
             value={filters.search}
             onChange={(e) => updateFilters({ search: e.target.value })}
@@ -351,8 +351,8 @@ export default function ProductFilter({
 
         {/* Filters + Sort row.
             The count is `whitespace-nowrap` and both controls are inline-flex with fixed padding,
-            so at 320px this row's min-content width came to ~360 and pushed the whole document —
-            and with it the fixed header, which sizes off the initial containing block — 40px wider
+            so at 320px this row's min-content width came to ~360 and pushed the whole document,
+            and with it the fixed header, which sizes off the initial containing block. 40px wider
             than the screen. The count is contextual text rather than a control, so on phones it
             moves to its own line below (see above) and only Filter + Sort share this row. */}
         <div className="flex items-center gap-2 sm:ml-auto min-w-0">

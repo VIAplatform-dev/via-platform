@@ -4,7 +4,7 @@ import { syncItemToApiPlatforms, getCrossListBoard } from "@/app/lib/cross-listi
 
 export const dynamic = "force-dynamic";
 
-// Retry publishing a single item to its API marketplaces (eBay/Etsy/Depop) after a failure —
+// Retry publishing a single item to its API marketplaces (eBay/Etsy/Depop) after a failure,
 // the "Retry" button on the board. Re-runs the push and returns the refreshed board so the row
 // updates in place. { itemId }
 export async function POST(request: NextRequest) {

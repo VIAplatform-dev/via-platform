@@ -1,12 +1,12 @@
 /**
  * The person icon in a seller's own header, bound to OUR sign-in.
  *
- * 20 of the 23 hosted stores already carry one — a link to `/account`, a `customer_login` form, or
+ * 20 of the 23 hosted stores already carry one. A link to `/account`, a `customer_login` form, or
  * an icon classed for it. The three that do not are the same three that are not on Shopify. So
  * rather than bolting a VYA button onto somebody's header, we use the control a shopper already
  * reaches for, exactly as the cart icon now opens our drawer instead of the theme's.
  *
- * Its own destination has to go. Left alone it sends the shopper to the platform's login page —
+ * Its own destination has to go. Left alone it sends the shopper to the platform's login page,
  * which on a store that has left Shopify is a dead end, and on one that has not is an account with
  * the wrong shop.
  *
@@ -19,7 +19,7 @@ import type { Element as DomElement } from "domhandler";
 /**
  * Controls that mean "sign in" or "my account".
  *
- * Deliberately excludes logout — a shopper clicking "Log out" has not asked to sign in — and is kept
+ * Deliberately excludes logout, a shopper clicking "Log out" has not asked to sign in, and is kept
  * away from anything cart-shaped, since both are header icons and binding the wrong one would open
  * sign-in when someone meant to open their bag.
  */
@@ -40,7 +40,7 @@ export const ACCOUNT_SELECTOR_LIST: string[] = [
  'a[aria-label*="sign in" i]',
  'button[aria-label*="sign in" i]',
  // Shopify's own account web component. Its icon lives in a shadow root where no selector reaches
- // it, but a click inside a shadow root is retargeted to the host on the way out — so binding the
+ // it, but a click inside a shadow root is retargeted to the host on the way out, so binding the
  // host catches it, and our window capture stops the event before the component's handler runs.
  "shopify-account",
  '[class*="account-button" i]',
@@ -50,8 +50,8 @@ export const ACCOUNT_SELECTOR_LIST: string[] = [
  * The list as one selector string.
  *
  * Exported because the SERVER is not the only place that binds. Shopify's newer themes build their
- * header in JavaScript after the page loads — the account button simply is not in the HTML we
- * receive — so the page binds again in the browser using this exact list. Two binders, one list:
+ * header in JavaScript after the page loads. The account button simply is not in the HTML we
+ * receive, so the page binds again in the browser using this exact list. Two binders, one list:
  * if they ever drift, one of them stops matching the thing that ships.
  */
 export const ACCOUNT_SELECTORS = ACCOUNT_SELECTOR_LIST.join(",");
@@ -84,12 +84,12 @@ export function hasAccountControl(html: string): boolean {
 export function bindAccountControls(html: string, opts: { signedInAs?: string | null } = {}): string {
  if (!html) return html;
  // A WHOLE DOCUMENT, not a fragment. Parsed as a fragment, parse5 discards the <body> tag and keeps
- // only its children — which silently threw away `data-vya-has-cart-control` and put the floating
+ // only its children, which silently threw away `data-vya-has-cart-control` and put the floating
  // bag pill back on all 20 stores that already have a cart icon. Read-only callers may parse
  // loosely; anything that hands the page back must hand back the same document.
  const $ = cheerio.load(html);
  const controls = controlsIn($);
- if (!controls.length) return html; // untouched, byte for byte — nothing to bind
+ if (!controls.length) return html; // untouched, byte for byte. Nothing to bind
  for (const el of controls) {
   const $el = $(el);
   const style = ($el.attr("style") || "").replace(/;?\s*$/, "");

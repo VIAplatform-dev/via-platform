@@ -7,13 +7,13 @@ import path from "node:path";
 //   npx playwright test -c e2e/playwright.config.ts
 //
 // Tests sign in with the admin cookie (sha256 of ADMIN_PASSWORD). The password comes from the
-// repo's .env.local — the same file the dev server reads — so nothing needs exporting by hand;
+// repo's .env.local, the same file the dev server reads, so nothing needs exporting by hand;
 // a value already in the shell wins. Where tests need specific numbers they intercept the API
 // with a fixture, so the rendering is proved without writing orders into the database.
 try {
  process.loadEnvFile(path.join(__dirname, "..", ".env.local"));
 } catch {
- // No .env.local (CI) — ADMIN_PASSWORD must then be in the environment.
+ // No .env.local (CI): ADMIN_PASSWORD must then be in the environment.
 }
 
 export default defineConfig({

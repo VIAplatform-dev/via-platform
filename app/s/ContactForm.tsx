@@ -6,7 +6,7 @@ import { DEFAULT_CONTACT_FIELDS, answerKey, canSubmit, splitSubmission, type Con
 
 /**
  * The store's message form. Used by the contact SECTION as-is, and by a form ELEMENT a seller drops
- * anywhere and labels for its own purpose — wholesale, stylist bookings, sourcing requests. `topic`
+ * anywhere and labels for its own purpose. Wholesale, stylist bookings, sourcing requests. `topic`
  * travels with the message so the seller can tell those apart in their inbox instead of receiving a
  * pile of identical "get in touch" notes.
  *
@@ -30,8 +30,8 @@ export default function ContactForm({ accent, storeSlug, topic, cta = "Send", co
    await fetch("/api/contact", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    // `topic` was being dropped here, which is why every form on a site — wholesale, sourcing,
-    // get-in-touch — arrived in the inbox looking identical.
+    // `topic` was being dropped here, which is why every form on a site. Wholesale, sourcing,
+    // get-in-touch: arrived in the inbox looking identical.
     body: JSON.stringify({ storeSlug, name, email, message, itemTitle: topic || undefined }),
    });
   } catch {

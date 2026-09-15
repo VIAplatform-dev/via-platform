@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
  const session = event.data.object;
 
  // A store finished the hosted bank-connect flow, authorising VYA to debit it for consignor
- // payouts on sales that settled off VYA. Nothing was saved when we handed out the link — this
+ // payouts on sales that settled off VYA. Nothing was saved when we handed out the link. This
  // is the only place the mandate becomes real. See app/lib/store-debit.ts.
  if (session.mode === "setup" && (session.metadata as Record<string, string>)?.type === "store_bank_mandate") {
  const slug = (session.metadata as Record<string, string>)?.store_slug;
@@ -154,9 +154,9 @@ export async function POST(request: NextRequest) {
  console.error("Failed to send sourcing request to stores:", err);
  }
  } else {
- // May already be processed — look it up for logging
+ // May already be processed. Look it up for logging
  const existing = await getSourcingRequestBySession(stripeSessionId).catch(() => null);
- console.log(`Sourcing webhook: session ${stripeSessionId} — status: ${existing?.status ?? "not found"}`);
+ console.log(`Sourcing webhook: session ${stripeSessionId}: status: ${existing?.status ?? "not found"}`);
  }
  break;
  }
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
  // ── ACH debits that fund consignor payouts ────────────────────────────────────────────────
  //
  // The consignor is paid HERE, days after the store pressed Pay, and only because the money has
- // actually arrived. The other half of this — a debit that bounces — must release the hold that
+ // actually arrived. The other half of this, a debit that bounces. Must release the hold that
  // recordPayout put on her balance, or she is owed money that no longer appears anywhere.
  case "payment_intent.processing":
  case "payment_intent.succeeded":
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
  console.log("[stripe-webhook] consignment ACH cleared, paid:", payout.id, transfer.id);
  } else {
  // awaiting_funds is usually a no-op (the row was created in that state). failed/canceled
- // release the hold — settlePayoutByIntent writes the reversing ledger entry.
+ // release the hold: settlePayoutByIntent writes the reversing ledger entry.
  await settlePayoutByIntent(intentId, next);
  }
  break;

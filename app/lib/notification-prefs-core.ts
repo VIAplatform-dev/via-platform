@@ -8,7 +8,7 @@
 export const PUSH_EVENTS = ["sold", "message", "offer", "payout"] as const;
 // "daily" and "weekly" were here, and nothing ever sent either one: there is no daily-summary and no
 // weekly-numbers email in the codebase, so both were switches a seller could flip forever with no
-// effect. A control that governs nothing is worse than a missing feature — it makes a promise. They
+// effect. A control that governs nothing is worse than a missing feature. It makes a promise. They
 // come back the day the emails do.
 export const EMAIL_EVENTS = ["needs"] as const;
 export type PushEvent = (typeof PUSH_EVENTS)[number];
@@ -22,7 +22,7 @@ export type NotificationPrefs = {
 /** What a PUT sends: only the keys being changed. */
 export type NotificationPrefsPatch = { push?: Partial<Record<PushEvent, boolean>>; email?: Partial<Record<EmailEvent, boolean>> };
 
-/** What each toggle is called — the phone's Notifications screen uses the same words. */
+/** What each toggle is called. The phone's Notifications screen uses the same words. */
 export const PUSH_LABELS: Record<PushEvent, string> = { sold: "A piece sells", message: "A buyer messages", offer: "An offer comes in", payout: "A payout lands" };
 export const EMAIL_LABELS: Record<EmailEvent, string> = { needs: "Something needs you" };
 
@@ -57,7 +57,7 @@ export function pushEnabled(prefs: NotificationPrefs, ev: PushEvent): boolean {
 }
 
 /** Does this store want this email? Mirrors pushEnabled, and exists because the digests were sending
- *  to every store regardless — a seller who switched "Something needs you" off still got it. */
+ *  to every store regardless. A seller who switched "Something needs you" off still got it. */
 export function emailEnabled(prefs: NotificationPrefs, ev: EmailEvent): boolean {
  return prefs.email?.[ev] !== false;
 }

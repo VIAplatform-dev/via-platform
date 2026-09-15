@@ -4,7 +4,7 @@ import { neon } from "@neondatabase/serverless";
 import { classifyDevice, geoFromHeaders, type GeoHint } from "./store-visits-db.ts";
 import { ensureSchema } from "./db-setup.ts";
 
-// Scans of the printed QR codes in qr-codes.ts. One row per scan (NOT session-gated —
+// Scans of the printed QR codes in qr-codes.ts. One row per scan (NOT session-gated,
 // two people scanning the same booth sign is two scans, and that count is the point).
 //
 // Location comes from Vercel's edge geo headers, which are present in production and
@@ -36,7 +36,7 @@ async function createSchema(sql: ReturnType<typeof db>) {
 }
 
 /**
- * The city centroid Vercel resolves for the request IP. Coarse by design — good enough to
+ * The city centroid Vercel resolves for the request IP. Coarse by design: good enough to
  * pin a scan on a map, never precise enough to identify a person. Stored as TEXT because
  * the headers are strings and nothing here does math on them.
  */
@@ -84,7 +84,7 @@ export type QrPlaceRow = {
  lastScan: string;
 };
 
-/** Scan counts per code — the headline "did anyone actually scan the card". */
+/** Scan counts per code. The headline "did anyone actually scan the card". */
 export async function getQrScanTotals(sinceDays?: number): Promise<{ code: string; scans: number; lastScan: string }[]> {
  await ensureTable();
  const sql = db();
@@ -119,7 +119,7 @@ export async function getQrScanPlaces(sinceDays?: number, limit = 100): Promise<
  }));
 }
 
-/** The raw tail, newest first — for eyeballing what a single scan actually recorded. */
+/** The raw tail, newest first, for eyeballing what a single scan actually recorded. */
 export async function getRecentQrScans(limit = 25): Promise<QrScanRow[]> {
  await ensureTable();
  const rows = (await db()`SELECT code, city, region, country, device_type, timestamp

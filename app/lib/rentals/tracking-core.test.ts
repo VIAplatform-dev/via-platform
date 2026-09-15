@@ -25,7 +25,7 @@ test("past due with nothing scanned is overdue, and says exactly that", () => {
  assert.match(w.line, /nothing has been scanned/);
 });
 
-test("a scan turns 'overdue' into 'on its way back' — the piece is moving", () => {
+test("a scan turns 'overdue' into 'on its way back'. The piece is moving", () => {
  // The whole point: a date-based guess says overdue while the carrier is holding the box.
  const w = whereabouts({ ...out, trackingStatus: "TRANSIT", trackingEta: "2026-09-13" }, "2026-09-12");
  assert.equal(w.stage, "coming-back");
@@ -42,7 +42,7 @@ test("delivered but not checked in is named, not treated as done", () => {
  // The dates stay blocked until someone checks it in, and a store shouldn't have to guess why.
  const w = whereabouts({ ...out, trackingStatus: "DELIVERED" }, "2026-09-09");
  assert.equal(w.stage, "back");
- assert.match(w.line, /check it in/);
+ assert.match(w.line, /Check it in/);
 });
 
 test("the store marking it back is the last word", () => {

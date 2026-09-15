@@ -39,7 +39,7 @@ const MARGIN_LOSS = {
    { label: "Expenses", cents: -25_000 },
    { label: "Net profit", cents: -8_200, total: true },
   ],
-  missingCostNote: "Cost missing on 3 sold pieces — not counted above.",
+  missingCostNote: "Cost missing on 3 sold pieces, not counted above.",
  },
 };
 
@@ -48,7 +48,7 @@ const MARGIN_UNKNOWN = {
  available: false,
  current: { ...MARGIN_LOSS.current, coveredSales: 0, costCents: 0, feeCents: 0, cardFeeCents: 0, labelCostCents: 0, consignorCutCents: 0 },
  netProfitCents: null, netMarginPct: null,
- profit: { lines: [{ label: "Revenue", cents: 0 }, { label: "Net profit", cents: 0, total: true }], missingCostNote: "Cost missing on 9 sold pieces — not counted above." },
+ profit: { lines: [{ label: "Revenue", cents: 0 }, { label: "Net profit", cents: 0, total: true }], missingCostNote: "Cost missing on 9 sold pieces, not counted above." },
 };
 
 async function signIn(page: Page) {

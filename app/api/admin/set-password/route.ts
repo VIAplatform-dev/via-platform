@@ -3,14 +3,14 @@ import { emailForInvite, setPasswordFromInvite } from "@/app/lib/admin-users-db"
 
 export const dynamic = "force-dynamic";
 
-// GET — validate an invite token and return the email it's for (or null).
+// GET: validate an invite token and return the email it's for (or null).
 export async function GET(request: NextRequest) {
  const token = new URL(request.url).searchParams.get("token") || "";
  const email = await emailForInvite(token).catch(() => null);
  return NextResponse.json({ ok: !!email, email });
 }
 
-// POST — set the password from a valid invite token. The token IS the authorization.
+// POST: set the password from a valid invite token. The token IS the authorization.
 export async function POST(request: NextRequest) {
  const body = await request.json().catch(() => null);
  const token = String(body?.token || "");

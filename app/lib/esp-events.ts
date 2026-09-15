@@ -1,6 +1,6 @@
 // A sale, told to the store's email tool as it happens.
 //
-// Klaviyo builds its flows on EVENTS — "Placed Order" is what a post-purchase or win-back sequence
+// Klaviyo builds its flows on EVENTS. "Placed Order" is what a post-purchase or win-back sequence
 // waits for. A contact list without events means those flows never fire, so this is not optional
 // extra credit; it's the difference between a connection that works and one that only looks
 // connected.

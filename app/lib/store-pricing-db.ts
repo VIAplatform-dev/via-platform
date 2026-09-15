@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 // Per-store pricing rules. For now: the minimum markup over cost the price engine
-// must respect (a floor — the market comp can always go higher). Default 30%.
+// must respect (a floor: the market comp can always go higher). Default 30%.
 
 export const DEFAULT_MIN_MARKUP_BPS = 3000; // 30%
 

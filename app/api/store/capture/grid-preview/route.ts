@@ -10,11 +10,11 @@ import { liveItemsFor, hrefForStore } from "@/app/lib/site-builder/serve";
 
 export const dynamic = "force-dynamic";
 
-// GET ?path=&id=&config= — a product grid exactly as a shopper would get it, for the editor's canvas.
+// GET ?path=&id=&config= a product grid exactly as a shopper would get it, for the editor's canvas.
 //
 // Rendered by the same function the serve route fills grids with (gridBlockInnerHtml), from live
 // inventory, so the preview cannot differ from the page. READ-ONLY: a GET, because nothing here is
-// written — a kit derived for a store that has none yet is kept in memory, and stored only when she
+// written: a kit derived for a store that has none yet is kept in memory, and stored only when she
 // saves a page with a grid on it (see grid-kit-store.ts).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

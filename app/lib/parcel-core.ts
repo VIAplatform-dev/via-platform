@@ -1,7 +1,7 @@
-// The parcel a piece ships as. Pure — no I/O.
+// The parcel a piece ships as. Pure, no I/O.
 //
 // Buyers are quoted a flat tier by weight and girth (shipping-tiers.ts). An unweighed piece used to
-// land on the intake's "16 oz, 12×9×3" fallback, which is a SMALL parcel — so a coat nobody weighed
+// land on the intake's "16 oz, 12×9×3" fallback, which is a SMALL parcel, so a coat nobody weighed
 // was quoted the small tier and the seller paid the difference at the counter. This module fills
 // the gap honestly: the AI's estimate when it made one, a short per-category default when it
 // didn't, and a warning when what she typed lands in a different tier from what the piece looks
@@ -22,7 +22,7 @@ export type ParcelEstimate = {
 
 type TierLike = { id: TierId; maxWeightOz: number };
 
-/** Which tier a weight alone lands in. Null for no weight — that is "unknown", not "small". */
+/** Which tier a weight alone lands in. Null for no weight. That is "unknown", not "small". */
 export function tierForWeight(weightOz: number | null | undefined, tiers: TierLike[] = SHIPPING_TIERS): TierId | null {
  const w = Number(weightOz);
  if (!Number.isFinite(w) || w <= 0) return null;
@@ -30,7 +30,7 @@ export function tierForWeight(weightOz: number | null | undefined, tiers: TierLi
 }
 
 // Packed weight, in ounces, by category. The ai-intake prompt's own guide ranges, taken at their
-// middle. Deliberately short — a table nobody maintains is worse than the model's own judgment,
+// middle. Deliberately short: a table nobody maintains is worse than the model's own judgment,
 // which is used first whenever it exists.
 const BY_SLUG: Record<string, number> = {
  "coats-jackets": 52,
@@ -92,14 +92,14 @@ export function parcelMismatch(args: { typedWeightOz: number | null | undefined;
  // HER NUMBER IS USED EITHER WAY, and the wording has to say so.
  //
  // This is a guess from a photograph set against a number typed by the person holding the piece.
- // She is more likely to be right, and nothing here blocks or overrides her — resolveParcelAtPublish
+ // She is more likely to be right, and nothing here blocks or overrides her. ResolveParcelAtPublish
  // takes the typed weight. But the old wording ("You typed 16 oz, but this looks like…") read as a
- // refusal, and was taken as one: "it wouldn't let me post it." So it now says what it is — a note
+ // refusal, and was taken as one: "it wouldn't let me post it." So it now says what it is. A note
  // about what it will cost, with her weight kept.
  const guess = looks ? `${looks} (${est.tier} parcel)` : `a ${est.tier} parcel`;
  const message = under
-  ? `Using your ${args.typedWeightOz} oz — buyers pay the ${typedTier} tier. Worth a check: from the photos this looks like ${guess}, and if it is, you'd cover the difference on postage.`
-  : `Using your ${args.typedWeightOz} oz — buyers pay the ${typedTier} tier. From the photos this looks like ${guess}, so buyers may be paying more postage than it needs.`;
+  ? `Using your ${args.typedWeightOz} oz: buyers pay the ${typedTier} tier. Worth a check: from the photos this looks like ${guess}, and if it is, you'd cover the difference on postage.`
+  : `Using your ${args.typedWeightOz} oz: buyers pay the ${typedTier} tier. From the photos this looks like ${guess}, so buyers may be paying more postage than it needs.`;
  return { typedTier, estimatedTier: est.tier, message };
 }
 
@@ -142,12 +142,12 @@ export function resolveParcelAtPublish(args: {
 /**
  * The parcel to buy a label for.
  *
- * This used to be `order.itemWeightOz || 16` with 12×9×3 behind it — so a piece that reached the
+ * This used to be `order.itemWeightOz || 16` with 12×9×3 behind it, so a piece that reached the
  * order without dimensions bought a small-mailer label regardless of what it was. A massive bag
  * shipped on a 16oz label: the carrier either refuses it at the counter or bills the adjustment
  * back weeks later, and either way the store finds out after the fact.
  *
- * The buyer already told us how big it is. They paid a tier — Small, Medium or Large — and that
+ * The buyer already told us how big it is. They paid a tier, Small, Medium or Large, and that
  * tier is a floor the label may not go under. So: use the piece's own measurements where it has
  * them, and where it doesn't, fall back to the tier that was PAID FOR rather than to a guess. Where
  * a piece has measurements that disagree with the tier, take the larger of the two; a heavy coat
@@ -155,7 +155,7 @@ export function resolveParcelAtPublish(args: {
  */
 export function parcelForLabel(args: {
  item: { weightOz?: number | null; lengthIn?: number | null; widthIn?: number | null; heightIn?: number | null };
- /** What the buyer actually paid for shipping, in cents — maps back to the tier they bought. */
+ /** What the buyer actually paid for shipping, in cents. Maps back to the tier they bought. */
  shippingPaidCents?: number | null;
 }): { weightOz: number; lengthIn: number; widthIn: number; heightIn: number } {
  const paid = Number(args.shippingPaidCents) || 0;
@@ -168,13 +168,13 @@ export function parcelForLabel(args: {
  const w = num(args.item.weightOz);
  const l = num(args.item.lengthIn), wd = num(args.item.widthIn), h = num(args.item.heightIn);
 
- // With no tier to lean on either, "medium" is the honest default — the middle of the ladder, not
+ // With no tier to lean on either, "medium" is the honest default. The middle of the ladder, not
  // the bottom of it. Under-buying is the expensive mistake; over-buying costs pennies.
  const floorTier: TierId = paidTier ?? "medium";
  const floorBox = BOX[floorTier];
  // Two different jobs, and conflating them over-buys. When the weight is UNKNOWN we buy the top of
  // the tier, because that's the heaviest thing the buyer's payment could have been for. When it is
- // KNOWN we trust it, but not below the tier's own floor — so a genuine 90oz coat buys 90oz, while
+ // KNOWN we trust it, but not below the tier's own floor, so a genuine 90oz coat buys 90oz, while
  // one mis-typed as 4oz still buys a Large parcel.
  const unknownWeight = floorTier === "small" ? 16 : floorTier === "medium" ? 48 : 96;
  const minWeight = floorTier === "small" ? 1 : floorTier === "medium" ? 17 : 49;
@@ -192,13 +192,13 @@ export function parcelForLabel(args: {
 /**
  * One box for a whole checkout.
  *
- * Orders are one row per piece, and the label was bought per row from that row's measurements — so
+ * Orders are one row per piece, and the label was bought per row from that row's measurements, so
  * a t-shirt and a large bag bought together produced two labels, each sized for its own item. In
  * practice the seller packs them in one box and sticks on whichever label she clicked, which is
  * the t-shirt's. The parcel has to describe what is actually being posted.
  *
  * Weight adds up. Dimensions don't: things go IN a box, they don't queue end to end. Clothing packs
- * flat and stacks, so the box is as long and wide as its largest item and as tall as the stack —
+ * flat and stacks, so the box is as long and wide as its largest item and as tall as the stack,
  * max, max, sum. That errs slightly large, which is the safe direction: an over-declared parcel
  * costs a little more, an under-declared one gets refused or billed back.
  */
@@ -210,7 +210,7 @@ export function combineParcels(
  if (!real.length) return parcelForLabel({ item: {}, shippingPaidCents: opts.shippingPaidCents });
  if (real.length === 1) return parcelForLabel({ item: real[0], shippingPaidCents: opts.shippingPaidCents });
 
- // Add up what the pieces actually are. The floor is applied ONCE, to the total — applying it per
+ // Add up what the pieces actually are. The floor is applied ONCE, to the total. Applying it per
  // item would make three t-shirts weigh more than a coat, because each would be rounded up to the
  // middle of the ladder before anything was added together.
  const num = (v: unknown, fallback: number) => { const n = Math.ceil(Number(v)); return Number.isFinite(n) && n > 0 ? n : fallback; };

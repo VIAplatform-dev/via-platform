@@ -56,12 +56,12 @@ const BLANK: Form = { title: "", brand: "", era: "", material: "", colour: "", c
 
 type Flag = { level: string; message: string; marketUsd: number; pct?: number };
 
-// Client mirror of the server's computePriceFlag (works in whole dollars) — lets the flag update
+// Client mirror of the server's computePriceFlag (works in whole dollars). Lets the flag update
 // instantly as the seller edits the price, once we know the item's market value. No server call.
 //
 // It must be given the RAW market value, never the suggestion. The suggestion is market × the store's
 // pricing stance (and now × the cost floor), so a premium store comparing against its own suggestion
-// was told "right at market" while sitting 25% above it — the store's own premium cancelled out its
+// was told "right at market" while sitting 25% above it. The store's own premium cancelled out its
 // own warning, and the two halves of the app disagreed by exactly the multiplier. The low/high band
 // is built from raw market too, so this is also the only reading where the band and the midpoint
 // describe the same thing.
@@ -70,15 +70,15 @@ function flagFor(priceUsd: number, marketUsd: number | null, lowUsd: number | nu
  const lo = lowUsd ?? Math.round(marketUsd * 0.85);
  const hi = highUsd ?? Math.round(marketUsd * 1.2);
  const pct = Math.round(((priceUsd - marketUsd) / marketUsd) * 100);
- if (priceUsd < lo) return { level: "under", pct, marketUsd, message: `About ${Math.abs(pct)}% below market — comparable pieces sit around $${marketUsd}. You could likely price higher.` };
- if (priceUsd > hi) return { level: "over", pct, marketUsd, message: `About ${pct}% above market (~$${marketUsd}) — expect a slower sale.` };
+ if (priceUsd < lo) return { level: "under", pct, marketUsd, message: `About ${Math.abs(pct)}% below market: comparable pieces sit around $${marketUsd}. You could likely price higher.` };
+ if (priceUsd > hi) return { level: "over", pct, marketUsd, message: `About ${pct}% above market (~$${marketUsd}): expect a slower sale.` };
  return { level: "at", pct, marketUsd, message: `Right at market (~$${marketUsd}).` };
 }
 
 const RISKY = ["brand", "era", "material"] as const;
 
 // A field only has something worth confirming if it's non-empty AND not an AI
-// placeholder like "N/A"/"Unknown". Those mean the AI couldn't determine it — there's
+// placeholder like "N/A"/"Unknown". Those mean the AI couldn't determine it. There's
 // nothing for the seller to confirm, so such fields shouldn't be filled or gate publishing.
 const NO_VALUE_RE = /^(n\/?a|none|unknown|unsure|not sure|not applicable|n\.a\.)$/i;
 function hasRealValue(v: string | null | undefined): boolean {
@@ -134,12 +134,12 @@ export default function IntakePage() {
  const [flaws, setFlaws] = useState<string[]>([]);
  const [newFlaw, setNewFlaw] = useState(""); // the flaw being typed; whatever is left in the box is saved too
  // Structure (owner audit #27/#31): the note beyond the grade, the category's measurement template,
- // and the parcel the AI judged this piece to be — kept so a typed weight can be checked against it.
+ // and the parcel the AI judged this piece to be. Kept so a typed weight can be checked against it.
  const [conditionNote, setConditionNote] = useState("");
  const [measurements, setMeasurements] = useState<Partial<Record<MeasurementKey, string>>>({});
  const [aiParcel, setAiParcel] = useState<ParcelEstimate | null>(null);
  const units = useStoreUnits(withStore);
- // Provenance (owner audit #18): where it came from and when — hers, never shown to shoppers. The
+ // Provenance (owner audit #18): where it came from and when. Hers, never shown to shoppers. The
  // same two fields the inventory editor has; the datalist is her own previous source names.
  const [promptVersion, setPromptVersion] = useState<string | null>(null);
  const [seoBusy, setSeoBusy] = useState(false);
@@ -158,20 +158,20 @@ export default function IntakePage() {
  // Which photo the big frame is showing. The cover by default; clicking a thumbnail opens that one
  // instead, because the strip is far too small to judge a crop in.
  const [selPhoto, setSelPhoto] = useState(0);
- // Which packaging she's using. Preselected from the AI's weight — the honest signal, since it
+ // Which packaging she's using. Preselected from the AI's weight. The honest signal, since it
  // came from looking at the actual garment.
  const [packing, setPacking] = useState<string>("small-box");
  const fileRef = useRef<HTMLInputElement>(null);
  const dragIdx = useRef<number | null>(null);
  const [markupPct, setMarkupPct] = useState<number | null>(null);
  const [aiDraft, setAiDraft] = useState<Record<string, string | null>>({});
- // The cover photo these details were written from. Swap the photo and the words stay — describing
+ // The cover photo these details were written from. Swap the photo and the words stay. Describing
  // a garment that is no longer on the screen, which is worse than an empty form: it looks filled in.
  const [aiPhoto, setAiPhoto] = useState<string | null>(null);
  const [embedding, setEmbedding] = useState<number[] | null>(null);
  const [marketPrice, setMarketPrice] = useState<number | null>(null);
  const [rawMarketCents, setRawMarketCents] = useState<number | null>(null);
- // The AI's pricing confidence — logged with the item so we can calibrate confidence vs. how far
+ // The AI's pricing confidence. Logged with the item so we can calibrate confidence vs. how far
  // the seller re-prices ("does 0.7 actually mean ~right?").
  const [aiConfidence, setAiConfidence] = useState<number | null>(null);
  const [priceNote, setPriceNote] = useState<string>("");
@@ -183,7 +183,7 @@ export default function IntakePage() {
  const [belowFloor, setBelowFloor] = useState(false);
  // Cost plus the markup she set. Derived, so it follows the cost field as she types.
  const floorUsd = markupPct != null && form.cost.trim() ? Math.round(Number(form.cost) * (1 + markupPct / 100)) || null : null;
- const [lowConf, setLowConf] = useState(false); // too few comps to flag over/under — show a rough range, not a verdict
+ const [lowConf, setLowConf] = useState(false); // too few comps to flag over/under. Show a rough range, not a verdict
  const [consigned, setConsigned] = useState(false);
  // Rental terms decided while the piece is being written. There's no item to attach them to yet,
  // so they're held here and written the moment publish hands back an id.
@@ -207,7 +207,7 @@ export default function IntakePage() {
  title: form.title,
  price: Number(form.price) || 0,
  // Cost and measurements were missing here while publish sent them, so an autosaved
- // draft quietly lost both — cost is what the profit reporting runs on.
+ // draft quietly lost both. Cost is what the profit reporting runs on.
  cost: form.cost === "" ? null : Number(form.cost) || 0,
  measurements: form.measurements || null,
  images: [ghost, ...photos].filter(Boolean),
@@ -220,7 +220,7 @@ export default function IntakePage() {
  category: form.category || null,
  collections: selectedCols,
  status: "draft" as const,
- // AI guess + context so DRAFTS (not only publishes) build the accuracy signal — a seller's edit to
+ // AI guess + context so DRAFTS (not only publishes) build the accuracy signal. A seller's edit to
  // the AI draft is the label, and most test drafts never get published. Recorded per draft id.
  aiDraft,
  marketCents: rawMarketCents,
@@ -243,7 +243,7 @@ export default function IntakePage() {
  return () => clearTimeout(t);
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [photos, form, selectedCols, ghost, phase, busy]);
- // Final save on tab close (beforeunload) AND in-app navigation away (unmount) — fire-and-forget.
+ // Final save on tab close (beforeunload) AND in-app navigation away (unmount): fire-and-forget.
  useEffect(() => {
  const beacon = () => {
   const { canSave, payload } = beaconRef.current;
@@ -277,8 +277,8 @@ export default function IntakePage() {
  });
  const d = await res.json().catch(() => null);
  if (res.ok && d?.description) set("description", d.description);
- else setErr(d?.error || "Couldn’t polish that — try again.");
- } catch { setErr("Couldn’t polish that — try again."); }
+ else setErr(d?.error || "Couldn’t polish that: try again.");
+ } catch { setErr("Couldn’t polish that: try again."); }
  setSeoBusy(false);
  }
 
@@ -298,7 +298,7 @@ export default function IntakePage() {
  });
  }
 
- // Upload photos only — AI is a separate, on-demand step ("Fill the rest with AI").
+ // Upload photos only: AI is a separate, on-demand step ("Fill the rest with AI").
  async function onPick(files: FileList | File[] | null) {
  if (!files) return;
  const list = Array.from(files).filter((f) => !f.type || f.type.startsWith("image/")).slice(0, MAX_ITEM_IMAGES);
@@ -323,7 +323,7 @@ export default function IntakePage() {
  setBusy(false);
  }
 
- // Establish the item's market value from the server ONCE — on price blur, when we don't already
+ // Establish the item's market value from the server ONCE, on price blur, when we don't already
  // have it (e.g. the seller typed a price without running Fill-with-AI). After that the flag
  // recomputes client-side as the price changes, so this stays cheap and instant.
  async function checkPriceOnBlur() {
@@ -349,11 +349,11 @@ export default function IntakePage() {
  } catch { /* best-effort nudge; stay silent */ }
  }
 
- // Fill ONLY the blank fields with AI — whatever the seller typed is kept. Pricing always
+ // Fill ONLY the blank fields with AI. Whatever the seller typed is kept. Pricing always
  // runs now (cheaply, off our own data), so a typed price still gets an over/under-market flag.
  async function fillWithAI() {
  if (!photos.length) { setErr("Add at least one photo first."); return; }
- // Brand sharpens the comps/price/description, but it's no longer required — the intake's
+ // Brand sharpens the comps/price/description, but it's no longer required. The intake's
  // reverse-image search + vision infer it from the photo when the seller leaves it blank.
  setBusy(true);
  setBusyMsg("Filling the blanks…");
@@ -361,7 +361,7 @@ export default function IntakePage() {
  try {
  const filled: Record<string, string> = {};
  (Object.keys(form) as (keyof Form)[]).forEach((k) => { const v = String(form[k]).trim(); if (v) filled[k] = v; });
- // Phase 1 — draft the FIELDS only (fast), so they render immediately; price/runway follow.
+ // Phase 1: draft the FIELDS only (fast), so they render immediately; price/runway follow.
  const r = await fetch(withStore("/api/store/intake"), {
  method: "POST",
  headers: { "Content-Type": "application/json" },
@@ -382,13 +382,13 @@ export default function IntakePage() {
  if (d.runway || dr?.runway) setRunway(d.runway ?? dr?.runway);
  if (d.celebrity) setCelebrity(d.celebrity);
 
- // Flag risky fields the AI filled (were blank) with low confidence — before merge.
+ // Flag risky fields the AI filled (were blank) with low confidence, before merge.
  if (dr) {
  const flags = RISKY.filter((k) => {
  if (String(form[k]).trim()) return false; // seller already filled it → trusted
  const fld = dr[k];
  // Only flag when the AI actually produced a real value it's unsure about. If the AI
- // left it blank or returned "N/A", there's nothing to confirm — don't gate on it.
+ // left it blank or returned "N/A", there's nothing to confirm. Don't gate on it.
  return !!fld && hasRealValue(fld.value) && fld.confidence < THRESHOLD;
  });
  setFlagged(flags);
@@ -401,10 +401,10 @@ export default function IntakePage() {
  setAiDraft(predicted); setAiPhoto(photos[0] ?? null); }
  }
 
- // Merge — only ever fill EMPTY fields; never overwrite what the seller typed.
+ // Merge, only ever fill EMPTY fields; never overwrite what the seller typed.
  setForm((f) => {
  const next = { ...f };
- // Fill only EMPTY fields, and only with a real value — never write "N/A"/"Unknown"
+ // Fill only EMPTY fields, and only with a real value, never write "N/A"/"Unknown"
  // placeholders (leave the field genuinely blank so it doesn't look filled-but-unknown).
  const fill = (k: keyof Form, v: string | null | undefined) => { if (!String(next[k]).trim() && hasRealValue(v)) next[k] = String(v); };
  if (dr) {
@@ -423,7 +423,7 @@ export default function IntakePage() {
  return next;
  });
 
- // Phase 2 — price + over/under-market flag + runway (the fields are already on screen).
+ // Phase 2: price + over/under-market flag + runway (the fields are already on screen).
  setBusyMsg("Pricing…");
  const resolved = {
  brand: filled.brand || dr?.brand?.value || "",
@@ -472,7 +472,7 @@ export default function IntakePage() {
  }
 
  const allConfirmed = flagged.every((k) => confirmed[k]);
- // Most pieces need flat measurements (fit is everything secondhand) — except small accessories
+ // Most pieces need flat measurements (fit is everything secondhand). Except small accessories
  // where they don't apply. Drives a soft nudge, never a hard block.
  const needsMeasurements = !/jewel|ring|earring|necklace|bracelet|brooch|\bhat\b|belt|scarf|sunglass|watch|gift ?card|\bhair\b/i.test(`${form.category} ${form.title}`);
 
@@ -527,22 +527,22 @@ export default function IntakePage() {
  if ((status === "active" || publishAt) && !allConfirmed) { setErr("Confirm the flagged fields first."); return; }
  if (publishAt && new Date(publishAt).getTime() <= Date.now()) { setErr("Pick a time in the future to schedule."); return; }
  // A name typed into "add a new consignor" that was never Added. Publishing here used to succeed
- // with no consignor attached and say nothing — so the piece sells, the split never happens, and
+ // with no consignor attached and say nothing, so the piece sells, the split never happens, and
  // nobody notices until the consignor asks. Refuse instead, and name the button she has to press.
  if (consigned && consign.newName.trim() && !consign.consignorId) {
-  setErr(`Press “Add” next to “${consign.newName.trim()}” to save them as a consignor first — or clear the box if this piece isn’t on consignment.`);
+  setErr(`Press “Add” next to “${consign.newName.trim()}” to save them as a consignor first, or clear the box if this piece isn’t on consignment.`);
   return;
  }
  // A weight is required to go live, because here the weight IS the buyer's postage: it picks the
  // flat tier they're charged. Shopify lets a product publish without one and finds out at checkout,
- // but Shopify rates live at fulfilment — we quote up front, so an unweighed piece silently quotes
+ // but Shopify rates live at fulfilment. We quote up front, so an unweighed piece silently quotes
  // the middle tier and the store eats the difference on anything heavy.
  //
  // It's cheap to satisfy: the AI weighs the piece from the photos, so the field arrives filled in.
- // This only catches the case where that failed AND nobody typed one. Drafts are exempt — a draft
+ // This only catches the case where that failed AND nobody typed one. Drafts are exempt: a draft
  // isn't for sale yet.
  if ((status === "active" || publishAt) && !(Number(form.weightOz) > 0) && !(aiParcel?.weightOz)) {
-  setErr("Add the weight before publishing — it decides what a buyer is charged for postage, and without it a heavy piece is quoted as a light one.");
+  setErr("Add the weight before publishing. It decides what a buyer is charged for postage, and without it a heavy piece is quoted as a light one.");
   return;
  }
  setBusy(true);
@@ -577,7 +577,7 @@ export default function IntakePage() {
  setScheduledAt(d.scheduled ? d.publishAt : null);
  setSavedDraft(status === "draft" && !d.scheduled);
  // The autosaved draft is promoted in place by the publish endpoint (via draftId), so there's no
- // separate row to clean up — just forget the id so "List another" starts a fresh draft.
+ // separate row to clean up, just forget the id so "List another" starts a fresh draft.
  draftIdRef.current = null;
  setPhase("done");
  } catch (e) {
@@ -609,7 +609,7 @@ export default function IntakePage() {
  <div>
  <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">✓</div>
  <p className="text-xl font-semibold text-stone-900">{scheduledAt ? "Scheduled" : savedDraft ? "Saved as draft" : "Listed"}</p>
- <p className="mt-1 text-sm text-stone-500">{scheduledAt ? `It’ll go live automatically on ${new Date(scheduledAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}.` : savedDraft ? "It’s in your inventory — publish it (or the whole drop) when you’re ready." : "It’s live on your storefront."}</p>
+ <p className="mt-1 text-sm text-stone-500">{scheduledAt ? `It’ll go live automatically on ${new Date(scheduledAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}.` : savedDraft ? "It’s in your inventory. Publish it (or the whole drop) when you’re ready." : "It’s live on your storefront."}</p>
  {/* Where the piece actually landed. eBay/Etsy answer synchronously; Depop and
      Vestiaire come back queued for the extension to finish. */}
  {!scheduledAt && !savedDraft && crossResult.length > 0 && (
@@ -621,7 +621,7 @@ export default function IntakePage() {
      <div key={c.platform} className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-3.5 py-2.5">
       <div className="min-w-0 flex-1">
        <div className="text-[13px] font-medium text-stone-800">{c.name}</div>
-       <div className="text-[11px] text-stone-400">{listed ? "Live now" : queued ? "Open the extension to finish — it’s pre-filled" : "Couldn’t list — check the details"}</div>
+       <div className="text-[11px] text-stone-400">{listed ? "Live now" : queued ? "Open the extension to finish. It’s pre-filled" : "Couldn’t list: check the details"}</div>
       </div>
       {listed && c.url && <a href={c.url} target="_blank" rel="noopener" className="text-[11px] font-semibold text-[var(--accent,#0e9f76)] hover:underline">View</a>}
       <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", listed ? "bg-emerald-50 text-emerald-700" : queued ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700")}>
@@ -647,7 +647,7 @@ export default function IntakePage() {
  <div>
  <label className={label}>
  {name}
- {isFlagged && <span className="ml-2 text-[11px] font-normal text-amber-600">● AI unsure — confirm</span>}
+ {isFlagged && <span className="ml-2 text-[11px] font-normal text-amber-600">● AI unsure. Confirm</span>}
  </label>
  <input className={cn(input, isFlagged && !confirmed[k] && "border-amber-400 bg-amber-50/50")} value={form[k]} onChange={(e) => set(k, e.target.value)} />
  {isFlagged && (
@@ -672,14 +672,14 @@ export default function IntakePage() {
 
  {autoSavedAt && phase === "form" && (
  <div className="mb-4 flex items-center gap-1.5 text-[11px] text-stone-400">
- <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Draft auto-saved — it’s safe in your inventory if you leave.
+ <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Draft auto-saved. It’s safe in your inventory if you leave.
  </div>
  )}
 
  {reverseImage && (
  reverseImage.brand
- ? <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-[12px] text-emerald-800">🔍 Reverse image search identified <span className="font-semibold">{reverseImage.brand}</span> from {reverseImage.hits} of {reverseImage.matches} web matches{reverseImage.sampleTitles[0] ? <span className="text-emerald-700/80"> — e.g. “{reverseImage.sampleTitles[0].slice(0, 70)}”</span> : null}.</div>
- : <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-[12px] text-amber-800">🔍 Reverse image search found {reverseImage.matches} web {reverseImage.matches === 1 ? "match" : "matches"} but no confident brand{reverseImage.sampleTitles[0] ? <span className="text-amber-700/80"> — e.g. “{reverseImage.sampleTitles[0].slice(0, 70)}”</span> : null}. Confirm the brand below.</div>
+ ? <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-[12px] text-emerald-800">🔍 Reverse image search identified <span className="font-semibold">{reverseImage.brand}</span> from {reverseImage.hits} of {reverseImage.matches} web matches{reverseImage.sampleTitles[0] ? <span className="text-emerald-700/80">, e.g. “{reverseImage.sampleTitles[0].slice(0, 70)}”</span> : null}.</div>
+ : <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-[12px] text-amber-800">🔍 Reverse image search found {reverseImage.matches} web {reverseImage.matches === 1 ? "match" : "matches"} but no confident brand{reverseImage.sampleTitles[0] ? <span className="text-amber-700/80">, e.g. “{reverseImage.sampleTitles[0].slice(0, 70)}”</span> : null}. Confirm the brand below.</div>
  )}
 
  <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
@@ -688,7 +688,7 @@ export default function IntakePage() {
  {photos.length ? (
  <>
  <TechCard className="overflow-hidden">
- {/* The cover, in the shape a shopper sees it. Clicking opens the positioner — sellers shoot
+ {/* The cover, in the shape a shopper sees it. Clicking opens the positioner. Sellers shoot
      vertically and the card crops the middle, so a piece framed low lost its hem and there was
      nothing to do about it. Only a real uploaded photo can be repositioned; the ghost-mannequin
      render is generated to fit already. */}
@@ -744,7 +744,7 @@ export default function IntakePage() {
    <p><strong>These details were written from a different photo.</strong> Everything below still describes the piece you removed.</p>
    <div className="mt-1.5 flex gap-3">
     <button type="button" onClick={clearDetails} className="font-semibold underline underline-offset-2">Clear them</button>
-    <button type="button" onClick={() => setAiPhoto(photos[0])} className="text-amber-800/70 underline underline-offset-2">Keep — they still apply</button>
+    <button type="button" onClick={() => setAiPhoto(photos[0])} className="text-amber-800/70 underline underline-offset-2">Keep. They still apply</button>
    </div>
   </div>
  )}
@@ -767,12 +767,12 @@ export default function IntakePage() {
  )}
 
  {runway && <p className="mt-3 text-[12px] text-stone-600">🎬 Runway match: <a href={runwayShowUrl(runway)} target="_blank" rel="noopener noreferrer" className="font-medium underline decoration-stone-300 underline-offset-2 hover:decoration-stone-600">{runway}</a> <span className="text-stone-400">↗ view show</span></p>}
- {celebrity && <p className="mt-1.5 text-[12px] text-stone-600">⭐ As seen on: <span className="font-medium text-stone-800">{celebrity}</span> <span className="text-stone-400">— confirm before publishing</span></p>}
+ {celebrity && <p className="mt-1.5 text-[12px] text-stone-600">⭐ As seen on: <span className="font-medium text-stone-800">{celebrity}</span> <span className="text-stone-400"> confirm before publishing</span></p>}
  {careTag && <p className="mt-3 text-[12px] text-stone-500">Read from care tag: <span className="italic">{careTag}</span></p>}
- {/* Nudge for a tag shot — a legible brand/care label is the single strongest signal for
+ {/* Nudge for a tag shot. A legible brand/care label is the single strongest signal for
    getting the brand + era right, and the reverse-image search now scans every frame. */}
  {!reverseImage?.brand && (
- <p className="mt-3 flex items-start gap-1.5 text-[11px] text-stone-400"><Tag size={12} className="mt-px shrink-0 text-stone-400" />Add a clear shot of the brand/care tag — it’s the surest way for AI to nail the brand &amp; era.</p>
+ <p className="mt-3 flex items-start gap-1.5 text-[11px] text-stone-400"><Tag size={12} className="mt-px shrink-0 text-stone-400" />Add a clear shot of the brand/care tag. It’s the surest way for AI to nail the brand &amp; era.</p>
  )}
  {/* Specific-piece match (Phase 2): the exact model we recognized from the reference index,
    used to sharpen the title/era and tighten the price comps. Only shown when confident. */}
@@ -783,7 +783,7 @@ export default function IntakePage() {
  <TechButton className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length}>
  <Sparkles size={14} className="mr-1.5 inline" />{busy ? busyMsg : "Fill the rest with AI"}
  </TechButton>
- <p className="mt-1.5 text-[11px] text-stone-400">{!form.brand.trim() ? "Tip: adding the brand sharpens the price & description — but AI will infer it from the photo if you leave it blank." : "Only fills blanks. Your price is always checked against live market comps."}</p>
+ <p className="mt-1.5 text-[11px] text-stone-400">{!form.brand.trim() ? "Tip: adding the brand sharpens the price & description, but AI will infer it from the photo if you leave it blank." : "Only fills blanks. Your price is always checked against live market comps."}</p>
 
  <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => onPick(e.target.files)} />
  </div>
@@ -801,7 +801,7 @@ export default function IntakePage() {
  onChange={(g) => set("condition", g)}
  note={conditionNote}
  onNoteChange={setConditionNote}
- flagged={flagged.includes("condition") && !confirmed.condition ? <span className="ml-2 text-[11px] font-normal text-amber-600">● AI unsure — confirm</span> : null}
+ flagged={flagged.includes("condition") && !confirmed.condition ? <span className="ml-2 text-[11px] font-normal text-amber-600">● AI unsure. Confirm</span> : null}
  />
  {flagged.includes("condition") && (
  <label className="-mt-2 flex items-center gap-1.5 text-[11px] text-stone-500">
@@ -812,7 +812,7 @@ export default function IntakePage() {
  {/* Flaws are set by the AI from the photos and still show under Condition on the storefront.
      The hand-entry list came off the form: eleven fields before a price is too many. */}
  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
- <div><label className={label}>Size <span className="font-normal text-stone-400">— as marked on the tag</span></label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="IT 40 / UK 12 / M" /></div>
+ <div><label className={label}>Size <span className="font-normal text-stone-400"> as marked on the tag</span></label><input className={input} value={form.size} onChange={(e) => set("size", e.target.value)} placeholder="IT 40 / UK 12 / M" /></div>
  <div>
  <label className={label}>Category</label>
  <div className="pt-1"><CategoryBreadcrumb value={form.category || null} onChange={(v) => set("category", v || "")} /></div>
@@ -820,16 +820,16 @@ export default function IntakePage() {
  </div>
  <div>
  <MeasurementFields category={form.category} values={measurements} onChange={setMeasurements} unit={units.unit} />
- {!Object.values(measurements).some((v) => v && v.trim()) && needsMeasurements && <p className="mt-1 text-[10px] text-amber-600">Buyers can’t try it on — listings with measurements sell faster. Add the key ones.</p>}
+ {!Object.values(measurements).some((v) => v && v.trim()) && needsMeasurements && <p className="mt-1 text-[10px] text-amber-600">Buyers can’t try it on. Listings with measurements sell faster. Add the key ones.</p>}
  </div>
  {/* ONE COLUMN ON A PHONE. Side by side at 390px left each field about 170px wide: the price
      placeholder truncated mid-word ("You set it, or AI estin") and the cost label wrapped onto two
      lines, which pushed its input below the price input. Two columns from `sm` up, where they fit. */}
  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
  <div><label className={label}>Price ($)</label><input className={input} value={form.price} onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, ""); set("price", v); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(Number(v) || 0, Math.round(rawMarketCents / 100), priceLow, priceHigh)); if (floorUsd) setBelowFloor((Number(v) || 0) > 0 && (Number(v) || 0) < floorUsd); }} onBlur={checkPriceOnBlur} inputMode="decimal" placeholder="Your price, or leave for AI" />{(priceNote || (markupPct != null && form.cost)) && <p className="mt-1 text-[10px] text-stone-400">{priceNote || `auto · ${markupPct}% over cost`}</p>}</div>
- <div><label className={label}>Cost ($) <span className="font-normal text-stone-400">— what you paid, private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="optional" /></div>
+ <div><label className={label}>Cost ($) <span className="font-normal text-stone-400"> what you paid, private</span></label><input className={input} value={form.cost} onChange={(e) => onCostChange(e.target.value)} inputMode="decimal" placeholder="optional" /></div>
  </div>
- {/* Raw market, not the suggestion — the band either side of it is built from raw market, so a
+ {/* Raw market, not the suggestion. The band either side of it is built from raw market, so a
      suggestion marker inside it drew the store's own premium as if it were the market itself. */}
  {priceLow != null && priceHigh != null && priceHigh > priceLow && (
  <PriceScale low={priceLow} high={priceHigh} market={rawMarketCents != null ? Math.round(rawMarketCents / 100) : marketPrice} value={Number(form.price) || 0} />
@@ -840,25 +840,25 @@ export default function IntakePage() {
  </div>
  )}
  {/* Her own rule, broken by her own hand. The market flag above is about what buyers will pay; this
-     is about what she paid — a price under cost plus her markup is a loss, whatever the comps say.
+     is about what she paid. A price under cost plus her markup is a loss, whatever the comps say.
      Said, never silently corrected: the price she typed is hers. */}
  {belowFloor && floorUsd != null && (
  <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-800 ring-1 ring-rose-200">
-  ⚠️ Below your pricing floor — your {markupPct}% minimum over the ${Number(form.cost)} you paid works out at ${floorUsd}.{" "}
+  ⚠️ Below your pricing floor. Your {markupPct}% minimum over the ${Number(form.cost)} you paid works out at ${floorUsd}.{" "}
   <button type="button" onClick={() => { set("price", String(floorUsd)); setBelowFloor(false); if (rawMarketCents && !lowConf) setPriceFlag(flagFor(floorUsd, Math.round(rawMarketCents / 100), priceLow, priceHigh)); }} className="underline underline-offset-2 hover:opacity-70">Use ${floorUsd}</button>
  </div>
  )}
  {lowConf && rawMarketCents != null && (
  <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-[11px] text-stone-500 ring-1 ring-stone-200">
- Not enough comparable pieces to price this confidently — treat the range as a rough guide. Add more detail or “Fill with AI” for a firmer read.
+ Too few comparable sales to price this confidently. Add more detail or use Fill with AI for a firmer number.
  </div>
  )}
 
  <RentalPanel priceCents={Math.round((Number(form.price) || 0) * 100)} onDraftChange={setRentalDraft} />
 
  {/* Same shape as Renting above: these are the two "this piece works differently" switches, and
-     they were drawn differently — one with a label pill and roomy copy, one with a bold line and
-     small grey text — which made them read as unrelated features rather than a pair. */}
+     they were drawn differently. One with a label pill and roomy copy, one with a bold line and
+     small grey text, which made them read as unrelated features rather than a pair. */}
  <div className="mt-5 rounded-xl border border-stone-200 p-4">
  <div className="flex items-start justify-between gap-6">
  <div className="min-w-0">
@@ -888,7 +888,7 @@ export default function IntakePage() {
  <div><label className={label}>Consignor split %</label><input className={input} value={consign.split} onChange={(e) => setConsign({ ...consign, split: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" placeholder="auto from rules" /></div>
  </div>
  {/* Typing a name and NOT pressing Add used to lose it: the piece published with no consignor,
-     and nothing said so. The field turns red and the button reads "Add — don't forget" while a
+     and nothing said so. The field turns red and the button reads "Add. Don't forget" while a
      name is sitting there uncommitted, and publish refuses (see consignBlocker). */}
  {(consign.consignorId === "__new__" || consign.newName.trim()) && (
  <div className="flex items-end gap-2">
@@ -903,19 +903,19 @@ export default function IntakePage() {
  </div>
  <button type="button" onClick={addConsignor} disabled={!consign.newName.trim()}
   className={`rounded-lg border px-3 py-2 text-[12.5px] disabled:opacity-40 ${consign.newName.trim() ? "border-red-400 bg-red-50 font-semibold text-red-600" : "border-stone-200 text-stone-600 hover:bg-stone-50"}`}>
-  {consign.newName.trim() ? "Add — don’t forget" : "Add"}
+  {consign.newName.trim() ? "Add: don’t forget" : "Add"}
  </button>
  </div>
  )}
  {consign.newName.trim() && (
-  <p className="text-[11.5px] font-medium text-red-600">Press <strong>Add</strong> to save “{consign.newName.trim()}” as a consignor — otherwise this piece publishes with none.</p>
+  <p className="text-[11.5px] font-medium text-red-600">Press <strong>Add</strong> to save “{consign.newName.trim()}” as a consignor. Otherwise this piece publishes with none.</p>
  )}
  {consign.split && <p className="text-[11px] text-stone-400">Consignor gets {consign.split}% · store keeps {100 - (Number(consign.split) || 0)}%.</p>}
  </div>
  )}
  </div>
  <div>
- {/* One question instead of four numbers — but the weight stays, because the buyer's postage is
+ {/* One question instead of four numbers, but the weight stays, because the buyer's postage is
      chosen by the LARGER of weight and girth and getting it wrong means the store eats the
      difference on every parcel. The AI weighs the piece from the photos; the packaging adds its
      own; the tier and the buyer's price are shown so nothing is decided out of sight. */}
@@ -930,7 +930,7 @@ export default function IntakePage() {
    if (box) {
     set("lengthIn", String(box.lengthIn)); set("widthIn", String(box.widthIn)); set("heightIn", String(box.heightIn));
     // THE WEIGHT COMES WITH THE BOX. Reported from a real listing: picking medium, then changing to
-    // small, left the medium weight behind — a parcel quoted at one tier and posted at another.
+    // small, left the medium weight behind. A parcel quoted at one tier and posted at another.
     //
     // Only when she hasn't set a weight of her own. A hand-typed weight is a measurement, and a
     // box she picked afterwards must not silently overwrite something she weighed.
@@ -939,13 +939,13 @@ export default function IntakePage() {
    }
   }}
  >
-  {PACKAGING.map((b) => <option key={b.id} value={b.id}>{b.label} — {b.hint}</option>)}
+  {PACKAGING.map((b) => <option key={b.id} value={b.id}>{b.label}: {b.hint}</option>)}
  </select>
 
  <div className="mt-2.5 flex flex-wrap items-center gap-2">
   <label className="text-[12px] font-medium text-stone-700">Weight</label>
   {/* Shown and typed in the store's own unit; stored in ounces, which is what the tiers, the
-      carriers and the label all speak. A London shop weighs a coat in grams — asking her for
+      carriers and the label all speak. A London shop weighs a coat in grams. Asking her for
       ounces is the same discourtesy as showing her a dollar sign, and a converted-in-her-head
       weight is a mis-quoted parcel. */}
   <input
@@ -957,7 +957,7 @@ export default function IntakePage() {
     const oz = typed ? toOz(typed, units.weightUnit) : null;
     set("weightOz", oz ? String(oz) : "");
     // AND THE BOX FOLLOWS THE WEIGHT. Heavier than the box she has selected can hold means the
-    // box was wrong, not the scale — she is the one holding the piece.
+    // box was wrong, not the scale. She is the one holding the piece.
     if (oz) setPacking(suggestPackaging(oz));
    }}
    placeholder={aiParcel?.weightOz ? String(fromOz(aiParcel.weightOz, units.weightUnit)) : units.weightUnit}
@@ -975,13 +975,13 @@ export default function IntakePage() {
   const packed = packedWeightOz(piece, box);
   if (!box) return null;
   if (!packed) {
-   return <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 ring-1 ring-amber-200">Add a weight — without one the buyer is quoted the middle tier, and a heavy piece costs you the difference.</p>;
+   return <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11.5px] text-amber-800 ring-1 ring-amber-200">Add a weight, without one the buyer is quoted the middle tier, and a heavy piece costs you the difference.</p>;
   }
   const tier = assignTier({ weightOz: packed, lengthIn: box.lengthIn, widthIn: box.widthIn, heightIn: box.heightIn });
   return (
    <p className="mt-2 text-[11.5px] text-stone-500">
     {box.lengthIn}×{box.widthIn}×{box.heightIn} in · about {packed} oz packed ·{" "}
-    <span className="font-medium text-stone-800">buyer pays {tier.label} — ${(tier.priceCents / 100).toFixed(2)}</span>
+    <span className="font-medium text-stone-800">buyer pays {tier.label}: ${(tier.priceCents / 100).toFixed(2)}</span>
    </p>
   );
  })()}
@@ -1001,7 +1001,7 @@ export default function IntakePage() {
  </div>
 
  <div>
- <label className={label}>Collections <span className="font-normal text-stone-400">— group it so it sells</span></label>
+ <label className={label}>Collections <span className="font-normal text-stone-400"> group it so it sells</span></label>
  <div className="flex flex-wrap gap-2">
  {cols.map((c) => {
  const on = selectedCols.includes(c.title);
@@ -1044,7 +1044,7 @@ export default function IntakePage() {
    onChange={(e) => setNewCol(e.target.value)}
    onBlur={() => { const t = newCol.trim(); if (t && !selectedCols.includes(t)) setSelectedCols((s) => [...s, t]); setNewCol(""); setAddingCol(false); }}
    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") { setNewCol(""); setAddingCol(false); } }}
-   placeholder="Name it — Y2K, Designer bags…"
+   placeholder="Name it: Y2K, Designer bags…"
   />
  )}
  </div>
@@ -1120,7 +1120,7 @@ export default function IntakePage() {
 
    </div>
 
-   <p className="mt-3 text-[11px] text-stone-400 sm:pl-[104px]">Your storefront always goes live — these are the extra marketplaces.</p>
+   <p className="mt-3 text-[11px] text-stone-400 sm:pl-[104px]">Your storefront always goes live. These are the extra marketplaces.</p>
 
   </div>
 
@@ -1130,7 +1130,7 @@ export default function IntakePage() {
  <div className="flex flex-wrap items-center gap-4 border-t border-stone-100 pt-4">
  <TechButton className="h-11 sm:h-auto" onClick={() => publish("active")} disabled={busy || !allConfirmed}>{busy ? busyMsg : "Publish listing"}</TechButton>
  <TechButton variant="secondary" className="h-11 sm:h-auto" onClick={() => publish("draft")} disabled={busy || !form.title.trim()}>Save as draft</TechButton>
- {/* Always available, not only when we happen to notice the photo changed — "start this piece
+ {/* Always available, not only when we happen to notice the photo changed. "start this piece
      again" is a thing a seller wants for plenty of reasons we can't detect. Confirms first,
      because it throws away written work. */}
  {(form.title.trim() || Object.keys(aiDraft).length > 0) && (
@@ -1143,10 +1143,10 @@ export default function IntakePage() {
    Clear details
   </button>
  )}
- {!allConfirmed && <span className="text-[11px] text-amber-600">Confirm the flagged fields to publish — or save as a draft for now</span>}
+ {!allConfirmed && <span className="text-[11px] text-amber-600">Confirm the flagged fields to publish, or save as a draft for now</span>}
  {err && <span className="text-xs text-red-600">{err}</span>}
  {/* Schedule publish: pick a future time → saved as a draft now, auto-published then. */}
- {/* On a phone the label takes its own line and the picker takes the room left beside the button —
+ {/* On a phone the label takes its own line and the picker takes the room left beside the button,
      at its natural width the picker pushed Schedule 79px off the screen. */}
  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:ml-auto">
  <span className="basis-full text-[11px] uppercase tracking-[0.14em] text-stone-400 sm:basis-auto">Schedule</span>

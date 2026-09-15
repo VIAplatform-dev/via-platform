@@ -45,7 +45,7 @@ export async function POST(
  const req = await getSourcingRequestById(id, session.user.id);
  if (!req) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
- // Draft (unpaid) — just delete, no refund needed
+ // Draft (unpaid), just delete, no refund needed
  if (req.status === "pending_payment") {
  const sql = neon(process.env.DATABASE_URL || process.env.POSTGRES_URL || "");
  await sql`DELETE FROM sourcing_requests WHERE id = ${id} AND user_id = ${session.user.id} AND status = 'pending_payment'`;
@@ -76,7 +76,7 @@ export async function POST(
  } catch (err) {
  console.error("[cancel-sourcing] Stripe refund failed:", err);
  return NextResponse.json(
- { error: "Refund failed — please contact support." },
+ { error: "Refund failed. Please contact support." },
  { status: 500 }
  );
  }

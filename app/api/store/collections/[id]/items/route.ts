@@ -12,7 +12,7 @@ async function seller(request: NextRequest) {
 }
 const idsOf = (b: unknown) => (Array.isArray((b as { ids?: unknown[] })?.ids) ? (b as { ids: unknown[] }).ids.filter((x): x is string => typeof x === "string") : []);
 
-// POST { ids } — add items to this collection (an item can live in many collections; no others are touched).
+// POST { ids }: add items to this collection (an item can live in many collections; no others are touched).
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const s = await seller(request);
  if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  return NextResponse.json({ ok: true, count: ids.length });
 }
 
-// DELETE { ids } — remove items from this collection (the items themselves stay, as do their other collections).
+// DELETE { ids }: remove items from this collection (the items themselves stay, as do their other collections).
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const s = await seller(request);
  if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,9 +36,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
  return NextResponse.json({ ok: true, count: ids.length });
 }
 
-// PATCH { ids } — set the ORDER of items within this collection, in the order given. This is what a
+// PATCH { ids }: set the ORDER of items within this collection, in the order given. This is what a
 // storefront section reads when it shows "the first few" of a collection, so it's the seller's control
-// over which pieces lead — curated once here rather than re-picked in every section that uses it.
+// over which pieces lead. Curated once here rather than re-picked in every section that uses it.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const s = await seller(request);
  if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

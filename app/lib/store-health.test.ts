@@ -18,7 +18,7 @@ test("a store with nothing wrong passes with no findings", () => {
 });
 
 test("a product missing from the catalogue is blocking; a price scraped off a page is not", () => {
- // A piece we do not hold cannot be sold at all — blocking, and always was. The price line beside
+ // A piece we do not hold cannot be sold at all. Blocking, and always was. The price line beside
  // it is a diff of two page texts, which cannot tell a wrong price from her page differing between
  // reads; it is reported, but it does not condemn the store. See the tier test further down.
  const parity = structuredClone(cleanParity);
@@ -40,7 +40,7 @@ test("prices missing only because those products are absent are not a price prob
  const g = gradeStore({ parity, blackout: cleanBlackout });
  assert.equal(g.verdict, "warn");
  assert.ok(!g.findings.some((f) => f.tier === "blocking"));
- // Still REPORTED when more prices are missing than products are — just not as a blocking one.
+ // Still REPORTED when more prices are missing than products are, just not as a blocking one.
  parity.shopper["/collections/x"].pricesPresent = "0/4";
  const g2 = gradeStore({ parity, blackout: cleanBlackout });
  assert.equal(g2.verdict, "warn");
@@ -71,7 +71,7 @@ test("losing images or a collection count under blackout is degrading, not block
  assert.equal(photos.page, "/");
 });
 
-test("losing product links or the header under blackout is blocking — shoppers cannot reach items", () => {
+test("losing product links or the header under blackout is blocking. Shoppers cannot reach items", () => {
  const blackout: BlackoutReport = { pages: { "/collections/all": { normal: page, blackout: { ...page, productLinks: 0, headerVisible: false } } } };
  const g = gradeStore({ parity: cleanParity, blackout });
  assert.equal(g.verdict, "fail");
@@ -111,7 +111,7 @@ test("findingKind collapses counts, pages and examples so the same problem group
   findingKind({ tier: "degrading", page: "/", message: "8 photos would stop loading if you left your current platform." }));
 });
 
-test("on a product page, products absent here are the store's recommendation picks — cosmetic, and said so", () => {
+test("on a product page, products absent here are the store's recommendation picks. Cosmetic, and said so", () => {
  const parity = structuredClone(cleanParity);
  parity.shopper["/products/x"] = { titlesPresent: "0/4", titlesInOrder: "0/1", pricesPresent: "1/5", navPresent: "8/8", headingsPresent: "3/3" };
  const g = gradeStore({ parity, blackout: cleanBlackout });
@@ -121,7 +121,7 @@ test("on a product page, products absent here are the store's recommendation pic
  assert.match(g.findings[0].message, /you may also like/i);
 });
 
-test("a rail serving pieces the seller never filed in it is blocking — the page contradicts itself", () => {
+test("a rail serving pieces the seller never filed in it is blocking. The page contradicts itself", () => {
  // Not a difference with their site: a difference with our OWN records. A shopper on that page is
  // being shown stock the seller did not put there, which is worse than a page that is merely stale.
  const parity = structuredClone(cleanParity);
@@ -179,10 +179,10 @@ test("prices that all match produce no finding", () => {
 
 test("a page that loses SOME products under blackout is degrading, not blocking", () => {
  // thenicheshop: a filter app injects extra tiles, so the page renders 40 normally and 35 with the
- // platform cut off — and 14 of them differ, so it is a different selection rather than a shrunken
+ // platform cut off, and 14 of them differ, so it is a different selection rather than a shrunken
  // one. Every piece that drops out is active and sits in four to six other collections, so nothing
  // becomes unreachable. Calling that "product links would stop working" is not true.
- // normal and blackout must be SEPARATE objects — the clean fixture shares one.
+ // normal and blackout must be SEPARATE objects. The clean fixture shares one.
  const blackout = { pages: { "/": { normal: { ...page, productLinks: 40 }, blackout: { ...page, productLinks: 35 } } } };
  const g = gradeStore({ parity: cleanParity, blackout });
  const f = g.findings.find((x) => /product/i.test(x.message));
@@ -205,7 +205,7 @@ test("a page that loses EVERY product under blackout is still blocking", () => {
 test("a store whose catalogue we could not check never reads as passing", () => {
  // lei-vintage and montrose-edit are Squarespace; thevintageboutiquestyle.com is on something we do
  // not recognise at all. The catalogue, price, collection and sold-status checks all run only for
- // Shopify, and simply produced nothing for these three — so vintage-boutique-style came back as the
+ // Shopify, and simply produced nothing for these three, so vintage-boutique-style came back as the
  // fleet's ONLY pass, by not being examined. Silence is not a clean bill of health.
  const parity = structuredClone(cleanParity);
  parity.catalog = { platform: "other" } as never;
@@ -225,7 +225,7 @@ test("a store we did check is not accused of being uncheckable", () => {
 test("a piece she has no photo of is her problem to fix, not a store failure", () => {
  // feathers-boutique-vintage's seven are in stock and priced, with no image on her own site.
  // Nobody can render a card without one. Saying so is more use to her than calling it a product
- // we dropped — and it must not fail her store.
+ // we dropped, and it must not fail her store.
  const parity = structuredClone(cleanParity) as never as { catalog: Record<string, unknown> };
  parity.catalog.missingNoPhoto = 7;
  const f = gradeStore({ parity: parity as never, blackout: cleanBlackout }).findings;
@@ -245,12 +245,12 @@ test("sold and unlisted pieces are never counted as missing", () => {
 test("a price scraped off the page is degrading; a price we would not honour is blocking", () => {
  // TWO different checks, and only one of them can say "a shopper would be charged something else".
  //
- //   pricesPresent  — every money-shaped string on her page, diffed against ours. It cannot tell a
+ //   pricesPresent: every money-shaped string on her page, diffed against ours. It cannot tell a
  //                    wrong price from her page simply differing between two loads. On loved-again
  //                    it reported 14 of 15 while a hand check found all fourteen of her prices on
  //                    ours; on chill-boutique its "missing prices" were the prices of products her
  //                    homepage curates and ours does not.
- //   priceStale     — the rendered price against the item record the cart will charge. Exact.
+ //   priceStale: the rendered price against the item record the cart will charge. Exact.
  //
  // Grading the scrape as blocking told six sellers their store showed the wrong price. That claim
  // is the most alarming this check can make and the most expensive to be wrong about, so it belongs
@@ -272,7 +272,7 @@ test("a price scraped off the page is degrading; a price we would not honour is 
 
 test("a page with no products on EITHER side has nothing to compare, and says nothing", () => {
  // hachi-archive's homepage is a lookbook: no product grid, on her site or ours. The comparison
- // read 0 products from her page and 0 from ours — a match — and the grader called it "we couldn't
+ // read 0 products from her page and 0 from ours, a match, and the grader called it "we couldn't
  // compare the products on this page", which sounds like a failure of ours and is not one.
  //
  // Everything else on that page matched exactly: headings 2/2, nav 1/1, prices 1/1, images 8 vs 8.
@@ -296,7 +296,7 @@ test("a page with no products but other differences is still reported", () => {
 
 test("a product page with no recommendation links is not 'couldn't compare'", () => {
  // The 0/0 check ran BEFORE the product-page branch, so a product page whose only product links are
- // its "you may also like" strip — and which therefore reads 0/0 when neither side shows one —
+ // its "you may also like" strip, and which therefore reads 0/0 when neither side shows one,
  // reported as unreadable instead of matching.
  const parity = structuredClone(cleanParity);
  parity.shopper["/products/marc-jacobs-mary-janes"] = { titlesPresent: "0/0", titlesInOrder: "0/0", pricesPresent: "2/2", navPresent: "1/1", headingsPresent: "1/1" };

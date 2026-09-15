@@ -1,11 +1,11 @@
 // Weight, in the unit the seller actually thinks in.
 //
-// Everything is STORED in ounces — one unit through the database, the shipping tiers, the carriers
+// Everything is STORED in ounces. One unit through the database, the shipping tiers, the carriers
 // and the label. That doesn't change: a second stored unit is how a parcel ends up weighing 500 of
 // something nobody recorded.
 //
 // What changes is the number a seller reads and types. A London shop weighs a coat in grams, and
-// asking her for ounces is the same discourtesy as showing her a dollar sign — she converts in her
+// asking her for ounces is the same discourtesy as showing her a dollar sign. She converts in her
 // head, or guesses, and a guessed weight is a mis-quoted parcel.
 
 export type WeightUnit = "oz" | "g";

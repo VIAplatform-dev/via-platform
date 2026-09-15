@@ -34,7 +34,7 @@ function extractColor(title: string): string | null {
 }
 
 // The colour we filter/group on. The seller's TITLE is authoritative when it
-// names a colour ("tan suede skirt") — that's the item being sold. Vision is
+// names a colour ("tan suede skirt"): that's the item being sold. Vision is
 // only a FALLBACK for titles with no colour word (e.g. a black pinstripe skirt),
 // because a model often wears other garments that fool a whole-image colour read.
 // Capitalized to match extractColor's casing so they merge.
@@ -134,7 +134,7 @@ function sortProducts(
  case "newest":
  default:
  return sorted.sort((a, b) => {
- // Primary: DB id descending — higher id = more recently added to VYA,
+ // Primary: DB id descending. Higher id = more recently added to VYA,
  // avoids mixing millisecond timestamps with integer fallbacks.
  if (a.dbId != null && b.dbId != null) return b.dbId - a.dbId;
  // Fallback for products without dbId (e.g. favorites page)
@@ -229,7 +229,7 @@ export default function FilteredProductGrid({
 
  const setCurrentPage = useCallback((page: number) => {
  setCurrentPageState(page);
- // pushState (not replace) so each page is its own history entry — browser
+ // pushState (not replace) so each page is its own history entry. Browser
  // Back returns to the previous page instead of the page you entered from.
  // We update the URL directly rather than via the Next.js router, which can
  // serve a stale cached render on back navigation.
@@ -271,7 +271,7 @@ export default function FilteredProductGrid({
  const filteredProducts = useMemo(() => {
  let result = products;
 
- // Search filter — split query into category-intent words and text words.
+ // Search filter: split query into category-intent words and text words.
  // Category words (e.g. "top", "bag", "shoe") narrow to the inferred category
  // so "black top" returns black tops, not black top-handle bags.
  if (filters.search.trim()) {
@@ -341,7 +341,7 @@ export default function FilteredProductGrid({
  );
  }
 
- // Size filter — a ranged size ("US 2-4") matches a filter for ANY size it
+ // Size filter: a ranged size ("US 2-4") matches a filter for ANY size it
  // covers, so a piece that fits a 2 or a 4 shows up under both.
  if (filters.selectedSizes.length > 0) {
  result = result.filter((p) => {
@@ -453,7 +453,7 @@ export default function FilteredProductGrid({
  return Array.from(bMap.values());
  }, [products]);
 
- // Get unique sizes for the filter. Show EVERY real size present — vintage pieces
+ // Get unique sizes for the filter. Show EVERY real size present. Vintage pieces
  // are usually one-of-a-kind, so a "3+ products" threshold would hide most sizes
  // (a single size-4 or US-6 item would never be filterable). Junk values (years,
  // measurements) are excluded by a plausibility check instead of a count gate.
@@ -480,7 +480,7 @@ export default function FilteredProductGrid({
  return Array.from(seen).sort();
  }, [products]);
 
- // Unique colours across products — from the image colour (preferred) or title.
+ // Unique colours across products, from the image colour (preferred) or title.
  const availableColors = useMemo(() => {
  const seen = new Set<string>();
  products.forEach((p) => {
@@ -490,13 +490,13 @@ export default function FilteredProductGrid({
  return Array.from(seen).sort();
  }, [products]);
 
- // Track products whose images all failed to load — remove them from the grid
+ // Track products whose images all failed to load. Remove them from the grid
  const [deadImageIds, setDeadImageIds] = useState<Set<string>>(new Set());
  const handleImageFail = useCallback((id: string) => {
  setDeadImageIds((prev) => new Set([...prev, id]));
  }, []);
 
- // Fetch favorite counts — only for the current page, after idle
+ // Fetch favorite counts, only for the current page, after idle
  const [favCounts, setFavCounts] = useState<Record<number, number>>({});
 
  useEffect(() => {

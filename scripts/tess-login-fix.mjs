@@ -2,11 +2,11 @@
 //
 // Her two identities: the curated marketplace record is `tess-elizabeth-vintage` (app/lib/stores.ts),
 // her hosted site is `tesselizabethvintage` (the vyasites.com host label IS the slug). Sign-in used
-// to resolve from storeContactEmails, which only knows the first — so she'd land in a store with no
+// to resolve from storeContactEmails, which only knows the first, so she'd land in a store with no
 // captured site, and the import screen would offer to crawl one.
 //
 // Fixed in two halves: resolveStoreSlug now consults store_users BEFORE the hardcoded map
-// (app/lib/storeAuth.ts), and this adds her row. storeContactEmails is left alone on purpose — it is
+// (app/lib/storeAuth.ts), and this adds her row. storeContactEmails is left alone on purpose. It is
 // also the address book for store emails and the roster the sourcing/digest crons iterate, so
 // editing it to fix a login would quietly edit all three.
 //
@@ -37,14 +37,14 @@ async function show(label) {
                         WHERE lower(email) = lower(${EMAIL})
                            OR store_slug IN (${SLUG}, ${"tess-elizabeth-vintage"})
                         ORDER BY id`;
- console.log(`\n${label} — store_users rows: ${rows.length}`);
+ console.log(`\n${label}: store_users rows: ${rows.length}`);
  for (const r of rows) console.log(`   #${r.id}  ${r.store_slug}  ${r.email}  (${r.role})`);
  return rows;
 }
 
 // Sanity: the slug we're pointing her at must actually be the one holding her site.
 // `site_captures` is the table the overwrite guard itself counts (listCapturePaths in
-// app/lib/site-capture-db.ts) — checking any other one would prove nothing about the guard.
+// app/lib/site-capture-db.ts). Checking any other one would prove nothing about the guard.
 const [pages] = await sql`SELECT count(*)::int AS n FROM site_captures WHERE store_slug = ${SLUG}`;
 const [items] = await sql`SELECT count(*)::int AS n FROM products WHERE store_slug = ${SLUG}`;
 console.log(`${SLUG}: ${pages.n} captured pages, ${items.n} products`);

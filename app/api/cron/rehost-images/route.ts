@@ -4,18 +4,18 @@ import { rehostImage } from "@/app/lib/rehost-images";
 import { allPhotosMoved } from "@/app/lib/rehost-images-core";
 
 // Copies imported item images from the seller's old CDN onto OUR Vercel Blob storage,
-// in the background — so the listing survives them leaving the old platform, WITHOUT
+// in the background, so the listing survives them leaving the old platform, WITHOUT
 // making the interactive "bring your site over" import wait on hundreds of uploads.
 // Bounded per run + a self-healing `images_rehosted` marker so it never re-scans work
 // it already did. Idempotent. Manual run: curl -H "Authorization: Bearer $CRON_SECRET" ...
 export const maxDuration = 300;
 
-const BATCH = 20; // items per run — each may re-host several images
+const BATCH = 20; // items per run: each may re-host several images
 
 export async function GET(request: Request) {
  const secret = process.env.CRON_SECRET;
  const authHeader = request.headers.get("authorization");
- // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ // Header only: a query-string secret leaks into Vercel/CDN access logs and Referer headers.
  if (!secret || authHeader !== `Bearer ${secret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
  if (!url) return NextResponse.json({ error: "No database URL" }, { status: 500 });
  const sql = neon(url);
 
- // Marker column — self-heal so no migration step is needed.
+ // Marker column: self-heal so no migration step is needed.
  await sql`ALTER TABLE items ADD COLUMN IF NOT EXISTS images_rehosted BOOLEAN DEFAULT FALSE`.catch(() => {});
 
  const rows = (await sql`
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
  let itemsProcessed = 0;
  let imagesRehosted = 0;
- let itemsLeftBehind = 0; // tried, and at least one photo would still go dark — retried next run
+ let itemsLeftBehind = 0; // tried, and at least one photo would still go dark. Retried next run
  for (const r of rows) {
  const imgs = Array.isArray(r.images) ? r.images : [];
  const out: string[] = [];
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
  out.push(rehosted);
  }
  // Done means DONE. `rehostImage` returns the original URL on every failure path, so marking the
- // item finished regardless recorded failures as successes — permanently, since the job never
+ // item finished regardless recorded failures as successes. Permanently, since the job never
  // revisits a finished item. 429 items across six stores were left with their photos on the
  // seller's platform and a marker saying they had been copied. See allPhotosMoved.
  const done = allPhotosMoved(out);

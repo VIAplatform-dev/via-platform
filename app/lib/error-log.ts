@@ -5,7 +5,7 @@ import { describeError } from "./error-message";
 
 // Error-monitoring foundation. The codebase had no telemetry, so failures on important paths
 // vanished into swallowed catches (the sold_items bug hid for MONTHS this way). logError() records
-// a failure to a queryable table, always console.errors it (the floor — works even when the DB is
+// a failure to a queryable table, always console.errors it (the floor: works even when the DB is
 // what failed), and for 'critical' emails ops (throttled). An admin dashboard reads getRecentErrors/
 // getErrorSummary. The whole point: silent failures become visible.
 
@@ -35,12 +35,12 @@ async function ensureTable() {
 }
 
 // Throttle critical email alerts per source so a hot loop can't flood the ops inbox. (In-memory, so
-// per-instance on serverless — imperfect but enough to prevent a storm.)
+// per-instance on serverless. Imperfect but enough to prevent a storm.)
 const lastAlert = new Map<string, number>();
 const ALERT_THROTTLE_MS = 10 * 60 * 1000;
 
 /**
- * Record a failure that would otherwise be swallowed. NEVER THROWS — an error logger that throws
+ * Record a failure that would otherwise be swallowed. NEVER THROWS: an error logger that throws
  * would mask the very failure it's recording, so every step is best-effort.
  */
 export async function logError(source: string, err: unknown, opts?: { context?: Record<string, unknown>; severity?: ErrorSeverity }): Promise<void> {

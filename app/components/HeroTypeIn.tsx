@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 /**
  * Rotating typewriter for the hero headline. Types a phrase, holds, deletes,
- * then advances to the next — looping forever. Each phrase's full text is
+ * then advances to the next. Looping forever. Each phrase's full text is
  * rendered as an invisible sizing layer so the typed overlay fills into place
  * without reflow (the buttons below never jump). Respects reduced-motion.
  */
@@ -60,7 +60,7 @@ export default function HeroTypeIn({
 
  return (
  <h1 className={`relative ${className ?? ""}`} aria-label={phrases[0]} style={{ minHeight: "2.2em" }}>
- {/* sizing layer — reserves the current phrase's box, no reflow while typing */}
+ {/* sizing layer: reserves the current phrase's box, no reflow while typing */}
  <span className="opacity-0" aria-hidden="true">{current}</span>
  {/* typed overlay */}
  <span className="absolute inset-0" aria-hidden="true">

@@ -8,7 +8,7 @@ import { colors, spacing } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { ToggleRow, Button, Notice, Loading } from "../../components/seller/Form";
 
-// Sales tax — one switch, and the truth about what it does.
+// Sales tax: one switch, and the truth about what it does.
 //
 // VYA never calculates tax. Storefront sales are direct charges on HER Stripe account, so collecting
 // and filing are hers; this switch tells Stripe Tax to calculate at checkout against HER
@@ -88,7 +88,7 @@ export default function TaxScreen() {
             <Notice tone="good">
               {t.registrations > 0
                 ? `Registered in ${t.registrations} ${t.registrations === 1 ? "place" : "places"}. Tax is added where you're registered and nowhere else.`
-                : "Stripe Tax is on, but you aren't registered anywhere yet — so nothing is being added. Add a registration in Stripe from Payouts."}
+                : "Stripe Tax is on, but you aren't registered anywhere yet, so nothing is being added. Add a registration in Stripe from Payouts."}
             </Notice>
           ) : null}
 
@@ -96,7 +96,7 @@ export default function TaxScreen() {
 
           <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
             VYA doesn&apos;t collect or file sales tax for you. Your storefront sales are charged on
-            your own Stripe account, so what&apos;s collected and what&apos;s filed are yours — this
+            your own Stripe account, so what&apos;s collected and what&apos;s filed are yours. This
             switch only asks Stripe to work out the amount.
           </Text>
         </>

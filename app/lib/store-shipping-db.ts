@@ -4,9 +4,9 @@ import type { PickupSettings } from "./pickup-core";
 import { type LabelPrinter, isLabelPrinter, DEFAULT_LABEL_PRINTER } from "./label-format-core";
 
 // Per-store shipping policy: where they ship from, and who pays.
-//   buyer_pays — live rate shown at checkout, added to the buyer's total
-//   store_pays — free at checkout; the store absorbs the label cost
-//   free_over  — buyer pays below freeThresholdCents, free at/above it
+//   buyer_pays. Live rate shown at checkout, added to the buyer's total
+//   store_pays. Free at checkout; the store absorbs the label cost
+//   free_over: buyer pays below freeThresholdCents, free at/above it
 export type ShipMode = "buyer_pays" | "store_pays" | "free_over";
 /** How a buyer-paid price is arrived at. Orthogonal to WHO pays, which is ShipMode. */
 export type ShipPricing = "live" | "flat";
@@ -30,14 +30,14 @@ export type ShippingSettings = {
   */
  expeditedOffered?: boolean;
  /**
-  * How buyer-paid postage is priced on this store's own site — the store's call, as it would be
+  * How buyer-paid postage is priced on this store's own site. The store's call, as it would be
   * on Shopify. "live" quotes the real carrier rate for the route and adds VYA's markup; "flat"
   * uses the store's own per-zone prices (shipping-zones.ts) and the store carries the variance.
   * Default live: at a 1% platform fee VYA cannot absorb distance, and it buys every label.
   */
  pricing?: ShipPricing;
  /**
-  * Who settles customs duty on an international order. It is not just a billing preference — it
+  * Who settles customs duty on an international order. It is not just a billing preference. It
   * decides the INCOTERM on the declaration, so a store that absorbs duty in its prices and ships
   * DDU has its buyer billed at the door anyway and pays for the same duty twice.
   */
@@ -45,18 +45,29 @@ export type ShippingSettings = {
  /**
   * The store's OWN carrier account at EasyPost, when it has connected one.
   *
-  * This is what decides whether the store may promise "duties covered" — see resolveDutyMode. On
+  * This is what decides whether the store may promise "duties covered". See resolveDutyMode. On
   * VYA's shared wallet, duty would land on VYA weeks later in an amount nobody quoted, so DDP is
   * only offered once the carrier is billing the store directly.
   */
  carrierAccountId?: string | null;
- /** Where this store ships and what it charges per region — see shipping-zones.ts. */
+ /** Where this store ships and what it charges per region. See shipping-zones.ts. */
  zones?: ZoneConfig | null;
  mode: ShipMode;
  freeThresholdCents: number | null;
  shipFrom: ShipFrom | null;
  /** Collect in store, for a seller who has one. Null = not offered. See app/lib/pickup-core.ts. */
  pickup: PickupSettings | null;
+ /**
+  * Working days between an order landing and the parcel going out.
+  *
+  * The one thing a buyer wants to know that no other setting can answer. A carrier quotes TRANSIT
+  * time, not how long a parcel sits on a seller's table first, so "2 to 5 days" means nothing until
+  * you know whether she posts tomorrow or on Saturday.
+  *
+  * Null means she has not said, and nothing claims anything on her behalf: a promise about her own
+  * week is not one to guess at.
+  */
+ dispatchDays?: number | null;
 };
 
 const MODES: ShipMode[] = ["buyer_pays", "store_pays", "free_over"];
@@ -87,19 +98,20 @@ async function ensureTable() {
  await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS label_printer TEXT`;
  await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS expedited_offered BOOLEAN`;
  await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS pricing TEXT`;
+ await db()`ALTER TABLE store_shipping ADD COLUMN IF NOT EXISTS dispatch_days INTEGER`;
  ensured = true;
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export async function getShippingSettings(storeSlug: string): Promise<ShippingSettings> {
  await ensureTable();
- const rows = await db()`SELECT mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones, label_printer, expedited_offered, pricing FROM store_shipping WHERE store_slug = ${storeSlug}`;
+ const rows = await db()`SELECT mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones, label_printer, expedited_offered, pricing, dispatch_days FROM store_shipping WHERE store_slug = ${storeSlug}`;
  if (!rows.length) return DEFAULT;
  const r: any = rows[0];
  const mode = MODES.includes(r.mode) ? (r.mode as ShipMode) : "buyer_pays";
  const shipFrom = r.ship_from ? (typeof r.ship_from === "string" ? JSON.parse(r.ship_from) : r.ship_from) : null;
  const pickup = r.pickup ? (typeof r.pickup === "string" ? JSON.parse(r.pickup) : r.pickup) : null;
- return { mode, freeThresholdCents: r.free_threshold_cents ?? null, shipFrom, pickup, dutyMode: isDutyMode(r.duty_mode) ? r.duty_mode : DEFAULT_DUTY_MODE, carrierAccountId: r.carrier_account_id ?? null, zones: r.zones ? (typeof r.zones === "string" ? JSON.parse(r.zones) : r.zones) : DEFAULT_ZONES, labelPrinter: isLabelPrinter(r.label_printer) ? r.label_printer : DEFAULT_LABEL_PRINTER, expeditedOffered: r.expedited_offered === true, pricing: isShipPricing(r.pricing) ? r.pricing : "live" };
+ return { mode, freeThresholdCents: r.free_threshold_cents ?? null, shipFrom, pickup, dutyMode: isDutyMode(r.duty_mode) ? r.duty_mode : DEFAULT_DUTY_MODE, carrierAccountId: r.carrier_account_id ?? null, zones: r.zones ? (typeof r.zones === "string" ? JSON.parse(r.zones) : r.zones) : DEFAULT_ZONES, labelPrinter: isLabelPrinter(r.label_printer) ? r.label_printer : DEFAULT_LABEL_PRINTER, expeditedOffered: r.expedited_offered === true, pricing: isShipPricing(r.pricing) ? r.pricing : "live", dispatchDays: typeof r.dispatch_days === "number" ? r.dispatch_days : null };
 }
 
 /** Has the store saved shipping settings at all? getShippingSettings answers with a default for a
@@ -115,7 +127,7 @@ export async function setShippingSettings(storeSlug: string, s: ShippingSettings
  const mode = MODES.includes(s.mode) ? s.mode : "buyer_pays";
  const threshold = mode === "free_over" && s.freeThresholdCents && s.freeThresholdCents > 0 ? Math.round(s.freeThresholdCents) : null;
  // The country is stored as the carriers need it, at the point of writing. The settings form takes
- // free text, and two stores had "United States" saved — which Shippo and EasyPost both reject, so
+ // free text, and two stores had "United States" saved, which Shippo and EasyPost both reject, so
  // no rate ever came back and no label could be bought. Normalising here means it can't recur; the
  // carrier-side calls normalise too, for rows written before this existed.
  const shipFromJson = s.shipFrom ? JSON.stringify({ ...s.shipFrom, country: isoCountry(s.shipFrom.country) }) : null;
@@ -126,9 +138,14 @@ export async function setShippingSettings(storeSlug: string, s: ShippingSettings
  const labelPrinter = isLabelPrinter(s.labelPrinter) ? s.labelPrinter : DEFAULT_LABEL_PRINTER;
  const expeditedOffered = s.expeditedOffered === true;
  const pricing = isShipPricing(s.pricing) ? s.pricing : "live";
- await db()`INSERT INTO store_shipping (store_slug, mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones, label_printer, expedited_offered, pricing, updated_at)
- VALUES (${storeSlug}, ${mode}, ${threshold}, ${shipFromJson}::jsonb, ${pickupJson}::jsonb, ${dutyMode}, ${carrierAccountId}, ${zonesJson}::jsonb, ${labelPrinter}, ${expeditedOffered}, ${pricing}, now())
- ON CONFLICT (store_slug) DO UPDATE SET mode = ${mode}, free_threshold_cents = ${threshold}, ship_from = ${shipFromJson}::jsonb, pickup = ${pickupJson}::jsonb, duty_mode = ${dutyMode}, carrier_account_id = ${carrierAccountId}, zones = ${zonesJson}::jsonb, label_printer = ${labelPrinter}, expedited_offered = ${expeditedOffered}, pricing = ${pricing}, updated_at = now()`;
+ // 1 to 30 working days, or nothing. A seller who types 90 has misunderstood the question, and a
+ // zero would publish "orders go out within 0 days".
+ const dispatchDays = Number.isFinite(Number(s.dispatchDays)) && Number(s.dispatchDays) >= 1 && Number(s.dispatchDays) <= 30
+  ? Math.round(Number(s.dispatchDays))
+  : null;
+ await db()`INSERT INTO store_shipping (store_slug, mode, free_threshold_cents, ship_from, pickup, duty_mode, carrier_account_id, zones, label_printer, expedited_offered, pricing, dispatch_days, updated_at)
+ VALUES (${storeSlug}, ${mode}, ${threshold}, ${shipFromJson}::jsonb, ${pickupJson}::jsonb, ${dutyMode}, ${carrierAccountId}, ${zonesJson}::jsonb, ${labelPrinter}, ${expeditedOffered}, ${pricing}, ${dispatchDays}, now())
+ ON CONFLICT (store_slug) DO UPDATE SET mode = ${mode}, free_threshold_cents = ${threshold}, ship_from = ${shipFromJson}::jsonb, pickup = ${pickupJson}::jsonb, duty_mode = ${dutyMode}, carrier_account_id = ${carrierAccountId}, zones = ${zonesJson}::jsonb, label_printer = ${labelPrinter}, expedited_offered = ${expeditedOffered}, pricing = ${pricing}, dispatch_days = ${dispatchDays}, updated_at = now()`;
 }
 
 /** Does this store have a usable ship-from address (required for rates + labels)? */

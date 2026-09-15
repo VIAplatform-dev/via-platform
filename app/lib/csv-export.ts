@@ -1,4 +1,4 @@
-// Shared CSV export. One definition so every download quotes the same way — a
+// Shared CSV export. One definition so every download quotes the same way. A
 // title containing a comma or a quote is the normal case in resale, not an edge
 // one, and a spreadsheet that splits a listing name across two columns is worse
 // than no export at all.
@@ -27,7 +27,7 @@ export function downloadCsv(filename: string, csv: string): void {
  URL.revokeObjectURL(url);
 }
 
-/** "inventory-2026-08-31.csv" — dated, so repeated exports don't overwrite each other. */
+/** "inventory-2026-08-31.csv": dated, so repeated exports don't overwrite each other. */
 export function datedFilename(base: string): string {
  return `${base}-${new Date().toISOString().slice(0, 10)}.csv`;
 }

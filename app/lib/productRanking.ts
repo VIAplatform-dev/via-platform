@@ -6,15 +6,15 @@ import { brands } from "./brandData";
  * Designed for a curated vintage/secondhand platform where engagement data
  * is sparse. When clicks/favorites exist they dominate, but for zero-
  * engagement products the score is driven by listing quality (images),
- * moderate brand recognition, and price attractiveness — NOT just brand
+ * moderate brand recognition, and price attractiveness, NOT just brand
  * name alone.
  *
  * Score components (with max contribution):
- * 1. Engagement — clicks, favorites, conversions (uncapped, ×5)
- * 2. Images — more photos = better listing (0–25)
- * 3. Recency — small freshness nudge (0–12)
- * 4. Brand — light boost, not dominant (0–8)
- * 5. Price — mid-range vintage sweet spot (0–8)
+ * 1. Engagement: clicks, favorites, conversions (uncapped, ×5)
+ * 2. Images: more photos = better listing (0–25)
+ * 3. Recency: small freshness nudge (0–12)
+ * 4. Brand: light boost, not dominant (0–8)
+ * 5. Price: mid-range vintage sweet spot (0–8)
  */
 
 const TIER1_BRANDS = new Set([
@@ -66,7 +66,7 @@ export function computeProductScore(input: RankingInput): number {
  score += Math.max(0, 12 * Math.exp(-daysOld / 14));
 
  // ── 4. Brand recognition (0–8) ──
- // Light touch — brand is a signal but shouldn't dominate.
+ // Light touch: brand is a signal but shouldn't dominate.
  // A great unbranded piece should rank close to a branded one.
  if (input.brandSlug) {
  if (TIER1_BRANDS.has(input.brandSlug)) score += 8;
@@ -103,7 +103,7 @@ export function computeProductScore(input: RankingInput): number {
  *
  * After scoring, pure score-sort clusters items from the same store
  * together (because they share similar brand/image/recency traits).
- * This interleave ensures variety — no more than `maxConsecutive` items
+ * This interleave ensures variety, no more than `maxConsecutive` items
  * from the same store appear in a row, while still respecting score
  * order as much as possible.
  */

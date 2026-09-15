@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "playwright/test";
 import { createHash } from "node:crypto";
 
-// Tier 6 — online selling and shipping, as the owner sees it: a piece carries its measurements,
+// Tier 6: online selling and shipping, as the owner sees it: a piece carries its measurements,
 // its grade and where it ships on the storefront; an unweighed coat is no longer quoted as a small
 // parcel; three pieces bought together are one row, one label, one Mark posted; and the shipping
 // prices she sets are in her own currency with VYA's shown greyed behind them.
@@ -101,7 +101,7 @@ test.describe("A piece · sizing and condition as structure, and where it ships 
     await expect(page.getByTestId("condition-extra")).toContainText("one loose button");
    }
    await expect(page.getByTestId("flaws").locator("li")).toHaveCount(1);
-   // Ships to: only once the store has saved shipping at all — otherwise the page says nothing.
+   // Ships to: only once the store has saved shipping at all. Otherwise the page says nothing.
    const setup = await request.get(`/api/store/onboarding-status?store=${STORE}`, { headers: cookie() });
    const shippingOn = ((await setup.json()).setup as { id: string; done: boolean }[]).find((s) => s.id === "shipping")?.done === true;
    const shipsTo = page.getByTestId("ships-to");
@@ -240,7 +240,7 @@ test.describe("Settings › Shipping · her own prices, in her currency (#26)", 
   await expect(home).toBeVisible();
   await expect(home).toContainText("£");
   await expect(home).not.toContainText("$");
-  // Her prices where she set them (zero included — free small parcels), VYA's greyed where she didn't.
+  // Her prices where she set them (zero included. Free small parcels), VYA's greyed where she didn't.
   await expect(home.getByLabel("Your own country Small price")).toHaveValue("0");
   await expect(home.getByLabel("Your own country Medium price")).toHaveValue("4.5");
   await expect(home.getByLabel("Your own country Large price")).toHaveValue("");
@@ -250,7 +250,7 @@ test.describe("Settings › Shipping · her own prices, in her currency (#26)", 
   await expect(page.getByTestId("tier-prices-europe")).toBeVisible();
   await expect(page.getByTestId("tier-prices-north_america")).toHaveCount(0);
   await expect(page.getByTestId("tier-prices-europe").getByLabel("Europe Medium price")).toHaveAttribute("placeholder", "14");
-  // Reset clears the row's overrides — the save carries no rates for home.
+  // Reset clears the row's overrides. The save carries no rates for home.
   await expect(page.getByTestId("tier-prices-europe").getByRole("button", { name: "Reset to VYA’s" })).toHaveCount(0);
   await home.getByRole("button", { name: "Reset to VYA’s" }).click();
   await expect.poll(() => saved).not.toBeNull();

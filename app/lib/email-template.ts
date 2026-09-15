@@ -3,7 +3,7 @@
 //
 // The reference is the way good fashion retail email actually reads: the shop's name at the top,
 // one plain line of context, ONE big serif sentence saying the thing, a small line under it, one
-// button — and then, if there are pieces to show, each one as a photo beside its name with its own
+// button, and then, if there are pieces to show, each one as a photo beside its name with its own
 // button. Nothing else. No grid of tiles, no stacked banners, no second call to action competing
 // with the first.
 //
@@ -11,8 +11,8 @@
 // note are the same email with different words. Writing each one separately is how a store ends up
 // with three different-looking emails and no way to restyle them together.
 //
-// A store can change what it should be able to change — logo, colours, fonts, the button word, the
-// footer — and everything else stays consistent, because the consistency is the point.
+// A store can change what it should be able to change. Logo, colours, fonts, the button word, the
+// footer, and everything else stays consistent, because the consistency is the point.
 //
 // Email HTML rules, which is why this looks the way it does: tables not flex, inline styles not
 // classes, no external CSS, images with explicit widths, and a plain-text-ish reading order so it
@@ -32,12 +32,12 @@ export type EmailLink = { label: string; url: string };
  * The shape of the email, not its colours.
  *
  * One layout for everything made every template look like the same email with different words. Each
- * of these is a genuinely different arrangement — and all of them take the store's own logo, colours
+ * of these is a genuinely different arrangement, and all of them take the store's own logo, colours
  * and fonts, so two shops picking the same design still send two different-looking emails. That's the
  * part a stock template gallery can't do.
  */
 export type EmailDesign =
- | "classic"    // logo, headline, button, pieces beneath — the everyday one
+ | "classic"    // logo, headline, button, pieces beneath. The everyday one
  | "statement"  // headline reversed out of the accent colour, full width. For an announcement.
  | "photo"      // the first piece full-bleed at the top, words underneath
  | "editorial"  // centred serif between hairline rules, generous space
@@ -52,14 +52,14 @@ export type StoreEmailOptions = {
  /**
   * The grey line an inbox shows after the subject.
   *
-  * Left unset, mail clients grab the first words of the email — usually the shop's own name, which
+  * Left unset, mail clients grab the first words of the email. Usually the shop's own name, which
   * wastes the second most valuable line in the inbox. Hidden in the body itself, which is the only
   * way to set it: there's no header for it.
   */
  preheader?: string | null;
  /** The one big sentence. This is the email. */
  headline: string;
- /** The small line under it. Optional — most emails don't need one. */
+ /** The small line under it. Optional: most emails don't need one. */
  subhead?: string | null;
  /** A discount code, shown plainly. */
  code?: string | null;
@@ -76,16 +76,16 @@ export type StoreEmailOptions = {
  /**
   * What the email sits on.
   *
-  * "brand" makes the WHOLE email the store's colour — the thing every good resale email in the
+  * "brand" makes the WHOLE email the store's colour. The thing every good resale email in the
   * references does, and the thing a white email with a coloured button cannot fake. Text flips to a
   * readable tone automatically, so a pale pink ground gets dark type and a deep brown gets light.
   */
  ground?: "white" | "brand";
- /** Pieces in bands, each under its own heading — "UNDER $500", "Pick Your Prints". */
+ /** Pieces in bands, each under its own heading. "UNDER $500", "Pick Your Prints". */
  sections?: { heading?: string | null; products: EmailProduct[]; columns?: 2 | 3 }[];
  /** Show prices under the pieces. Off suits one-of-one resale, where the name is the draw. */
  showPrices?: boolean;
- /** The small nav row under the logo — Shop, New in, About. */
+ /** The small nav row under the logo. Shop, New in, About. */
  navLinks?: EmailLink[];
  /** Instagram and the rest, as words. Icon fonts don't render in email. */
  social?: EmailLink[];
@@ -108,7 +108,7 @@ const esc = (s: string) =>
  * Strip the markdown a store writes into an automation body.
  *
  * Campaign bodies are markdown, so a store types "# Just landed" and expects a heading. This
- * template sets the headline in the heading face itself, so the "#" has nothing left to do — and
+ * template sets the headline in the heading face itself, so the "#" has nothing left to do, and
  * left in, it renders literally: the preview read "# Just landed", hash and all.
  */
 export function plainText(s: string): string {
@@ -136,7 +136,7 @@ const SANS = "'Helvetica Neue',Helvetica,Arial,sans-serif";
  * The whole email.
  *
  * Everything except `storeName` and `headline` is optional, and each part simply doesn't render
- * when it's missing — so a one-line welcome and a six-piece new-arrivals send are the same call.
+ * when it's missing, so a one-line welcome and a six-piece new-arrivals send are the same call.
  */
 export function storeEmailHtml(o: StoreEmailOptions): string {
  const b = o.brand ?? {};
@@ -261,7 +261,7 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
   </div>`;
 
  // Load the faces the store picked. Without this the email NAMES a font it never fetches, so every
- // choice fell back to Georgia and the picker looked broken — which it effectively was.
+ // choice fell back to Georgia and the picker looked broken, which it effectively was.
  // Gmail and Apple Mail honour this link; Outlook ignores it and gets the fallback, which is why
  // each stack still ends in a real serif or sans rather than a bare family name.
  const families = [headFamily, bodyFamily]
@@ -316,7 +316,7 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
   * Pieces in bands.
   *
   * Every email in the references does this: a heading on the ground colour, then a tight grid, then
-  * another. It's what lets one email carry eight pieces without reading as a catalogue dump — the
+  * another. It's what lets one email carry eight pieces without reading as a catalogue dump. The
   * bands give a shopper somewhere to stop.
   */
  const band = (sec: { heading?: string | null; products: EmailProduct[]; columns?: 2 | 3 }) => {
@@ -338,7 +338,7 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
    const missing = cols - sec.products.slice(i, i + cols).length;
    rows.push(`<tr>${row}${`<td width="${w}"></td>`.repeat(missing)}</tr>`);
   }
-  // The heading sits ON the ground as a band, the way "UNDER $500" does — a rule above and below,
+  // The heading sits ON the ground as a band, the way "UNDER $500" does. A rule above and below,
   // centred, in the heading face. It reads as a divider rather than as another line of copy.
   const head = sec.heading
    ? `<tr><td style="padding:6px 8px 20px;">
@@ -356,7 +356,7 @@ export function storeEmailHtml(o: StoreEmailOptions): string {
   gridRows.push(`<tr>${gridCell(products[i])}${products[i + 1] ? gridCell(products[i + 1]) : '<td width="50%"></td>'}</tr>`);
  }
  // The grid builds its own table instead of reusing productsBlock, so it has to render the heading
- // itself — otherwise "Heading above the pieces" silently vanishes on this one layout.
+ // itself: otherwise "Heading above the pieces" silently vanishes on this one layout.
  const gridHeading = o.productsHeading && products.length
   ? `<tr><td align="center" style="font-family:${heading};font-size:20px;line-height:1.3;color:${text};text-align:center;padding:0 0 22px;">${esc(o.productsHeading)}</td></tr>`
   : "";

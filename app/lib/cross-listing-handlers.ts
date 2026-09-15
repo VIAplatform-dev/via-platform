@@ -6,7 +6,7 @@ import { markCrossListing, platformByKey } from "./cross-listing-db";
 //
 // Queueing and marking-listed differ between Depop and Vestiaire by exactly one string: the platform
 // key. Copying twenty lines per marketplace is how the third one ends up subtly different from the
-// first — so both call these, and a new marketplace is a three-line route file.
+// first, so both call these, and a new marketplace is a three-line route file.
 
 /**
  * Record that the seller means to list this piece here.
@@ -30,7 +30,7 @@ export async function queueForPlatform(request: NextRequest, platform: string): 
 /**
  * The extension reporting back that the seller actually posted it.
  *
- * The URL is optional because not every site shows one at the moment of posting — a listing with no
+ * The URL is optional because not every site shows one at the moment of posting. A listing with no
  * link recorded is still listed, and pretending otherwise would leave the board permanently wrong.
  */
 export async function markListedOnPlatform(request: NextRequest, platform: string): Promise<NextResponse> {

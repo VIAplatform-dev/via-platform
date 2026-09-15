@@ -1,14 +1,14 @@
 // Every field of a listing the phone can edit, as data.
 //
 // It lives out here rather than inside the screen so a test can read it, because the thing that
-// keeps going wrong is not the editing — it is the LIST. A piece is one record; the web editor and
+// keeps going wrong is not the editing. It is the LIST. A piece is one record; the web editor and
 // /api/store/items/[id] have always carried fourteen fields and the phone carried eight, so
 // `description`, `era`, `material`, `colour`, `category` and the parcel numbers could be set on a
 // laptop and then neither seen nor corrected at the counter. The seller's report was "not all the
 // details that should be there", which is exactly right.
 //
 // WEB_PATCH_FIELDS below is a copy of what app/api/store/items/[id]/route.ts accepts, and the test
-// asserts this file covers it. A copy can go stale — it cannot import across the two packages — so
+// asserts this file covers it. A copy can go stale, it cannot import across the two packages, so
 // it is worth being plain about what it does and does not buy: it catches a field being dropped
 // from the phone, not a field being added to the web. Adding one there means adding it here too.
 
@@ -28,7 +28,7 @@ export type ListingField = {
 export const FIELDS: ListingField[] = [
   { key: "title", label: "Title" },
   { key: "price", label: "Price", numeric: true },
-  // What she paid — the one number the margin report can't do without.
+  // What she paid: the one number the margin report can't do without.
   { key: "cost", label: "Cost", numeric: true, placeholder: "what you paid" },
   { key: "brand", label: "Brand" },
   { key: "era", label: "Era", placeholder: "Late 1990s" },
@@ -37,14 +37,14 @@ export const FIELDS: ListingField[] = [
   { key: "size", label: "Size" },
   { key: "category", label: "Category", placeholder: "Bags" },
   { key: "condition", label: "Condition" },
-  // Beyond the grade — her words on the wear, the same note Review and the web editor take.
+  // Beyond the grade: her words on the wear, the same note Review and the web editor take.
   { key: "conditionNote", label: "Condition note", placeholder: "light wear to the sole, tiny mark inside…" },
   // One comma-separated line, like Review; stored as the list the product page prints.
-  { key: "flaws", label: "Flaws", placeholder: "scuffed toe, light pilling — comma-separated" },
+  { key: "flaws", label: "Flaws", placeholder: "scuffed toe, light pilling. Comma-separated" },
   // The paragraph a shopper reads. Last of the words, and multiline so it isn't a one-line box
   // holding two thousand characters.
   { key: "description", label: "Description", multiline: true, placeholder: "How it feels, what it goes with, why you bought it…" },
-  // The box is not typed — it is chosen, from the same "Ships in" list the web offers, which
+  // The box is not typed. It is chosen, from the same "Ships in" list the web offers, which
   // writes lengthIn/widthIn/heightIn from the preset (see lib/seller/packaging.ts). Nobody
   // measures a mailer. The WEIGHT stays a field, because the buyer's postage is chosen by the
   // larger of weight and girth and it is the one number the box cannot supply.
@@ -73,7 +73,7 @@ export const WEB_PATCH_FIELDS: string[] = [
  * wins here, because a cap that lets her pick 20 and then silently stores 15 on the listing flow is
  * worse than one that is honest up front.
  *
- * Six was the old number, invented by the camera screen — it meant the phone, the device she
+ * Six was the old number, invented by the camera screen. It meant the phone, the device she
  * actually shoots on, accepted fewer photos than the web did.
  */
 export const MAX_PHOTOS = 15;

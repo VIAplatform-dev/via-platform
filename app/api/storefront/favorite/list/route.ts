@@ -16,7 +16,7 @@ export async function OPTIONS(req: NextRequest) {
  return withCors(req, new NextResponse(null, { status: 204 }));
 }
 
-// GET ?slug= — the signed-in shopper's saved pieces at this store.
+// GET ?slug= the signed-in shopper's saved pieces at this store.
 //
 // `signedIn` is the whole point of the answer, not a detail of it: the storefront draws a different
 // drawer for somebody who has no list yet and somebody who has not said who they are. Both have an

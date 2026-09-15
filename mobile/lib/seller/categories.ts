@@ -1,10 +1,10 @@
-// The categories a piece can be — the phone's mirror of the web's taxonomy. Pure.
+// The categories a piece can be. The phone's mirror of the web's taxonomy. Pure.
 //
 // WHY THIS EXISTS. The phone had no category list at all. Every screen that wanted one asked for
 // free text ("Category: Bags"), which is three separate problems wearing one coat:
 //
 //   1. MEASUREMENTS ARE CHOSEN BY CATEGORY (measurements.ts). A piece with no category, or with a
-//      word the templates don't recognise, gets the generic length/width pair — so the buyer of a
+//      word the templates don't recognise, gets the generic length/width pair, so the buyer of a
 //      dress never sees a waist. Market Mode's quick list is where this bites hardest: it creates
 //      a piece from a price and a photo, and everything it made arrived in Drafts uncategorised.
 //   2. The storefront navigates by these slugs (categoryMap on the web). "bag", "Bags" and
@@ -13,8 +13,8 @@
 //      were therefore filed differently, and only one of them could be found again.
 //
 // The slugs and their grouping are copied from app/lib/item-tags.ts (CATEGORY_GROUPS) and the
-// labels from app/lib/categoryMap.ts. A copy can go stale — the phone cannot import across the two
-// packages — so categories.test.ts asserts the one thing that actually breaks when it does: that
+// labels from app/lib/categoryMap.ts. A copy can go stale. The phone cannot import across the two
+// packages, so categories.test.ts asserts the one thing that actually breaks when it does: that
 // every slug offered here still has a measurement template matching the web's.
 
 export type CategoryGroup = { label: string; slugs: string[] };
@@ -49,7 +49,7 @@ export const isCanonicalCategory = (v: string | null | undefined): boolean => !!
  * What to print for a stored category.
  *
  * A stored value is either one of the slugs above or whatever the seller typed before there was a
- * list — so an unrecognised value is shown as she wrote it rather than replaced or hidden.
+ * list, so an unrecognised value is shown as she wrote it rather than replaced or hidden.
  */
 export function categoryLabel(value: string | null | undefined): string {
   const v = String(value ?? "").trim();

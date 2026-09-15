@@ -1,11 +1,11 @@
 // Working out a theme's cart layout by watching it render two products we chose.
 //
 // THE PROBLEM. Shopify renders a theme's sections from Liquid, on their servers, from files we do
-// not have. When a shopper adds to cart, the theme asks us for the re-rendered HTML — so we have to
+// not have. When a shopper adds to cart, the theme asks us for the re-rendered HTML, so we have to
 // reproduce markup we cannot render. Every cart bug we have is downstream of that.
 //
 // WHAT WE USED TO DO. Hardcode one theme's class names (`cart-item`, `#CartDrawer`,
-// `totals__subtotal-value`). Those are Dawn's. Horizon calls a row `cart-items__table-row` — and so
+// `totals__subtotal-value`). Those are Dawn's. Horizon calls a row `cart-items__table-row`, and so
 // is its table HEADER, so the selector matched the header first and every cart line rendered as
 // "Product image / Product information". Adding a Horizon branch buys two themes and fails on the
 // third: themes are arbitrary markup, customisable per store, with no finite list to enumerate.
@@ -27,7 +27,7 @@
 import * as cheerio from "cheerio";
 import type { Element as DomEl } from "domhandler";
 
-/** Where a value sits inside the row — a path of child indices from the row's root, never a class
+/** Where a value sits inside the row. A path of child indices from the row's root, never a class
  *  name. A path cannot accidentally match a table header the way `[class*='cart-item']` did. */
 export type Slot = { path: number[]; kind: "text" | "attr"; attr?: string };
 
@@ -40,16 +40,16 @@ export type CartTemplate = {
  slots: { title?: Slot; price?: Slot; image?: Slot; href?: Slot };
  /** Every element whose text was the sum of the two known prices. */
  subtotalPaths: number[][];
- /** Leaves inside the row that describe the TEMPLATE's product and nothing else — a vendor, a SKU,
+ /** Leaves inside the row that describe the TEMPLATE's product and nothing else. A vendor, a SKU,
   *  a variant label. We have no value to substitute, so they are dropped rather than shown wrong. */
  stalePaths: number[][];
- /** Text that appears only when the cart is empty — the empty state to hide when it is not. */
+ /** Text that appears only when the cart is empty. The empty state to hide when it is not. */
  emptyMarkers: string[];
  /** 0..1. Below the caller's threshold, use VYA's own cart markup instead of guessing. */
  confidence: number;
 };
 
-/** One of the two products we deliberately put in the cart — our answer key. */
+/** One of the two products we deliberately put in the cart. Our answer key. */
 export type KnownItem = {
  title: string;
  priceText: string;
@@ -75,7 +75,7 @@ function pathTo($: cheerio.CheerioAPI, root: DomEl, el: DomEl): number[] | null 
 }
 
 /**
- * The element that holds item A and nothing of item B — A's row.
+ * The element that holds item A and nothing of item B. A's row.
  *
  * Elements containing A-and-not-B form a chain from the title element up to the row; the row's
  * PARENT holds both, so the row is the SHALLOWEST link in that chain. Taking the deepest would give
@@ -128,7 +128,7 @@ function moneyValue(s: string): number | null {
  return Number.isFinite(n) ? n : null;
 }
 
-/** A leaf whose ENTIRE text is an amount. Such a field is restateable — we know the price — so it
+/** A leaf whose ENTIRE text is an amount. Such a field is restateable, we know the price, so it
  *  must never be treated as an un-substitutable per-product field. */
 const MONEY_LEAF = /^[^\d]{0,3}[\d,]+(\.\d{2})?\s*[A-Za-z]{0,3}$/;
 
@@ -137,7 +137,7 @@ const MONEY_LEAF = /^[^\d]{0,3}[\d,]+(\.\d{2})?\s*[A-Za-z]{0,3}$/;
  *
  * The known URL comes from products.json ("…/109.jpg?v=17841") while the cart page renders a RESIZED
  * variant ("…/109_150x150.jpg?v=17841"). Comparing the strings never matches, so the image slot was
- * never found — and every cart line then showed the TEMPLATE's picture, which is what a shopper
+ * never found, and every cart line then showed the TEMPLATE's picture, which is what a shopper
  * actually saw: two different bags with the same photo.
  */
 function imageKey(url: string): string {
@@ -172,7 +172,7 @@ export function deriveCartTemplate(opts: {
 
  const rowA = findRow($, a, b);
  if (!rowA) return null;
- // Both known items must be present, or we cannot tell what repeats — one row is a coincidence.
+ // Both known items must be present, or we cannot tell what repeats. One row is a coincidence.
  const rowB = findRow($, b, a);
  if (!rowB) return null;
 
@@ -205,7 +205,7 @@ export function deriveCartTemplate(opts: {
  }
  if (a.href) slots.href = findSlot($, rowA, (el) => el.tagName === "a" && ($(el).attr("href") || "").includes(a.href!), "attr", "href");
 
- // The subtotal is the number that is neither item's price — it can only be their sum.
+ // The subtotal is the number that is neither item's price. It can only be their sum.
  const subtotalPaths: number[][] = [];
  const priceB = moneyValue(b.priceText);
  const sum = priceA != null && priceB != null ? priceA + priceB : null;
@@ -221,7 +221,7 @@ export function deriveCartTemplate(opts: {
  // Fields that describe the template's product and cannot be restated for a different one.
  //
  // Found by comparing the two rows position by position: a leaf whose text DIFFERS between them is
- // per-product. The title and price differ too, but those have slots and get filled — everything
+ // per-product. The title and price differ too, but those have slots and get filled. Everything
  // else (a vendor line, a SKU, a variant label) has no value we could put there. Showing the
  // template's is worse than showing none: a real Dawn store rendered "PradaMonogram Pochette" on
  // every line because the vendor came along with the row.
@@ -230,10 +230,10 @@ export function deriveCartTemplate(opts: {
  );
  const stalePaths: number[][] = [];
  for (const el of $(rowA).find("*").toArray() as DomEl[]) {
-  if ($(el).children().length) continue; // leaves only — a wrapper's difference is its children's
+  if ($(el).children().length) continue; // leaves only: a wrapper's difference is its children's
   const text = norm($(el).text());
   if (!text) continue;
-  // A price differs between the two rows but is not "stale" — render fills every money field.
+  // A price differs between the two rows but is not "stale". Render fills every money field.
   if (MONEY_LEAF.test(text) && moneyValue(text) != null) continue;
   const p = pathTo($, rowA, el);
   if (!p || slotKeys.has(p.join("."))) continue;

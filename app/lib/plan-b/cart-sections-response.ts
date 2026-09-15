@@ -1,6 +1,6 @@
 // The `sections` half of every cart response, in one place.
 //
-// Dawn-family themes don't just POST a cart change — they also ask the server to re-render named
+// Dawn-family themes don't just POST a cart change. They also ask the server to re-render named
 // sections and swap the HTML into the page. If `sections` is missing from the response, the theme's
 // own callback throws reading `sections[id]` off nothing, and the shopper is shown
 // "There was an error while updating your cart" even though the change was applied.
@@ -38,7 +38,7 @@ export async function buildCartSectionsResponse(opts: {
   const alt = path.endsWith("/") ? path.replace(/\/+$/, "") : `${path}/`;
   pageHtml = await getCapturePage(slug, alt).catch(() => null);
  }
- // The drawer and cart icon live in the site header, which is on every page — so when the calling
+ // The drawer and cart icon live in the site header, which is on every page, so when the calling
  // page was never captured (product pages are rendered on demand), the home page serves as well.
  if (!pageHtml) pageHtml = await getCapturePage(slug, "/").catch(() => null);
 

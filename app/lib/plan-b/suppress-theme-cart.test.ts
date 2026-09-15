@@ -5,14 +5,14 @@ import { suppressThemeCart, THEME_CART_SELECTORS } from "./suppress-theme-cart.t
 
 const has = (sel: string) => THEME_CART_SELECTORS.some((s) => s.startsWith(sel));
 
-// Shopify — the family this started with.
+// Shopify: the family this started with.
 test("hides Shopify's cart drawer and notification", () => {
  for (const s of ["#CartDrawer", "cart-drawer", "cart-drawer-component", ".cart-notification"]) {
   assert.ok(has(s), `${s} should be suppressed`);
  }
 });
 
-// Squarespace — found live on lei-vintage and montrose-edit, where BOTH carts opened at once
+// Squarespace: found live on lei-vintage and montrose-edit, where BOTH carts opened at once
 // because the suppression list only knew Shopify's names.
 test("hides Squarespace's cart too", () => {
  for (const s of [".sqs-custom-cart", ".Cart-inner", ".sqs-cart-dropdown", ".commerce-mini-cart-root"]) {
@@ -21,7 +21,7 @@ test("hides Squarespace's cart too", () => {
 });
 
 // The shopper still needs something to press. Squarespace's icon links to /cart, which VYA's cart
-// script intercepts — hiding it would leave no way to open the bag at all.
+// script intercepts. Hiding it would leave no way to open the bag at all.
 test("never hides the cart ICON, only the panel it opens", () => {
  for (const s of THEME_CART_SELECTORS) {
   assert.ok(!/header-actions-action--cart|icon--cart|cart-icon-bubble|\.cart-quantity/.test(s),
@@ -60,7 +60,7 @@ test("survives empty input", () => {
 
 test("the rescue rule does not force our pill back on top of the theme's own bag", () => {
  // Found in a real browser on 20 of 23 stores. The rule that keeps a theme's stylesheet from
- // hiding OUR drawer was written to cover the floating pill too — and `!important` beat the rule
+ // hiding OUR drawer was written to cover the floating pill too, and `!important` beat the rule
  // that hides the pill on stores whose own cart icon we've already bound. Two bags, everywhere.
  const out = suppressThemeCart(`<html><head></head><body data-vya-has-cart-control="1"></body></html>`);
  assert.match(out, /body\[data-vya-has-cart-control\][^{]*#vya-cart-btn\s*\{[^}]*display:\s*none\s*!important/);

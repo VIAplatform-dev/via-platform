@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
  let skippedCount = 0;
 
  if (hasMultiUrls) {
- // Multi-URL store — fetch each, merge, dedupe by title
+ // Multi-URL store: fetch each, merge, dedupe by title
  const seen = new Set<string>();
  const merged: SquarespaceProduct[] = [];
  for (const u of shopUrls!) {
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
  if (products.length === 0) {
  return NextResponse.json({
  success: false,
- error: "0 products returned from store — sync skipped to prevent data loss",
+ error: "0 products returned from store. Sync skipped to prevent data loss",
  skippedCount,
  });
  }
@@ -135,8 +135,8 @@ export async function GET() {
  method: "POST",
  body: {
  storeName: "Store Display Name",
- shopUrl: "https://example.com/shop (recommended — uses JSON API with prices)",
- rssUrl: "https://example.com/products?format=rss (fallback — may lack prices)",
+ shopUrl: "https://example.com/shop (recommended. Uses JSON API with prices)",
+ rssUrl: "https://example.com/products?format=rss (fallback: may lack prices)",
  },
  },
  example: {

@@ -22,8 +22,8 @@ function isAuthorized(request: NextRequest): boolean {
  return !!adminToken && adminToken === hashPassword(adminPassword);
 }
 
-// GET /api/admin/data-products?days=30 — funnel + price/velocity + search trends
-// + sizing demand. Internal / beta — not exposed to stores.
+// GET /api/admin/data-products?days=30: funnel + price/velocity + search trends
+// + sizing demand. Internal / beta, not exposed to stores.
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const { searchParams } = new URL(request.url);

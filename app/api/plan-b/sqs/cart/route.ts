@@ -4,7 +4,7 @@ import { buildSqsCart, NO_CART_MESSAGE } from "@/app/lib/plan-b/sqs-cart-json";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/commerce/shopping-cart — Squarespace's own bundle asks for the cart on every page load,
+// GET /api/commerce/shopping-cart: Squarespace's own bundle asks for the cart on every page load,
 // then syncs the header pill from what comes back. Middleware rewrites a store origin's request
 // here (see squarespaceThemeRoute).
 export async function GET(request: NextRequest) {

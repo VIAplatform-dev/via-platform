@@ -1,14 +1,14 @@
 import { quantile } from "./metrics";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — eBay comps (external price + competition signal).
+// Data Layer: eBay comps (external price + competition signal).
 //
 // Uses the open Browse API (active listings → asking-price band + how many are
 // listed) via an app OAuth token. Graceful: with no EBAY_CLIENT_ID/SECRET it
 // returns null and the rest of the system simply runs on VYA data alone.
 //
 // Sold comps (Marketplace Insights, approval-gated) slot in later as
-// `soldPer30d` — the blended verdict already handles it.
+// `soldPer30d`: the blended verdict already handles it.
 // ───────────────────────────────────────────────────────────────────────────
 
 const OAUTH_URL = "https://api.ebay.com/identity/v1/oauth2/token";
@@ -52,7 +52,7 @@ export type EbayComps = {
  soldPer30d?: number | null; // filled when Marketplace Insights is enabled
 };
 
-// Raw title+price for the active listings of a query — the input to sub-market clustering.
+// Raw title+price for the active listings of a query. The input to sub-market clustering.
 // (searchComps discards titles; this keeps them so a wide brand can be split into real segments.)
 export async function searchListings(query: string, limit = 50): Promise<{ title: string; price: number }[]> {
  const token = await getEbayToken();
@@ -72,7 +72,7 @@ export async function searchListings(query: string, limit = 50): Promise<{ title
 }
 
 // A single active listing with the fields a sourcing / flip-finder needs (URL to buy, image,
-// condition, seller) — searchListings/searchComps drop these.
+// condition, seller): searchListings/searchComps drop these.
 export type DetailedListing = {
  itemId: string;
  title: string;

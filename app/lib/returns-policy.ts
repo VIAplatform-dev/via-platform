@@ -13,11 +13,11 @@
 // written to again.
 //
 // A STORE'S POLICY IS THE STORE'S. Nothing here rewrites, normalises or summarises what a seller
-// wrote — the merge picks WHICH of two records to read, and never edits either one's content. The
+// wrote: the merge picks WHICH of two records to read, and never edits either one's content. The
 // only text VYA ever generates is the one-line summary beside the rules (policySummary), which is
 // built from the numbers and has never been the seller's prose.
 //
-// Pure — no database. store-policy-db does the reading.
+// Pure, no database. store-policy-db does the reading.
 
 /**
  * The store's returns text, from the record that holds it.
@@ -35,7 +35,7 @@ export function resolveReturnsText(canonical: string | null | undefined, legacy:
 /**
  * Does this store still have its words only in the old place?
  *
- * True means a save should carry them across rather than start from an empty box — the seller opens
+ * True means a save should carry them across rather than start from an empty box. The seller opens
  * the Policies page and finds what she wrote on the other screen, instead of a blank she assumes
  * means nothing was ever saved.
  */

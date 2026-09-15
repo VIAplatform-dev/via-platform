@@ -2,11 +2,11 @@ import { neon } from "@neondatabase/serverless";
 import type { Granularity, Window } from "./period";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — shared plumbing for the store suite.
+// Analytics: shared plumbing for the store suite.
 //
 // Every metric module below this file follows the same three rules:
 //   1. Scope by seller id (resolved once, in the suite), never by re-joining slug.
-//   2. Take a resolved Window — no module invents its own idea of "this period".
+//   2. Take a resolved Window, no module invents its own idea of "this period".
 //   3. Degrade to zeros, never throw. A fresh store, or a table an older
 //      deployment hasn't created yet, must render an empty dashboard rather
 //      than a 500. `safe()` is the one place that policy lives.
@@ -22,7 +22,7 @@ export function db() {
  * The order statuses that count as a realised sale. Money has moved and the sale
  * stands: `fulfilled` is a terminal success alongside paid/shipped/delivered.
  * `pending` hasn't been paid, `cancelled`/`refunded` are explicitly not revenue.
- * Exported so every surface reports the same GMV — there is exactly one
+ * Exported so every surface reports the same GMV. There is exactly one
  * definition of "sold" in the product.
  */
 export const SOLD_STATUSES = ["paid", "shipped", "delivered", "fulfilled"];
@@ -73,7 +73,7 @@ export const ratePct = (n: number, d: number): number => (d > 0 ? Math.round((n 
 /** Integer-cents mean, guarding the empty case. */
 export const meanCents = (total: number, count: number): number => (count > 0 ? Math.round(total / count) : 0);
 
-/** Median of a numeric list (computed in JS — the sets here are small). */
+/** Median of a numeric list (computed in JS: the sets here are small). */
 export function median(values: number[]): number | null {
  const xs = values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b);
  if (!xs.length) return null;
@@ -103,7 +103,7 @@ export function percentileOf(value: number | null, population: number[]): number
 /**
  * The `date_trunc` unit for a granularity. Postgres accepts the unit as a bind
  * parameter, so callers pass this straight into the query rather than
- * interpolating — no string building anywhere near the SQL.
+ * interpolating, no string building anywhere near the SQL.
  */
 export function truncUnit(g: Granularity): string {
  return g === "day" ? "day" : g === "week" ? "week" : "month";

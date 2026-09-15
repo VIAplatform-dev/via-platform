@@ -1,6 +1,6 @@
-// Real resale comps via SerpApi — eBay *sold* listings (actual transaction prices,
+// Real resale comps via SerpApi. EBay *sold* listings (actual transaction prices,
 // the gold standard) plus Google Shopping (broad market). Gated behind the key AND
-// an explicit enable flag, so it's fully dormant — no calls, no spend — until you
+// an explicit enable flag, so it's fully dormant, no calls, no spend, until you
 // subscribe and flip PHOTOROOM-style SERPAPI_ENABLED=true.
 
 import { unstable_cache } from "next/cache";
@@ -47,7 +47,7 @@ const LENS_PRODUCTS_MIN_PRICED = Number(process.env.VYA_LENS_PRODUCTS_MIN_PRICED
 export type VisualMatch = { title: string; priceCents: number | null; source: string; link?: string; thumbnail?: string; similarity?: number; pricedFrom?: "products" };
 
 /** Reverse-image search (Google Lens) for the exact / visually-identical product.
- *  This is the single best signal for BRAND ID and true price — it finds the same
+ *  This is the single best signal for BRAND ID and true price. It finds the same
  *  piece listed across the web instead of guessing from the look. [] if not enabled. */
 export async function reverseImageMatches(imageUrl: string): Promise<VisualMatch[]> {
  if (!isCompsConfigured() || !imageUrl) return [];
@@ -65,19 +65,19 @@ export async function reverseImageMatches(imageUrl: string): Promise<VisualMatch
  matches = mergeLensMatches(matches, products);
  console.log(`[lens-products] primary_priced=${pricedCount(parseLensMatches(r))} products=${products.length} merged_priced=${pricedCount(matches)}`);
  }
- // Cache only a genuine SerpApi response (r != null) — never persist a transient timeout/error as
+ // Cache only a genuine SerpApi response (r != null), never persist a transient timeout/error as
  // "no matches", which would poison this photo's lookups for the whole TTL.
  if (r) await saveCachedLens(imageUrl, matches);
  return matches;
 }
 
 /** Adaptive multi-frame reverse image. Sellers upload several photos but only the first
- *  ever gets searched — a bad primary frame (folded, back, a detail shot) finds nothing
+ *  ever gets searched. A bad primary frame (folded, back, a detail shot) finds nothing
  *  even when a later frame would nail the exact piece. This tries the primary first and
  *  only escalates to the next frames when the evidence so far is WEAK, merging + deduping
  *  matches across the frames it actually ran. Quota-aware: a clean product shot still
  *  costs exactly one Lens call; extra calls are spent only on the hard cases that need them.
- *  `strong(matchesSoFar)` decides "we have enough, stop" — the caller supplies it because
+ *  `strong(matchesSoFar)` decides "we have enough, stop". The caller supplies it because
  *  what counts as enough (brand consensus vs. priced comps) depends on the intake context. */
 export async function reverseImageBestOf(
  imageUrls: string[],
@@ -99,17 +99,17 @@ export async function reverseImageBestOf(
  seen.add(k);
  merged.push(m);
  }
- if (strong(merged)) break; // enough evidence — don't spend more quota on this listing
+ if (strong(merged)) break; // enough evidence: don't spend more quota on this listing
  }
  return { matches: merged, framesUsed };
 }
 
-// Editorial / archival photo sources — Getty & the fashion press. Their captions are the richest
+// Editorial / archival photo sources. Getty & the fashion press. Their captions are the richest
 // PROVENANCE signal (who wore it, which show/season) and frequently DON'T name the brand, so they'd
 // be dropped by the brand filter that guards pricing. We mine them separately for runway + celebrity.
 const EDITORIAL_SOURCE = /getty|gettyimages|wireimage|imaxtree|shutterstock|vogue|wwd\.com|\bwwd\b|gorunway|firstview|nowfashion|launchmetrics|harper|harpersbazaar|elle\.com|hola|popsugar|whowhatwear|redcarpet/i;
 
-/** Titles/captions of reverse-image matches that come from editorial/Getty sources — the raw
+/** Titles/captions of reverse-image matches that come from editorial/Getty sources. The raw
  *  evidence for "documented on the runway" and "as seen on <celebrity>". Kept UN-brand-filtered
  *  on purpose: a red-carpet caption naming the wearer rarely repeats the brand. [] if none. */
 export function editorialCaptions(matches: VisualMatch[]): string[] {
@@ -121,13 +121,13 @@ export function editorialCaptions(matches: VisualMatch[]): string[] {
 // below the same-physical-item bar used in bulk grouping. Tunable per real data via env + the log.
 const VISUAL_MATCH_MIN = Number(process.env.VYA_VISUAL_MATCH_MIN) || 0.68;
 
-/** Google Lens returns visually-APPROXIMATE results — a different model of the same brand, a
- *  look-alike — and those wrong comps drag the price to the wrong number (the "$685 Gucci that
+/** Google Lens returns visually-APPROXIMATE results. A different model of the same brand, a
+ *  look-alike, and those wrong comps drag the price to the wrong number (the "$685 Gucci that
  *  actually resells for $1,800" case: the matched bag wasn't the same bag). This embeds each
  *  match's thumbnail and keeps only those that genuinely look like the query photo, tagging each
  *  with its `similarity` (best first). It only ever FILTERS when it has the signal: with no query
  *  embedding, no thumbnails, or a total embedding failure it returns the input unchanged, so we
- *  never make pricing worse — we just remove the matches we can prove are a different item. */
+ *  never make pricing worse. We just remove the matches we can prove are a different item. */
 export async function verifyMatchesByImage(
  queryEmbedding: number[] | null,
  matches: VisualMatch[],
@@ -164,7 +164,7 @@ export function matchesToComps(matches: VisualMatch[]): Comp[] {
  .map((m) => ({ title: m.title, priceCents: m.priceCents as number, currency: "USD", sold: false, source: (m.source || "Visual match") + (m.pricedFrom === "products" ? " (Lens products)" : ""), link: m.link }));
 }
 
-// Authenticated-luxury resellers — the truest comps for designer pieces; surfaced first so
+// Authenticated-luxury resellers. The truest comps for designer pieces; surfaced first so
 // they survive any downstream truncation before the valuation step sees them.
 const PREMIUM_SOURCE = /real\s?real|vestiaire|fashionphile|rebag|luxury\s?closet|1st\s?dibs|farfetch/i;
 
@@ -177,7 +177,7 @@ export function rankComps(comps: Comp[]): Comp[] {
 
 // Distinctive bag-MODEL names. Used to reject comps that are a different model than the query (e.g.
 // pricing a "Jumbo Single Flap" off "Accordion"/"Camera"/"Westminster" bags dragged the median wrong).
-// Generic words ("flap", "bag") are deliberately excluded — too many models share them.
+// Generic words ("flap", "bag") are deliberately excluded. Too many models share them.
 const BAG_MODELS = [
  "jumbo", "maxi", "single flap", "double flap", "classic flap", "medium flap", "small flap", "mini flap",
  "2.55", "reissue", "wallet on chain", "woc", "accordion", "camera bag", "westminster", "boy bag",
@@ -186,7 +186,7 @@ const BAG_MODELS = [
  "speedy", "neverfull", "alma", "keepall", "pochette", "capucines", "twist", "petite malle", "lady dior",
  "book tote", "montaigne", "gaucho", "marcie", "paddington", "faye", "antigona", "nightingale", "pandora",
  "luggage tote", "trapeze", "sunset", "vanity", "bucket", "backpack",
- // Distinctive silhouettes/shapes — a Saddle should not be priced off a Hobo, etc.
+ // Distinctive silhouettes/shapes. A Saddle should not be priced off a Hobo, etc.
  "hobo", "saddle", "pochette", "clutch", "tote bag", "shopper", "duffle", "bowling", "boston bag",
 ];
 
@@ -216,7 +216,7 @@ export function compactQuery(query: string): string {
 }
 
 /** Drop comps that are a DIFFERENT bag model than the query. Only fires when the query names a model
- *  AND a comp names ONLY other model(s) — comps with no model signal get the benefit of the doubt, and
+ *  AND a comp names ONLY other model(s). Comps with no model signal get the benefit of the doubt, and
  *  the caller falls back to the unfiltered set if this leaves too few. */
 export function filterModelConflicts(comps: Comp[], query: string): Comp[] {
  const q = query.toLowerCase();
@@ -230,7 +230,7 @@ export function filterModelConflicts(comps: Comp[], query: string): Comp[] {
  });
 }
 
-/** eBay SOLD + completed — real transaction prices (the reality anchor reverse-image can't
+/** eBay SOLD + completed. Real transaction prices (the reality anchor reverse-image can't
  *  give, since Google Lens shows asking/active listings). One SerpApi call. Searched on a COMPACT
  *  query so the model actually matches recent sold listings (recency also fixes stale valuations). */
 export async function fetchEbaySold(query: string): Promise<Comp[]> {
@@ -244,7 +244,7 @@ export async function fetchEbaySold(query: string): Promise<Comp[]> {
  return comps;
 }
 
-/** Google Shopping — broad keyword market. One SerpApi call. Used as a FALLBACK when the
+/** Google Shopping. Broad keyword market. One SerpApi call. Used as a FALLBACK when the
  *  reverse-image + eBay-sold set is thin (poor photo / very rare piece). */
 export async function fetchGoogleShopping(query: string): Promise<Comp[]> {
  if (!isCompsConfigured() || !query.trim()) return [];
@@ -258,13 +258,13 @@ export async function fetchGoogleShopping(query: string): Promise<Comp[]> {
 }
 
 
-/** Legacy full basket (eBay sold + Google Shopping + RealReal pass) — 3 SerpApi calls. Kept
+/** Legacy full basket (eBay sold + Google Shopping + RealReal pass). 3 SerpApi calls. Kept
  *  for the dry-run comparison; estimatePrice now uses the leaner reverse-image + eBay-sold path. */
 export async function fetchComps(query: string): Promise<Comp[]> {
  if (!isCompsConfigured() || !query.trim()) return [];
  // eBay-SOLD is the anchor and usually enough on its own. Two redundant calls dropped for speed:
- //  • the dedicated RealReal pass — reverse-image already surfaces RealReal/Vestiaire/etc. natively;
- //  • Google Shopping — now only fetched as a FALLBACK when the sold set is thin.
+ //  • the dedicated RealReal pass. Reverse-image already surfaces RealReal/Vestiaire/etc. natively;
+ //  • Google Shopping. Now only fetched as a FALLBACK when the sold set is thin.
  // Cold lookups go from 3 SerpApi calls to 1 (common case) or 2 (thin), and the slow stragglers are gone.
  const ebay = await fetchEbaySold(query);
  if (ebay.length >= 6) return rankComps(ebay);
@@ -275,7 +275,7 @@ export async function fetchComps(query: string): Promise<Comp[]> {
 export type ResaleTrend = { momentumPct: number; trending: boolean; note: string; source: string };
 
 /** Broad resale-world demand trend for a brand/item via Google Trends (SerpApi).
- *  Google search interest is the best cross-market proxy for real resale demand — it
+ *  Google search interest is the best cross-market proxy for real resale demand. It
  *  spans the whole secondhand world (what shoppers are hunting for across every site),
  *  not VYA's thin pilot traffic. Compares recent vs prior interest over ~3 months.
  *  Returns null when comps aren't enabled or there isn't enough signal. */
@@ -295,14 +295,14 @@ async function _fetchResaleTrendUncached(query: string): Promise<ResaleTrend | n
  const momentumPct = Math.round(((recent - prior) / prior) * 100);
  return {
  momentumPct,
- trending: momentumPct >= 10, // a real, sustained uptick — not noise
+ trending: momentumPct >= 10, // a real, sustained uptick, not noise
  note: `${momentumPct >= 0 ? "+" : ""}${momentumPct}% resale search demand vs prior 3mo`,
  source: "Google Trends",
  };
 }
 
 // Cache by query (brand+category) for a week: a brand's search-trend momentum barely moves
-// week to week and is shared across every listing of that brand — so this collapses the cost
+// week to week and is shared across every listing of that brand, so this collapses the cost
 // from one SerpApi call per listing to roughly one call per brand per week.
 export const fetchResaleTrend = unstable_cache(_fetchResaleTrendUncached, ["resale-trend"], {
  revalidate: 604800, // 7 days

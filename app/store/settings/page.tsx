@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { Card, CardHeader, PageHeader, Button, Input, Field, cn } from "../ui";
 import { SHIPPING_TIERS } from "@/app/lib/shipping-tiers";
+import ListingLayout from "./ListingLayout";
+import type { LayoutSection } from "@/app/lib/description-layout";
 
 type ShipFrom = { name?: string; street1?: string; street2?: string; city?: string; state?: string; zip?: string; country?: string; phone?: string };
 type ShipMode = "buyer_pays" | "store_pays" | "free_over";
@@ -15,14 +17,15 @@ type Brief = {
  pricing: { stance: string; targetPct: string; goal: string; notes: string };
  voice: { tone: string; rules: string[]; notes: string };
  about: string;
+ layout: LayoutSection[];
 };
-const EMPTY_BRIEF: Brief = { pricing: { stance: "", targetPct: "", goal: "", notes: "" }, voice: { tone: "", rules: [], notes: "" }, about: "" };
+const EMPTY_BRIEF: Brief = { pricing: { stance: "", targetPct: "", goal: "", notes: "" }, voice: { tone: "", rules: [], notes: "" }, about: "", layout: [] };
 
 const STANCES: [string, string, string][] = [
- ["value", "Value — below market", "Priced to move; undercut comparable listings."],
+ ["value", "Value: below market", "Priced to move; undercut comparable listings."],
  ["market", "At market", "Match the going rate from comps."],
  ["slight_premium", "Slight premium", "About 10% above market for your curation."],
- ["premium", "Premium", "About 25% above — a destination store."],
+ ["premium", "Premium", "About 25% above. A destination store."],
  ["custom", "Custom", "Set your own target vs. market."],
 ];
 const GOALS: [string, string][] = [["margin", "Maximize margin"], ["balanced", "Balanced"], ["velocity", "Move fast"]];
@@ -33,7 +36,9 @@ const ACCENT = "#5D0F17";
 const ta = "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-[13px] text-stone-900 placeholder:text-stone-400 outline-none transition focus:border-stone-400 focus:ring-2 focus:ring-stone-900/[0.06]";
 
 export default function SettingsPage() {
- const [tab, setTab] = useState<"brief" | "pricing" | "shipping" | "sender" | "policy">("brief");
+ const [tab, setTab] = useState<"brief" | "layout" | "pricing" | "shipping" | "sender" | "policy">("brief");
+ // The format VYA read off her existing listings, offered as a starting point rather than imposed.
+ const [learned, setLearned] = useState<{ layout: LayoutSection[]; words: number } | null>(null);
 
  // Returns / refund policy
  const [refundsEnabled, setRefundsEnabled] = useState(true);
@@ -58,7 +63,7 @@ export default function SettingsPage() {
  const [mode, setMode] = useState<ShipMode>("buyer_pays");
  const [threshold, setThreshold] = useState("");
  const [from, setFrom] = useState<ShipFrom>({ country: "US" });
- // Collect in store. `pickupOn` is only the toggle — an address is what makes it a real offer, so
+ // Collect in store. `pickupOn` is only the toggle. An address is what makes it a real offer, so
  // the save below refuses the pair (see pickupOffered in app/lib/pickup-core.ts).
  const [pickupOn, setPickupOn] = useState(false);
  const [pickupAddr, setPickupAddr] = useState<ShipFrom>({ country: "US" });
@@ -67,7 +72,7 @@ export default function SettingsPage() {
  const [sSaved, setSSaved] = useState(false);
  const [sErr, setSErr] = useState<string | null>(null);
 
- // Sender — email identity + (optional) own-domain authentication
+ // Sender: email identity + (optional) own-domain authentication
  const [snd, setSnd] = useState<SenderSettings | null>(null);
  const [sender, setSender] = useState<SenderInfo>(null);
  const [fromName, setFromName] = useState("");
@@ -101,7 +106,9 @@ export default function SettingsPage() {
   pricing: { stance: x.pricing?.stance || "", targetPct: x.pricing?.targetPct != null ? String(x.pricing.targetPct) : "", goal: x.pricing?.goal || "", notes: x.pricing?.notes || "" },
   voice: { tone: x.voice?.tone || "", rules: Array.isArray(x.voice?.rules) ? x.voice.rules : [], notes: x.voice?.notes || "" },
   about: x.about || "",
+  layout: Array.isArray(x.layout) ? x.layout : [],
   });
+  setLearned(d?.learned ?? null);
  }).catch(() => {});
  fetch("/api/store/shipping").then((r) => (r.ok ? r.json() : null)).then((d) => {
   if (!d) return;
@@ -144,7 +151,7 @@ export default function SettingsPage() {
  try {
   const r = await fetch("/api/store/email-domain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify" }) });
   const d = await r.json();
-  if (r.ok) { setSnd(d.settings); setSender(d.sender); setEMsg(d.verified ? "Verified — emails now send from your domain." : "Not verified yet — DNS can take a bit to propagate."); }
+  if (r.ok) { setSnd(d.settings); setSender(d.sender); setEMsg(d.verified ? "Verified. Emails now send from your domain." : "Not verified yet: DNS can take a bit to propagate."); }
   else setEMsg(d.error || "Couldn’t verify.");
  } catch { setEMsg("Couldn’t verify."); }
  setEBusy(null);
@@ -170,6 +177,7 @@ export default function SettingsPage() {
   },
   voice: { tone: b.voice.tone, rules: b.voice.rules, notes: b.voice.notes },
   about: b.about,
+  layout: b.layout,
  };
  await fetch("/api/store/brief", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief: payload }) }).catch(() => {});
  setBBusy(false); setBSaved(true);
@@ -184,7 +192,7 @@ export default function SettingsPage() {
  setSBusy(true); setSSaved(false); setSErr(null);
  const need = ["street1", "city", "state", "zip"] as const;
  if (need.some((k) => !(from[k] || "").trim())) { setSErr("Add a full ship-from address (street, city, state, zip)."); setSBusy(false); return; }
- // A collection toggle with nowhere to collect from is not an offer — don't let her publish one and
+ // A collection toggle with nowhere to collect from is not an offer. Don't let her publish one and
  // believe it's live. The server refuses it too; this just says so before the round trip.
  if (pickupOn && (!(pickupAddr.street1 || "").trim() || !(pickupAddr.city || "").trim())) {
   setSErr("Add the street and city buyers will collect from, or turn collection off."); setSBusy(false); return;
@@ -214,15 +222,15 @@ export default function SettingsPage() {
 
   {/* Tabs */}
   <div className="mb-6 flex gap-5 border-b border-stone-200">
-  {([["brief", "How VYA works"], ["pricing", "Pricing floor"], ["policy", "Returns"], ["sender", "Email sender"]] as const).map(([k, lbl]) => (
+  {([["brief", "How VYA works"], ["layout", "Listing layout"], ["pricing", "Pricing floor"], ["policy", "Returns"], ["sender", "Email sender"]] as const).map(([k, lbl]) => (
    <button key={k} onClick={() => setTab(k)} className={`-mb-px border-b-2 pb-2.5 text-[13px] font-medium transition ${tab === k ? "border-[#5D0F17] text-[#5D0F17]" : "border-transparent text-stone-400 hover:text-stone-600"}`}>{lbl}</button>
   ))}
   </div>
 
-  {/* Store brief — what the owner tells VYA */}
+  {/* Store brief: what the owner tells VYA */}
   {tab === "brief" && (
   <Card className="mb-5">
-  <CardHeader title="How VYA should work for you" subtitle="VYA already learns your pricing and voice from your catalog. This is where you steer it — what you say here takes priority." />
+  <CardHeader title="How VYA should work for you" subtitle="Steer how VYA prices and writes for you. What you say here beats anything it learned from your catalogue." />
   <div className="space-y-6 px-5 py-4">
 
    {/* Pricing stance */}
@@ -290,7 +298,7 @@ export default function SettingsPage() {
    <textarea className={cn(ta, "min-h-[64px] resize-y")} value={b.voice.notes} onChange={(e) => setV("notes", e.target.value)} maxLength={1000} placeholder="e.g. Speak to the collector. Name the designer and the era, then the fit. Never oversell." />
    </Field>
 
-   <Field label="About your store" hint="Who you are, what you carry, your goals — anything that helps VYA get it right.">
+   <Field label="About your store" hint="Who you are, what you carry, your goals. Anything that helps VYA get it right.">
    <textarea className={cn(ta, "min-h-[80px] resize-y")} value={b.about} onChange={(e) => { setB((s) => ({ ...s, about: e.target.value })); setBSaved(false); }} maxLength={2000} placeholder="A line or two about your store, your buyers, and how you want to come across." />
    </Field>
 
@@ -299,6 +307,22 @@ export default function SettingsPage() {
    {bSaved && <span className="text-xs text-emerald-600">Saved ✓</span>}
    </div>
   </div>
+  </Card>
+  )}
+
+  {/* How her listings are laid out: the order, in her words. Hers beats what VYA read off her
+      catalogue, because the learned format can only ever repeat what she already published. */}
+  {tab === "layout" && (
+  <Card className="mb-5">
+  <CardHeader title="How your listings are laid out" subtitle="The order VYA writes in, and what each part is called. Yours beats anything it picked up from your catalogue." />
+  <ListingLayout
+   layout={b.layout}
+   onChange={(layout) => { setB((s) => ({ ...s, layout })); setBSaved(false); }}
+   learned={learned}
+   onSave={saveBrief}
+   busy={bBusy}
+   saved={bSaved}
+  />
   </Card>
   )}
 
@@ -322,11 +346,11 @@ export default function SettingsPage() {
   {/* Shipping */}
   {tab === "shipping" && (
   <Card>
-  <CardHeader title="Shipping" subtitle="Buyers pay one clean flat rate by size — VYA buys the real carrier label and handles the rest." />
+  <CardHeader title="Shipping" subtitle="VYA prices the postage on every order and buys the label. Your buyer sees one price at checkout." />
   <div className="space-y-5 px-5 py-4">
    <div>
    <p className="mb-1 text-[13px] font-medium text-stone-700">Flat rates</p>
-   <p className="mb-3 text-xs text-stone-500">Each piece is auto-sized from its weight and dimensions — the buyer just sees one price. No live-rate math, no odd numbers.</p>
+   <p className="mb-3 text-xs text-stone-500">Worked out from the size and weight on the piece, and how far it is going. Measure your pieces and it is right.</p>
    <div className="grid grid-cols-3 gap-2">
     {SHIPPING_TIERS.map((t) => (
     <div key={t.id} className="rounded-lg border border-stone-200 bg-stone-50/60 p-3">
@@ -357,9 +381,9 @@ export default function SettingsPage() {
    <p className="mb-2 text-[13px] font-medium text-stone-700">Who pays for shipping</p>
    <div className="space-y-2">
     {([
-    ["buyer_pays", "Buyer pays", "The flat rate is added to the buyer’s total at checkout."],
-    ["store_pays", "Free shipping (you absorb it)", "No shipping charged; you cover the label at fulfillment."],
-    ["free_over", "Free over a threshold", "Buyer pays the flat rate below the amount, free at/above it."],
+    ["buyer_pays", "Buyer pays", "Postage is added to the buyer’s total at checkout."],
+    ["store_pays", "Free shipping (you absorb it)", "No postage at checkout. The label is charged to your card."],
+    ["free_over", "Free over a threshold", "The buyer pays postage below the amount, and nothing at or above it."],
     ] as const).map(([m, title, desc]) => (
     <label key={m} className={cn("flex cursor-pointer gap-3 rounded-lg border p-3 transition", mode === m ? "border-[#5D0F17] bg-[#5D0F17]/[0.03]" : "border-stone-200 hover:border-stone-300")}>
      <input type="radio" name="shipmode" checked={mode === m} onChange={() => { setMode(m); setSSaved(false); }} className="mt-0.5 accent-[#5D0F17]" style={{ accentColor: ACCENT }} />
@@ -377,7 +401,7 @@ export default function SettingsPage() {
    )}
    </div>
 
-   {/* Collect in store — the option a marketplace can't give a seller with a shop. */}
+   {/* Collect in store: the option a marketplace can't give a seller with a shop. */}
    <div className="rounded-lg border border-stone-200 p-4">
    <label className="flex cursor-pointer items-start gap-3">
     <input type="checkbox" checked={pickupOn} onChange={(e) => { setPickupOn(e.target.checked); setSSaved(false); setSErr(null); }} className="mt-0.5" style={{ accentColor: ACCENT }} />
@@ -403,7 +427,7 @@ export default function SettingsPage() {
      <textarea value={pickupNote} onChange={(e) => { setPickupNote(e.target.value.slice(0, 400)); setSSaved(false); }} rows={2}
      placeholder="Wed–Sun, 11am–6pm. Ask for Scottie at the counter." className={ta} />
     </Field>
-    {!pickupReady && <p className="text-xs text-amber-700">Buyers can’t collect from nowhere — add at least a street and city, or collection stays off.</p>}
+    {!pickupReady && <p className="text-xs text-amber-700">Buyers can’t collect from nowhere. Add at least a street and city, or collection stays off.</p>}
     </div>
    )}
    </div>
@@ -417,15 +441,15 @@ export default function SettingsPage() {
   </Card>
   )}
 
-  {/* Returns / refund policy — buyer-facing, per store */}
+  {/* Returns / refund policy. Buyer-facing, per store */}
   {tab === "policy" && (
   <Card className="mb-5">
-  <CardHeader title="Returns & refunds" subtitle="The rules: how long buyers have, what it costs them, and who pays the postage back. Your storefront shows these before anyone buys." />
+  <CardHeader title="Returns & refunds" subtitle="How long buyers have, what it costs them, and who pays return postage. Shown on your storefront before anyone buys." />
   <div className="space-y-5 px-5 py-4">
    <div className="flex items-center justify-between gap-4">
    <div>
     <p className="text-[13px] font-medium text-stone-800">Accept returns</p>
-    <p className="text-[12px] text-stone-500">On: buyers can send a piece back within the window you set. Off: your storefront says “All sales final.” You can still refund any order by hand either way.</p>
+    <p className="text-[12px] text-stone-500">On, buyers can return a piece within the window you set. Off, your storefront says “All sales final.” You can refund by hand either way.</p>
    </div>
    <button
     type="button" onClick={() => { setRefundsEnabled((v) => !v); setPolSaved(false); }} aria-pressed={refundsEnabled}
@@ -447,7 +471,7 @@ export default function SettingsPage() {
    )}
 
    {refundsEnabled && (
-   <Field label="Return shipping" hint="Who pays to send it back. Either way VYA makes the label and emails it to the buyer — nobody queues at a post office counter.">
+   <Field label="Return shipping" hint="Who pays return postage. VYA makes the label and emails it to the buyer either way.">
     <div className="flex gap-2">
     {(["buyer", "store"] as const).map((who) => (
      <button key={who} type="button" onClick={() => { setReturnShippingPaidBy(who); setPolSaved(false); }}
@@ -461,17 +485,17 @@ export default function SettingsPage() {
    )}
 
    {/* ONE record. This box and the Returns tab under Settings → Policies edit the same text
-       (store_profiles.policies.returns) — see app/lib/returns-policy.ts. They were two separate
+       (store_profiles.policies.returns). See app/lib/returns-policy.ts. They were two separate
        paragraphs in two tables until the merge, which let a store hold two contradicting policies. */}
-   <Field label="Your returns policy" hint="The words buyers read on your returns page. This is the same text as Settings → Policies → Returns — edit it in either place.">
+   <Field label="Your returns policy" hint="The words buyers read on your returns page. The same text as Settings → Policies → Returns.">
     <textarea value={policyText} onChange={(e) => { setPolicyText(e.target.value); setPolSaved(false); }} rows={3} className={ta}
-    placeholder={refundsEnabled ? "e.g. Returns accepted on unworn items within 14 days; buyer pays return shipping." : "e.g. All sales are final — message us with any questions before you buy."} />
+    placeholder={refundsEnabled ? "e.g. Returns accepted on unworn items within 14 days; buyer pays return shipping." : "e.g. All sales are final. Message us with any questions before you buy."} />
    </Field>
 
    <div className="rounded-md bg-stone-50 px-3 py-2.5 text-[12px] text-stone-500">
    Buyers will see: <span className="font-medium text-stone-700">{
     !refundsEnabled ? "All sales final."
-    : `${Number(returnWindowDays) > 0 ? `Returns accepted within ${returnWindowDays} days` : "Returns accepted — contact the store"}${Number(restockingFeePct) > 0 ? ` · ${restockingFeePct}% restocking fee.` : "."}`
+    : `${Number(returnWindowDays) > 0 ? `Returns accepted within ${returnWindowDays} days` : "Returns accepted. Contact the store"}${Number(restockingFeePct) > 0 ? ` · ${restockingFeePct}% restocking fee.` : "."}`
    }</span>
    </div>
 
@@ -483,11 +507,11 @@ export default function SettingsPage() {
   </Card>
   )}
 
-  {/* Email sender — the identity marketing emails send from (moved here from Marketing) */}
+  {/* Email sender: the identity marketing emails send from (moved here from Marketing) */}
   {tab === "sender" && (
   <div className="space-y-5">
    <Card>
-   <CardHeader title="Sender identity" subtitle="How your marketing emails send — the name customers see and where replies go. Used on every campaign & automation." />
+   <CardHeader title="Sender identity" subtitle="How your marketing emails send. The name customers see and where replies go. Used on every campaign & automation." />
    <div className="space-y-4 px-5 py-4">
     <Field label="From name"><Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Your store name" /></Field>
     <Field label="Reply-to email" hint="Where customer replies land."><Input value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="you@yourstore.com" /></Field>
@@ -496,12 +520,12 @@ export default function SettingsPage() {
     {/* SAVED vs TYPED, said out loud.
         
         The box showed what she had typed and this line showed what was saved, with nothing marking
-        the difference — so changing the name and not pressing Save looked exactly like changing the
+        the difference, so changing the name and not pressing Save looked exactly like changing the
         name and having it ignored. That was the report: "I changed it to gianna and it didn't
         reflect." */}
     {sender && (
      unsavedIdentity
-      ? <span className="text-xs text-amber-700">Not saved yet — press Save to send as <b>{fromName || sender.fromName}</b>.</span>
+      ? <span className="text-xs text-amber-700">Not saved yet. Press Save to send as <b>{fromName || sender.fromName}</b>.</span>
       : <span className="text-xs text-stone-500">Currently sends as <b className="text-stone-700">{sender.fromName}</b> &lt;{sender.fromAddress}&gt;</span>
     )}
     </div>
@@ -509,7 +533,7 @@ export default function SettingsPage() {
    </Card>
 
    <Card>
-   <CardHeader title="Send from your own domain" subtitle="Authenticate your domain so emails send FROM your address — better trust & deliverability. Optional." />
+   <CardHeader title="Send from your own domain" subtitle="Authenticate your domain so emails send FROM your address. Better trust & deliverability. Optional." />
    <div className="px-5 py-4">
     {snd?.verified ? (
     <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
@@ -545,7 +569,7 @@ export default function SettingsPage() {
     </div>
     )}
     {eMsg && <p className="mt-3 text-xs text-stone-600">{eMsg}</p>}
-    <p className="mt-3 text-[11px] text-stone-400">Until you authenticate a domain, emails send from your name via VYA’s shared sending domain — replies still route to your reply-to address. Authenticate a domain and, if your reply-to is on it, emails send from that address too.</p>
+    <p className="mt-3 text-[11px] text-stone-400">Emails send from your name, through VYA, until you authenticate your own domain. Replies come to you either way.</p>
    </div>
    </Card>
   </div>
@@ -553,12 +577,14 @@ export default function SettingsPage() {
 
   {/* Only under the tabs it is actually about.
       
-      It sat outside every tab, so it turned up under "Email sender" too — offering to set pricing
+      It sat outside every tab, so it turned up under "Email sender" too. Offering to set pricing
       and free shipping on a screen about which address your mail goes out from. Asking VYA does not
       authenticate a sending domain, so on that tab the line was an offer nothing could honour. */}
   {(tab === "brief" || tab === "pricing" || tab === "shipping") && (
-   <p className="mt-4 text-xs text-stone-400">You can change any of this by asking VYA instead — say something like &ldquo;price my archival pieces higher&rdquo; or &ldquo;free shipping over $150&rdquo; and it will set it for you.</p>
+   <p className="mt-4 text-xs text-stone-400">You can change any of this by asking VYA: &ldquo;price my archival pieces higher&rdquo;, &ldquo;free shipping over $150&rdquo;.</p>
   )}
  </div>
  );
 }
+
+

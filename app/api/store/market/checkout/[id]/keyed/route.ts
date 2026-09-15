@@ -6,7 +6,7 @@ import { stripeGet } from "@/app/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
-// POST — switch an open checkout to keyed entry: mint (or reuse) its PaymentIntent and hand the
+// POST: switch an open checkout to keyed entry: mint (or reuse) its PaymentIntent and hand the
 // client secret to the seller's Payment Element. Idempotent on the checkout id.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);

@@ -5,17 +5,17 @@ import { Download, X } from "lucide-react";
 import { TechCard, TechButton, TechButtonLink } from "./ui";
 import { depopPrompt, DEPOP_PROMPT_KEY, type PromptState } from "@/app/lib/depop-prompt";
 
-// "Are your products on Depop?" — asked once, of the sellers it could possibly help.
+// "Are your products on Depop?". Asked once, of the sellers it could possibly help.
 //
 // A seller building a shop from scratch is looking at an empty inventory and a lot of typing. Most
 // of them already have the whole thing on Depop: photographs taken, descriptions written, prices
 // decided. One question here is the difference between a migration and a re-entry.
 //
-// WHO IS NOT ASKED. Anyone who brought her own website over — her pieces came in with the site, so
+// WHO IS NOT ASKED. Anyone who brought her own website over. Her pieces came in with the site, so
 // the question has no right answer and reads as VYA not knowing what it just did. Anyone who has
 // already imported. And anyone who has answered, ever, on any device: see store-prompts-db.
 //
-// See app/lib/depop-prompt.ts — the rule is there, tested, rather than spread through this render.
+// See app/lib/depop-prompt.ts. The rule is there, tested, rather than spread through this render.
 
 // The canonical listing. The short /detail/<id> form 301s here, and a redirect on the way to an
 // install is one more thing that can go wrong in front of somebody deciding whether to bother.
@@ -73,28 +73,28 @@ export default function DepopImportPrompt() {
    <div className="min-w-0 flex-1">
     <p className="text-[14.5px] font-medium text-stone-900">Are your products on Depop?</p>
     <p className="mt-1 max-w-[62ch] text-[13px] leading-relaxed text-stone-500">
-     Bring your whole shop over — listings <span className="text-stone-400">and</span> sold history — as drafts,
+     Bring your whole shop over, listings <span className="text-stone-400">and</span> sold history, as drafts,
      so you don&rsquo;t type any of it twice. Nothing goes live until you say so.
     </p>
 
     {/* WITHOUT THE EXTENSION, SAY WHY AND HAND IT OVER. The import runs in her own browser, signed in
-        as her — that is the whole reason it can read her shop at all, and it is worth one sentence,
+        as her: that is the whole reason it can read her shop at all, and it is worth one sentence,
         because "install something" with no reason given is where most people stop. */}
     {verdict.action === "install-extension" && !started && (
      <p className="mt-2 max-w-[62ch] text-[12.5px] leading-relaxed text-stone-500">
-      It runs through a free Chrome extension, on your own computer, signed in as you — which is how it
+      It runs through a free Chrome extension, on your own computer, signed in as you, which is how it
       can read your shop at all. One install, then the button here does the rest.
      </p>
     )}
     {installing && (
      <p className="mt-2 text-[12.5px] font-medium text-stone-700">
-      Once it&rsquo;s added, refresh this page — this turns into &ldquo;Yes, bring them over&rdquo;.
+      Once it&rsquo;s added, refresh this page. This turns into &ldquo;Yes, bring them over&rdquo;.
      </p>
     )}
 
     {started && (
      <p className="mt-2 text-[12.5px] font-medium text-stone-700">
-      Opening Depop and importing — watch the panel there, then come back. Your drafts land in Inventory.
+      Opening Depop and importing. Watch the panel there, then come back. Your drafts land in Inventory.
      </p>
     )}
    </div>
@@ -105,7 +105,7 @@ export default function DepopImportPrompt() {
       <TechButton onClick={bringThemOver}>Yes, bring them over</TechButton>
      ) : (
       // A button reading "bring them over" that cannot bring anything over is worse than the question,
-      // so the offer becomes the install — primary, right here, not a link to go and find somewhere.
+      // so the offer becomes the install. Primary, right here, not a link to go and find somewhere.
       <TechButtonLink href={EXTENSION_URL} target="_blank" rel="noopener" onClick={() => setInstalling(true)}>
        <Download size={14} /> Add to Chrome
       </TechButtonLink>

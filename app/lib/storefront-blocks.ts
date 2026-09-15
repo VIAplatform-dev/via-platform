@@ -1,5 +1,5 @@
 // Section-based storefront ("blocks"). A storefront's home page is an ordered list
-// of blocks the seller — or VYA — can add, edit, reorder, and remove. Deliberately a
+// of blocks the seller, or VYA. Can add, edit, reorder, and remove. Deliberately a
 // small, curated set of section types (simpler than Shopify's nested tree), each with
 // a flat props bag so VYA can build them conversationally.
 
@@ -14,15 +14,15 @@ export type BgMedia =
  | { kind: "image"; url: string }
  | { kind: "video"; url: string; poster?: string }
  | { kind: "embed"; url: string };
-// Per-element ("free") overrides for one built-in text field — position, size, and full Figma/Canva-style
+// Per-element ("free") overrides for one built-in text field. Position, size, and full Figma/Canva-style
 // text styling, all independent per field (the heading can be bold + wide-tracked while the subtext isn't).
 export type FreeStyle = {
  x?: number; y?: number;        // position: % of the section, centre-anchored (both set = floated out of flow)
  fontPx?: number;               // font size in px
- w?: number;                    // width as a % of the field's own container — set by dragging a SIDE
+ w?: number;                    // width as a % of the field's own container. Set by dragging a SIDE
                                 // handle. Rewraps the text (three lines become one long line); the
                                 // corner handles scale the type instead.
- h?: number;                    // height as a % of the frame's OWN WIDTH — i.e. an aspect ratio, where
+ h?: number;                    // height as a % of the frame's OWN WIDTH. I.e. an aspect ratio, where
                                 // 100 is square. Only a PHOTO uses it: text takes its height from its
                                 // content, but a photo's frame is a box the merchant sizes directly,
                                 // so its corner handles set w and h rather than a font size.
@@ -39,58 +39,58 @@ export type FreeStyle = {
 };
 export type BlockStyle = {
  bg?: string; // "accent" | "dark" | a #hex (default = theme background)
- bgGradient?: string; // "#hex|#hex|angleDeg" — a two-stop linear gradient (wins over bg colour)
- bgImage?: string; // URL — a full-bleed background photo behind the whole section (wins over gradient/colour)
+ bgGradient?: string; // "#hex|#hex|angleDeg": a two-stop linear gradient (wins over bg colour)
+ bgImage?: string; // URL: a full-bleed background photo behind the whole section (wins over gradient/colour)
  bgMedia?: BgMedia; // richer background (uploaded video / GIF / embedded YouTube-Vimeo-Drive link); supersedes bgImage
  free?: Record<string, FreeStyle>; // per-ELEMENT overrides, keyed by the element's edit key (heading/subtext/cta/…). Position (x,y), size (fontPx), and full per-field text styling. Any subset.
- bgOverlay?: number; // 0–80 — dark scrim strength over a background photo (for legible text)
- textColor?: string; // #hex — overrides the section's text colour
- align?: BlockAlign; // text alignment — section-wide default, used by any field below with no override of its own
+ bgOverlay?: number; // 0–80: dark scrim strength over a background photo (for legible text)
+ textColor?: string; // #hex: overrides the section's text colour
+ align?: BlockAlign; // text alignment: section-wide default, used by any field below with no override of its own
  headingAlign?: BlockAlign; // heading's own alignment (wins over `align`, independent of subtext/body/cta)
  subtextAlign?: BlockAlign; // subtext's own alignment (ditto)
  ctaAlign?: BlockAlign; // the built-in button's own alignment (ditto)
  bodyAlign?: BlockAlign; // body copy's own alignment (ditto)
- headingSize?: BlockScale; // heading scale — legacy preset, used only when headingSizePx isn't set
- headingSizePx?: number; // px — explicit heading font size (wins over headingSize)
+ headingSize?: BlockScale; // heading scale: legacy preset, used only when headingSizePx isn't set
+ headingSizePx?: number; // px: explicit heading font size (wins over headingSize)
  headingFont?: string; // per-section heading font override
  tracking?: number; // heading letter-spacing, in hundredths of an em (2 = 0.02em; negatives allowed)
- subtextSizePx?: number; // px — explicit subtext font size (also applies to "attribution" fields, which share the same class)
+ subtextSizePx?: number; // px: explicit subtext font size (also applies to "attribution" fields, which share the same class)
  subtextFont?: string; // per-section subtext font override (ditto)
  lineHeight?: number; // heading/subtext/body line-height, as a percent of font size (140 = 1.4)
  textBold?: boolean; // bold heading/subtext/body text in this section
  textItalic?: boolean; // italicize heading/subtext/body text in this section
  textUnderline?: boolean; // underline heading/subtext/body text in this section
- // The section's own built-in CTA button (the `cta` field — e.g. hero/featured/split "Shop now").
+ // The section's own built-in CTA button (the `cta` field: e.g. hero/featured/split "Shop now").
  // Distinct from a free-form overlay button, which carries its own colours/shape in its `props`.
- ctaBg?: string; // #hex — button background (default: theme accent)
- ctaColor?: string; // #hex — button text colour (default: white)
+ ctaBg?: string; // #hex: button background (default: theme accent)
+ ctaColor?: string; // #hex: button text colour (default: white)
  ctaShape?: "square" | "rounded" | "pill"; // button corner style (default: theme corner style)
- ctaHoverBg?: string; // #hex — button background on hover
- ctaHoverColor?: string; // #hex — button text colour on hover
- ctaBorder?: number; // px — button outline width. With ctaOutline on, this IS the button (no fill).
- ctaBorderColor?: string; // #hex — button outline colour (default: ctaBg)
- ctaOutline?: boolean; // "No fill" style — transparent background, coloured border + text; fills in on hover
- ctaFont?: string; // per-button font override — parity with a free-form overlay button's own Font control
+ ctaHoverBg?: string; // #hex: button background on hover
+ ctaHoverColor?: string; // #hex: button text colour on hover
+ ctaBorder?: number; // px: button outline width. With ctaOutline on, this IS the button (no fill).
+ ctaBorderColor?: string; // #hex: button outline colour (default: ctaBg)
+ ctaOutline?: boolean; // "No fill" style: transparent background, coloured border + text; fills in on hover
+ ctaFont?: string; // per-button font override: parity with a free-form overlay button's own Font control
  ctaSize?: "sm" | "md" | "lg"; // parity with a free-form overlay button's own Size control
  ctaFullWidth?: boolean; // stretch the button to the section's full content width, instead of hugging its label
  space?: BlockScale; // vertical breathing-room preset (used when padY isn't set)
- padY?: number; // px — explicit vertical padding, top AND bottom (overrides `space`)
+ padY?: number; // px: explicit vertical padding, top AND bottom (overrides `space`)
  // Top and bottom independently. `padY` sets both at once and stays the simple control; these win
- // over it per edge, so "no gap above, keep the gap below" is expressible — which it wasn't when the
+ // over it per edge, so "no gap above, keep the gap below" is expressible, which it wasn't when the
  // only vertical control moved both edges together.
- padTop?: number; // px — space above the section's content (overrides padY/space for this edge)
- padBottom?: number; // px — space below it (ditto)
- padX?: number; // px — explicit horizontal padding
- radius?: number; // px — section corner radius
- border?: number; // px — section border width
- borderColor?: string; // #hex — section border colour
+ padTop?: number; // px: space above the section's content (overrides padY/space for this edge)
+ padBottom?: number; // px: space below it (ditto)
+ padX?: number; // px: explicit horizontal padding
+ radius?: number; // px: section corner radius
+ border?: number; // px: section border width
+ borderColor?: string; // #hex: section border colour
  shadow?: BlockShadow; // preset drop shadow
- minH?: number; // px — explicit section height, set by dragging the resize handle on the canvas
+ minH?: number; // px: explicit section height, set by dragging the resize handle on the canvas
 };
 
 // Turn a pasted YouTube / Vimeo / Google-Drive URL into an embeddable, autoplaying, muted,
 // looping, chrome-free iframe src for a section background. Returns null if unrecognized.
-// (Drive is best-effort: its /preview embed ignores autoplay/loop — steer sellers to YouTube/Vimeo.)
+// (Drive is best-effort: its /preview embed ignores autoplay/loop. Steer sellers to YouTube/Vimeo.)
 export function backgroundEmbedSrc(rawUrl: string): string | null {
  const url = (rawUrl || "").trim();
  if (!url) return null;
@@ -107,7 +107,7 @@ export function backgroundEmbedSrc(rawUrl: string): string | null {
 // of breaking at a fixed pixel. On narrow screens the overlay layer auto-stacks below the section content
 // (see Blocks) so nothing overlaps or runs off a phone.
 // `triangle` is a shape like rect/circle. `form` is a real, working form the seller can drop anywhere
-// and label for its own purpose — wholesale enquiries, stylist bookings, sourcing requests — not only
+// and label for its own purpose, wholesale enquiries, stylist bookings, sourcing requests, not only
 // the "get in touch" the contact SECTION already covers.
 export type OverlayKind = "button" | "text" | "image" | "rect" | "circle" | "line" | "triangle" | "form";
 export type Overlay = {
@@ -119,13 +119,13 @@ export type Overlay = {
  h?: number; // 0–100, % height (images/shapes; text/buttons auto-height)
  props: Record<string, string>; // button:{label,href,bg,color}; text:{text,color,size}; image:{src,alt}; rect/circle:{fill,radius,opacity}; line:{color,thickness}
 };
-// `variant` picks the section's LAYOUT (see storefront-variants.ts) — where the image sits, how many
+// `variant` picks the section's LAYOUT (see storefront-variants.ts), where the image sits, how many
 // columns, grid vs carousel. Absent = the layout that shipped before variants existed, so every
 // storefront saved to date keeps rendering exactly as it did. `style` stays the separate "skin" axis.
 export type Block = { id: string; type: BlockType; variant?: string; props: Record<string, string>; style?: BlockStyle; overlays?: Overlay[] };
 
 // STRIPS: sections that are a thin full-width band rather than a block of content. They behave
-// differently in two places — skins must not give them roomy section padding, and the resize handle
+// differently in two places. Skins must not give them roomy section padding, and the resize handle
 // must let them go genuinely thin (a hero's 80px floor is taller than a whole announcement bar).
 // Kept here, next to BlockType, so the renderer, the skins, and the editor can't drift apart on it.
 export const STRIP_SECTION_TYPES = ["announcement", "marquee"] as const;
@@ -133,7 +133,7 @@ export const isStripSection = (t?: string) => STRIP_SECTION_TYPES.includes(t as 
 /** How short a section may be dragged. Strips hug a line of text; everything else needs room to read. */
 /**
  * The ceiling on how many products one section may show. A collection can hold hundreds of pieces;
- * a section pointed at one must still read as a section, not the whole catalogue on the homepage —
+ * a section pointed at one must still read as a section, not the whole catalogue on the homepage,
  * that's what the Shop page is for. Enforced in the renderer, not just the picker, so a hand-edited
  * prop or a value saved before the cap existed is clamped too.
  */
@@ -144,7 +144,7 @@ export const featuredCount = (raw: string | undefined, fallback: number) =>
 /**
  * How many columns a product grid should use for a given number of pieces, when the seller hasn't
  * chosen. A collection of five in a fixed four-across grid leaves one piece stranded on its own row,
- * which reads as a mistake rather than a layout — and the seller can't fix it without understanding
+ * which reads as a mistake rather than a layout, and the seller can't fix it without understanding
  * why. So: prefer a row length that divides evenly, and treat "one item alone on the last row" as the
  * worst outcome (that's the case that looks broken), not merely as a gap.
  */
@@ -170,7 +170,7 @@ export const maxSectionHeight = (t?: string) => (isStripSection(t) ? 64 : 2000);
 
 // `collection` renders a picker of the store's own collections. It's the seam that makes a product
 // section stop meaning "the newest few items" and start meaning "whatever the seller put in THIS
-// collection" — so they curate in Inventory once and the storefront follows.
+// collection", so they curate in Inventory once and the storefront follows.
 // `choice` renders a fixed dropdown (its own options); `collection` renders a picker of the store's
 // own collections. Both exist so a section can be configured without free-typing a magic value.
 export type BlockField = { key: string; label: string; kind: "text" | "textarea" | "image" | "datetime" | "collection" | "choice"; options?: { value: string; label: string }[] };
@@ -181,39 +181,39 @@ export const BLOCK_TYPES: BlockDef[] = [
  { type: "hero", label: "Hero banner", description: "A large banner with a heading and button.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Background image", kind: "image" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "New Arrivals", subtext: "Curated vintage, one-of-one.", cta: "Shop now", image: "", ctaHref: ""} },
  { type: "featured", label: "Featured products", description: "A grid of your products.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "eyebrow", label: "Small label above the heading", kind: "text" }, { key: "collection", label: "Products shown", kind: "collection" },
   ], defaults: { heading: "The Edit", eyebrow: "", collection: "" } },
- // Shop-by-category tiles — the single most common section on real vintage/fashion stores. Gets a shopper
+ // Shop-by-category tiles. The single most common section on real vintage/fashion stores. Gets a shopper
  // to what they want in one click; each tile deep-links a category, which is strong internal-linking SEO.
- { type: "collections", label: "Shop by category", description: "A grid of category/collection tiles — the fastest way for shoppers to find what they want.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Tiles — one per line, 'Label | image URL' (image optional)", kind: "textarea" }], defaults: { heading: "Shop by category", items: "Dresses\nOuterwear\nHandbags\nShoes\nDenim\nAccessories", cols: "3" } },
- // Social proof — customer reviews. Present on nearly every store that converts; builds trust before the buy.
- { type: "testimonials", label: "Reviews", description: "Customer quotes with names and stars — social proof that lifts trust and conversion.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Reviews — one per line, 'Quote | Name'", kind: "textarea" }], defaults: { heading: "Loved by our customers", items: "Exactly as described and the quality is incredible. | Maya R.\nMy new favourite shop — everything is one of one. | Priya S.\nShipped fast and beautifully packaged. | Jordan T." } },
- // Live drop countdown — urgency for the next release, and it brings shoppers back at drop time.
- { type: "countdown", label: "Drop countdown", description: "A live countdown to your next drop — builds urgency and pulls shoppers back when it goes live.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "date", label: "Drop date & time", kind: "datetime" }, { key: "cta", label: "Button label (optional)", kind: "text" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "The next drop lands in", subtext: "Set your alarm — one-of-ones, gone when they’re gone.", date: "", cta: "", ctaHref: "" } },
- // Blog / journal — editorial content (care guides, lookbooks, icons). Brand-building and strong for SEO.
- { type: "blog", label: "Blog / journal", description: "A row of articles or lookbook posts — editorial content that builds the brand and helps SEO.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Posts — one per line, 'Title | excerpt | image URL | link'", kind: "textarea" }], defaults: { heading: "The Journal", items: "Caring for vintage leather | Keep your finds looking their best. | | \nVintage icons: the Lady bag | The story behind a classic. | | \nStyling denim three ways | From day to night. | | " } },
- { type: "split", label: "Split — image & text", description: "A photo beside a heading, paragraph, and button — the editorial workhorse for a story or a category.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "body", label: "Body", kind: "textarea" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }, { key: "imageSide", label: "Image side (left or right)", kind: "text" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "Every piece, one of one", body: "Tell the story behind your edit — what you source, how you find it, why it matters.", cta: "", image: "", imageSide: "left", ctaHref: ""} },
- // Flexible multi-column content — 2/3/4 columns, each an optional image + heading + text + button.
+ { type: "collections", label: "Shop by category", description: "A grid of category/collection tiles. The fastest way for shoppers to find what they want.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Tiles. One per line, 'Label | image URL' (image optional)", kind: "textarea" }], defaults: { heading: "Shop by category", items: "Dresses\nOuterwear\nHandbags\nShoes\nDenim\nAccessories", cols: "3" } },
+ // Social proof: customer reviews. Present on nearly every store that converts; builds trust before the buy.
+ { type: "testimonials", label: "Reviews", description: "Customer quotes with names and stars. Social proof that lifts trust and conversion.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Reviews. One per line, 'Quote | Name'", kind: "textarea" }], defaults: { heading: "Loved by our customers", items: "Exactly as described and the quality is incredible. | Maya R.\nMy new favourite shop. Everything is one of one. | Priya S.\nShipped fast and beautifully packaged. | Jordan T." } },
+ // Live drop countdown: urgency for the next release, and it brings shoppers back at drop time.
+ { type: "countdown", label: "Drop countdown", description: "A live countdown to your next drop. Builds urgency and pulls shoppers back when it goes live.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "date", label: "Drop date & time", kind: "datetime" }, { key: "cta", label: "Button label (optional)", kind: "text" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "The next drop lands in", subtext: "Set your alarm: one-of-ones, gone when they’re gone.", date: "", cta: "", ctaHref: "" } },
+ // Blog / journal: editorial content (care guides, lookbooks, icons). Brand-building and strong for SEO.
+ { type: "blog", label: "Blog / journal", description: "A row of articles or lookbook posts. Editorial content that builds the brand and helps SEO.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "items", label: "Posts. One per line, 'Title | excerpt | image URL | link'", kind: "textarea" }], defaults: { heading: "The Journal", items: "Caring for vintage leather | Keep your finds looking their best. | | \nVintage icons: the Lady bag | The story behind a classic. | | \nStyling denim three ways | From day to night. | | " } },
+ { type: "split", label: "Split: image & text", description: "A photo beside a heading, paragraph, and button. The editorial workhorse for a story or a category.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "body", label: "Body", kind: "textarea" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }, { key: "imageSide", label: "Image side (left or right)", kind: "text" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "Every piece, one of one", body: "Tell the story behind your edit. What you source, how you find it, why it matters.", cta: "", image: "", imageSide: "left", ctaHref: ""} },
+ // Flexible multi-column content: 2/3/4 columns, each an optional image + heading + text + button.
  // The general-purpose "put content side by side" layout: feature rows, values, how-it-works, categories.
- { type: "columns", label: "Columns", description: "Content side by side — 2, 3, or 4 columns, each with an optional image, heading, text, and button.", fields: [{ key: "heading", label: "Heading (optional)", kind: "text" }, { key: "items", label: "Columns — one per line, 'Heading | Text | image URL | button label | button link'", kind: "textarea" }], defaults: { heading: "", items: "Sourced with care | Every piece is hand-selected for quality and authenticity. | | | \nOne of one | No restocks — when it’s gone, it’s gone. | | | \nShipped fast | Carefully packaged and on its way within a day. | | | ", cols: "3" } },
- // Booking a time with the shop. Not a rental section — a store that only sells still takes
+ { type: "columns", label: "Columns", description: "Content side by side. 2, 3, or 4 columns, each with an optional image, heading, text, and button.", fields: [{ key: "heading", label: "Heading (optional)", kind: "text" }, { key: "items", label: "Columns. One per line, 'Heading | Text | image URL | button label | button link'", kind: "textarea" }], defaults: { heading: "", items: "Sourced with care | Every piece is hand-selected for quality and authenticity. | | | \nOne of one | No restocks, when it’s gone, it’s gone. | | | \nShipped fast | Carefully packaged and on its way within a day. | | | ", cols: "3" } },
+ // Booking a time with the shop. Not a rental section. A store that only sells still takes
  // fittings, sourcing chats and collections.
- { type: "appointments", label: "Appointments", description: "Let people book a time with you — fittings, collections, sourcing chats. Times come from your opening hours.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "textarea" }, { key: "cta", label: "Button label", kind: "text" }, { key: "bookingUrl", label: "External booking link (Calendly, Cal.com — leave blank to use your own opening hours)", kind: "text" }], defaults: { heading: "Book an appointment", subtext: "Come and see the archive in person. Pick a time that suits you and we'll confirm it.", cta: "Book it"} },
- { type: "text", label: "Text", description: "A heading and a paragraph — your story, shipping info, anything.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "body", label: "Body", kind: "textarea" }], defaults: { heading: "About", body: "Tell your story here." } },
+ { type: "appointments", label: "Appointments", description: "Let people book a time with you. Fittings, collections, sourcing chats. Times come from your opening hours.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "textarea" }, { key: "cta", label: "Button label", kind: "text" }, { key: "bookingUrl", label: "External booking link (Calendly, Cal.com: leave blank to use your own opening hours)", kind: "text" }], defaults: { heading: "Book an appointment", subtext: "Come and see the archive in person. Pick a time that suits you and we'll confirm it.", cta: "Book it"} },
+ { type: "text", label: "Text", description: "A heading and a paragraph. Your story, shipping info, anything.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "body", label: "Body", kind: "textarea" }], defaults: { heading: "About", body: "Tell your story here." } },
  { type: "image", label: "Image", description: "A full-width photo from your library.", fields: [{ key: "image", label: "Image", kind: "image" }, { key: "caption", label: "Caption", kind: "text" }], defaults: { image: "", caption: "" } },
  { type: "gallery", label: "Gallery", description: "A row of photos from your library.", fields: [{ key: "images", label: "Image URLs (one per line)", kind: "textarea" }], defaults: { images: "" } },
- { type: "marquee", label: "Marquee — scrolling strip", description: "A moving strip of words that scrolls across — the designers or brands you carry, or a tagline.", fields: [{ key: "items", label: "Items (one per line or comma-separated)", kind: "textarea" }, { key: "sep", label: "Separator between items (e.g. ✦ • — /, or leave blank for none)", kind: "text" }], defaults: { items: "", sep: "✦" } },
- { type: "statement", label: "Statement — big quote", description: "One large statement or quote. Best given a dark or accent background for drama.", fields: [{ key: "quote", label: "Quote", kind: "textarea" }, { key: "attribution", label: "Attribution", kind: "text" }], defaults: { quote: "When it’s gone, it’s gone.", attribution: "" } },
- { type: "spotlight", label: "Spotlight — one piece", description: "Feature a single hero product, big, with its details and a button.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Details", kind: "textarea" }, { key: "price", label: "Price", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }, { key: "collection", label: "Products shown", kind: "collection" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "Piece of the week", subtext: "", price: "", cta: "Shop this piece", image: "", collection: "", ctaHref: ""} },
- { type: "video", label: "Video", description: "Embed a video — paste a YouTube, Vimeo, or .mp4 link.", fields: [{ key: "url", label: "Video URL (YouTube, Vimeo, or .mp4)", kind: "text" }, { key: "caption", label: "Caption", kind: "text" }], defaults: { url: "", caption: "" } },
+ { type: "marquee", label: "Marquee: scrolling strip", description: "A moving strip of words that scrolls across. The designers or brands you carry, or a tagline.", fields: [{ key: "items", label: "Items (one per line or comma-separated)", kind: "textarea" }, { key: "sep", label: "Separator between items (e.g. ✦ • /, or leave blank for none)", kind: "text" }], defaults: { items: "", sep: "✦" } },
+ { type: "statement", label: "Statement: big quote", description: "One large statement or quote. Best given a dark or accent background for drama.", fields: [{ key: "quote", label: "Quote", kind: "textarea" }, { key: "attribution", label: "Attribution", kind: "text" }], defaults: { quote: "When it’s gone, it’s gone.", attribution: "" } },
+ { type: "spotlight", label: "Spotlight: one piece", description: "Feature a single hero product, big, with its details and a button.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Details", kind: "textarea" }, { key: "price", label: "Price", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "image", label: "Image", kind: "image" }, { key: "collection", label: "Products shown", kind: "collection" }, { key: "ctaHref", label: "Button link (optional)", kind: "text" }], defaults: { heading: "Piece of the week", subtext: "", price: "", cta: "Shop this piece", image: "", collection: "", ctaHref: ""} },
+ { type: "video", label: "Video", description: "Embed a video: paste a YouTube, Vimeo, or .mp4 link.", fields: [{ key: "url", label: "Video URL (YouTube, Vimeo, or .mp4)", kind: "text" }, { key: "caption", label: "Caption", kind: "text" }], defaults: { url: "", caption: "" } },
  { type: "newsletter", label: "Newsletter signup", description: "Collect emails from your visitors.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }, { key: "placeholder", label: "Email box wording", kind: "text" }, { key: "thanks", label: "What they see after signing up", kind: "text" }], defaults: { heading: "Join the list", subtext: "First access to new arrivals.", cta: "Sign up", placeholder: "", thanks: ""} },
  // A real contact form (name · email · message) that emails the store, plus an optional contact email.
- { type: "contact", label: "Contact form", description: "A get-in-touch form — ask whatever you need to — plus your contact email. Every store should have one.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "fields", label: "Questions asked", kind: "textarea" }, { key: "email", label: "Contact email (optional, shown below the form)", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }], defaults: { heading: "Get in touch", subtext: "Questions about a piece, sizing, or an order? Send us a note.", fields: "Name | text\nEmail | email | yes\nMessage | long | yes", email: "", cta: "Send"} },
- // A real, interactive accordion — each Q&A is a stored pair (q0/a0, q1/a1…), so it's editable on the
+ { type: "contact", label: "Contact form", description: "A get-in-touch form, ask whatever you need to, plus your contact email. Every store should have one.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Subtext", kind: "text" }, { key: "fields", label: "Questions asked", kind: "textarea" }, { key: "email", label: "Contact email (optional, shown below the form)", kind: "text" }, { key: "cta", label: "Button label", kind: "text" }], defaults: { heading: "Get in touch", subtext: "Questions about a piece, sizing, or an order? Send us a note.", fields: "Name | text\nEmail | email | yes\nMessage | long | yes", email: "", cta: "Send"} },
+ // A real, interactive accordion. Each Q&A is a stored pair (q0/a0, q1/a1…), so it's editable on the
  // canvas and expands on click natively (<details>), no scripts. Great for FAQs, shipping, sizing.
- { type: "faq", label: "FAQ / Accordion", description: "Expandable question-and-answer rows — click to open. Perfect for FAQs, shipping & returns, sizing.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Intro line (optional)", kind: "textarea" }], defaults: { heading: "Frequently asked", subtext: "", q0: "How are pieces sourced?", a0: "Every piece is hand-selected for quality and authenticity.", q1: "What condition are items in?", a1: "Condition is noted on each listing — most pieces are pre-loved or vintage.", q2: "Do you accept returns?", a2: "See our Shipping & Returns page for the details." } },
- // Escape hatch: any custom component VYA (or a hands-on seller) builds from HTML — accordions,
+ { type: "faq", label: "FAQ / Accordion", description: "Expandable question-and-answer rows. Click to open. Perfect for FAQs, shipping & returns, sizing.", fields: [{ key: "heading", label: "Heading", kind: "text" }, { key: "subtext", label: "Intro line (optional)", kind: "textarea" }], defaults: { heading: "Frequently asked", subtext: "", q0: "How are pieces sourced?", a0: "Every piece is hand-selected for quality and authenticity.", q1: "What condition are items in?", a1: "Condition is noted on each listing. Most pieces are pre-loved or vintage.", q2: "Do you accept returns?", a2: "See our Shipping & Returns page for the details." } },
+ // Escape hatch: any custom component VYA (or a hands-on seller) builds from HTML. Accordions,
  // tabs, comparison tables, timelines… Paired with custom CSS this can express anything the fixed
  // section types can't. The HTML is sanitized to a safe allowlist on save (see sanitize-storefront-html).
- { type: "custom", label: "Custom section", description: "Anything else — accordions, tabs, tables, or fully interactive widgets. Ask VYA to build it, or write your own HTML/CSS/JS. Add JS and it runs safely in an isolated sandbox.", fields: [{ key: "html", label: "HTML", kind: "textarea" }, { key: "css", label: "CSS (optional)", kind: "textarea" }, { key: "js", label: "JavaScript (optional — runs sandboxed)", kind: "textarea" }], defaults: { html: "" } },
+ { type: "custom", label: "Custom section", description: "Anything else: accordions, tabs, tables, or fully interactive widgets. Ask VYA to build it, or write your own HTML/CSS/JS. Add JS and it runs safely in an isolated sandbox.", fields: [{ key: "html", label: "HTML", kind: "textarea" }, { key: "css", label: "CSS (optional)", kind: "textarea" }, { key: "js", label: "JavaScript (optional: runs sandboxed)", kind: "textarea" }], defaults: { html: "" } },
 ];
 
 export const BLOCK_TYPE_IDS = BLOCK_TYPES.map((b) => b.type);
@@ -222,7 +222,7 @@ export function blockDef(type: string): BlockDef | undefined {
  return BLOCK_TYPES.find((b) => b.type === type);
 }
 
-// A layout id is a short slug (see storefront-variants.ts). Validated by shape, never by membership —
+// A layout id is a short slug (see storefront-variants.ts). Validated by shape, never by membership,
 // see the note in sanitizeBlocks for why an unrecognized id is kept rather than thrown away.
 export const VARIANT_ID_RE = /^[a-z0-9-]{1,32}$/;
 
@@ -232,7 +232,7 @@ export function newBlockId(): string {
  return `b_${Date.now().toString(36)}${seq}`;
 }
 
-// `variant` is stored verbatim (shape-checked) — this module deliberately knows nothing about the
+// `variant` is stored verbatim (shape-checked). This module deliberately knows nothing about the
 // variant REGISTRY, so it stays a dependency-free description of the data. Callers that want a
 // variant's seeded defaults compose the two: makeBlock(type, variantDefaults(type, v), normalizeVariant(type, v)).
 export function makeBlock(type: BlockType, props?: Record<string, string>, variant?: string): Block {
@@ -257,7 +257,7 @@ const OVERLAY_DEFAULTS: Record<OverlayKind, Record<string, string>> = {
  // `topic` rides along to the store with the message, so a seller can tell which form it came from.
  form: { title: "Enquire", topic: "Enquiry", cta: "Send", note: "" },
 };
-// Starting box (in % of the section) per kind — shapes/images get a real size so they render
+// Starting box (in % of the section) per kind. Shapes/images get a real size so they render
 // immediately; text/buttons stay auto-sized until the seller drags a resize handle.
 const OVERLAY_START: Partial<Record<OverlayKind, { w?: number; h?: number }>> = {
  image: { w: 28 },
@@ -290,7 +290,7 @@ export const safeSrc = (v: unknown): string => {
 };
 
 const OVERLAY_KINDS: OverlayKind[] = ["button", "text", "image", "rect", "circle", "line", "triangle", "form"];
-// A font-family name — letters/numbers/spaces/hyphens only (matches the storefront font list; no CSS injection).
+// A font-family name: letters/numbers/spaces/hyphens only (matches the storefront font list; no CSS injection).
 const safeFont = (v: unknown) => String(v ?? "").slice(0, 50).replace(/[^\w \-]/g, "").trim();
 const hex6 = (v: unknown, dflt: string) => (/^#[0-9a-fA-F]{6}$/.test(String(v ?? "")) ? String(v) : dflt);
 const intStr = (v: unknown, lo: number, hi: number, dflt: number) => String(Math.min(hi, Math.max(lo, Math.round(Number(v)) || dflt)));
@@ -356,7 +356,7 @@ export function defaultBlocks(): Block[] {
  return [makeBlock("hero"), makeBlock("featured")];
 }
 
-// Additional storefront pages (beyond the home page) — each built from the same
+// Additional storefront pages (beyond the home page). Each built from the same
 // blocks. The home page lives in theme.blocks; these live in theme.extraPages.
 export type StorePage = { slug: string; title: string; blocks: Block[] };
 
@@ -364,7 +364,7 @@ export function pageSlugify(s: string): string {
  return (s || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "page";
 }
 
-// "product" is the builder's product template — a seller-made page on that slug would collide with
+// "product" is the builder's product template. A seller-made page on that slug would collide with
 // it in the page strip.
 const RESERVED_SLUGS = new Set(["shop", "home", "product", "cart", "checkout", "preview"]);
 
@@ -391,7 +391,7 @@ export function sanitizeBlocks(input: unknown): Block[] {
  if (!b || !blockDef(b.type)) continue;
  const props: Record<string, string> = {};
  // A link prop is the one prop that can execute: `javascript:…` typed into a button's Link field
- // reached the database and then the page. Everything else is text, so only these are filtered —
+ // reached the database and then the page. Everything else is text, so only these are filtered,
  // and by the same rule overlays already use.
  for (const [k, v] of Object.entries(b.props || {})) props[k] = k === "ctaHref" || k === "href" ? safeHref(v) : String(v ?? "");
  const s = (b.style || {}) as BlockStyle;
@@ -412,7 +412,7 @@ export function sanitizeBlocks(input: unknown): Block[] {
  if (s.align === "left" || s.align === "center" || s.align === "right") style.align = s.align;
  if (scale(s.headingSize)) style.headingSize = s.headingSize;
  if (scale(s.space)) style.space = s.space;
- // Deep style inspector props — validate colours, clamp numbers, whitelist enums.
+ // Deep style inspector props. Validate colours, clamp numbers, whitelist enums.
  const hex = (v: unknown) => /^#[0-9a-fA-F]{6}$/.test(String(v ?? ""));
  const num = (v: unknown, lo: number, hi: number): number | undefined => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : undefined; };
  // gradient: "#hex|#hex|angle"
@@ -430,7 +430,7 @@ export function sanitizeBlocks(input: unknown): Block[] {
  if (s.shadow === "sm" || s.shadow === "md" || s.shadow === "lg" || s.shadow === "xl") style.shadow = s.shadow;
 
  // Everything below was DECLARED on BlockStyle, emitted by the CSS compiler, and wired to a control
- // in the studio — but never copied here. This function rebuilds `style` from scratch as a whitelist,
+ // in the studio, but never copied here. This function rebuilds `style` from scratch as a whitelist,
  // and every autosave round-trips through it (see the design route), so each of these was written to
  // the block, rendered once, and then silently thrown away on the very next save. Section height set
  // by dragging the resize handle, the whole button style panel, per-field alignment, an explicit
@@ -463,7 +463,7 @@ export function sanitizeBlocks(input: unknown): Block[] {
  { const f = fontName(s.ctaFont); if (f) style.ctaFont = f; }
  if (s.ctaOutline) style.ctaOutline = true;
  if (s.ctaFullWidth) style.ctaFullWidth = true;
- // Section height. Clamped to the same bounds the canvas resize handle enforces, per section type —
+ // Section height. Clamped to the same bounds the canvas resize handle enforces, per section type,
  // a strip (announcement/marquee) tops out far lower than a hero.
  { const h = num(s.minH, minSectionHeight(b.type), maxSectionHeight(b.type)); if (h !== undefined) style.minH = h; }
  // Per-element free transforms (heading/subtext/cta/… dragged & scaled on the canvas).
@@ -494,7 +494,7 @@ export function sanitizeBlocks(input: unknown): Block[] {
  const hasStyle = Object.keys(style).length > 0;
  const overlays = sanitizeOverlays(b.overlays);
  // Variant: validated by SHAPE (a short slug), not by membership in the registry. An id we don't
- // recognize is kept and left for the renderer to fall back on — because the id we don't recognize
+ // recognize is kept and left for the renderer to fall back on, because the id we don't recognize
  // today may be one a NEWER deploy wrote (a rollback, or a preview build), and stripping it here
  // would permanently destroy that merchant's layout choice on the next autosave. Rendering falls
  // back safely (resolveVariant); storage does not throw information away.

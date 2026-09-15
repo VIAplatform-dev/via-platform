@@ -9,12 +9,12 @@ const LINES: CartLineItem[] = [
 ];
 
 test("the cart carries the two fields Squarespace's header pill syncs from", () => {
- // `TemplateCart.syncAll({items: totalQuantity, subtotal: subtotalAmount})` — and subtotalAmount is
+ // `TemplateCart.syncAll({items: totalQuantity, subtotal: subtotalAmount})`, and subtotalAmount is
  // derived from subtotalCents. Get either wrong and the pill shows the wrong bag.
  const cart = buildSqsCart(LINES, "tok", 1_700_000_000_000);
  assert.equal(cart.totalQuantity, 2);
  assert.equal(cart.subtotalCents, 98_700);
- // Cents, as an INTEGER — their formatter divides by 100 itself, so "987.00" would render as $9.87.
+ // Cents, as an INTEGER. Their formatter divides by 100 itself, so "987.00" would render as $9.87.
  assert.equal(typeof cart.subtotalCents, "number");
  assert.equal(cart.grandTotalCents, 98_700, "VYA charges tax and shipping at checkout, not here");
  assert.equal(cart.id, "tok");
@@ -23,7 +23,7 @@ test("the cart carries the two fields Squarespace's header pill syncs from", () 
 
 test("the added-to-cart mini-cart gets a price it can print", () => {
  // Its own code: `Gp(successData.subTotal, successData.item?.price?.currency)`, and Gp divides by
- // 100. A cart entry that spelled it `subtotalCents` — the spelling the cart TOTALS use — showed
+ // 100. A cart entry that spelled it `subtotalCents`, the spelling the cart TOTALS use. Showed
  // the shopper the right piece at $0.00.
  const [entry] = buildSqsCart([LINES[0]], "tok").entries;
  assert.equal(entry.subTotal, 43_700, "minor units, under the name the mini-cart reads");
@@ -60,7 +60,7 @@ test("an empty cart is empty, not a cart with nothing in it", () => {
  assert.deepEqual(cart.entries, []);
  assert.equal(cart.totalQuantity, 0);
  assert.equal(cart.subtotalCents, 0);
- // The route answers a visitor with no cart the way Squarespace does — 404 with this exact message,
+ // The route answers a visitor with no cart the way Squarespace does. 404 with this exact message,
  // which its own bundle reads as "empty" rather than as a failure.
  assert.equal(NO_CART_MESSAGE, "You have no shopping cart yet.");
 });
@@ -75,7 +75,7 @@ test("the posted item id is read whichever name it arrives under", () => {
 test("orderId, selectedShippingOption and shippingLocation are OMITTED, never sent as null", () => {
  // The real ShoppingCart model declares these with a validator (isString / isObject / isObject) and
  // no fallback value. YUI's Model.setAttrs() validates the whole incoming object before applying any
- // of it, so `null` here — which fails every one of those validators — silently threw out the ENTIRE
+ // of it, so `null` here, which fails every one of those validators. Silently threw out the ENTIRE
  // update, including a correct, non-empty `entries` array. Confirmed against the real bundle and by
  // reproducing it end to end: a real cart with a real item still rendered as "nothing in your cart"
  // until these were omitted instead of nulled. Omitting the key means its setter is never called, so
@@ -84,7 +84,7 @@ test("orderId, selectedShippingOption and shippingLocation are OMITTED, never se
  assert.equal("orderId" in cart, false);
  assert.equal("selectedShippingOption" in cart, false);
  assert.equal("shippingLocation" in cart, false);
- // And the object must actually SERIALIZE that way — a `key: undefined` would still fail the model's
+ // And the object must actually SERIALIZE that way. A `key: undefined` would still fail the model's
  // validator once JSON round-trips it, since `JSON.parse(JSON.stringify(undefined))` here is what a
  // fetch() response body actually carries, not the in-memory object.
  const json = JSON.parse(JSON.stringify(cart));

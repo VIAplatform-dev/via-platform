@@ -1,7 +1,7 @@
-// VYA Cross-Lister — background service worker.
+// VYA Cross-Lister: background service worker.
 // Bridges the popup ⇄ VYA backend ⇄ the Depop content script. All requests to VYA carry the
 // seller's own vyaplatform.com session cookie (credentials: "include" + host_permissions), so the
-// seller only ever acts as themselves — on both VYA and Depop.
+// seller only ever acts as themselves, on both VYA and Depop.
 
 const VYA = "https://vyaplatform.com";
 // Each marketplace's "create listing" page. Add a key here + a content-script adapter to support more.
@@ -27,7 +27,7 @@ async function reportResult(itemId, status, url, platform = "depop") {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ itemId, platform, status, url: url || null }),
     });
-  } catch { /* best effort — the seller can re-sync later */ }
+  } catch { /* best effort: the seller can re-sync later */ }
 }
 
 // Open a fresh "create listing" tab on the target marketplace, wait for its content script to be
@@ -39,7 +39,7 @@ async function listItem(platform, item) {
   if (!url) return { ok: false, error: `Unsupported marketplace: ${platform}` };
   const tab = await chrome.tabs.create({ url, active: true });
   const ready = await waitForContentScript(tab.id, 15000);
-  if (!ready) return { ok: false, error: `${platform} page didn't load in time — try again.` };
+  if (!ready) return { ok: false, error: `${platform} page didn't load in time. Try again.` };
   try {
     const res = await chrome.tabs.sendMessage(tab.id, { type: "FILL_LISTING", item });
     if (res?.ok) await reportResult(item.id, "pending", null, platform);
@@ -52,7 +52,7 @@ async function listItem(platform, item) {
 // ── engagement stats ──────────────────────────────────────────────────────────
 // The content scripts read like/offer counts off the seller's OWN marketplace pages and send them
 // here; we forward to VYA, which folds them into the cross-listing dashboard's roll-up. Same session
-// cookie, same act-as-yourself model as listing — we're just reading what the seller already sees.
+// cookie, same act-as-yourself model as listing. We're just reading what the seller already sees.
 
 // Map of marketplace listing URLs → VYA item ids (+ the seller's handle per platform), so a content
 // script can attribute a scraped count to the right item and find the seller's shop page to scan.
@@ -76,7 +76,7 @@ async function reportStats(itemId, platform, stats) {
   } catch { return false; }
 }
 
-// Seller's own shop/closet URL per platform — visiting it lets a content script scan every listing's
+// Seller's own shop/closet URL per platform. Visiting it lets a content script scan every listing's
 // like count in one page load (far better than opening each listing).
 function shopUrl(platform, handle) {
   const h = encodeURIComponent(handle);

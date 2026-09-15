@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { SHOPPER_COOKIE, shopperCookieOptions } from "@/app/lib/shopper-session";
 
-/** POST — end this shopper's session at this store. Only this store: the cookie is host-scoped. */
+/** POST: end this shopper's session at this store. Only this store: the cookie is host-scoped. */
 export const dynamic = "force-dynamic";
 
 export async function POST() {

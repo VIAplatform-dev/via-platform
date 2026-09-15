@@ -31,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const text = body?.body ? String(body.body).trim() : "";
  if (!text) return NextResponse.json({ error: "Message required." }, { status: 400 });
  await addMessage(conv.id, "store", text.slice(0, 5000));
- // Notify the buyer their message got a reply (was a dead end before — they had to revisit the link).
+ // Notify the buyer their message got a reply (was a dead end before. They had to revisit the link).
  if (conv.buyerEmail) {
  const store = stores.find((s) => s.slug === slug);
  const sf = await getStorefrontBySlug(slug).catch(() => null);

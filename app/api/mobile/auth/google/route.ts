@@ -62,7 +62,7 @@ export async function POST(request: Request) {
  const jwt = signMobileJwt(userId, email);
 
  // Approval status so the app can show a "you're on the waitlist" screen instead of
- // empty/erroring catalog calls — content endpoints (/api/public/*) now require approval.
+ // empty/erroring catalog calls. Content endpoints (/api/public/*) now require approval.
  const status = await getPilotStatus(email).catch(() => "pending");
 
  return NextResponse.json({
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
  user: { id: userId, email, name: info.name ?? null },
  approved: status === "approved",
  status,
- // Matches /api/mobile/auth/me — the app routes sellers to their own tabs on this.
+ // Matches /api/mobile/auth/me: the app routes sellers to their own tabs on this.
  storeSlug: await storeSlugForMobileEmail(email),
  });
  } catch (err) {

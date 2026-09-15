@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 
-// "Where your shoppers come from" — attribution by acquisition channel. Clicks from
+// "Where your shoppers come from". Attribution by acquisition channel. Clicks from
 // the clicks table (utm_source captured on landing), orders + sales by joining
 // conversions back to the click that drove them (conversions.via_click_id), so each
 // channel gets real conversion rate + AOV. New vs returning from first-order status.
@@ -109,7 +109,7 @@ export async function getChannelTrend(storeSlug: string, sinceDays = 30): Promis
  return { days, series };
 }
 
-/** Total store sales in the period — every conversion, attributed to a click or not.
+/** Total store sales in the period. Every conversion, attributed to a click or not.
  *  The denominator for "share of sales attributed to marketing". */
 export async function getStoreSalesTotal(storeSlug: string, sinceDays?: number): Promise<number> {
  const sql = db();

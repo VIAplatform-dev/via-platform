@@ -118,7 +118,7 @@ export default function ProductDetailModal({
  onClick={handleClose}
  />
 
- {/* Modal — slides up on mobile, centered on desktop */}
+ {/* Modal: slides up on mobile, centered on desktop */}
  <div
  className={`relative w-full sm:max-w-2xl sm:mx-4 max-h-[95vh] overflow-y-auto bg-[#FFFDF8] rounded-t-xl sm:rounded-none shadow-2xl transition-all duration-300 ease-out ${
  showModal

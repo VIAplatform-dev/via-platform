@@ -1,13 +1,13 @@
 // Which captured pages the site itself actually leads to.
 //
 // A crawl finds every URL that answers, and a Shopify store answers on far more than it shows. Auto
-// -created collections, one-off pages from an old campaign, an archived drop — they all still
+// -created collections, one-off pages from an old campaign, an archived drop. They all still
 // resolve, so they all get captured, and they all then appear in the editor's page strip looking
 // exactly as live as the homepage. A seller scrolling that strip finds "Commission 7" sitting
 // beside "New Arrivals" and reasonably concludes we have published something she retired.
 //
 // So: a page nothing links to is marked, greyed and sorted last. The word used is "Not linked",
-// never "Archived" — because these pages ARE still reachable by anyone holding the URL, and telling
+// never "Archived", because these pages ARE still reachable by anyone holding the URL, and telling
 // her they're archived would be the same false reassurance pointing the other way. Hiding them from
 // the storefront is a separate, deliberate action; this only stops the strip implying they're a
 // featured part of her shop.
@@ -62,7 +62,7 @@ export function linkTargets(html: string, origin?: string | null): Set<string> {
 /**
  * Split captured paths into the ones the site leads to and the ones it doesn't.
  *
- * `sourceHtml` is the pages we read links out of — in practice the homepage and, when it exists, the
+ * `sourceHtml` is the pages we read links out of, in practice the homepage and, when it exists, the
  * collections index. Not every captured page: reading eighty megabytes of HTML to decorate a strip
  * of thumbnails would cost more than the feature is worth, and a page linked from nothing but a
  * single product page is not one a shopper finds either.

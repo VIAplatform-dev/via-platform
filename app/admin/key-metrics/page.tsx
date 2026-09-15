@@ -36,7 +36,7 @@ function trendLabel(current: number, prev: number, fmtFn: (n: number) => string)
  if (prev === 0) return null;
  const delta = current - prev;
  const pct = ((current - prev) / prev) * 100;
- // Cap at ±999% — larger swings mean the comparison window has bad/missing data
+ // Cap at ±999% larger swings mean the comparison window has bad/missing data
  if (Math.abs(pct) > 999) return null;
  const sign = delta >= 0 ? "+" : "";
  return `${sign}${fmtFn(delta)} (${sign}${pct.toFixed(0)}%) vs prev period`;
@@ -327,7 +327,7 @@ export default function KeyMetricsPage() {
  return (
  <section>
  <h2 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, fontWeight: 500, margin: "0 0 14px" }}>
- Growth at a Glance — {data.period?.label ?? "This Period"} vs Previous Period
+ Growth at a Glance. {data.period?.label ?? "This Period"} vs Previous Period
  </h2>
  <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "24px 28px" }}>
  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px 32px" }}>
@@ -372,7 +372,7 @@ export default function KeyMetricsPage() {
  <Link href="/admin/analytics" style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "24px 28px", gridColumn: "span 1", textDecoration: "none", display: "block", transition: "box-shadow 0.15s, border-color 0.15s" }} onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 1px 8px rgba(0,0,0,0.06)"; e.currentTarget.style.borderColor = "#d4d4d8"; }} onMouseLeave={e => { e.currentTarget.style.boxShadow = ""; e.currentTarget.style.borderColor = BORDER; }}>
  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
  <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, margin: "0 0 8px" }}>
- {data.period?.isAllTime ? "All-Time GMV" : data.period?.isMonth ? `GMV — ${data.period.label}` : "All-Time GMV"}
+ {data.period?.isAllTime ? "All-Time GMV" : data.period?.isMonth ? `GMV: ${data.period.label}` : "All-Time GMV"}
  </p>
  <span style={{ fontSize: 11, color: MUTED_TEXT }}>→</span>
  </div>
@@ -380,17 +380,17 @@ export default function KeyMetricsPage() {
  {data.period?.isMonth ? fmt$(data.gmv.last30d) : fmt$(data.gmv.total)}
  </p>
  <WeeklyGmvChart data={data.gmvByWeek} />
- <p style={{ fontSize: 11, color: MUTED_TEXT, margin: "10px 0 0" }}>Weekly GMV — last 10 weeks</p>
+ <p style={{ fontSize: 11, color: MUTED_TEXT, margin: "10px 0 0" }}>Weekly GMV. Last 10 weeks</p>
  </Link>
  <MetricCard
- label={data.period?.isMonth ? `Last Week of ${data.period.label}` : data.period?.isAllTime ? "GMV — Last 7 Days" : "GMV — Last 7 Days"}
+ label={data.period?.isMonth ? `Last Week of ${data.period.label}` : data.period?.isAllTime ? "GMV: Last 7 Days" : "GMV: Last 7 Days"}
  value={fmt$(data.gmv.last7d)}
  trend={<TrendBadge current={data.gmv.last7d} prev={data.gmv.prev7d} fmtFn={fmt$} />}
  note={`Previous period: ${fmt$(data.gmv.prev7d)}`}
  href="/admin/analytics"
  />
  <MetricCard
- label={data.period?.isMonth ? `vs Previous Month` : data.period?.isAllTime ? "Since Launch" : "GMV — Last 30 Days"}
+ label={data.period?.isMonth ? `vs Previous Month` : data.period?.isAllTime ? "Since Launch" : "GMV: Last 30 Days"}
  value={data.period?.isMonth ? fmt$(data.gmv.prev30d) : fmt$(data.gmv.last30d)}
  trend={data.period?.isMonth ? undefined : <TrendBadge current={data.gmv.last30d} prev={data.gmv.prev30d} fmtFn={fmt$} />}
  note={data.period?.isMonth ? `${data.period.label} total: ${fmt$(data.gmv.last30d)}` : `Previous 30 days: ${fmt$(data.gmv.prev30d)}`}
@@ -412,20 +412,20 @@ export default function KeyMetricsPage() {
  <h2 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, fontWeight: 500, margin: "0 0 14px" }}>Total Orders</h2>
  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
  <MetricCard
- label={data.period?.isAllTime ? "All-Time Orders" : data.period?.isMonth ? `Orders — ${data.period.label}` : "All-Time Orders"}
+ label={data.period?.isAllTime ? "All-Time Orders" : data.period?.isMonth ? `Orders. ${data.period.label}` : "All-Time Orders"}
  value={fmtNum(data.period?.isMonth ? data.totalOrders.last30d : data.totalOrders.allTime)}
  note="Total orders placed through VYA, excluding returns"
  href="/admin/conversions"
  />
  <MetricCard
- label="Orders — Last 7 Days"
+ label="Orders. Last 7 Days"
  value={fmtNum(data.totalOrders.last7d)}
  trend={<TrendBadge current={data.totalOrders.last7d} prev={data.totalOrders.prev7d} fmtFn={fmtNum} />}
  note={`Previous 7 days: ${fmtNum(data.totalOrders.prev7d)}`}
  href="/admin/conversions"
  />
  <MetricCard
- label={data.period?.isMonth ? `vs Previous Month` : "Orders — Last 30 Days"}
+ label={data.period?.isMonth ? `vs Previous Month` : "Orders. Last 30 Days"}
  value={data.period?.isMonth ? fmtNum(data.totalOrders.prev30d) : fmtNum(data.totalOrders.last30d)}
  trend={data.period?.isMonth ? undefined : <TrendBadge current={data.totalOrders.last30d} prev={data.totalOrders.prev30d} fmtFn={fmtNum} />}
  note={data.period?.isMonth ? `${data.period.label} orders: ${fmtNum(data.totalOrders.last30d)}` : `Previous 30 days: ${fmtNum(data.totalOrders.prev30d)}`}
@@ -440,7 +440,7 @@ export default function KeyMetricsPage() {
  <h2 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, fontWeight: 500, margin: "0 0 14px" }}>Conversion & Revenue</h2>
  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
  <MetricCard
- label={data.period?.isMonth || data.period?.isAllTime ? `Conversion Rate — ${data.period.label}` : "Conversion Rate (7d)"}
+ label={data.period?.isMonth || data.period?.isAllTime ? `Conversion Rate: ${data.period.label}` : "Conversion Rate (7d)"}
  value={data.period?.isMonth || data.period?.isAllTime ? fmtPct(data.conversionRate.periodRate) : fmtPct(data.conversionRate.last7d)}
  sub={data.period?.isMonth || data.period?.isAllTime
  ? `${fmtNum(data.conversionRate.periodConversions)} orders from ${fmtNum(data.conversionRate.periodVisitors)} visitors in ${data.period?.label}`
@@ -450,7 +450,7 @@ export default function KeyMetricsPage() {
  href="/admin/conversions"
  />
  <MetricCard
- label={data.period?.isMonth || data.period?.isAllTime ? `Email CTR — ${data.period.label}` : "Email CTR (7d)"}
+ label={data.period?.isMonth || data.period?.isAllTime ? `Email CTR: ${data.period.label}` : "Email CTR (7d)"}
  value={data.period?.isMonth || data.period?.isAllTime
  ? fmtPct(data.emailCtr?.ctrPeriod ?? 0)
  : fmtPct(data.emailCtr?.ctr7d ?? 0)}
@@ -460,11 +460,11 @@ export default function KeyMetricsPage() {
  trend={data.period?.isMonth
  ? undefined
  : <TrendBadge current={data.emailCtr?.ctr7d ?? 0} prev={data.emailCtr?.ctrPrev7d ?? 0} fmtFn={fmtPct} />}
- note="Click-through rate. ⚠️ Email-link click tracking only works from Jun 23, 2026 — links errored before then, so earlier clicks weren't recorded. CTR is only meaningful from that date."
+ note="Click-through rate. ⚠️ Email-link click tracking only works from Jun 23, 2026. Links errored before then, so earlier clicks weren't recorded. CTR is only meaningful from that date."
  href="/admin/emails"
  />
  <MetricCard
- label={data.period?.isMonth || data.period?.isAllTime ? `Email Sales — ${data.period.label}` : "Email Sales (all-time)"}
+ label={data.period?.isMonth || data.period?.isAllTime ? `Email Sales. ${data.period.label}` : "Email Sales (all-time)"}
  value={fmt$(data.period?.isMonth || data.period?.isAllTime ? (data.emailSales?.revenuePeriod ?? 0) : (data.emailSales?.revenueAll ?? 0))}
  sub={`${fmtNum(data.period?.isMonth || data.period?.isAllTime ? (data.emailSales?.ordersPeriod ?? 0) : (data.emailSales?.ordersAll ?? 0))} orders from email · ${fmt$(data.emailSales?.revenueAll ?? 0)} / ${fmtNum(data.emailSales?.ordersAll ?? 0)} orders all-time`}
  note="Sales whose originating click came from an email link (utm_source=email)"
@@ -472,7 +472,7 @@ export default function KeyMetricsPage() {
  />
  <MetricCard
  label="Approval → First Purchase"
- value={data.approvalToPurchase?.avgDays != null ? `${data.approvalToPurchase.avgDays.toFixed(1)} days` : "—"}
+ value={data.approvalToPurchase?.avgDays != null ? `${data.approvalToPurchase.avgDays.toFixed(1)} days` : "-"}
  sub={data.approvalToPurchase?.medianDays != null
  ? `Median ${data.approvalToPurchase.medianDays.toFixed(1)} days · ${fmtNum(data.approvalToPurchase?.buyers ?? 0)} buyers`
  : `${fmtNum(data.approvalToPurchase?.buyers ?? 0)} buyers`}
@@ -499,14 +499,14 @@ export default function KeyMetricsPage() {
  </div>
  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginTop: 16 }}>
  <MetricCard
- label={data.period?.isMonth || data.period?.isAllTime ? `Clicks — ${data.period.label}` : "Clicks — Last 30 Days"}
+ label={data.period?.isMonth || data.period?.isAllTime ? `Clicks. ${data.period.label}` : "Clicks. Last 30 Days"}
  value={fmtNum(data.clicks?.last30d ?? 0)}
  trend={<TrendBadge current={data.clicks?.last30d ?? 0} prev={data.clicks?.prev30d ?? 0} fmtFn={fmtNum} />}
  note={`Previous period: ${fmtNum(data.clicks?.prev30d ?? 0)} · Last 7 days: ${fmtNum(data.clicks?.last7d ?? 0)} (prev: ${fmtNum(data.clicks?.prev7d ?? 0)})`}
  href="/admin/analytics"
  />
  <MetricCard
- label={data.period?.isMonth || data.period?.isAllTime ? `Favorites Added — ${data.period.label}` : "Favorites Added — 30d"}
+ label={data.period?.isMonth || data.period?.isAllTime ? `Favorites Added. ${data.period.label}` : "Favorites Added. 30d"}
  value={fmtNum(data.favoritesVolume?.period ?? 0)}
  trend={<TrendBadge current={data.favoritesVolume?.period ?? 0} prev={data.favoritesVolume?.prevPeriod ?? 0} fmtFn={fmtNum} />}
  note={`Previous period: ${fmtNum(data.favoritesVolume?.prevPeriod ?? 0)} · Last 7 days: ${fmtNum(data.favoritesVolume?.week ?? 0)}`}
@@ -532,7 +532,7 @@ export default function KeyMetricsPage() {
  href="/admin/customers"
  />
  <MetricCard
- label={`New Accounts — ${data.period?.label ?? "This Period"}`}
+ label={`New Accounts. ${data.period?.label ?? "This Period"}`}
  value={fmtNum(data.newUsers?.period ?? 0)}
  trend={<TrendBadge current={data.newUsers?.period ?? 0} prev={data.newUsers?.prevPeriod ?? 0} fmtFn={fmtNum} />}
  note={`Previous period: ${fmtNum(data.newUsers?.prevPeriod ?? 0)} · Last 7 days: ${fmtNum(data.newUsers?.week ?? 0)} (prev: ${fmtNum(data.newUsers?.prevWeek ?? 0)})`}
@@ -566,12 +566,12 @@ export default function KeyMetricsPage() {
  {data.period?.isMonth ? (
  <>
  <div>
- <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, margin: "0 0 6px" }}>Signups — {data.period.label}</p>
+ <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, margin: "0 0 6px" }}>Signups. {data.period.label}</p>
  <p style={{ fontSize: 32, fontWeight: 600, color: DARK, margin: "0 0 4px", lineHeight: 1 }}>{fmtNum(currentMonthData?.signups ?? 0)}</p>
  {prevMonthData && <TrendBadge current={currentMonthData?.signups ?? 0} prev={prevMonthData.signups} fmtFn={fmtNum} />}
  </div>
  <div>
- <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, margin: "0 0 6px" }}>Approved — {data.period.label}</p>
+ <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, margin: "0 0 6px" }}>Approved. {data.period.label}</p>
  <p style={{ fontSize: 32, fontWeight: 600, color: DARK, margin: "0 0 4px", lineHeight: 1 }}>{fmtNum(currentMonthData?.approved ?? 0)}</p>
  <p style={{ fontSize: 12, color: GRAY, margin: 0 }}>of {fmtNum(currentMonthData?.signups ?? 0)} signups</p>
  </div>
@@ -604,7 +604,7 @@ export default function KeyMetricsPage() {
  )}
  </div>
 
- {/* Bar chart — only show when not filtered to a single month */}
+ {/* Bar chart, only show when not filtered to a single month */}
  {!data.period?.isMonth && (
  <div style={{ overflowX: "auto" }}>
  <div style={{ display: "flex", alignItems: "flex-end", gap: 8, minWidth: visibleMonths.length * 56, height: 80 }}>
@@ -728,7 +728,7 @@ export default function KeyMetricsPage() {
 
  <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "24px 28px" }}>
  <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, margin: "0 0 16px" }}>
- Buyer Retention — {data.period?.label ?? "Last 30 Days"}
+ Buyer Retention: {data.period?.label ?? "Last 30 Days"}
  </p>
 
  {/* Came back after purchase */}
@@ -736,7 +736,7 @@ export default function KeyMetricsPage() {
  <p style={{ fontSize: 12, color: GRAY, margin: "0 0 4px" }}>Came back after buying</p>
  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
  <p style={{ fontSize: 30, fontWeight: 600, color: DARK, margin: 0, lineHeight: 1 }}>
- {data.buyerRetention.returnRate === null ? "—" : fmtPct(data.buyerRetention.returnRate)}
+ {data.buyerRetention.returnRate === null ? "-" : fmtPct(data.buyerRetention.returnRate)}
  </p>
  <p style={{ fontSize: 12, color: MUTED_TEXT, margin: 0 }}>
  {fmtNum(data.buyerRetention.returnedAfterPurchase)} of {fmtNum(data.buyerRetention.totalBuyers)} buyers
@@ -762,7 +762,7 @@ export default function KeyMetricsPage() {
  <p style={{ fontSize: 12, color: GRAY, margin: "0 0 4px" }}>Bought again</p>
  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
  <p style={{ fontSize: 30, fontWeight: 600, color: DARK, margin: 0, lineHeight: 1 }}>
- {data.buyerRetention.repeatPurchaseRate === null ? "—" : fmtPct(data.buyerRetention.repeatPurchaseRate)}
+ {data.buyerRetention.repeatPurchaseRate === null ? "-" : fmtPct(data.buyerRetention.repeatPurchaseRate)}
  </p>
  <p style={{ fontSize: 12, color: MUTED_TEXT, margin: 0 }}>
  {fmtNum(data.buyerRetention.boughtAgain)} of {fmtNum(data.buyerRetention.totalBuyers)} buyers
@@ -811,7 +811,7 @@ export default function KeyMetricsPage() {
    {r.label}
   </p>
   <p style={{ fontSize: 26, fontWeight: 700, color: r.rate == null ? MUTED_TEXT : DARK, margin: "0 0 4px", lineHeight: 1 }}>
-   {r.rate == null ? "—" : fmtPct(r.rate)}
+   {r.rate == null ? "-" : fmtPct(r.rate)}
   </p>
   <p style={{ fontSize: 11, color: GRAY, margin: 0 }}>
    {r.retained} of {r.cohort} buyer{r.cohort === 1 ? "" : "s"}
@@ -831,7 +831,7 @@ export default function KeyMetricsPage() {
  {data.activityBreakdown && (
  <section>
  <h2 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: MUTED_TEXT, fontWeight: 500, margin: "0 0 14px" }}>
- Active User Breakdown — {data.period?.label ?? "Last 30 Days"}
+ Active User Breakdown: {data.period?.label ?? "Last 30 Days"}
  </h2>
  <div style={{ background: BG_CARD, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "20px 28px" }}>
  <p style={{ fontSize: 12, color: MUTED_TEXT, margin: "0 0 16px" }}>

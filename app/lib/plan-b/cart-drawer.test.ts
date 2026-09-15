@@ -9,7 +9,7 @@ const LINES = [
 ];
 
 /**
- * The drawer exactly as this theme really serves it — structure taken from the live capture
+ * The drawer exactly as this theme really serves it. Structure taken from the live capture
  * (#CartDrawer > .drawer__inner > cart-drawer-items.is-empty > #CartDrawer-Form > #CartDrawer-CartItems),
  * including the `onsubmit="return false"` the crawler stamps on every /cart form.
  */
@@ -159,7 +159,7 @@ test("a title containing markup stays inert", () => {
 });
 
 // ── Picking the row template ──────────────────────────────────────────────────────────────────────
-// The bug: Horizon themes call their rows `cart-items__table-row`, which CONTAINS "cart-item" — and
+// The bug: Horizon themes call their rows `cart-items__table-row`, which CONTAINS "cart-item", and
 // so does their table HEADER row. The old selector took the first match, cloned the header, and
 // rendered "Product image / Product information" as if it were a product.
 const HORIZON_CART = `<html><body><table class="cart-items__table">
@@ -184,7 +184,7 @@ test("never clones a table header row as if it were a product", () => {
 test("finds the real row in a theme whose classes we do not recognise", () => {
  const out = buildCartDrawerSection({ pageHtml: PAGE, rowTemplateHtml: HORIZON_CART, lines: LINES, checkoutHref: "/checkout?cart=1" })!;
  const $ = cheerio.load(out);
- // Two lines in, two rows out — cloned from the theme's own <tbody> row.
+ // Two lines in, two rows out. Cloned from the theme's own <tbody> row.
  assert.equal($("tbody tr, tr").length >= 2, true);
  assert.match($.root().text(), /Monogram Pochette/);
  assert.match($.root().text(), /Coach Carryall/);
@@ -209,7 +209,7 @@ test("prefers a derived template over guessing at the markup", async () => {
    { title: "Known B", priceText: "20.00", imageUrl: "https://cdn/b.jpg", href: "/products/b" },
   ],
  });
- assert.ok(template, "the fixture uses class names nothing in our code knows — derivation must still work");
+ assert.ok(template, "the fixture uses class names nothing in our code knows. Derivation must still work");
 
  const out = buildCartDrawerSection({ pageHtml: PAGE, rowTemplateHtml: CART_PAGE, template, lines: LINES, checkoutHref: "/checkout?cart=1" })!;
  const $ = cheerio.load(out);
@@ -222,7 +222,7 @@ test("prefers a derived template over guessing at the markup", async () => {
 });
 
 // ── The drawer on a NORMAL page load ──────────────────────────────────────────────────────────────
-// Clicking the cart icon opens the drawer that is ALREADY in the page — no request is made. That
+// Clicking the cart icon opens the drawer that is ALREADY in the page, no request is made. That
 // drawer was captured with an empty cart, so a shopper with items in their bag clicked the icon and
 // was told "Your cart is empty" while the badge beside it said 1.
 test("injectCartDrawer fills the drawer that ships with the page", async () => {

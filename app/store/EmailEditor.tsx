@@ -4,7 +4,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Bold, Italic, Heading, List, Link2, Image as ImageIcon, Sparkles } from "lucide-react";
 
-// A true WYSIWYG editor for store emails: bold is bold, headings are headings — the store owner
+// A true WYSIWYG editor for store emails: bold is bold, headings are headings. The store owner
 // never sees markdown symbols. It reads/writes the email body as the same lightweight markdown the
 // server renderer + VYA use, so the pipeline is unchanged; the formatting just happens visually.
 
@@ -67,7 +67,7 @@ export default function EmailEditor({ body, onBody, subject, link, storeName, pl
  const lastMd = useRef(body);
 
  // Render the editor HTML on mount and whenever the body changes from OUTSIDE (e.g. VYA writes the
- // email) — but NOT while the user is typing (sync() keeps lastMd in step, so this is a no-op then,
+ // email), but NOT while the user is typing (sync() keeps lastMd in step, so this is a no-op then,
  // which avoids the caret jumping to the start on every keystroke).
  useEffect(() => {
  if (!ref.current) return;
@@ -161,7 +161,7 @@ export default function EmailEditor({ body, onBody, subject, link, storeName, pl
  {empty && <div className="pointer-events-none absolute left-3.5 top-3 text-[14px] leading-relaxed text-stone-400">{placeholder || "Write like you're talking to a customer…"}</div>}
  </div>
  </div>
- <p className="mt-1.5 text-[11px] text-stone-400">Type normally, then select text and use the toolbar to make it <b>bold</b>, a heading, or a list — or ask VYA to write it for you.</p>
+ <p className="mt-1.5 text-[11px] text-stone-400">Type normally, then select text and use the toolbar to make it <b>bold</b>, a heading, or a list, or ask VYA to write it for you.</p>
  </div>
 
  <div>

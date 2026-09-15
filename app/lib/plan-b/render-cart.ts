@@ -3,7 +3,7 @@
 // This is the payoff of derive-cart-template.ts: because the template says WHERE each value goes
 // (as a position in the row, not a class name), filling it needs no knowledge of the theme at all.
 // Dawn and Horizon go through the identical code path below, and so will a theme neither of us has
-// seen — there is no branch to add.
+// seen: there is no branch to add.
 //
 // It replaces the per-theme selector lists that used to live in injectCartPage and
 // buildCartDrawerSection, which is what made a Horizon store render its table HEADER as a product.
@@ -15,8 +15,8 @@ import type { CartTemplate, Slot } from "./derive-cart-template.ts";
 import type { CartPageLine } from "../site-capture.ts";
 
 /**
- * Anything a theme uses to remove a line: a custom element, a class, a link into /cart/change, or —
- * most commonly on newer themes — an icon button whose only label is an aria-label or title.
+ * Anything a theme uses to remove a line: a custom element, a class, a link into /cart/change, or,
+ * most commonly on newer themes. An icon button whose only label is an aria-label or title.
  */
 const REMOVE_CONTROL = [
  "cart-remove-button",
@@ -28,7 +28,7 @@ const REMOVE_CONTROL = [
  "button[name='remove']",
 ].join(", ");
 
-/** A leaf whose ENTIRE text is a money amount — a price, not a sentence that mentions one. */
+/** A leaf whose ENTIRE text is a money amount. A price, not a sentence that mentions one. */
 const MONEY_ONLY = /^[^\d]{0,3}[\d,]+(\.\d{2})?\s*[A-Z]{0,3}$/;
 
 function money(cents: number, currency: string | null): string {
@@ -47,7 +47,7 @@ function at($: cheerio.CheerioAPI, root: DomEl, path: number[]): cheerio.Cheerio
  return $cur as cheerio.Cheerio<DomEl>;
 }
 
-/** Write one value into one slot. Text is set with .text(), which escapes — a seller-controlled
+/** Write one value into one slot. Text is set with .text(), which escapes. A seller-controlled
  *  title can never become live markup. */
 function fill($: cheerio.CheerioAPI, root: DomEl, slot: Slot | undefined, value: string | null): void {
  if (!slot) return;
@@ -55,7 +55,7 @@ function fill($: cheerio.CheerioAPI, root: DomEl, slot: Slot | undefined, value:
  if (!$el) return;
  if (slot.kind === "text") { $el.text(value ?? ""); return; }
  if (!slot.attr) return;
- if (value == null) { $el.remove(); return; } // no image for this line — drop it, don't show the template's
+ if (value == null) { $el.remove(); return; } // no image for this line. Drop it, don't show the template's
  $el.attr(slot.attr, value);
  if (slot.attr === "src") $el.removeAttr("srcset").removeAttr("data-srcset").removeAttr("sizes");
 }
@@ -64,7 +64,7 @@ function fill($: cheerio.CheerioAPI, root: DomEl, slot: Slot | undefined, value:
  * The theme's own cart lines, one per item in the visitor's bag.
  *
  * Everything not covered by a slot is left exactly as the theme wrote it, so its CSS, spacing and
- * column layout survive — that is the whole reason for cloning rather than building markup.
+ * column layout survive: that is the whole reason for cloning rather than building markup.
  */
 export function renderCartRows(template: CartTemplate, lines: CartPageLine[]): string {
  if (!template?.rowHtml || !lines.length) return "";
@@ -87,7 +87,7 @@ export function renderCartRows(template: CartTemplate, lines: CartPageLine[]): s
 
   // Every OTHER money string in the row is this line's price too. Themes commonly print a unit
   // price AND a line total; the derived slot is only one of them, so without this the row rendered
-  // "£600.00 … £155.00" — the real price beside the template's, which is worse than either alone.
+  // "£600.00 … £155.00": the real price beside the template's, which is worse than either alone.
   // Safe because VYA stock is one-of-one: quantity is always 1, so unit and total are equal.
   for (const el of $(root).find("*").toArray()) {
    const $el = $(el);
@@ -98,7 +98,7 @@ export function renderCartRows(template: CartTemplate, lines: CartPageLine[]): s
    $el.text(priceText);
   }
 
-  // Fields that described the template's product and have no counterpart here — a vendor, a SKU,
+  // Fields that described the template's product and have no counterpart here. A vendor, a SKU,
   // a variant label. Dropped, because the alternative is every line claiming to be a Prada.
   for (const path of template.stalePaths || []) {
    const $el = at($, root, path);
@@ -118,12 +118,12 @@ export function renderCartRows(template: CartTemplate, lines: CartPageLine[]): s
   $(root).find("[class*='quantity'] input, quantity-input input").attr("value", "1").attr("readonly", "readonly").attr("min", "1").attr("max", "1");
   $(root).find("[class*='quantity__button'], [name='minus'], [name='plus']").remove();
 
-  // The remove control, addressed by VYA item id rather than by line position — a position is only
+  // The remove control, addressed by VYA item id rather than by line position. A position is only
   // meaningful against a particular render of the bag, and goes stale the moment anything changes.
   //
   // Recognising the theme's OWN control matters as much as wiring it: themes label it with an icon
   // and no text (Horizon uses a trash glyph), and when that went unrecognised we appended a second,
-  // text-labelled "Remove" of our own — so every line carried two.
+  // text-labelled "Remove" of our own, so every line carried two.
   // .first(): the selector is deliberately broad, and a row can contain several elements that look
   // like a remove control (a wrapper, the button, an inner icon). Wiring all of them put six remove
   // handles on one line.

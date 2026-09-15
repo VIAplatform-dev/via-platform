@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { normalizeCategory } from "@/app/lib/market-data-db";
 
 // Backfill training_examples.category from each example's title using VYA's canonical
-// normalizeCategory() — so the nightly intake-accuracy exam has a real answer key for category
+// normalizeCategory(), so the nightly intake-accuracy exam has a real answer key for category
 // (it was blank on the ~4,485 marketplace-backfilled rows, forcing category to show n/a).
 // Dry-run by default; ?apply=1 writes. Grouped by resulting category → ~20 UPDATEs, not thousands.
 

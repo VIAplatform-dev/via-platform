@@ -29,7 +29,7 @@ test("a piece with no price is not missing either", () => {
 });
 
 test("in stock and priced but with no photo is its own answer, not 'missing'", () => {
- // feathers-boutique-vintage's seven are real, in stock, £188–£695 — and have no photo on HER
+ // feathers-boutique-vintage's seven are real, in stock, £188–£695, and have no photo on HER
  // site. We cannot render a card without an image, so this is hers to fix, not ours, and it must
  // read as that rather than as a product we dropped.
  const bare = p({ handle: "nophoto", images: [] });
@@ -56,11 +56,11 @@ test("a product with no variants at all is unsellable, not missing", () => {
 
 // ── Rental options are never a buy price (see variant-pricing.ts) ──────────────────────────────────
 // Before this, `buyable` read ANY priced+available variant as a real purchase option. On Venus
-// Vintage — a rental shop — that made every one of its 51 rent-only pieces (available, and priced at
+// Vintage, a rental shop. That made every one of its 51 rent-only pieces (available, and priced at
 // their RENTAL rate) look "missing from our copy", when in truth VYA correctly does not sell them.
 // Rolled fleet-wide, this would have put every rental-only piece on every rental store on the
 // blocking list, the exact false-alarm class catalog-parity.ts already exists to rule out.
-test("a rental option, however priced and available, is never a buy price — not missing, not blocking", () => {
+test("a rental option, however priced and available, is never a buy price, not missing, not blocking", () => {
  const rentOnly = p({ handle: "boots", variants: [
   { available: true, price: "0.00", title: "3 Day Rental" },
   { available: true, price: "150.00", title: "7 Day Rental" },
@@ -71,7 +71,7 @@ test("a rental option, however priced and available, is never a buy price — no
  assert.deepEqual(got.unsellable.map((x) => x.handle), ["boots"]);
 });
 
-test("a piece that both rents AND sells is still missing when we don't hold it — priced by its Purchase option", () => {
+test("a piece that both rents AND sells is still missing when we don't hold it. Priced by its Purchase option", () => {
  const both = p({ handle: "slingbacks", variants: [
   { available: true, price: "22.00", title: "3 Day Rental" },
   { available: true, price: "540.00", title: "Purchase" },

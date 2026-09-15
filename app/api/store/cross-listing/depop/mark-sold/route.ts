@@ -7,14 +7,14 @@ import { creditConsignedSale } from "@/app/lib/consignment-db";
 export const dynamic = "force-dynamic";
 
 // ───────────────────────────────────────────────────────────────────────────
-// "These items sold on Depop" — from the extension's sold-check.
+// "These items sold on Depop", from the extension's sold-check.
 //
 // Our server can't read Depop (Cloudflare), so the extension does it in the seller's own browser:
 // it reads their Depop sold items, pulls the VYA ids out of the SKUs the fill step stamped, and posts
 // them here. This is the same "sold anywhere → pull everywhere" the eBay cron does, just triggered by
 // the browser instead of a schedule, because Depop can only be read from a real logged-in browser.
 //
-// Idempotent: an item already sold on VYA is skipped, so re-seeing the same Depop sale is a no-op —
+// Idempotent: an item already sold on VYA is skipped, so re-seeing the same Depop sale is a no-op,
 // which matters, because the extension will re-report the same sold items every time it runs.
 // ───────────────────────────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
  const sold: string[] = [];
  for (const itemId of itemIds) {
   const item = await getItem(itemId).catch(() => null);
-  if (!item || item.status === "sold") continue; // not ours, or already handled — skip
+  if (!item || item.status === "sold") continue; // not ours, or already handled. Skip
   await markSold(itemId).catch(() => {});
   await delistEverywhere(itemId, "depop").catch(() => {});
   // Consigned? Credit the consignor. Payout stays manual, same as eBay: Depop paid the seller

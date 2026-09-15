@@ -4,7 +4,7 @@
 // the build-a-store / import generator, count-up stats, particle net, hero parallax,
 // Formspree handler). Runs client-side from a useEffect.
 export function initInfra() {
-// ── Floating, rotating storefronts (hero) — real products from live VYA stores ──
+// ── Floating, rotating storefronts (hero): real products from live VYA stores ──
 const STOREFRONTS=[
  {name:"In a Past Life",url:"inapast.life",products:[
   ["Vintage Dior Croc Pumps","$460","https://images.squarespace-cdn.com/content/v1/69815f50511d56376c42034b/09f10bef-691e-4a40-aec9-2df8ecd21176/F2924448-63D1-4BA3-ACAA-25C9D5CA1782.PNG"],
@@ -165,7 +165,7 @@ addEventListener('scroll',()=>{hdr.classList.toggle('scrolled',scrollY>20)});
  function paint(pal,name,tagText){
    chrome(name,tagText,pal.bg,pal.name,pal.name,slug(name));
    phTiles(pal.name,pal.name);
-   tag.textContent='✓ Store ready — published to '+slug(name);
+   tag.textContent='✓ Store ready: published to '+slug(name);
  }
  const SSWIMG='https://images.squarespace-cdn.com/content/v1/681a7e7f321f915140724edc/';
  const KNOWN={'sassysowhat.com':{name:'SASSYSOWHAT',tag:'Curated collectible designer · with attitude',url:'sassysowhat.com',bg:'#fdf3f7',nc:'#7a1f4d',tc:'#b5476b',prods:[['Rare Pink Pearl Louboutin Heels','$350',SSWIMG+'8d3e9dfa-702c-4bf9-a16e-94715390719d/9B2D5344-77AB-480E-9C11-5BD18C6A4A2E.jpg?format=500w'],['Silver Jimmy Choo Heels','$300',SSWIMG+'e49599a4-cae0-41db-97fe-32a49b61bf05/C44A5612-5CE2-4982-A66D-34E4A65B0812.jpg?format=500w'],['Cool Chanel Platform Pumps','$450',SSWIMG+'ba2431da-9771-479a-a6c4-957b1a80ebe8/99FB5158-2D2A-4867-9819-4717765CBE49.jpg?format=500w'],['Rare Italian Snakeskin Spike Heel','$350',SSWIMG+'72ab0c3c-e120-40b5-bea1-f4c232726b2f/8330C9A0-52B5-46A0-95F1-1A8DBFECA533.jpg?format=500w']]}};
@@ -180,7 +180,7 @@ addEventListener('scroll',()=>{hdr.classList.toggle('scrolled',scrollY>20)});
  const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  function finishGen(){gen.innerHTML=SPIN;gen.classList.remove('show');res.classList.add('show');tag.classList.add('show');}
  function realGrid(prods){return prods.slice(0,8).map(p=>"<div class='prod'><div class='img' style=\"background-image:url('"+String(p.image).replace(/'/g,'%27')+"');background-size:cover;background-position:center;background-color:#efe6d7\"><div class='meta'><div class='pn'>"+esc(p.name)+"</div><div class='pp'>"+esc(p.price)+"</div></div></div></div>").join('');}
- // Imported site: the seller's OWN homepage — lead with their real hero image (the store's
+ // Imported site: the seller's OWN homepage. Lead with their real hero image (the store's
  // first page), then a featured row of their real products underneath.
  function paintReal(name,tagText,urlText,prods,brand,heroImg){
    const accent=brand||'#5D0F17';
@@ -193,13 +193,13 @@ addEventListener('scroll',()=>{hdr.classList.toggle('scrolled',scrollY>20)});
    grid.innerHTML=realGrid(prods);
  }
  // Paint an AI-generated store: its chosen VYA template's palette + tasteful empty product slots
- // (we don't drop other stores' real products into a prospective seller's preview — the seller
+ // (we don't drop other stores' real products into a prospective seller's preview. The seller
  // fills these with their own pieces).
  function paintGenerated(d){
    const pal=d.palette||{};
    chrome(d.storeName,d.tagline,pal.bg||'#fff',pal.name||'#2c241d',pal.accent||'#5D0F17',slug(d.storeName));
    phTiles(pal.name||'#2c241d',pal.accent||'#5D0F17');
-   tag.textContent='✓ Store ready — published to '+slug(d.storeName);
+   tag.textContent='✓ Store ready: published to '+slug(d.storeName);
  }
  // Latest action wins: an in-flight generate/import that resolves late must not clobber a newer
  // one (e.g. the auto-generate on scroll finishing after the user hits Import).
@@ -223,7 +223,7 @@ addEventListener('scroll',()=>{hdr.classList.toggle('scrolled',scrollY>20)});
    }
  }
  // Import a site: a faithful LIVE clone of the store's real homepage, rendered in a sandboxed
- // iframe — their actual site (hero, nav, everything), just framed inside VYA.
+ // iframe: their actual site (hero, nav, everything), just framed inside VYA.
  const cloneEl=$('sfClone');
  function runImport(){
    const my=++seq;
@@ -233,12 +233,12 @@ addEventListener('scroll',()=>{hdr.classList.toggle('scrolled',scrollY>20)});
    gen.classList.add('show');gen.textContent='Cloning '+dom+'…';
    urlEl.textContent=dom+' · live on VYA';
    // Point the iframe at the clone endpoint (a real doc URL) so the theme's own JS runs normally
-   // and draws its videos/lazy images. Reveal as soon as it starts painting — don't wait for every
-   // asset — so it feels fast; the images fill in progressively.
+   // and draws its videos/lazy images. Reveal as soon as it starts painting. Don't wait for every
+   // asset, so it feels fast; the images fill in progressively.
    let shown=false;
    const reveal=()=>{ if(shown||my!==seq)return; shown=true;
      res.classList.add('cloning','show');
-     tag.textContent='✓ '+dom+" — your real homepage, live on VYA";tag.classList.add('show');
+     tag.textContent='✓ '+dom+": your real homepage, live on VYA";tag.classList.add('show');
      gen.classList.remove('show');
    };
    cloneEl.onload=reveal;
@@ -251,7 +251,7 @@ addEventListener('scroll',()=>{hdr.classList.toggle('scrolled',scrollY>20)});
    res.classList.remove('cloning');runGenerate();
  }
  document.querySelectorAll('.tab').forEach(tb=>tb.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));tb.classList.add('on');const d=tb.dataset.tab==='desc';$('paneDesc').style.display=d?'block':'none';$('paneImport').style.display=d?'none':'block';});
- const chipMap={'Old money · B&W':'The Heritage Club — timeless 80s & 90s tailoring. Black and white, old money.','Warm & earthy':'Sunset Supply — 70s boho and western finds. Warm, earthy, cozy.','Bold & playful':'Loud Era — Y2K and 2000s pieces. Bold, colorful, playful.','Dark & moody':'After Hours — 90s grunge and archival. Dark and moody.'};
+ const chipMap={'Old money · B&W':'The Heritage Club. Timeless 80s & 90s tailoring. Black and white, old money.','Warm & earthy':'Sunset Supply. 70s boho and western finds. Warm, earthy, cozy.','Bold & playful':'Loud Era. Y2K and 2000s pieces. Bold, colorful, playful.','Dark & moody':'After Hours. 90s grunge and archival. Dark and moody.'};
  document.querySelectorAll('.pchip').forEach(c=>c.onclick=()=>{$('prompt').value=chipMap[c.textContent.trim()]||c.textContent;generate('desc');});
  const bb=$('buildBtn'),ib=$('importBtn');if(bb)bb.onclick=()=>generate('desc');if(ib)ib.onclick=()=>generate('import');
  new IntersectionObserver((es,o)=>{es.forEach(e=>{if(e.isIntersecting){generate('desc');o.unobserve(res);}})},{threshold:.3}).observe(res);
@@ -291,7 +291,7 @@ if(hv&&hero){hero.addEventListener('mousemove',e=>{const r=hero.getBoundingClien
  jf.addEventListener('submit',async function(e){e.preventDefault();
   const btn=jf.querySelector('button');const old=btn.textContent;btn.textContent='Joining…';
   try{const r=await fetch(jf.action,{method:'POST',body:new FormData(jf),headers:{Accept:'application/json'}});
-   if(r.ok){jf.innerHTML='<div style="font-family:var(--head);font-size:24px;color:var(--oxblood)">You&#39;re on the list — we&#39;ll be in touch.</div>';}
+   if(r.ok){jf.innerHTML='<div style="font-family:var(--head);font-size:24px;color:var(--oxblood)">You&#39;re on the list. We&#39;ll be in touch.</div>';}
    else{btn.textContent=old;}
   }catch(err){btn.textContent=old;}
  });

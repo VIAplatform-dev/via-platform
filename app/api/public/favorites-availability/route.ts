@@ -10,8 +10,8 @@ function db() {
 }
 
 // POST /api/public/favorites-availability
-// Body: { ids: string[] }  — composite product ids ("store-slug-123").
-// Returns { available: string[] } — the subset still in the catalog. Anything a
+// Body: { ids: string[] }: composite product ids ("store-slug-123").
+// Returns { available: string[] }: the subset still in the catalog. Anything a
 // shopper favorited that ISN'T returned has sold out / been delisted (vintage is
 // one-of-one, so a removed listing means it's gone). On error, `available` is null
 // so the app can fail safe (treat everything as still available, grey out nothing).

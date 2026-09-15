@@ -31,7 +31,7 @@ export default function AdminStoresPage() {
  <div style={{ fontSize: 14, fontWeight: 600, color: "#09090b" }}>{store.name}</div>
  <div style={{ fontSize: 11, color: "#a1a1aa", marginTop: 2 }}>{store.slug}</div>
  </td>
- <td style={{ padding: "12px 16px", fontSize: 13, color: "#71717a" }}>{store.location || "—"}</td>
+ <td style={{ padding: "12px 16px", fontSize: 13, color: "#71717a" }}>{store.location || "-"}</td>
  <td style={{ padding: "12px 16px" }}>
  <span style={{
  fontSize: 11, fontWeight: 500,

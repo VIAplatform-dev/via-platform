@@ -3,8 +3,8 @@ import { sendExpoPush, type PushPayload } from "./push";
 
 // Reaching a shopper on her phone, from code that only knows her email address.
 //
-// THE GAP THIS CLOSES. Every shopper-facing notification VYA sends — new arrivals, a winback, a
-// piece you looked at, a last chance, something trending — is written as an EMAIL cron, and those
+// THE GAP THIS CLOSES. Every shopper-facing notification VYA sends. New arrivals, a winback, a
+// piece you looked at, a last chance, something trending. Is written as an EMAIL cron, and those
 // crons identify people by email address. Push tokens are keyed by `user_id`. Nothing joined the
 // two, so of a dozen scheduled notifications exactly one (notify-follows, which reads tokens
 // directly) ever reached a phone. Someone with the app installed got the same inbox as someone
@@ -65,7 +65,7 @@ export async function pushToEmail(email: string, payload: PushPayload): Promise<
 /**
  * Push a whole audience at once, each person getting their own message.
  *
- * `build` returns null to skip somebody — a copy line that needs a piece name has nothing to say
+ * `build` returns null to skip somebody. A copy line that needs a piece name has nothing to say
  * when that person's list came back empty, and a push saying "undefined" is worse than silence.
  */
 export async function pushToEmails<T extends { email: string }>(

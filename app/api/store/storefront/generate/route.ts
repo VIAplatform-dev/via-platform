@@ -5,7 +5,7 @@ import { generateStarterStorefront, isGenerateConfigured } from "@/app/lib/store
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// POST — VYA designs a complete starter storefront (template, colors, fonts,
+// POST: VYA designs a complete starter storefront (template, colors, fonts,
 // homepage sections, About/FAQ/Shipping pages) for the acting store.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

@@ -59,3 +59,38 @@ test("reconcile: a cash checkout never asks Stripe", () => {
  assert.equal(reconcileDecision({ status: "awaiting_payment", tender: "cash", expiresAt: "2026-08-28T10:15:00Z", createdAt: "2026-08-28T10:00:00Z" }, null, new Date("2026-08-28T10:05:00Z")), "wait");
  assert.equal(reconcileDecision({ status: "awaiting_payment", tender: "cash", expiresAt: "2026-08-28T10:15:00Z", createdAt: "2026-08-28T10:00:00Z" }, null, new Date("2026-08-28T10:16:00Z")), "expire");
 });
+
+test("an in-person sale carries its sales tax", () => {
+ // IN-PERSON WAS THE ONE CHANNEL THAT CHARGED NONE. A dress sold across a table in a state with
+ // sales tax is as taxable as the same dress posted from the same shop.
+ const c = { id: "co_1", itemId: "i1", sellerId: "s1", amountCents: 12000, currency: "usd", tender: "qr" } as never;
+ const p = marketSessionParams({
+  checkout: c, item: { title: "Silk slip", image: null }, base: "https://getvya.ai",
+  feeCents: 120, now: new Date(), taxCents: 990, taxCalculationId: "taxcalc_1",
+ });
+ // Its own line, so the buyer sees what it is rather than a rounder number.
+ const lines = Object.values(p.line_items) as { price_data: { unit_amount: number; product_data: { name: string } } }[];
+ assert.equal(lines.length, 2);
+ assert.equal(lines[1].price_data.unit_amount, 990);
+ assert.equal(lines[1].price_data.product_data.name, "Sales tax");
+ // And the calculation travels, so the webhook can file the transaction once the money is taken.
+ assert.equal(p.metadata.tax_calculation, "taxcalc_1");
+ assert.equal(p.metadata.tax_cents, "990");
+});
+
+test("no tax, no line and no metadata", () => {
+ // Most sellers have no registrations, so Stripe calculates nothing and nothing should appear.
+ const c = { id: "co_2", itemId: "i1", sellerId: "s1", amountCents: 12000, currency: "usd", tender: "qr" } as never;
+ const p = marketSessionParams({ checkout: c, item: { title: "Silk slip", image: null }, base: "https://getvya.ai", feeCents: 120, now: new Date() });
+ assert.equal(Object.values(p.line_items).length, 1);
+ assert.equal(p.metadata.tax_calculation, undefined);
+});
+
+test("a keyed sale puts the tax on the amount, having no line items to hang it off", () => {
+ const c = { id: "co_3", itemId: "i1", sellerId: "s1", amountCents: 12000, currency: "usd", tender: "keyed" } as never;
+ const p = marketIntentParams({ checkout: c, feeCents: 120, taxCents: 990, taxCalculationId: "taxcalc_2" });
+ assert.equal(p.amount, 12990);
+ assert.equal(p.metadata.tax_calculation, "taxcalc_2");
+ // And without tax it is untouched, never 12000 plus undefined.
+ assert.equal(marketIntentParams({ checkout: c, feeCents: 120 }).amount, 12000);
+});

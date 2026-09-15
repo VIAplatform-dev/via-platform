@@ -55,7 +55,7 @@ export async function GET(
           ORDER BY favorite_count DESC LIMIT 10
         `,
       ]);
-      // Show every figure in USD — convert non-US stores from their stored currency
+      // Show every figure in USD. Convert non-US stores from their stored currency
       // (a no-op for the USD prices we sync), matching how conversions are stored.
       const toUsd = (r: Record<string, unknown>) =>
         convertCurrencyToUSD(Number(r.price), (r.currency as string) || store.currency || "USD");

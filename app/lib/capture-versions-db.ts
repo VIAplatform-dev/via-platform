@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { versionsToDrop, worthVersioning, keepFor, type VersionReason, type VersionRow } from "./capture-versions-core.ts";
 
 /**
- * Previous versions of captured pages — the undo that `site_captures` does not have.
+ * Previous versions of captured pages. The undo that `site_captures` does not have.
  *
  * STORED GZIPPED, and that is not an optimisation. The captures are 748 MB of a 1.1 GB database:
  * keeping three plain-text copies of each page would have tripled the whole database. Real pages
@@ -43,7 +43,7 @@ export function htmlSha(html: string): string {
 /**
  * Keep the CURRENT contents of a page before something overwrites it.
  *
- * Called with what is in `site_captures` right now, BEFORE the write lands — a version is the thing
+ * Called with what is in `site_captures` right now, BEFORE the write lands. A version is the thing
  * being replaced, never the thing replacing it. Skips content identical to the newest version we
  * already hold, so the rehosting pass rewriting a page to exactly itself does not spend a slot.
  *
@@ -87,7 +87,7 @@ export type StoredVersion = {
  id: string;
  reason: VersionReason;
  createdAt: string;
- /** Size of the page as captured, for the admin list — not the compressed size. */
+ /** Size of the page as captured, for the admin list, not the compressed size. */
  bytesRaw: number;
 };
 
@@ -143,7 +143,7 @@ export async function latestVersion(slug: string, path: string, reason: VersionR
 }
 
 /** Which of this store's pages the seller can still step back on, newest first. Never reads the
- *  HTML — the portal only needs to know which pages offer the button. */
+ *  HTML: the portal only needs to know which pages offer the button. */
 export async function pagesWithEdits(slug: string): Promise<{ path: string; savedAt: string }[]> {
  await ensure();
  const rows = (await sql()`SELECT DISTINCT ON (path) path, created_at FROM site_capture_versions

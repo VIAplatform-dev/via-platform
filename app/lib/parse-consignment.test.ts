@@ -41,14 +41,14 @@ test("parseConsignors ignores an implausible split (>100)", () => {
  assert.equal(rows[0].splitPct, null);
 });
 
-test("money reads both conventions — a decimal comma is not a thousands separator", () => {
+test("money reads both conventions. A decimal comma is not a thousands separator", () => {
  // "124,50" meaning $124.50 was read as $12,450: a hundredfold error in what a store believes it
  // owes someone. Both styles turn up because an export follows the store's own locale.
  assert.equal(toCents("124.50"), 12450);
  assert.equal(toCents("124,50"), 12450);
  assert.equal(toCents("$1,240.50"), 124050);
  assert.equal(toCents("1.240,50"), 124050);
- assert.equal(toCents("1,240"), 124000, "no decimals — the comma groups thousands");
+ assert.equal(toCents("1,240"), 124000, "no decimals. The comma groups thousands");
  assert.equal(toCents(""), 0);
- assert.equal(toCents("—"), 0);
+ assert.equal(toCents("-"), 0);
 });

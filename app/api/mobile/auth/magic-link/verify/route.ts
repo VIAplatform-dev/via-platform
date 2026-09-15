@@ -32,7 +32,7 @@ export async function POST(request: Request) {
  const jwt = signMobileJwt(userId, email);
 
  // storeSlug alongside the token, matching /api/mobile/auth/me. Without it the app only learns a
- // seller is a seller on the NEXT launch — it routes on this, so a fresh sign-in would drop a store
+ // seller is a seller on the NEXT launch. It routes on this, so a fresh sign-in would drop a store
  // owner into the shopper app.
  return NextResponse.json({ token: jwt, user: { id: userId, email }, storeSlug: await storeSlugForMobileEmail(email) });
  } catch (err) {

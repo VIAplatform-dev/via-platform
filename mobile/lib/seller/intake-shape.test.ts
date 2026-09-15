@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeDraft, readEstimate, costFromText, hasRealValue } from "./intake-shape.ts";
 
-// The real response, copied from a live production call — see intake-shape.ts for why this
+// The real response, copied from a live production call. See intake-shape.ts for why this
 // fixture is written out rather than paraphrased.
 const DRAFT = {
   title: "Y2K Fendi Zucchino Monogram Logo Slide Sandals",
@@ -10,7 +10,7 @@ const DRAFT = {
   brand: { value: "Fendi", confidence: 1 },
   era: { value: "Y2K / early 2000s", confidence: 0.85 },
   material: { value: null, confidence: 0.4 },
-  condition: { value: "Good — light wear consistent with use", confidence: 0.7 },
+  condition: { value: "Good: light wear consistent with use", confidence: 0.7 },
   conditionGrade: "Good",
   category: "shoes",
   priceHint: 275,
@@ -24,7 +24,7 @@ test("a {value, confidence} field is flattened to its value", () => {
   assert.equal(d.era, "Y2K / early 2000s");
   // Condition is now structure: the grade on the chips, the sentence as the note (see below).
   assert.equal(d.condition, "Good");
-  assert.equal(d.conditionNote, "Good — light wear consistent with use");
+  assert.equal(d.conditionNote, "Good: light wear consistent with use");
 });
 
 test("plain string fields pass through untouched", () => {
@@ -60,7 +60,7 @@ test("the suggested price is read from estimate, not a top-level price", () => {
 });
 
 test("the comps count is how many comparable sales it actually read", () => {
-  // This is the "14 comps" on the Review screen — the difference between a number she trusts and
+  // This is the "14 comps" on the Review screen. The difference between a number she trusts and
   // one she overrides.
   assert.equal(readEstimate(ESTIMATE).compsCount, 2);
 });
@@ -86,15 +86,15 @@ test("the AI's parcel survives normalisation, so Review can say what the piece s
 });
 
 test("condition splits into the grade on the scale and the model's sentence as the note", () => {
-  const d = normalizeDraft({ conditionGrade: "Very Good", condition: { value: "Very good — light wear to the sole", confidence: 0.8 } });
+  const d = normalizeDraft({ conditionGrade: "Very Good", condition: { value: "Very good: light wear to the sole", confidence: 0.8 } });
   assert.equal(d.condition, "Very good");
-  assert.equal(d.conditionNote, "Very good — light wear to the sole");
+  assert.equal(d.conditionNote, "Very good: light wear to the sole");
   // The pricer's top grade maps onto the scale's.
   assert.equal(normalizeDraft({ conditionGrade: "Deadstock/NWT" }).condition, "Mint");
   // No grade, a bare sentence: the nearest grade, and the sentence kept as the note.
-  const bare = normalizeDraft({ condition: { value: "Excellent — barely worn", confidence: 0.7 } });
+  const bare = normalizeDraft({ condition: { value: "Excellent: barely worn", confidence: 0.7 } });
   assert.equal(bare.condition, "Excellent");
-  assert.equal(bare.conditionNote, "Excellent — barely worn");
+  assert.equal(bare.conditionNote, "Excellent: barely worn");
   // A sentence that IS just a grade needs no note.
   assert.equal(normalizeDraft({ condition: "Good" }).conditionNote, undefined);
 });

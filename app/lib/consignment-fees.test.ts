@@ -5,7 +5,7 @@ import { consignorCutWithFee, settledThroughVya, estimateMarketplaceFeeCents } f
 // This decides what somebody is actually owed, and the payout half decides whether VYA sends its
 // own money. Both are worth being paranoid about.
 
-test("a VYA sale is settled through VYA — there is a balance behind the payout", () => {
+test("a VYA sale is settled through VYA. There is a balance behind the payout", () => {
  for (const ch of ["vya", "storefront", "market", null, undefined, "VYA"]) {
   assert.equal(settledThroughVya(ch), true, String(ch));
  }
@@ -20,7 +20,7 @@ test("a marketplace sale is NOT settled through VYA", () => {
 });
 
 test("by default the store absorbs the marketplace fee", () => {
- // $100 sale, 50/50, eBay took $13. The consignor still gets $50 — the store's half carries it.
+ // $100 sale, 50/50, eBay took $13. The consignor still gets $50. The store's half carries it.
  const r = consignorCutWithFee(10000, 50, { feeCents: 1300 });
  assert.equal(r.cutCents, 5000);
  assert.equal(r.feeAppliedCents, 0);
@@ -64,7 +64,7 @@ test("no fee supplied behaves exactly as before", () => {
 test("fee estimates exist for the marketplaces we list to, and nowhere else", () => {
  assert.equal(estimateMarketplaceFeeCents("ebay", 10000), 1325);
  assert.equal(estimateMarketplaceFeeCents("depop", 10000), 1000);
- // No guess for a channel we don't know — a made-up fee would quietly change someone's payout.
+ // No guess for a channel we don't know. A made-up fee would quietly change someone's payout.
  assert.equal(estimateMarketplaceFeeCents("vya", 10000), null);
  assert.equal(estimateMarketplaceFeeCents(null, 10000), null);
 });

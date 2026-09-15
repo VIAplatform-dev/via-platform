@@ -5,13 +5,13 @@
  * it came from: an imported store's links carry the handle it had on Shopify
  * (/products/black-velvet-jacket), while a piece added on VYA carries its own id
  * (/products/2f6d6d68-9b11-…). The storefront cannot know which it is holding, and should not have
- * to — it sends whichever the link had, and the server resolves it against that store.
+ * to: it sends whichever the link had, and the server resolves it against that store.
  *
  * WHY DELEGATION AND NOT MARKUP. The heart is not built into the product card, because on an
  * imported store the card is the seller's own markup, cloned from her theme, filled with live data
  * by a function whose correctness a dozen shops depend on. Reaching into it to add a button would
  * put a wishlist in the blast radius of her grid. Instead the browser finds product links the way a
- * shopper does — by their address — and lays a heart over each one. Her card is not touched.
+ * shopper does, by their address, and lays a heart over each one. Her card is not touched.
  */
 
 /** A product URL on a storefront, however that storefront addresses its pieces. */

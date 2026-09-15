@@ -1,6 +1,6 @@
 // ───────────────────────────────────────────────────────────────────────────
 // One-click "Connect with Shopify" (OAuth). The seller clicks Connect, approves
-// on Shopify, and we exchange the code for an Admin API access token — no tokens
+// on Shopify, and we exchange the code for an Admin API access token, no tokens
 // or dev-dashboard steps for the seller. The token then drives the Admin API
 // import (shopify-admin.ts). Configured via SHOPIFY_CLIENT_ID / _SECRET (the app's
 // Client ID + secret from the Dev Dashboard → Settings).

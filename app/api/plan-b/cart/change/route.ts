@@ -5,7 +5,7 @@ import { buildCartSectionsResponse, requestedSectionIds } from "@/app/lib/plan-b
 
 export const dynamic = "force-dynamic";
 
-// POST /cart/change.js — the theme's quantity stepper and line "remove" control.
+// POST /cart/change.js. The theme's quantity stepper and line "remove" control.
 //
 // VYA inventory is one-of-one, so the only meaningful change is quantity 0 = remove. Any other
 // quantity is answered with the unchanged cart rather than an error: a theme that optimistically
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
  if (raw && Number.isFinite(quantity) && quantity <= 0) {
   // Themes address a line two different ways, and both arrive here. The DRAWER sends the line key,
   // which is the VYA item id (see toCartLine). The CART PAGE sends `line` as a 1-based POSITION.
-  // Treating a position as an id removed nothing at all — the row stayed, the shopper pressed the
+  // Treating a position as an id removed nothing at all. The row stayed, the shopper pressed the
   // bin again, and nothing ever happened.
   if (/^\d+$/.test(raw)) {
    const lines = await cartLines(token, store.sellerId).catch(() => []);

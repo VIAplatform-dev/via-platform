@@ -47,7 +47,7 @@ test("it still links to VYA, and safely", () => {
 
 test("a page that merely mentions the class still gets its badge", () => {
  // The guard used to be a substring search for "vya-powered". Our own account script mentions
- // `.vya-powered` — it measures anything of ours pinned in that corner — so every store silently
+ // `.vya-powered`, it measures anything of ours pinned in that corner, so every store silently
  // lost its badge. A guard must look for the thing itself, not for its name in passing.
  const html = `<html><body><script>document.querySelector(".vya-powered")</script><footer>x</footer></body></html>`;
  assert.equal(cheerio.load(injectPoweredBy(html))(".vya-powered").length, 1);

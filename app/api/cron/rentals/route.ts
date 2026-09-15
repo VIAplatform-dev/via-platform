@@ -30,7 +30,7 @@ export async function GET(request: Request) {
  const released = await sweepExpired().catch(() => ({ bookings: 0, requests: 0 }));
 
  const overdue = await listOverdue(today).catch(() => []);
- // One settings read per store, not per rental — a store with thirty pieces out has one answer.
+ // One settings read per store, not per rental. A store with thirty pieces out has one answer.
  const perStore = new Map<string, RentalSettings>();
  let charged = 0;
  let skipped = 0;
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
    const s = resolveSettings(store, r.overrides);
 
    // A store that doesn't charge for lateness still wants the rental marked overdue, so the queue
-   // shows it — it just never grows a fee.
+   // shows it: it just never grows a fee.
    const rate = s.lateFees ? s.lateFeeCentsPerDay : 0;
    const raw = rate * r.daysLate;
 

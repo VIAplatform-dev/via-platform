@@ -55,8 +55,8 @@ export default function CategorySweepClient({ stores }: { stores: StoreOpt[] }) 
   offset = data.nextOffset;
  }
  setMsg(dryRun
-  ? `Dry run complete — ${totals.corrected} miscategorized item(s) found across ${totals.scanned} scanned. Re-run with "apply" to fix them.`
-  : `Sweep complete — ${totals.written} correction(s) applied across ${totals.scanned} scanned.`);
+  ? `Dry run complete: ${totals.corrected} miscategorized item(s) found across ${totals.scanned} scanned. Re-run with "apply" to fix them.`
+  : `Sweep complete: ${totals.written} correction(s) applied across ${totals.scanned} scanned.`);
  await loadOverrides();
  } finally {
  setRunning(false);
@@ -98,7 +98,7 @@ export default function CategorySweepClient({ stores }: { stores: StoreOpt[] }) 
   <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} disabled={running} />
   Dry run (preview only)
  </label>
- <label style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 6 }} title="Skips the conservative second-pass check — surfaces many more candidates to review.">
+ <label style={{ fontSize: 14, display: "flex", alignItems: "center", gap: 6 }} title="Skips the conservative second-pass check. Surfaces many more candidates to review.">
   <input type="checkbox" checked={thorough} onChange={(e) => setThorough(e.target.checked)} disabled={running} />
   Thorough (less strict)
  </label>

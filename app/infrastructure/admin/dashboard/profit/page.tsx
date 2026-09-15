@@ -3,8 +3,8 @@
 // Profit & loss, as a spreadsheet.
 //
 // The Analytics tab shows one column for one period, which answers "how did this quarter go" and
-// nothing else. A shop keeps books to see the shape of a year — which months carry it, when costs
-// jumped, whether last March beat this one — and that is a grid, which is why every seller already
+// nothing else. A shop keeps books to see the shape of a year, which months carry it, when costs
+// jumped, whether last March beat this one, and that is a grid, which is why every seller already
 // has one in Excel. This is that grid, over VYA's own records plus whatever she brings across from
 // the spreadsheet she was keeping before.
 
@@ -83,7 +83,7 @@ export default function ProfitPage() {
    <AdminHeader
     eyebrow="Business · Analytics"
     title="Profit & loss"
-    subtitle="Every month side by side, the way your spreadsheet has it. Bring your old sheet across and it sits alongside what VYA records."
+    subtitle="Every month side by side. Import your old spreadsheet and it sits next to what VYA records."
     actions={
      <span className="flex gap-2">
       <TechButton variant="ghost" onClick={() => fileRef.current?.click()}><Upload size={14} /> Import a sheet</TechButton>
@@ -133,10 +133,10 @@ export default function ProfitPage() {
 
      {preview.skippedTotal > 0 && (
       <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-900 ring-1 ring-amber-200">
-       <p className="font-medium">{preview.skippedTotal} {preview.skippedTotal === 1 ? "row" : "rows"} we couldn&rsquo;t read — they won&rsquo;t be brought across.</p>
+       <p className="font-medium">{preview.skippedTotal} {preview.skippedTotal === 1 ? "row" : "rows"} we couldn&rsquo;t read. They won&rsquo;t be brought across.</p>
        <ul className="mt-1 space-y-0.5">
         {preview.skipped.slice(0, 4).map((s) => (
-         <li key={s.line} className="truncate">Line {s.line}: {s.reason} — <span className="font-mono opacity-70">{s.raw.slice(0, 60)}</span></li>
+         <li key={s.line} className="truncate">Line {s.line}: {s.reason}: <span className="font-mono opacity-70">{s.raw.slice(0, 60)}</span></li>
         ))}
        </ul>
       </div>
@@ -153,7 +153,7 @@ export default function ProfitPage() {
     <TechCard className="mb-4 flex items-start gap-2.5 border-amber-200 bg-amber-50/70 p-4 text-[12.5px] text-amber-900">
      <AlertTriangle size={15} className="mt-0.5 shrink-0" />
      <span>
-      {grid.overlapMonths.join(", ")} {grid.overlapMonths.length === 1 ? "holds" : "hold"} both your imported rows and VYA&rsquo;s own —
+      {grid.overlapMonths.join(", ")} {grid.overlapMonths.length === 1 ? "holds" : "hold"} both your imported rows and VYA&rsquo;s own,
       those months are counted twice. Take the upload back out below, or trim those months from your sheet and import it again.
      </span>
     </TechCard>
@@ -192,7 +192,7 @@ export default function ProfitPage() {
             <div key={r.key} className={cn("flex items-baseline justify-between gap-3 py-2", isNet ? "border-t-2 border-stone-900" : "border-b border-stone-100")}>
              <span className={cn("min-w-0", isNet ? "font-semibold text-stone-900" : "text-stone-700")}>{r.label}</span>
              <span className={cn("shrink-0 text-right", isNet ? "font-semibold" : isTotal ? "font-medium text-stone-700" : c === 0 ? "text-stone-300" : c < 0 ? "text-stone-500" : "text-stone-800", isNet && c < 0 && "text-rose-700")}>
-              {c === 0 && !isNet && !isTotal ? "—" : money(c)}
+              {c === 0 && !isNet && !isTotal ? "-" : money(c)}
              </span>
             </div>
            );
@@ -202,7 +202,7 @@ export default function ProfitPage() {
        );
       })}
      </div>
-     {/* Wide by nature — a year is twelve columns — so the grid scrolls inside its own card and the
+     {/* Wide by nature, a year is twelve columns, so the grid scrolls inside its own card and the
          first column stays put, the way a spreadsheet freezes panes. */}
      <div className="hidden overflow-x-auto sm:block">
       <table className="w-full min-w-max text-[13px] tabular-nums">
@@ -224,7 +224,7 @@ export default function ProfitPage() {
            {r.cells.map((c, i) => (
             <td key={i} className={cn("px-4 py-2.5 text-right", isNet ? "font-semibold" : c === 0 ? "text-stone-300" : c < 0 ? "text-stone-500" : "text-stone-800",
              isNet && c < 0 && "text-rose-700")}>
-             {c === 0 ? "—" : money(c)}
+             {c === 0 ? "-" : money(c)}
             </td>
            ))}
            <td className={cn("px-4 py-2.5 text-right", isNet ? "font-semibold" : "font-medium text-stone-700", isNet && r.total < 0 && "text-rose-700")}>
@@ -243,7 +243,7 @@ export default function ProfitPage() {
     <TechCard className="mt-4 overflow-hidden">
      <div className="border-b border-stone-100 px-5 py-3">
       <h2 className="text-[13px] font-semibold text-stone-800">Sheets you&rsquo;ve brought across</h2>
-      <p className="mt-0.5 text-[12px] text-stone-500">Each one can be taken back out whole — the rows it added stop counting.</p>
+      <p className="mt-0.5 text-[12px] text-stone-500">Each one can be taken back out whole. The rows it added stop counting.</p>
      </div>
      <div className="divide-y divide-stone-100">
       {batches.map((b) => (

@@ -11,7 +11,7 @@ export const maxDuration = 300;
 // own. Manual run: curl -H "Authorization: Bearer $CRON_SECRET" ...
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
- // Header only — a query-string secret leaks into Vercel/CDN access logs and Referer headers.
+ // Header only: a query-string secret leaks into Vercel/CDN access logs and Referer headers.
  const authed = request.headers.get("authorization") === `Bearer ${cronSecret}`;
  if (!cronSecret || !authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  try {

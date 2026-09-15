@@ -1,4 +1,4 @@
-// Marketing sections — countdown, newsletter, contact. Each wraps a real interactive component
+// Marketing sections. Countdown, newsletter, contact. Each wraps a real interactive component
 // (a live timer, a signup POST, a message form), so every layout here shares one rule: the working
 // component renders on the LIVE site, and the editor shows an inert preview of it. That's what keeps
 // clicking a button on the canvas from firing a real signup, and keeps the timer from animating
@@ -29,7 +29,7 @@ function Clock({ kit }: { kit: EditKit }) {
   ? <Countdown target={target} accent={ctx.colors.accent} headingFontFamily={ctx.head} paused={ctx.edit} />
   : <p className="text-[11px] uppercase tracking-[0.25em] opacity-40">Set a drop date &amp; time</p>;
 }
-// A section with no date set renders nothing on the live storefront — an empty timer is worse than
+// A section with no date set renders nothing on the live storefront. An empty timer is worse than
 // no section at all. In the editor it always shows, so it can be configured.
 const noDate = (kit: EditKit) => !(kit.p.date || "").trim() && !kit.ctx.edit;
 
@@ -47,7 +47,7 @@ function CountdownCentered({ kit }: { kit: EditKit }) {
 }
 
 // A compact strip: copy on one side, clock on the other. Sits between two sections without
-// commandeering the page — for a drop that's coming, not the reason the page exists.
+// commandeering the page, for a drop that's coming, not the reason the page exists.
 function CountdownStrip({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
  if (noDate(kit)) return null;
@@ -67,7 +67,7 @@ function CountdownStrip({ kit }: { kit: EditKit }) {
  );
 }
 
-// The clock leads at full size with the copy beneath it — maximum urgency, for the drop that IS the
+// The clock leads at full size with the copy beneath it. Maximum urgency, for the drop that IS the
 // page.
 function CountdownDisplay({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
@@ -124,7 +124,7 @@ function NewsletterSplit({ kit }: { kit: EditKit }) {
  );
 }
 
-// A tight band — one line of copy and the field side by side. The least demanding version, for a
+// A tight band: one line of copy and the field side by side. The least demanding version, for a
 // footer or between two heavy sections.
 function NewsletterBar({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
@@ -138,7 +138,7 @@ function NewsletterBar({ kit }: { kit: EditKit }) {
  );
 }
 
-// The invitation over a photo — the section background image (Style → Background) shows through, so
+// The invitation over a photo. The section background image (Style → Background) shows through, so
 // this layout is deliberately transparent and just sets its own contrast.
 function NewsletterPhoto({ kit }: { kit: EditKit }) {
  return (
@@ -175,7 +175,7 @@ function ContactFields({ kit }: { kit: EditKit }) {
 function ContactEmail({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  // "[YOUR EMAIL]" is a prompt the template left for the seller. Useful in the editor, a broken
- // mailto: link on a published page — so it shows while she's editing and not once it's live.
+ // mailto: link on a published page, so it shows while she's editing and not once it's live.
  if (!p.email || (!ctx.edit && isPlaceholderCopy(p.email))) return null;
  return <p className="mt-6 text-center text-xs opacity-55">Or email us at <a href={`mailto:${p.email}`} style={{ color: ctx.colors.accent }}>{p.email}</a></p>;
 }
@@ -207,7 +207,7 @@ function ContactSplit({ kit }: { kit: EditKit }) {
  );
 }
 
-// The form inside a bordered card on a tinted ground — a self-contained block that doesn't need the
+// The form inside a bordered card on a tinted ground. A self-contained block that doesn't need the
 // rest of the page to frame it.
 function ContactCard({ kit }: { kit: EditKit }) {
  const { ctx } = kit;

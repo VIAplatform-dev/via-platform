@@ -1,10 +1,10 @@
-// Pure rules for turning a captured storefront's products into VYA inventory — no database, no
+// Pure rules for turning a captured storefront's products into VYA inventory, no database, no
 // network, so they can be unit-tested directly (same split as inventory-core.ts next door).
 // capture-commerce.ts holds the DB-touching half and re-exports these.
 import type { ImportedProduct } from "./store-import.ts";
 
 // Money comes off the product as NUMBERS (priceCents + an ISO currency the platform told us).
-// These string parsers are the legacy fallback for sources that only give a formatted price —
+// These string parsers are the legacy fallback for sources that only give a formatted price,
 // never the primary path. Guessing currency from a "£"/"€" glyph is what labelled a UK store's
 // GBP catalogue as USD, so the glyph check only runs when the platform gave us nothing.
 export const parseCents = (price?: string) => Math.round((parseFloat((price || "").replace(/[^0-9.]/g, "")) || 0) * 100);
@@ -14,7 +14,7 @@ export const currencyOf = (p: ImportedProduct) => (p.currency && /^[A-Z]{3}$/.te
 export const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 /** Identity of an imported product: the platform plus the platform's OWN id/handle. This is what
- *  makes a re-import a merge instead of a duplicate — titles can't do it, because vintage stores
+ *  makes a re-import a merge instead of a duplicate. Titles can't do it, because vintage stores
  *  list distinct one-of-one pieces under the same name and rename items freely. */
 export const identityKey = (platform: string | null | undefined, id: string) => `${platform || "?"}:${id}`;
 
@@ -42,7 +42,7 @@ export type PriorItem = { sourceId?: string | null; sourcePlatform?: string | nu
  *
  * IDENTITY IS AUTHORITATIVE; TITLE IS ONLY A FALLBACK FOR DATA THAT HAS NO IDENTITY. The title
  * index must therefore hold only rows that carry no `sourceId` of their own (rows imported before
- * source ids existed) — see the caller. On a one-of-one vintage store the source really does list
+ * source ids existed). See the caller. On a one-of-one vintage store the source really does list
  * two different bags under one name, and letting a title match reach an identified row makes the
  * second one overwrite the first: the store stays a listing short and which bag survives depends on
  * feed order.
@@ -63,7 +63,7 @@ export function priorForProduct<T extends PriorItem>(
  * Is this product a repeat of one the store already holds under the same name?
  *
  * Only ever true for a product with NO source identity. With an id, "same title" is not evidence of
- * "same product" — it is evidence of a vintage seller naming two pieces the same way.
+ * "same product": it is evidence of a vintage seller naming two pieces the same way.
  */
 export function isTitleDuplicate(p: { sourceId?: string | null; name?: string }, titlesHeld: Set<string>): boolean {
  return !p.sourceId && titlesHeld.has((p.name || "").trim().toLowerCase());
@@ -72,7 +72,7 @@ export function isTitleDuplicate(p: { sourceId?: string | null; name?: string },
 /**
  * Which collections must NOT be rewritten from this read of the source.
  *
- * Membership is written with setItemCollections(), which REPLACES an item's collections — so a set
+ * Membership is written with setItemCollections(), which REPLACES an item's collections, so a set
  * built from an incomplete read deletes whatever it didn't see. Two things make a read incomplete:
  *
  *  1. the listing genuinely failed (the fetch layer reports these as `unread`), and
@@ -82,21 +82,21 @@ export function isTitleDuplicate(p: { sourceId?: string | null; name?: string },
  * nothing at the fetch layer could separate a throttled read from a genuinely empty collection.
  * That was true when it was written and is not true now: a throttled store answers 429 and the
  * fetch layer reports it (see CollectionPageResult's `Throttled`, and its `null` for "failed for
- * some other reason — never empty"). That layer was hardened later and this guard never caught up.
+ * some other reason, never empty"). That layer was hardened later and this guard never caught up.
  *
  * The cost of not catching up: shop-vintage-charm's "USA" served 34 pieces where her own shop shows
- * none, frames 21, plates-bowls 26, and the same on ascensio's boots and flats — 86 products in
+ * none, frames 21, plates-bowls 26, and the same on ascensio's boots and flats. 86 products in
  * categories the sellers had cleared out, frozen at capture day through every repair, while she was
  * told "we couldn't read these, re-run the import" for a problem that did not exist. Re-running
  * produced the identical result, for ever.
  *
- * A collection that does not exist also answers `200 {"products":[]}` — that much is still true and
+ * A collection that does not exist also answers `200 {"products":[]}`: that much is still true and
  * still indistinguishable. It does not matter: missing and emptied both mean she is showing nothing
  * there, so neither should we.
  *
  * What remains protected, and why:
  *  • a read the fetch layer failed on is still unread, always;
- *  • an empty answer with no CLEAN read behind it is still unread — that is the original fear, and
+ *  • an empty answer with no CLEAN read behind it is still unread. That is the original fear, and
  *    erring the other way once cost a store 417 curated memberships in a single re-run;
  *  • and a whole store emptying at once is refused however clean each answer looked. One seller
  *    clearing one category is ordinary; every category emptying in one pass is a store-wide failure
@@ -121,7 +121,7 @@ export function unreadCollectionSlugs(opts: {
  for (const [slug, stored] of opts.storedCount) {
   if (stored <= 0 || (opts.readCount.get(slug) ?? 0) !== 0 || out.includes(slug)) continue;
   if (completed.has(slug)) emptied.push(slug);
-  else out.push(slug); // empty, with no clean read behind it — protect what we hold
+  else out.push(slug); // empty, with no clean read behind it. Protect what we hold
  }
  // A whole store emptying in one pass is the store failing, not the seller tidying up.
  const held = [...opts.storedCount.values()].filter((n) => n > 0).length;
@@ -135,15 +135,15 @@ export function unreadCollectionSlugs(opts: {
  *
  * Two answers, and the difference is the whole point of this function:
  *
- *  LIVE — the order the seller's own /collections/{slug}/products.json listed them in on this run.
+ *  LIVE: the order the seller's own /collections/{slug}/products.json listed them in on this run.
  *         That is her shop as it stands today, and it is already on the wire during the membership
  *         read, so it costs nothing to keep.
- *  CAPTURED — the order the collection page had on the day we crawled her site. A photograph. It
+ *  CAPTURED: the order the collection page had on the day we crawled her site. A photograph. It
  *         was the ONLY answer we had, which is why bag-crush's rail still opened with three sold
  *         Guccis and a Dior long after she had put an LV Looping first.
  *
  * Live wins whenever there is one. Captured is the fallback for a store with no readable feed (not
- * Shopify) and for a collection whose read failed or came back partial — an incomplete read hands
+ * Shopify) and for a collection whose read failed or came back partial. An incomplete read hands
  * over no live order at all, precisely so that a fragment can never be used here.
  *
  * The one exception: a live order that resolves to none of our items tells us nothing, so the
@@ -184,20 +184,20 @@ export function plannedCollectionOrder(opts: {
  * Would writing this patch actually change the listing?
  *
  * This replaces asking "has the source changed?", which needed a hand-maintained list of fields to
- * fingerprint — name, price, currency, sold state, photos, size. Anything not on the list was
+ * fingerprint: name, price, currency, sold state, photos, size. Anything not on the list was
  * invisible, so the first re-sync after we started caring about something new skipped every existing
  * listing as "unchanged" and the feature silently did nothing.
  *
  * That happened four times: pieces coming back from sold, sale prices (we-thieves re-synced 168
  * listings, updated none, and reported no markdowns while her site was running a sale), the photo
  * markers, and the original stuck-sold bug. Each time the fix looked shipped and did nothing, and
- * each time the answer was to add one more field to the list — which sets up the next failure.
+ * each time the answer was to add one more field to the list, which sets up the next failure.
  *
  * Comparing the write itself cannot miss a field, because the field is in the write. It also makes
  * two hand-written special cases unnecessary: a piece returning to sale and an availability
  * disagreement both simply appear as a changed `status`.
  *
- * Only the keys being written are compared — the row carries columns the importer never touches
+ * Only the keys being written are compared. The row carries columns the importer never touches
  * (the seller's own edits, timestamps), and comparing those would make every listing look changed.
  */
 /** JSON with object keys in a fixed order, so only VALUES decide. Array order is preserved: it is
@@ -223,7 +223,7 @@ export function updateNeeded(prior: Record<string, unknown>, patch: Record<strin
   if (typeof now === "object" || typeof next === "object") {
    // Key order is not a change. The stored variants and the feed's carry identical values with the
    // keys in a different order, so comparing their JSON text reported every listing as changed on
-   // every run — blummier re-synced 155 items and marked none unchanged, which also meant every run
+   // every run: blummier re-synced 155 items and marked none unchanged, which also meant every run
    // wrote the seller's photo URLs back over our copies.
    if (stable(now) !== stable(next)) return true;
    continue;
@@ -237,7 +237,7 @@ export function updateNeeded(prior: Record<string, unknown>, patch: Record<strin
  * Is this piece worth importing at all?
  *
  * A price of zero used to disqualify anything. But a vintage seller zeroes the price when a piece
- * SELLS and keeps it published as her archive — bag-crush has 24 such pieces, with 19 to 28
+ * SELLS and keeps it published as her archive. Bag-crush has 24 such pieces, with 19 to 28
  * photographs each: a Chanel Mademoiselle Flap, a Louis Vuitton Multi Pochette, a Chanel Classic
  * Flap. Every one was dropped, and nothing told her.
  *
@@ -251,7 +251,7 @@ export function updateNeeded(prior: Record<string, unknown>, patch: Record<strin
 export function worthImporting(p: { title: string; cents: number | null | undefined; available?: boolean }): boolean {
  if (!p.title.trim()) return false;
  if (p.cents) return true;
- // No price. Keep it only if her own shop says it is sold — an archive piece, not a draft.
+ // No price. Keep it only if her own shop says it is sold. An archive piece, not a draft.
  // `undefined` means the feed did not say, and guessing "sold" would import every unpriced draft.
  return p.available === false;
 }
@@ -259,15 +259,15 @@ export function worthImporting(p: { title: string; cents: number | null | undefi
 /**
  * What an import does with a piece her shop only RENTS (see variant-pricing.ts).
  *
- * A rent-only piece has no buy price, so it must never be for sale — but it is real inventory, with a
+ * A rent-only piece has no buy price, so it must never be for sale, but it is real inventory, with a
  * real rental price, so it is written as a DRAFT (Store OS shows it to her; STOREFRONT_STATUSES keeps
  * every shopper-facing grid, the hosted cart's live sections and cross-listing from ever seeing a
  * draft) with its rental ladder saved to rental_terms. That is a holding pattern, not a launch: a
  * draft never rents through VYA until a seller explicitly publishes it AND rental booking for
- * imported pieces is built — this only keeps the data instead of throwing it away.
+ * imported pieces is built. This only keeps the data instead of throwing it away.
  *
  * "update-draft" exists because, before rental options were understood, some of these were imported
- * at a RENTAL price as if it were the buy price (Venus Vintage's Dior tan gaucho heels, at $25) — a
+ * at a RENTAL price as if it were the buy price (Venus Vintage's Dior tan gaucho heels, at $25). A
  * plain skip would leave those rows for sale at the wrong price forever, since the sweep deliberately
  * leaves alone anything the shop still lists.
  *
@@ -288,7 +288,7 @@ export function rentOnlyWarning(saved: number, movedBack: number): string | null
  const moved = movedBack > 0
   ? ` ${movedBack} of them had been listed for sale here at the wrong price and ${movedBack === 1 ? "was" : "were"} moved back to a draft.`
   : "";
- return `${pieces} your store only rents ${saved === 1 ? "was" : "were"} saved as ${saved === 1 ? "a draft" : "drafts"} — not visible to shoppers, since renting imported pieces through VYA isn’t set up yet.${moved}`;
+ return `${pieces} your store only rents ${saved === 1 ? "was" : "were"} saved as ${saved === 1 ? "a draft" : "drafts"}, not visible to shoppers, since renting imported pieces through VYA isn’t set up yet.${moved}`;
 }
 
 /**
@@ -303,7 +303,7 @@ export function rentOnlyWarning(saved: number, movedBack: number): string | null
  *
  *  • Skipping an item the feed places NOWHERE leaves its old links standing for ever. That is how
  *    shop-vintage-charm's "USA" kept 34 pieces after she emptied it, and kept them even once the
- *    read was believed — the guard stopped calling it a failure, and nothing then removed anything.
+ *    read was believed. The guard stopped calling it a failure, and nothing then removed anything.
  *    An empty answer about an item IS an answer: it belongs in no collection we read.
  */
 /**
@@ -311,12 +311,12 @@ export function rentOnlyWarning(saved: number, movedBack: number): string | null
  *
  * Only ones we could not read. A tag is a guess about where a piece belongs; a collection listing
  * we paged through to the end is the seller's own answer. When we have the answer, the guess does
- * not get a vote — otherwise a piece she has taken OUT of a collection walks straight back in on
+ * not get a vote. Otherwise a piece she has taken OUT of a collection walks straight back in on
  * the strength of a tag she never removed. ascensio's Boots collection is empty on her site; all
  * three sold pairs are still tagged "Boots", and that is why our copy kept showing them.
  *
  * When the listing failed (Squarespace, a throttled read), the tag is the only signal there is,
- * so it stands — that is the whole reason the tag path exists.
+ * so it stands. That is the whole reason the tag path exists.
  */
 export function taggedSlugs(o: { tags: string[]; known: Set<string>; unread: Set<string> }): string[] {
  const out = new Set<string>();
@@ -332,13 +332,13 @@ export function taggedSlugs(o: { tags: string[]; known: Set<string>; unread: Set
  * What should we file a piece under when her store no longer lists it AT ALL?
  *
  * The membership loop walks the feed, so a piece she has deleted is never visited and its links
- * stand for ever — blummier's Chantal Thomass corset sold, she took the listing down, and our copy
+ * stand for ever: blummier's Chantal Thomass corset sold, she took the listing down, and our copy
  * of her Chantal Thomass collection went on showing it. It is not in her collection listings for
  * the same reason it is not in her feed, so it comes out of every collection we READ, and keeps its
  * place only in the ones we could not.
  *
- * `vanished` is not decided here. The item sweep already made that call under sweepRefusal — "the
- * read did not reach the end of the catalogue" is never "they're all gone" — and wrote it on the
+ * `vanished` is not decided here. The item sweep already made that call under sweepRefusal. "the
+ * read did not reach the end of the catalogue" is never "they're all gone", and wrote it on the
  * row. This reads that decision rather than making a second, less careful one.
  *
  * Returns only the items whose filing actually changes: no write, no risk.
@@ -354,7 +354,7 @@ export function unfileVanished(o: {
   const held = o.held.get(id);
   if (!held?.length) continue;
   const keep = held.filter((c) => unread.has(c));
-  if (keep.length === held.length) continue; // all of them unread — nothing we know changes
+  if (keep.length === held.length) continue; // all of them unread. Nothing we know changes
   out.set(id, keep);
  }
  return out;
@@ -364,7 +364,7 @@ export function unfileVanished(o: {
 /** One piece the membership pass will decide collections for. */
 export type MembershipSubject = {
  itemId: string;
- /** The source's own id for this piece — the key the collection read is indexed by. */
+ /** The source's own id for this piece. The key the collection read is indexed by. */
  sourceId: string | null;
  /** The feed's tags, when this run's feed happened to include this piece. Empty otherwise, which
   *  costs nothing: tags only ever vote on collections we could NOT read (see taggedSlugs). */
@@ -374,7 +374,7 @@ export type MembershipSubject = {
 /**
  * Who the membership pass is about: every piece we HOLD, not the ones one feed read returned.
  *
- * The pass used to walk `products` — the output of the product step in the same invocation — and
+ * The pass used to walk `products`, the output of the product step in the same invocation, and
  * look each one up in the database. On a small store that is invisible, because one read returns
  * the whole catalogue and the two lists are identical.
  *
@@ -422,12 +422,12 @@ export function membershipSubjects(
 /**
  * Fill in collections the live pass could not read, from the pages we already downloaded.
  *
- * A collection we could not reach — throttled, or past the read ceiling — holds nothing at all.
+ * A collection we could not reach, throttled, or past the read ceiling. Holds nothing at all.
  * 461 of 2nd Street's 761 are in that position on every run. But the crawl already stored
  * /collections/{slug} for many of them, and its own grid says what was in it. Reading membership
  * off a page we have already paid for costs no outbound requests.
  *
- * It is a WORSE source than the live read — page one only, frozen at crawl day — so it never wins:
+ * It is a WORSE source than the live read, page one only, frozen at crawl day, so it never wins:
  * only collections the caller marks UNREAD are filled. Where we read a collection live, the live
  * answer stands, including when the live answer is "empty", because she may have cleared it out.
  * Believing a stale page there would put her archive back, which is the failure the unread and
@@ -442,7 +442,7 @@ export function mergeCapturedMembership(
 ): Map<string, string[]> {
  const out = new Map<string, string[]>([...membership].map(([k, v]) => [k, [...v]]));
  for (const [slug, handles] of capturedBySlug) {
-  if (!unread.has(slug)) continue; // read live — that answer stands, empty or not
+  if (!unread.has(slug)) continue; // read live: that answer stands, empty or not
   for (const h of handles) {
    const have = out.get(h) || [];
    if (!have.includes(slug)) have.push(slug);

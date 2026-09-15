@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { maySendCampaign, campaignAllowance, allowanceLabel, monthStart } from "./email-limits.ts";
 
-test("automatic emails are never metered — only campaigns are", () => {
+test("automatic emails are never metered, only campaigns are", () => {
  // Nothing here can refuse an order confirmation or an abandoned basket. Those fire because a
  // shopper did something, and a shop's receipts must not depend on its plan.
  assert.equal(campaignAllowance("starter"), 0);

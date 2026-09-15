@@ -11,7 +11,7 @@ test("a store with a person icon gets the panel", () => {
 });
 
 test("a store with no account control of its own still gets a sign-in", () => {
- // Six stores never had a person icon — three of them are not on Shopify at all. They used to be
+ // Six stores never had a person icon. Three of them are not on Shopify at all. They used to be
  // left alone, which meant their shoppers simply could not have an account. They get ours instead:
  // the panel goes in, and the browser adds an icon beside the bag because nothing of hers exists.
  const html = `<html><body><header><a href="/about">About</a></header></body></html>`;
@@ -105,7 +105,7 @@ test("the <head> is not thrown away either", () => {
 
 test("a store whose only account link a shopper can't reach gets one of ours", () => {
  // Three stores keep their only account link inside the mobile menu drawer or the empty-cart
- // panel — bound correctly, and invisible to anyone on a desktop. Binding a control nobody can
+ // panel: bound correctly, and invisible to anyone on a desktop. Binding a control nobody can
  // click is the same as having no sign-in at all. Whether it is reachable can only be answered in
  // the browser, so the page asks itself on load. See the fallback in the injected script.
  const html = `<html><body><header><a class="medium-hide" href="/account">Log in</a></header></body></html>`;
@@ -119,7 +119,7 @@ test("the fallback icon is labelled, not a bare glyph", () => {
  const html = `<html><body><header><a href="/account">Log in</a></header></body></html>`;
  const out = injectAccountPanel(html, { signedInAs: null, shopName: "X" });
  assert.match(out, /setAttribute\("aria-label","Account"\)/);
- assert.match(out, /aria-hidden="true"/, "the glyph itself is decorative — the label carries the meaning");
+ assert.match(out, /aria-hidden="true"/, "the glyph itself is decorative. The label carries the meaning");
 });
 
 
@@ -137,7 +137,7 @@ test("the corner button stacks above anything else of ours pinned in that corner
 
 test("our icon always goes in the same corner, never into her header", () => {
  // Three rounds of trying to slot it beside her bag ended with it next to a person-shaped icon the
- // seller already had — one pointing at /favorites — so a shopper saw two identical glyphs. We
+ // seller already had, one pointing at /favorites, so a shopper saw two identical glyphs. We
  // cannot know what her other icons mean; guessing wrong in her header is worse than being plain.
  const html = `<html><body><header><a href="/about">About</a></header></body></html>`;
  const out = injectAccountPanel(html, { signedInAs: null, shopName: "X" });
@@ -163,8 +163,8 @@ test("a widget that loads late still gets out of our way", () => {
 });
 
 test("the page binds her account control in the browser too, not only on the server", () => {
- // Three stores build their header in JavaScript AFTER the page loads — Shopify's newer themes
- // create <button class="account-button" aria-label="Account"> at runtime — so the server never
+ // Three stores build their header in JavaScript AFTER the page loads. Shopify's newer themes
+ // create <button class="account-button" aria-label="Account"> at runtime, so the server never
  // sees it, hers stays unbound, and the shopper gets her person icon AND our corner button.
  const html = `<html><body><header><a href="/about">About</a></header></body></html>`;
  const out = injectAccountPanel(html, { signedInAs: null, shopName: "X" });
@@ -180,10 +180,10 @@ test("logout is never bound in the browser either", () => {
 });
 
 test("the page keeps watching, because a fixed schedule is still a guess", () => {
- // A theme that builds its header on hydration, a menu that opens, a banner that closes — each
+ // A theme that builds its header on hydration, a menu that opens, a banner that closes. Each
  // changes whether a shopper can reach her account link, and each is a DOM change.
  const html = `<html><body><header><a href="/about">About</a></header></body></html>`;
  const out = injectAccountPanel(html, { signedInAs: null, shopName: "X" });
  assert.match(out, /MutationObserver/);
- assert.match(out, /if\(pending\)return/, "debounced — a busy page costs one pass, not hundreds");
+ assert.match(out, /if\(pending\)return/, "debounced. A busy page costs one pass, not hundreds");
 });

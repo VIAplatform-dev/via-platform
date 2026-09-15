@@ -18,7 +18,7 @@ test("a self-onboarded store falls back to the address she signs in with", () =>
  assert.deepEqual(r, { email: "her@gmail.com", source: "owner-login" });
 });
 
-test("no address at all is null — never an ops address dressed up as the store's", () => {
+test("no address at all is null, never an ops address dressed up as the store's", () => {
  assert.equal(pickStoreContact({}), null);
  assert.equal(pickStoreContact({ supportEmail: "", curated: null, ownerLogin: undefined }), null);
 });

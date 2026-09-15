@@ -1,17 +1,17 @@
 // ───────────────────────────────────────────────────────────────────────────
-// getvya.ai subscription tiers — the single source of truth for the seller plans.
+// getvya.ai subscription tiers. The single source of truth for the seller plans.
 //
 // THIS IS FOR THE getvya.ai OPERATING SYSTEM ONLY. It does NOT gate the
 // vyaplatform.com marketplace (that stays commission-based, no paywall).
 //
 // Model (decided 2026-08-01): 3 paid tiers, no free tier, a 30-day free trial on
-// signup, and an ~25% discount for an annual commitment. Prices are NOT hardcoded —
+// signup, and an ~25% discount for an annual commitment. Prices are NOT hardcoded,
 // each tier+interval maps to a Stripe **Price ID** in an env var, so the amount is
 // set once in Stripe (the UI reads the live number). Set the number whenever it's
 // decided; the plumbing doesn't care what it is.
 //
 // EDIT ME: tier names, taglines, and the feature→tier assignment below are a
-// starting strawman. Change them freely — the rest of the app reads from here.
+// starting strawman. Change them freely: the rest of the app reads from here.
 // ───────────────────────────────────────────────────────────────────────────
 
 export const TRIAL_DAYS = 30;
@@ -39,7 +39,7 @@ export const TIER_ORDER: Record<TierId, number> = { starter: 1, studio: 2, ateli
  * How many people can be in a store's workspace, by tier.
  *
  * Counts the OWNER. "2 seats" means the owner plus one other person, which is how a seller reads it
- * — a limit that excluded the owner would let a Starter store have three logins and feel like a bug.
+ * a limit that excluded the owner would let a Starter store have three logins and feel like a bug.
  *
  * A store with no live tier (free, or a lapsed subscription) keeps one seat, so the owner is never
  * locked out of her own store by a billing problem. Losing access to your inventory because a card
@@ -82,7 +82,7 @@ export function getTier(id: string | null | undefined): Tier | null {
 // you gate a workspace feature (via storeHasFeature in store-plans-db.ts).
 // EDIT ME: move features between tiers to shape what each plan is worth.
 export const FEATURE_MIN_TIER = {
- // Tier 1 — Starter: the essentials to run a single store on VYA.
+ // Tier 1: Starter: the essentials to run a single store on VYA.
  storefront: 1,
  inventory: 1,
  listings: 1,
@@ -91,13 +91,13 @@ export const FEATURE_MIN_TIER = {
  email_campaigns: 1,
  customers: 1,
  inbox_offers: 1,
- // Tier 2 — Studio: reach + your own brand.
+ // Tier 2: Studio: reach + your own brand.
  cross_listing: 2,
  custom_domain: 2,
  automations: 2,
  instagram_autopost: 2,
  demand_intelligence: 2, // Source Now, demand search, market benchmarks
- // Tier 3 — Pro (id `atelier`): the deep intelligence + consignment operation.
+ // Tier 3: Pro (id `atelier`): the deep intelligence + consignment operation.
  consignment: 3,
  culture_trends: 3,
  sourcing_alerts: 3,
@@ -107,7 +107,7 @@ export const FEATURE_MIN_TIER = {
 
 export type Feature = keyof typeof FEATURE_MIN_TIER;
 
-/** Human labels + the tier each feature belongs to — used to render the plan cards. */
+/** Human labels + the tier each feature belongs to. Used to render the plan cards. */
 export const FEATURE_LABELS: Record<Feature, string> = {
  storefront: "Storefront builder + hosting",
  inventory: "One-of-one inventory",
@@ -129,18 +129,18 @@ export const FEATURE_LABELS: Record<Feature, string> = {
  priority_support: "Priority support",
 };
 
-/** True if a tier unlocks a feature (cumulative — higher tiers include lower ones). */
+/** True if a tier unlocks a feature (cumulative: higher tiers include lower ones). */
 export function tierIncludesFeature(tierId: TierId, feature: Feature): boolean {
  return TIER_ORDER[tierId] >= FEATURE_MIN_TIER[feature];
 }
 
-/** The ordered feature keys a tier unlocks — for rendering "what's included". */
+/** The ordered feature keys a tier unlocks, for rendering "what's included". */
 export function featuresForTier(tierId: TierId): Feature[] {
  return (Object.keys(FEATURE_MIN_TIER) as Feature[]).filter((f) => tierIncludesFeature(tierId, f));
 }
 
 /**
- * The features a tier ADDS over the tier below it — what upgrading to it actually buys.
+ * The features a tier ADDS over the tier below it. What upgrading to it actually buys.
  *
  * Higher tiers are cumulative, so the three plan cards are largely the same list three times and a
  * seller reading them can't see where one stops being the other. The cards highlight these, which is

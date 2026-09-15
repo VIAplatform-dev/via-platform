@@ -196,7 +196,7 @@ export const brandMap = Object.fromEntries(
 // Short aliases (≤3 chars, e.g. lv/cd/ck) are already boundary-matched everywhere,
 // so they don't need listing. Every brand matcher (resolveBrand, designerPatterns,
 // detectBrand, inferBrandFromTitle) consults this set so they stay consistent.
-// NOTE: normal aliases are intentionally NOT here — they must keep matching
+// NOTE: normal aliases are intentionally NOT here. They must keep matching
 // plurals/possessives ("guccis", "gucci's", "gucci-style" → Gucci).
 export const WHOLE_WORD_ALIASES: ReadonlySet<string> = new Set([
  "etro",
@@ -207,7 +207,7 @@ export const WHOLE_WORD_ALIASES: ReadonlySet<string> = new Set([
  "the row",
 ]);
 
-// Lowercase title/brand keywords for a set of brand slugs — used to softly bias
+// Lowercase title/brand keywords for a set of brand slugs. Used to softly bias
 // the personalized feed toward designers a user picked in the taste test.
 const _BRAND_BY_SLUG = new Map(brands.map((b) => [b.slug, b]));
 export function designerKeywords(slugs: string[] | null | undefined): string[] {

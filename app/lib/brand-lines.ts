@@ -4,7 +4,7 @@
 // A fashion house is not one price. "Ralph Lauren" spans a runway Collection
 // gown that resells for thousands and a Lauren Ralph Lauren dress from a
 // department store that resells for forty dollars. brandData.ts holds one entry
-// for the whole house, and titleHasBrand() normalises punctuation away — so
+// for the whole house, and titleHasBrand() normalises punctuation away, so
 // "Lauren Ralph Lauren" contains "ralphlauren" and passes as the parent brand.
 //
 // That is how a Ralph Lauren Fall 2008 runway gown got priced at $53: every comp
@@ -269,7 +269,7 @@ export const BRAND_LINES: BrandLine[] = [
 ];
 
 // Fold accents before stripping, or "Chloé" becomes "chlo" and stops matching
-// "Chloe" — which is how most sellers actually type it. Same for Hervé Léger,
+// "Chloe", which is how most sellers actually type it. Same for Hervé Léger,
 // Comme des Garçons, Issey's lines and anything else with a diacritic.
 const norm = (s: string) =>
  (s || "")
@@ -313,7 +313,7 @@ export const MAX_COMP_TIER_GAP = 1;
  *
  * Only ever rejects on a KNOWN cross-tier conflict within the SAME house. A comp
  * from another house, or one we can't resolve, is left for the existing filters
- * and the model to judge — this narrows a specific, expensive failure rather
+ * and the model to judge. This narrows a specific, expensive failure rather
  * than becoming a second opinion on everything.
  */
 export function isFairComp(line: BrandLine | null, compTitle: string): boolean {
@@ -323,11 +323,11 @@ export function isFairComp(line: BrandLine | null, compTitle: string): boolean {
 
  // A runway or couture piece is held to a stricter rule: the comp must name a
  // top line too. An unqualified house name on a resale listing is not evidence of
- // the Collection — on eBay it is overwhelmingly the cheap line, because runway
+ // the Collection, on eBay it is overwhelmingly the cheap line, because runway
  // pieces barely trade there. Measured on a Ralph Lauren Fall 2008 gown: after
  // removing the explicit diffusion titles, the survivors were all bare "Ralph
  // Lauren" listings with a $49.99 median, which is department-store stock.
- // Leaving the pool near-empty is the honest outcome — the price engine already
+ // Leaving the pool near-empty is the honest outcome. The price engine already
  // has a branch for "essentially no true comps: price from what this exact piece
  // sells for, at lower confidence", which is the right answer for an archival piece.
  if (line.tier === "couture" || line.tier === "runway") {
@@ -362,14 +362,14 @@ export function compExclusions(line: BrandLine | null, limit = 4): string[] {
  if (!line) return [];
  const mine = norm(line.label);
  const out: string[] = [];
- // Each rival's own name first, then its aliases — so a tight limit still spends
+ // Each rival's own name first, then its aliases, so a tight limit still spends
  // its budget on the line itself rather than on that line's sub-brands.
  const rivals = rivalLines(line);
  const phrases = [...rivals.map((r) => norm(r.label)), ...rivals.flatMap((r) => r.keywords.map(norm))];
  for (const rival of [{ phrases }]) {
   for (const phrase of rival.phrases) {
    if (phrase.length < 3) continue;
-   // Skip only a phrase the WANTED line's own name contains — that would exclude
+   // Skip only a phrase the WANTED line's own name contains. That would exclude
    // the piece itself. The reverse is fine and is the common case: "versus
    // versace" contains "versace", but excluding that phrase removes only the
    // diffusion line and leaves plain Versace results untouched.
@@ -381,7 +381,7 @@ export function compExclusions(line: BrandLine | null, limit = 4): string[] {
 }
 
 /**
- * True when the resolved line is just the house name — what a seller types off a
+ * True when the resolved line is just the house name. What a seller types off a
  * tag ("Ralph Lauren") rather than a specific line ("Ralph Lauren Collection").
  * These are the cases worth resolving from the garment, because the same words
  * cover several markets.
@@ -390,7 +390,7 @@ export function isAmbiguousHouse(line: BrandLine | null): boolean {
  return Boolean(line && norm(line.label) === norm(line.house) && rivalLines(line).length > 0);
 }
 
-/** Every line of a house, most prestigious first — the options to choose between. */
+/** Every line of a house, most prestigious first. The options to choose between. */
 export function linesOfHouse(house: string): BrandLine[] {
  return BRAND_LINES.filter((l) => l.house === house).sort((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier]);
 }

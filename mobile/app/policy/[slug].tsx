@@ -2,7 +2,7 @@ import { ScrollView, Text } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { colors, fonts, spacing } from "../../lib/theme";
 
-// Terms, privacy and the returns policy — reachable from Settings and from the sign-in screen.
+// Terms, privacy and the returns policy. Reachable from Settings and from the sign-in screen.
 // Held as text in the app rather than a WebView so it stays readable offline and matches the app's
 // typography instead of dropping someone into a web page mid-flow.
 
@@ -30,7 +30,7 @@ const POLICIES: Record<string, { title: string; body: string }> = {
     body:
       "Return policies are set by each store, not by VYA, because each store is the seller. A store's policy is shown " +
       "on every one of its pieces, under Returns.\n\n" +
-      "If something arrives not as described, message the store from your Messages tab — that conversation is the " +
+      "If something arrives not as described, message the store from your Messages tab. That conversation is the " +
       "fastest route to a resolution.",
   },
 };

@@ -12,7 +12,7 @@ export const COLLABS_STORES = stores
 
 export const COLLABS_STORE_SLUGS = new Set(COLLABS_STORES.map((s) => s.slug));
 
-// Query to list products for a store — returns Collabs IDs, Shopify IDs, and existing affiliate links
+// Query to list products for a store. Returns Collabs IDs, Shopify IDs, and existing affiliate links
 const PRODUCTS_QUERY = `
   query ProductsQuery($searchParams: ProductsSearchInput!, $first: Int, $after: String, $seed: String!) {
     products(searchParams: $searchParams, first: $first, after: $after, seed: $seed) {
@@ -66,7 +66,7 @@ export async function fetchCollabsProducts(
   const gid = `gid://dovetale-api/ShopifyStore/${collabsStoreId}`;
 
   // Generate the seed once and reuse it for all pages so the Collabs API
-  // returns a consistent ordering — changing seed per page causes different
+  // returns a consistent ordering. Changing seed per page causes different
   // random orderings, meaning some products never appear and others repeat.
   const seed = [8, 4, 4, 4, 8]
     .map((n) =>

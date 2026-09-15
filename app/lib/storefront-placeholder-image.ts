@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Placeholder photography for templates.
 //
-// A template with empty image slots reads as broken — a seller can't tell whether a photo belongs
+// A template with empty image slots reads as broken. A seller can't tell whether a photo belongs
 // there or whether the section is meant to be text. So every image slot a template authors is filled,
 // and the builder marks the filler as filler so nobody publishes a store full of someone else's
 // pictures by accident.
@@ -21,7 +21,7 @@ export const PLACEHOLDER_MARK = "/storefront-placeholders/";
 /**
  * The set, in the order slots are filled.
  *
- * Portrait originals, resized to 1600px on the long edge — big enough for a full-bleed hero on a
+ * Portrait originals, resized to 1600px on the long edge. Big enough for a full-bleed hero on a
  * retina phone, small enough that a template with a dozen slots isn't a multi-megabyte page. Every
  * layout crops with object-fit, so one portrait source serves a 21:9 banner and a square tile alike.
  */
@@ -57,7 +57,7 @@ export function placeholderImage(index: number): string {
  * Is this image one of ours rather than the seller's?
  *
  * Checked by path, not by equality, so a URL that has been round-tripped through the sanitizer or
- * had a query string appended is still recognised — otherwise the builder would stop offering to
+ * had a query string appended is still recognised. Otherwise the builder would stop offering to
  * replace it and a seller could publish a storefront of our photos without ever being told.
  */
 export function isPlaceholderImage(src?: string): boolean {

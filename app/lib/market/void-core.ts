@@ -1,8 +1,8 @@
-// Whether a stall sale can be undone, and what undoing it means. Pure — no I/O.
+// Whether a stall sale can be undone, and what undoing it means. Pure, no I/O.
 //
 // A void at the stall is a refund with the customer standing there: the cash goes back out of
 // the tin, or the card payment is refunded, and the piece goes back on the rack. Only the acting
-// seller's own market sales, only while it is still "today" — the open session, or the last 24
+// seller's own market sales, only while it is still "today". The open session, or the last 24
 // hours of a closed one. Anything older is a return, which is the Orders page's job.
 
 export const VOID_WINDOW_MS = 24 * 3_600_000;
@@ -26,7 +26,7 @@ export function voidEligibility(sale: VoidableSale, ctx: { openSessionId: string
  if (!inOpenSession) {
   const now = (ctx.now ?? new Date()).getTime();
   const paid = sale.paidAt ? new Date(sale.paidAt).getTime() : NaN;
-  if (!Number.isFinite(paid) || now - paid > VOID_WINDOW_MS) return { ok: false, reason: "Only sales from the last 24 hours can be voided here — older ones are refunded from Orders." };
+  if (!Number.isFinite(paid) || now - paid > VOID_WINDOW_MS) return { ok: false, reason: "Only sales from the last 24 hours can be voided here. Older ones are refunded from Orders." };
  }
  if (sale.tender === "cash") return { ok: true, kind: "cash" };
  if (!sale.stripePaymentIntent) return { ok: false, reason: "There's no card payment on record for this sale, so it can't be refunded from here." };

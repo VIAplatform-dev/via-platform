@@ -1,9 +1,9 @@
-// Measurements per category — the phone's mirror of app/lib/measurements-core.ts. Pure.
+// Measurements per category: the phone's mirror of app/lib/measurements-core.ts. Pure.
 //
 // The keys and labels are the server's. A category is matched TWO ways, in order: the canonical
 // slug map first (the web's BY_SLUG, verbatim), then the words. The slug map is what makes a
 // category chosen from lib/seller/categories.ts measure exactly as the same category does on the
-// web; the word matching stays because plenty of stored categories are not slugs at all — the AI
+// web; the word matching stays because plenty of stored categories are not slugs at all. The AI
 // intake writes "jackets", a Shopify import writes whatever the seller typed years ago, and both
 // still have to produce a sensible template.
 //
@@ -76,7 +76,7 @@ export function measurementsFromForm(values: Partial<Record<MeasurementKey, stri
   return out;
 }
 
-/** "Pit to pit 48 cm · Length 62 cm" — the Review row's one line. */
+/** "Pit to pit 48 cm · Length 62 cm". The Review row's one line. */
 export function formatMeasurements(list: Measurement[] | null | undefined): string {
   return (list ?? []).map((m) => `${MEASUREMENT_LABELS[m.key]} ${m.value}${m.unit === "cm" ? " cm" : "\""}`).join(" · ");
 }

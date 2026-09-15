@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// POST /api/admin/backfill-sizes — recompute size_keys (filtering) AND repair the
+// POST /api/admin/backfill-sizes. Recompute size_keys (filtering) AND repair the
 // stored `size` when it's a generic letter that should be a real size (e.g. shoes
 // mislabeled "M"). Safe to re-run; only touches generic/null sizes.
 // Returns { scanned, updated, groups, sizesFixed }.

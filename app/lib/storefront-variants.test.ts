@@ -94,7 +94,7 @@ test("a pipe or a line break INSIDE a value no longer splits the row", () => {
 });
 
 test("a comma inside a loose value no longer shatters it into extra items", () => {
- // A Cloudinary/imgix transform puts commas in the path, and a loose schema splits rows on commas —
+ // A Cloudinary/imgix transform puts commas in the path, and a loose schema splits rows on commas,
  // so one gallery photo used to come back as three broken entries.
  const src = "https://res.cloudinary.com/x/image/upload/w_800,h_600,c_fill/bag.jpg";
  const stored = writeItems([{ src }], ITEM_SCHEMAS.gallery);
@@ -109,7 +109,7 @@ test("a comma inside a loose value no longer shatters it into extra items", () =
  assert.deepEqual(readItems({ items: writeItems(labels, ITEM_SCHEMAS.marquee) }, ITEM_SCHEMAS.marquee), labels);
 });
 
-test("a strict schema keeps commas bare — they aren't a delimiter there", () => {
+test("a strict schema keeps commas bare. They aren't a delimiter there", () => {
  // Escaping commas everywhere would litter backslashes through ordinary body copy.
  const items = [{ quote: "Fast, kind, and honest.", name: "Maya R." }];
  const stored = writeItems(items, ITEM_SCHEMAS.testimonials);
@@ -165,7 +165,7 @@ test("switching slideshow → hero keeps the extra slides on disk, not just the 
  assert.equal(next.variant, undefined);
  assert.equal(next.props.heading, "One", "the first slide is hoisted into the layout's own fields");
  assert.equal(next.props.image, "https://x/1.jpg");
- assert.ok(next.props.slides.includes("Two"), "slide two is still stored — switching back must restore it");
+ assert.ok(next.props.slides.includes("Two"), "slide two is still stored. Switching back must restore it");
  // …and it does:
  assert.equal(readItems(applyVariant(next, "slides").props, ITEM_SCHEMAS.slides).length, 2);
 });
@@ -242,7 +242,7 @@ test("switching between layouts of every core family preserves content", () => {
 // ── skins: the second axis. A skin must never be able to overrule the merchant ──────────────────
 import { SKINS, skinCss, isSkin } from "./storefront-skins.ts";
 
-test("no skin emits !important — per-section overrides must always win", () => {
+test("no skin emits !important, per-section overrides must always win", () => {
  // sectionOverrideCss emits the merchant's own choices with !important. If a skin used it too, the
  // later-declared rule would win and applying a skin could silently undo their work.
  for (const s of SKINS) assert.ok(!skinCss(s.id).includes("!important"), `${s.id} uses !important`);
@@ -251,7 +251,7 @@ test("no skin emits !important — per-section overrides must always win", () =>
 test("skin rules stay at single-class specificity and scope to their own root", () => {
  for (const s of SKINS) {
   // Split into rules, then drop at-rule preludes (`@container (max-width:640px){`) and the stray
-  // closing brace they leave behind: the rules INSIDE them still have to be scoped, and were —
+  // closing brace they leave behind: the rules INSIDE them still have to be scoped, and were,
   // this check just couldn't see past the wrapper once skins started carrying mobile padding.
   for (const rule of skinCss(s.id).split("}").filter(Boolean)) {
    const sel = rule.split("{").filter((part) => !part.trim().startsWith("@")).slice(0, -1).join("{") || rule.split("{")[0];
@@ -303,7 +303,7 @@ test("layout labels are unique within a section type", () => {
 
 test("every registered layout has a thumbnail case, or falls back to its type's", () => {
  // The picker keys thumbnails on `type/variant`. A layout with no case still renders (it falls back
- // to the section's generic wireframe) — this test just reports which ones are generic, so a family
+ // to the section's generic wireframe). This test just reports which ones are generic, so a family
  // can't quietly ship a wall of identical-looking cards.
  const src = readFileSync(new URL("../store/storefront/SectionThumb.tsx", import.meta.url), "utf8");
  const missing: string[] = [];
@@ -315,7 +315,7 @@ test("every registered layout has a thumbnail case, or falls back to its type's"
 });
 
 test("switching between FAQ layouts keeps every question and answer", () => {
- // All six read the same q0/a0 pairs, so a switch is purely presentational — nothing to migrate,
+ // All six read the same q0/a0 pairs, so a switch is purely presentational. Nothing to migrate,
  // nothing to lose, in either direction.
  const props = { heading: "Frequently asked", subtext: "Everything about sourcing and returns.", q0: "How are pieces sourced?", a0: "Hand-selected.", q1: "Returns?", a1: "14 days for credit." };
  for (const to of variantsFor("faq").map((v) => v.id)) {
@@ -339,7 +339,7 @@ test("a per-field width survives a save, and is clamped to something usable", ()
  assert.equal(d.style?.free?.heading?.w, undefined, "a non-numeric width is dropped");
 });
 
-test("width and font size are independent — a side drag can't disturb the type", () => {
+test("width and font size are independent. A side drag can't disturb the type", () => {
  const [b] = sanitizeBlocks([{ id: "x", type: "text", props: {}, style: { free: { heading: { w: 40, fontPx: 52 } } } }]);
  assert.equal(b.style?.free?.heading?.w, 40);
  assert.equal(b.style?.free?.heading?.fontPx, 52);
@@ -360,7 +360,7 @@ test("a chosen count under the cap is respected exactly", () => {
 });
 
 test("no value falls back to the layout's own default, not to the cap", () => {
- // Each featured layout passes its own fallback (grid 8, carousel 12, archive 10) — the cap must not
+ // Each featured layout passes its own fallback (grid 8, carousel 12, archive 10). The cap must not
  // flatten them all to the same number when the merchant hasn't chosen.
  assert.equal(featuredCount(undefined, 8), 8);
  assert.equal(featuredCount("", 12), 12);
@@ -368,7 +368,7 @@ test("no value falls back to the layout's own default, not to the cap", () => {
 });
 
 test("a nonsense count can never render zero products", () => {
- // 0 or a negative would otherwise slice to an empty grid — a section that silently shows nothing.
+ // 0 or a negative would otherwise slice to an empty grid. A section that silently shows nothing.
  assert.equal(featuredCount("0", 8), 8);
  assert.equal(featuredCount("-4", 8), 1);
 });
@@ -394,7 +394,7 @@ test("never leaves a single piece stranded alone on the last row", () => {
 
 test("prefers a row length that divides evenly", () => {
  assert.equal(autoColumns(4), 4);   // 4
- assert.equal(autoColumns(5), 5);   // 5 — one clean row, not 4 + 1
+ assert.equal(autoColumns(5), 5);   // 5: one clean row, not 4 + 1
  assert.equal(autoColumns(6), 3);   // 3 + 3
  assert.equal(autoColumns(8), 4);   // 4 + 4
  assert.equal(autoColumns(9), 3);   // 3 + 3 + 3

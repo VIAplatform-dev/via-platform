@@ -9,9 +9,9 @@ import { overRateLimit } from "@/app/lib/rate-limit-db";
 
 export const dynamic = "force-dynamic";
 
-// POST { lines:[{itemId, saleCents?}] | itemId, clientKey, tender } — reserve every item and open ONE
+// POST { lines:[{itemId, saleCents?}] | itemId, clientKey, tender }. Reserve every item and open ONE
 // checkout for ONE payment. For "qr" it also creates the Stripe Checkout Session; for "keyed" a
-// PaymentIntent. Nothing here marks anything sold — only a verified payment (or cash) does.
+// PaymentIntent. Nothing here marks anything sold, only a verified payment (or cash) does.
 export async function POST(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,10 +23,10 @@ export async function POST(request: NextRequest) {
  const tender = (["qr", "keyed", "cash"].includes(body?.tender) ? body.tender : "cash") as MarketTender;
  if (!lines.length || !clientKey) return NextResponse.json({ error: "items and clientKey required" }, { status: 400 });
  if (await overRateLimit({ bucket: "market-checkout", ip: `seller:${acting.seller.id}`, max: 40, windowMinutes: 1 })) {
- return NextResponse.json({ error: "Too many checkouts started — wait a moment and try again." }, { status: 429 });
+ return NextResponse.json({ error: "Too many checkouts started. Wait a moment and try again." }, { status: 429 });
  }
  const acct = tender === "cash" ? null : await sellerAccount(acting.slug);
- if (tender !== "cash" && !acct?.chargesEnabled) return NextResponse.json({ error: "Card payments are off — finish Stripe setup in Payments, or take cash.", code: "payments_disabled" }, { status: 409 });
+ if (tender !== "cash" && !acct?.chargesEnabled) return NextResponse.json({ error: "Card payments are off. Finish Stripe setup in Payments, or take cash.", code: "payments_disabled" }, { status: 409 });
  const session = await getOrOpenSession(acting.seller.id);
  const ua = request.headers.get("user-agent") || "";
  const deviceLabel = ua.includes("iPhone") ? "iPhone" : ua.includes("Android") ? "Android" : ua.includes("iPad") ? "iPad" : "another device";

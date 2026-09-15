@@ -5,7 +5,7 @@ import { resolveStoreSlug } from "@/app/lib/storeAuth";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/store/extras — free-layer store features (listing quality + activity),
+// GET /api/store/extras. Free-layer store features (listing quality + activity),
 // built only from the store's own data. Listing quality scans live products, so
 // it always reflects the latest sync.
 export async function GET(request: NextRequest) {

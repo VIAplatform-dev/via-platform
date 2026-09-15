@@ -9,7 +9,7 @@ export const maxDuration = 60;
 
 const AI_GATE = () => gate("intake-ai", Number(process.env.INTAKE_AI_CONCURRENCY) || 3);
 
-// Market quick list, step 1: photo → AI draft. ONE call, no pricing/comps/PhotoRoom — the seller sets
+// Market quick list, step 1: photo → AI draft. ONE call, no pricing/comps/PhotoRoom. The seller sets
 // the price. The photo (already a browser-resized JPEG) is stored so the listing has an image.
 const QUICK_HINT = "\n\nMARKET QUICK LIST: the seller is at a busy market. Keep the title under 60 characters and the description to two plain sentences. Never guess a brand from style alone.";
 
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
  const ext = m[1] === "image/png" ? "png" : m[1] === "image/webp" ? "webp" : "jpg";
  const blob = await put(`market/${acting.slug}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`, Buffer.from(m[2], "base64"), { access: "public", contentType: m[1] });
 
- // Manual quick list: store the photo only — the seller types name + price themselves.
+ // Manual quick list: store the photo only. The seller types name + price themselves.
  if (body?.ai === false) return NextResponse.json({ imageUrl: blob.url, draft: null });
  if (!isIntakeConfigured()) return NextResponse.json({ imageUrl: blob.url, draft: null, notConfigured: true });
  let draft: ListingDraft | null = null;

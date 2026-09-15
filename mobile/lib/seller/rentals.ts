@@ -1,7 +1,7 @@
 // What a rental day actually looks like, from the booking list.
 //
 // The seller's question at the counter is never "show me all bookings". It is "what leaves today,
-// what comes back today, and what is late" — three answers, in that order, because the first two
+// what comes back today, and what is late". Three answers, in that order, because the first two
 // are work she has to do before closing and the third is a phone call.
 //
 // Mirrors the statuses in app/lib/rentals/rentals-db.ts. Dates are plain YYYY-MM-DD days, compared
@@ -67,12 +67,12 @@ export function rentalDay(bookings: Booking[], today: string = todayDay()): Rent
     if (b.dueBack && b.dueBack < today && AWAY.has(b.status)) overdue.push(b);
     else if (b.dueBack === today && AWAY.has(b.status)) comingBack.push(b);
   }
-  // Worst first within overdue — the longest gone is the one to ring about.
+  // Worst first within overdue. The longest gone is the one to ring about.
   overdue.sort((a, b) => String(a.dueBack).localeCompare(String(b.dueBack)));
   return { goingOut, comingBack, overdue, out };
 }
 
-/** "Out with Marta · back Friday" — the line under a piece's name. */
+/** "Out with Marta · back Friday". The line under a piece's name. */
 export function bookingLine(b: Booking, today: string = todayDay()): string {
   const who = b.renterName?.trim();
   if (b.returnedAt) return who ? `Back from ${who}` : "Back";
@@ -92,7 +92,7 @@ export function trackingLine(b: Booking): string | null {
   return `${b.trackingStatus}${eta}`;
 }
 
-/** One sentence for the Home tile — the two numbers that decide whether she opens the screen. */
+/** One sentence for the Home tile. The two numbers that decide whether she opens the screen. */
 export function rentalsTileLine(d: RentalDay): string {
   if (d.overdue.length) return `${d.overdue.length} overdue`;
   const bits: string[] = [];

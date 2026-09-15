@@ -1,20 +1,20 @@
 import crypto from "crypto";
 import { getEtsyTokens, saveEtsyTokens, updateEtsyTokens, saveEtsyShop } from "./etsy-tokens-db";
 
-// Etsy Open API v3 integration — OAuth2 with PKCE, per seller. Mirrors the eBay integration:
+// Etsy Open API v3 integration. OAuth2 with PKCE, per seller. Mirrors the eBay integration:
 // auto-list new pieces and (the important bit) auto-DEACTIVATE a listing the moment the piece
 // sells elsewhere, so a one-of-one never double-sells.
 //
 // Requires three env vars (from your Etsy app, https://www.etsy.com/developers/your-apps):
-//   ETSY_KEYSTRING       — the app's keystring (the OAuth client_id, and the FIRST half of x-api-key)
-//   ETSY_CLIENT_SECRET   — the app's shared secret (the SECOND half of x-api-key: "keystring:secret")
-//   ETSY_REDIRECT_URI    — must exactly match a redirect URI registered on the Etsy app
+//   ETSY_KEYSTRING: the app's keystring (the OAuth client_id, and the FIRST half of x-api-key)
+//   ETSY_CLIENT_SECRET: the app's shared secret (the SECOND half of x-api-key: "keystring:secret")
+//   ETSY_REDIRECT_URI: must exactly match a redirect URI registered on the Etsy app
 
 const AUTHORIZE = "https://www.etsy.com/oauth/connect";
 const TOKEN = "https://api.etsy.com/v3/public/oauth/token";
 const API = "https://openapi.etsy.com/v3/application";
 // No listings_d (delete): the "delist" sets a listing to inactive, which is an edit (listings_w),
-// not a delete. Requesting delete is the top red flag for new Etsy app review — don't ask for it.
+// not a delete. Requesting delete is the top red flag for new Etsy app review. Don't ask for it.
 const SCOPES = ["listings_r", "listings_w", "transactions_r", "shops_r"];
 
 export type EtsyResult = { ok: boolean; listingUrl?: string; listingId?: string; error?: string };
@@ -75,7 +75,7 @@ export async function etsyExchangeCode(storeSlug: string, code: string, verifier
  const j = await res.json().catch(() => null) as { access_token?: string; refresh_token?: string; expires_in?: number } | null;
  if (!j?.access_token || !j?.refresh_token) return false;
  await saveEtsyTokens(storeSlug, { accessToken: j.access_token, refreshToken: j.refresh_token, expiresInSec: Number(j.expires_in) || 3600 });
- // Etsy access tokens are "{user_id}.{token}" — the prefix is the user id.
+ // Etsy access tokens are "{user_id}.{token}": the prefix is the user id.
  const userId = j.access_token.split(".")[0];
  await resolveShop(storeSlug, j.access_token, userId).catch(() => {});
  return true;
@@ -117,7 +117,7 @@ async function etsyFetch(token: string, path: string, init: RequestInit = {}): P
 
 // Resolve the seller's shop id + name from the authenticated user, and cache it.
 async function resolveShop(storeSlug: string, token: string, userId: string): Promise<{ shopId: string; shopName: string | null } | null> {
- // getShopByOwnerUserId — the shop owned by the authenticated user.
+ // getShopByOwnerUserId: the shop owned by the authenticated user.
  const r = await etsyFetch(token, `/users/${userId}/shops`);
  const j = r.json as { shop_id?: number; shop_name?: string; results?: { shop_id: number; shop_name: string }[] } | null;
  const shop = j?.results?.[0] ?? (j?.shop_id ? { shop_id: j.shop_id, shop_name: j.shop_name || "" } : null);
@@ -141,14 +141,14 @@ async function clothingTaxonomyId(token: string): Promise<number | null> {
 export async function listOnEtsy(storeSlug: string, item: EtsyItem): Promise<EtsyResult> {
  if (!etsyConfigured()) return { ok: false, error: "Etsy isn’t configured on the server." };
  const token = await accessToken(storeSlug);
- if (!token) return { ok: false, error: "Etsy isn’t connected — reconnect the account." };
+ if (!token) return { ok: false, error: "Etsy isn’t connected. Reconnect the account." };
  const t = await getEtsyTokens(storeSlug);
- if (!t?.shopId) return { ok: false, error: "Couldn’t find your Etsy shop — reconnect Etsy." };
+ if (!t?.shopId) return { ok: false, error: "Couldn’t find your Etsy shop. Reconnect Etsy." };
 
- // Etsy needs a shipping profile on physical listings — use the shop's first one.
+ // Etsy needs a shipping profile on physical listings. Use the shop's first one.
  const sp = await etsyFetch(token, `/shops/${t.shopId}/shipping-profiles`);
  const shippingProfileId = (sp.json as { results?: { shipping_profile_id: number }[] } | null)?.results?.[0]?.shipping_profile_id;
- if (!shippingProfileId) return { ok: false, error: "Set up a shipping profile in your Etsy shop first — Etsy requires one to list." };
+ if (!shippingProfileId) return { ok: false, error: "Set up a shipping profile in your Etsy shop first. Etsy requires one to list." };
  const taxonomyId = await clothingTaxonomyId(token);
  if (!taxonomyId) return { ok: false, error: "Couldn’t resolve an Etsy category. Try reconnecting." };
 

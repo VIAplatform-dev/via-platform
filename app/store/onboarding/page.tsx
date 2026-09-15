@@ -19,7 +19,7 @@ export default function OnboardingPage() {
  // the screen has to say so before they fill anything in.
  const [again, setAgain] = useState(false);
 
- // Already set up? Skip straight to the dashboard — unless you are one of VYA's own people, who
+ // Already set up? Skip straight to the dashboard, unless you are one of VYA's own people, who
  // are allowed to walk this flow again to test or demo it. Bouncing them out was the whole reason
  // it could only ever be seen once per email address.
  useEffect(() => {
@@ -48,7 +48,7 @@ export default function OnboardingPage() {
  setErr(null);
  try {
  // A big store's crawl outlives one serverless invocation, so the server hands back a `paused`
- // job with its place kept rather than a truncated result. Keep asking it to continue —
+ // job with its place kept rather than a truncated result. Keep asking it to continue,
  // otherwise a 90-page store would report the 12 pages that fit in the first invocation.
  let d: Record<string, unknown> | null = null;
  let ok = false;
@@ -86,27 +86,27 @@ export default function OnboardingPage() {
  <h1 className="font-serif text-3xl sm:text-4xl mb-3">Let’s set up your store.</h1>
  {again && (
  <p className="mb-6 border border-[#5D0F17]/15 bg-white px-3.5 py-3 text-sm text-[#5D0F17]/70">
-  <span className="font-medium text-[#5D0F17]">Test run.</span> Your store is already set up — you
+  <span className="font-medium text-[#5D0F17]">Test run.</span> Your store is already set up. You
   are seeing this because you are VYA. Anyone else lands on the dashboard from here.
  </p>
  )}
  <p className="text-sm text-[#5D0F17]/55 mb-8">
  {path === "import"
-  ? "Paste your existing site and VYA hosts it — every page, exactly as it looks — then switches the backend to VYA commerce. One step, then you’re live."
-  : "Two ways to start. Pick whichever fits — you can change everything later."}
+  ? "Paste your existing site and VYA hosts it, every page, exactly as it looks, then switches the backend to VYA commerce. One step, then you’re live."
+  : "Two ways to start. Pick whichever fits. You can change everything later."}
  </p>
 
- {/* Step 1 — the one-time fork. Shown until they pick a path (and before a result). */}
+ {/* Step 1: the one-time fork. Shown until they pick a path (and before a result). */}
  {!path && !result && (
  <div className="grid gap-4 sm:grid-cols-2">
   <button onClick={() => setPath("import")} className="text-left border border-[#5D0F17]/15 bg-white p-6 transition hover:border-[#5D0F17]/50 hover:shadow-[0_12px_40px_-24px_rgba(93,15,23,0.5)]">
   <p className="font-serif text-xl mb-1.5">I already have a website</p>
-  <p className="text-sm text-[#5D0F17]/55">Bring your Shopify or Squarespace store over — every page, exactly as it looks. One-time import.</p>
+  <p className="text-sm text-[#5D0F17]/55">Bring your Shopify or Squarespace store over. Every page, exactly as it looks. One-time import.</p>
   <span className="mt-4 inline-block text-xs uppercase tracking-[0.15em] text-[#5D0F17]">Bring it over →</span>
   </button>
   <button onClick={() => { setPath("build"); router.push("/admin/storefront"); }} className="text-left border border-[#5D0F17]/15 bg-white p-6 transition hover:border-[#5D0F17]/50 hover:shadow-[0_12px_40px_-24px_rgba(93,15,23,0.5)]">
   <p className="font-serif text-xl mb-1.5">I need to build one</p>
-  <p className="text-sm text-[#5D0F17]/55">Start from a clean storefront and let VYA design it from your products — add and arrange sections yourself.</p>
+  <p className="text-sm text-[#5D0F17]/55">Start from a clean storefront and let VYA design it from your products. Add and arrange sections yourself.</p>
   <span className="mt-4 inline-block text-xs uppercase tracking-[0.15em] text-[#5D0F17]">Build from scratch →</span>
   </button>
  </div>
@@ -142,7 +142,7 @@ export default function OnboardingPage() {
  value={url}
  onChange={(e) => setUrl(e.target.value)}
  onKeyDown={(e) => e.key === "Enter" && run()}
- placeholder="yourstore.com — Shopify or Squarespace"
+ placeholder="yourstore.com: Shopify or Squarespace"
  autoFocus
  />
  <button

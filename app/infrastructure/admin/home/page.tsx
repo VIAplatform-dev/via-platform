@@ -15,7 +15,7 @@ import { SectionLabel, TechCard, BarChart, SegmentedControl, StatusPill, TH, TD 
 
 type Overview = {
  revenueCents: number; orders: number; inventory: { active: number }; customers: number;
- /** Revenue per channel — her shop, in person, Depop, the Shopify she came from. All of it is in
+ /** Revenue per channel: her shop, in person, Depop, the Shopify she came from. All of it is in
   *  the totals; this says which door each sale came through. See analytics/channels.ts. */
  byChannel?: { channel: string; label: string; revenueCents: number; orders: number }[];
  productViews: number; favorites: number;
@@ -27,7 +27,7 @@ type InboxMsg = { id: string; buyerName?: string; name?: string; body?: string; 
 type Msg = { role: "user" | "assistant"; content: string };
 type Hold = { itemId: string; name: string; expiresAt: string; title: string | null };
 
-// Representative aggregate data — sales-by-channel and demand need cross-marketplace aggregation
+// Representative aggregate data: sales-by-channel and demand need cross-marketplace aggregation
 // we don't collect yet. Shapes are deck-final; swap for real feeds when wired.
 const PERIODS: Record<string, number> = { Today: 1, "7d": 7, "30d": 30, "90d": 90 };
 
@@ -35,7 +35,7 @@ const money = (c: number) => `$${(c / 100).toLocaleString(undefined, { maximumFr
 const B = "/admin";
 
 const ACTIONS = [
- { href: `${B}/add-listing`, icon: PlusCircle, title: "Add a listing", body: "Snap a photo — AI drafts the title, price, and description." },
+ { href: `${B}/add-listing`, icon: PlusCircle, title: "Add a listing", body: "Snap a photo: AI drafts the title, price, and description." },
  { href: `${B}/inventory`, icon: Package, title: "Inventory", body: "Manage your one-of-one pieces and drops." },
  { href: `${B}/orders`, icon: ShoppingBag, title: "Orders", body: "Fulfill sales and print shipping labels." },
  { href: `${B}/marketing/campaigns`, icon: Megaphone, title: "Marketing", body: "Campaigns, discounts, automations, and your sender." },
@@ -53,7 +53,7 @@ export default function WorkspaceHome() {
  const [inboxMsgs, setInboxMsgs] = useState<InboxMsg[]>([]);
  const [holds, setHolds] = useState<{ holds: Hold[]; today: Hold[]; thisWeek: Hold[] }>({ holds: [], today: [], thisWeek: [] });
  const [demand, setDemand] = useState<{ name: string; trend: string; index: number }[]>([]);
- // "Set up your store" — six steps (setup-core.ts) shown until every required one is done. Null
+ // "Set up your store". Six steps (setup-core.ts) shown until every required one is done. Null
  // until the route answers, so a store that IS set up never sees the card flash on load.
  type Setup = { steps: SetupStep[]; complete: boolean; done: number; total: number; next: SetupStep["id"] | null };
  const [setup, setSetup] = useState<Setup | null>(null);
@@ -67,10 +67,10 @@ export default function WorkspaceHome() {
  const r = await fetch("/api/store/onboarding-status", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skip: id }) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  readSetup(r);
  }
- // "Needs you" rows from /api/store/attention — already non-zero-only and in a fixed order.
+ // "Needs you" rows from /api/store/attention. Already non-zero-only and in a fixed order.
  const [needs, setNeeds] = useState<AttentionRow[]>([]);
  // Trends is VYA's own tooling, hidden from sellers in the workspace nav. The link out to it, and
- // the empty state that points at it, have to follow — a seller sent to a page she can't open
+ // the empty state that points at it, have to follow. A seller sent to a page she can't open
  // learns only that something exists which isn't for her.
  const [isOwner, setIsOwner] = useState(false);
  const [period, setPeriod] = useState("30d");
@@ -90,9 +90,9 @@ export default function WorkspaceHome() {
    .catch(() => {});
   return () => { alive = false; };
  }, [period]);
- const [nowMs] = useState(() => Date.now()); // stable "now" (set once) — keeps date math pure in render
+ const [nowMs] = useState(() => Date.now()); // stable "now" (set once): keeps date math pure in render
 
- // In-page chat state — asking from the home bar turns the page into a conversation.
+ // In-page chat state: asking from the home bar turns the page into a conversation.
  const [chatMode, setChatMode] = useState(false);
  const [msgs, setMsgs] = useState<Msg[]>([]);
  const [chatInput, setChatInput] = useState("");
@@ -133,7 +133,7 @@ export default function WorkspaceHome() {
 
  useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }); }, [msgs, busy, chatMode]);
 
- // Hide the floating Sidekick launcher while the full-page home chat is open — one "Ask VYA" at a time.
+ // Hide the floating Sidekick launcher while the full-page home chat is open. One "Ask VYA" at a time.
  useEffect(() => {
  window.dispatchEvent(new CustomEvent("vya:home-chat", { detail: chatMode }));
  return () => { window.dispatchEvent(new CustomEvent("vya:home-chat", { detail: false })); };
@@ -152,7 +152,7 @@ export default function WorkspaceHome() {
  msgsRef.current = after; setMsgs(after);
  if (r.ok && (d.actions || []).some((a: { name: string; ok: boolean }) => a.ok)) window.dispatchEvent(new Event("vya:store-updated"));
  } catch {
- const after = [...msgsRef.current, { role: "assistant" as const, content: "Couldn’t reach me just now — try again." }];
+ const after = [...msgsRef.current, { role: "assistant" as const, content: "Couldn’t reach me just now. Try again." }];
  msgsRef.current = after; setMsgs(after);
  }
  busyRef.current = false; setBusy(false);
@@ -163,7 +163,7 @@ export default function WorkspaceHome() {
  await fetch("/api/store/assistant", { method: "DELETE" }).catch(() => {});
  }
 
- // Respond to an offer straight from the notifications feed (optimistic — drop it from the list).
+ // Respond to an offer straight from the notifications feed (optimistic: drop it from the list).
  async function respondOffer(id: string, action: "accept" | "decline") {
  setOffersList((prev) => prev.filter((o) => o.id !== id));
  setPendingOffers((n) => Math.max(0, n - 1));
@@ -266,10 +266,10 @@ export default function WorkspaceHome() {
  const revC = inPeriod.reduce((s, o) => s + (o.amountCents || 0), 0);
  const prevRevC = prevPeriod.reduce((s, o) => s + (o.amountCents || 0), 0);
  const ordersCount = inPeriod.length;
- const aov = ordersCount ? money(Math.round(revC / ordersCount)) : "—";
+ const aov = ordersCount ? money(Math.round(revC / ordersCount)) : "-";
  const revDelta = prevRevC > 0 ? Math.round(((revC - prevRevC) / prevRevC) * 100) : null;
 
- // Revenue chart — buckets tied to the selected period, so it re-shapes on Today/7d/30d/90d.
+ // Revenue chart: buckets tied to the selected period, so it re-shapes on Today/7d/30d/90d.
  //   Today → 6×4h · 7d → 7 daily · 30d → 15×2-day · 90d → 13 weekly. Real, from paid orders by paidAt.
  const DAY = 86400000;
  const revCfg = period === "90d" ? { n: 13, w: 7 * DAY, fmt: (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) }
@@ -294,7 +294,7 @@ export default function WorkspaceHome() {
  const aging = agingBuckets(items, new Date(nowMs));
  const agingLabel = agingTile(aging);
  // Everything Home COULD show. Which four actually make it, and in what order, is decided by
- // attention-tiles.ts — pressing things claim the slots, the resting four fill the rest.
+ // attention-tiles.ts. Pressing things claim the slots, the resting four fill the rest.
  const candidates: Tile[] = [
  { id: "toShip", label: "Packages to ship", count: toShip, href: `${B}/orders`, urgent: toShip > 0 },
  { id: "offers", label: "Offers to review", count: pendingOffers, href: `${B}/inbox`, urgent: pendingOffers > 0 },
@@ -303,7 +303,7 @@ export default function WorkspaceHome() {
  { id: "drafts", label: "Drafts to publish", count: drafts, href: `${B}/inventory/drafts`, urgent: false },
  { id: "liveListings", label: "Live listings", count: active, href: `${B}/inventory`, urgent: false, good: true },
  // The rest of what needs her, from /api/store/attention. Holds and aging are skipped here because
- // the two tiles above already say it — with the customer's name, from the same data.
+ // the two tiles above already say it, with the customer's name, from the same data.
  ...needs.filter((r) => r.id !== "holdsToday" && r.id !== "aging").map((r) => ({ id: r.id, label: r.label, count: r.count, href: r.href, urgent: r.urgent })),
  ];
  const attention = homeTiles(candidates);
@@ -319,7 +319,7 @@ export default function WorkspaceHome() {
  <div className="flex items-center gap-2.5">
  <SegmentedControl options={["Today", "7d", "30d", "90d"]} value={period} onChange={setPeriod} />
  {/* Open the assistant where she is, rather than replacing the page she's reading.
-     Taking over the screen to ask a question means losing the numbers you were asking about —
+     Taking over the screen to ask a question means losing the numbers you were asking about,
      the panel already supports this via the `vya:ask` event the rest of the app uses. */}
  <button onClick={() => window.dispatchEvent(new CustomEvent("vya:ask"))} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3.5 py-[7px] text-[13px] font-medium text-stone-600 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition hover:border-[var(--accent)]/40 hover:text-[var(--accent-ink)]">
  <Sparkles size={14} className="text-[var(--accent)]" /> Ask VYA
@@ -327,7 +327,7 @@ export default function WorkspaceHome() {
  </div>
  </div>
 
- {/* Set up your store — until every required step is done. Left: the one next step and its button
+ {/* Set up your store, until every required step is done. Left: the one next step and its button
      (option B). Right: the ring and every step (option F); the optional domain can be skipped. */}
  {setup && !setup.complete && nextCopy && (
  <TechCard className="mb-4 overflow-hidden border-[var(--accent)]/35 p-0" data-testid="setup-card">
@@ -376,7 +376,7 @@ export default function WorkspaceHome() {
  </TechCard>
  )}
 
- {/* Needs attention — action-first */}
+ {/* Needs attention: action-first */}
  <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
  {attention.map((a) => (
  <Link key={a.id} href={a.href} className={`group relative overflow-hidden rounded-2xl border p-4 transition ${a.urgent ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50" : a.good ? "border-[var(--accent)]/15 bg-[var(--accent-soft)]/50 hover:bg-[var(--accent-soft)]" : "border-stone-200 bg-white hover:border-stone-300"}`}>
@@ -399,8 +399,8 @@ export default function WorkspaceHome() {
  <span className="text-[44px] leading-none tracking-[-0.01em] text-stone-900" style={serif}>{money(revC)}</span>
  {revDelta !== null && <span className={`mb-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${revDelta >= 0 ? "bg-[var(--accent-soft)] text-[var(--accent-ink)]" : "bg-rose-50 text-rose-500"}`}>{revDelta >= 0 ? "↑" : "↓"} {Math.abs(revDelta)}%</span>}
  </div>
- {/* WHERE THE MONEY CAME FROM. Everything is in the figure above — one continuous line across the
-     move — and this says which door each part came through: her shop, the market stall, Depop, the
+ {/* WHERE THE MONEY CAME FROM. Everything is in the figure above. One continuous line across the
+     move, and this says which door each part came through: her shop, the market stall, Depop, the
      Shopify she came from. It replaces a footnote about "imported" revenue, because history she
      brought over is not a special case, it is a channel she used to sell through, and it belongs
      next to Depop answering the same question. Only shown once there is more than one door. */}
@@ -484,9 +484,9 @@ export default function WorkspaceHome() {
  { label: "Orders", value: ordersCount.toLocaleString() },
  { label: "Avg. order", value: aov },
  { label: "Active listings", value: active.toLocaleString() },
- { label: "Customers", value: ov ? ov.customers.toLocaleString() : "—" },
- { label: "Product views", value: ov ? ov.productViews.toLocaleString() : "—" },
- { label: "Favorites", value: ov ? ov.favorites.toLocaleString() : "—" },
+ { label: "Customers", value: ov ? ov.customers.toLocaleString() : "-" },
+ { label: "Product views", value: ov ? ov.productViews.toLocaleString() : "-" },
+ { label: "Favorites", value: ov ? ov.favorites.toLocaleString() : "-" },
  ].map((m) => (
  <div key={m.label} className="bg-white p-4">
  <p className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-stone-400">{m.label}</p>
@@ -495,7 +495,7 @@ export default function WorkspaceHome() {
  ))}
  </TechCard>
 
- {/* What to source — real demand from market insights (empty state until the market data builds) */}
+ {/* What to source: real demand from market insights (empty state until the market data builds) */}
  <TechCard className="mt-4 p-5">
  <div className="mb-2 flex items-center justify-between">
  <p className="text-[13px] font-semibold text-stone-900">What to source</p>
@@ -515,13 +515,13 @@ export default function WorkspaceHome() {
  </div>
  ) : (
  <p className="py-8 text-center text-[13px] text-stone-400">
-  Demand builds as more of the marketplace sells — the brands and categories buyers are asking for will show up here.
+  Demand builds as more of the marketplace sells. The brands and categories buyers are asking for will show up here.
   {isOwner ? <> See <Link href={`${B}/trends`} className="underline">Trends</Link> for the full picture.</> : null}
  </p>
  )}
  </TechCard>
 
- {/* Notifications — offers to respond to + buyer messages, actionable inline */}
+ {/* Notifications: offers to respond to + buyer messages, actionable inline */}
  <TechCard className="mt-4 p-5">
  <div className="mb-1 flex items-center justify-between">
  <div className="flex items-center gap-2">
@@ -590,7 +590,7 @@ export default function WorkspaceHome() {
  ))}
  </tbody>
  </table>
- ) : <p className="py-10 text-center text-[13px] text-stone-400">No listings yet — snap a photo to add your first piece.</p>}
+ ) : <p className="py-10 text-center text-[13px] text-stone-400">No listings yet. Snap a photo to add your first piece.</p>}
  </TechCard>
 
  <TechCard className="p-5">
@@ -604,7 +604,7 @@ export default function WorkspaceHome() {
  <div key={o.id} className="flex items-center justify-between gap-3 py-[11px]">
  <div className="min-w-0">
  <p className="truncate text-[13px] font-medium text-stone-800">{o.itemTitle || "Order"}</p>
- <p className="truncate text-[11px] text-stone-400">{o.buyerEmail || "—"}</p>
+ <p className="truncate text-[11px] text-stone-400">{o.buyerEmail || "-"}</p>
  </div>
  <div className="flex shrink-0 items-center gap-2">
  <span className="text-[13px] font-semibold tabular-nums text-stone-800">{money(orderAmt(o))}</span>

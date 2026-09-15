@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 60_000, retry: 1, refetchOnWindowFocus: false } },
 });
 
-// A push that arrives while the app is open still shows as a banner — a sale is worth interrupting
+// A push that arrives while the app is open still shows as a banner. A sale is worth interrupting
 // for. Module level, as expo-notifications asks, so it is set before any notification can arrive.
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -69,11 +69,11 @@ export default function RootLayout() {
             >
               {/* Explicitly a card, never a sheet. Replacing into it from the sign-in modal
                   otherwise inherited that presentation and left the app in a dismissible
-                  card — see the dismissAll in auth/callback. */}
+                  card: see the dismissAll in auth/callback. */}
               <Stack.Screen name="(tabs)" options={{ headerShown: false, presentation: "card" }} />
               {/* The seller app. Same bundle, same sign-in; `storeSlug` routes between them. */}
               <Stack.Screen name="(seller)" options={{ headerShown: false, presentation: "card" }} />
-              {/* Market Mode takes over the screen — no tab bar, no header. */}
+              {/* Market Mode takes over the screen, no tab bar, no header. */}
               <Stack.Screen name="market/index" options={{ headerShown: false }} />
               <Stack.Screen name="market/find" options={{ headerShown: false }} />
               <Stack.Screen name="market/quick" options={{ headerShown: false }} />
@@ -103,7 +103,7 @@ export default function RootLayout() {
 // A render error anywhere below here shows a screen you can leave, instead of closing the app.
 //
 // expo-router looks for this export by name and wraps the whole tree in it. It is not a substitute
-// for fixing the error — the message is printed, not swallowed — but a shopper who taps something
+// for fixing the error, the message is printed, not swallowed, but a shopper who taps something
 // and watches VYA disappear does not come back, and on a phone there is no console to tell her
 // what happened.
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {

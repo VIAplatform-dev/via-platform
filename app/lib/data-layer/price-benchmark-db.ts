@@ -22,7 +22,7 @@ export type InternalPriceBenchmark = {
 
 // The platform's OWN realized-price benchmark for a brand and/or category, read from the
 // latest `market_metrics` snapshot (built nightly by build-market-metrics) and privacy-gated
-// via gateSegment — it only returns price data when >= minStores AND >= minTransactions, so a
+// via gateSegment: it only returns price data when >= minStores AND >= minTransactions, so a
 // benchmark can never reflect a single store. Prefers a brand match over category, and the 30d
 // window over 7d (more sales → sturdier). Returns CENTS (market_metrics stores dollars).
 export async function getInternalPriceBenchmark(opts: {
@@ -35,7 +35,7 @@ export async function getInternalPriceBenchmark(opts: {
 
  // market_metrics segments brands by HOUSE (brandData.ts has one entry for all of
  // Ralph Lauren), so for a house whose lines span more than one market the
- // brand-level median is a blend of runway and department-store prices — a
+ // brand-level median is a blend of runway and department-store prices. A
  // confidently wrong anchor. Fall through to the category benchmark instead:
  // better no brand anchor than one built from the wrong tier.
  const line = resolveBrandLine(brand);

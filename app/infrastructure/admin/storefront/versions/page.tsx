@@ -6,7 +6,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, TechButtonLink, StatusPil
 
 // Your storefronts: the one that's live, and every one you've kept.
 //
-// Sellers already know this model from Shopify's themes — a list, one published, the rest drafts —
+// Sellers already know this model from Shopify's themes, a list, one published, the rest drafts,
 // so it needs no explaining. What it buys them is the thing that wasn't possible before: importing
 // a real site AND building one here, keeping both, and switching whenever they like. Before this a
 // store had exactly one storefront and whichever arrived last destroyed the other.
@@ -17,7 +17,7 @@ type Version = { id: string; name: string; kind: VersionKind; published: boolean
 const KIND_LABEL: Record<VersionKind, string> = { imported: "Imported site", built: "Built here" };
 
 // The TIME, not just the day. A seller saving a copy before each big change has three drafts all
-// reading "saved Sep 8, 2026" — the line that exists to tell them apart tells them nothing, and the
+// reading "saved Sep 8, 2026". The line that exists to tell them apart tells them nothing, and the
 // only way to find the one from before lunch is to open each in turn. This component is client-only
 // and its data is fetched after mount, so a locale-formatted time can't mismatch a server render.
 const when = (iso: string | null) => {
@@ -51,7 +51,7 @@ export default function StorefrontVersionsPage() {
   setBusy(key); setError(null);
   const r = await fetch(url, init).then(async (x) => ({ ok: x.ok, d: await x.json().catch(() => ({})) })).catch(() => null);
   setBusy(null);
-  if (!r || !r.ok) { setError(r?.d?.error || "That didn’t work — try again."); return false; }
+  if (!r || !r.ok) { setError(r?.d?.error || "That didn’t work: try again."); return false; }
   if (r.d?.versions) setVersions(r.d.versions as Version[]);
   return true;
  }
@@ -116,15 +116,15 @@ export default function StorefrontVersionsPage() {
       </TechButton>
      </div>
      {/* Both buttons, explained. Only "Start a new design" used to be, and a seller asked of the other
-         one: "what does this do? save it as is in case you change things and wish to go back?" — which
+         one: "what does this do? save it as is in case you change things and wish to go back?", which
          is exactly what it does, so the answer belongs on the page rather than in her head. */}
      <div className="mb-6 space-y-1.5 text-[12px] leading-relaxed text-stone-400">
       <p>
        “Save a copy of what’s live” keeps your storefront exactly as it is right now as a draft. Your live site
-       doesn’t change — the copy is there to come back to if you edit something and change your mind.
+       doesn’t change: the copy is there to come back to if you edit something and change your mind.
       </p>
       <p>
-       “Start a new design” keeps your current storefront as a draft and puts you on a blank one — nothing is deleted,
+       “Start a new design” keeps your current storefront as a draft and puts you on a blank one. Nothing is deleted,
        and you can publish the old one again at any time.
       </p>
      </div>
@@ -152,7 +152,7 @@ export default function StorefrontVersionsPage() {
           onRenameSave={async () => { if (await act(`rename:${v.id}`, json({ id: v.id, action: "rename", name: draftName }, "PATCH"))) setRenaming(null); }}
           onPublish={() => act(`publish:${v.id}`, json({ id: v.id, action: "publish" }, "PATCH"))}
           onEdit={() => {
-            if (v.kind === "imported") { setError("Imported sites are edited on the live site — publish this one first."); return; }
+            if (v.kind === "imported") { setError("Imported sites are edited on the live site. Publish this one first."); return; }
             window.location.href = `/admin/storefront?version=${encodeURIComponent(v.id)}`;
            }}
           onDelete={() => setConfirmDelete(v.id)}

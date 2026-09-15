@@ -6,7 +6,7 @@ import { Check, Copy, ChevronDown, Heart, Tag, Eye, Bookmark, Settings2, Downloa
 import { vestiaireReadiness } from "@/app/lib/vestiaire";
 import { AdminPage, AdminHeader, TechCard, TechButtonLink, TechEmpty, StatusPill, MetricCard, TH, TD } from "../ui";
 
-// VYA Cross-Lister on the Chrome Web Store — reviewed and published (Unlisted, so it's reachable by
+// VYA Cross-Lister on the Chrome Web Store. Reviewed and published (Unlisted, so it's reachable by
 // this link rather than by search, which is why the button matters).
 const EXTENSION_URL = "https://chromewebstore.google.com/detail/vya-cross-lister/jcbjeoingkdkodflfbachfpllmkgojkp";
 
@@ -61,8 +61,8 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const [extInstalled, setExtInstalled] = useState(false);
  // Keyed "platform:itemId", NOT itemId.
  //
- // With one key per item, queueing a piece for Depop turned its VESTIAIRE cell green too — same
- // item, same key — so a piece that had never been sent to Vestiaire read "Queued ✓", the server
+ // With one key per item, queueing a piece for Depop turned its VESTIAIRE cell green too. Same
+ // item, same key, so a piece that had never been sent to Vestiaire read "Queued ✓", the server
  // had no record of it, and the "Open Vestiaire to list" card never appeared because nothing was
  // actually queued. A cell must only ever reflect its own marketplace.
  const [queueState, setQueueState] = useState<Record<string, "queuing" | "ok" | "err">>({});
@@ -99,7 +99,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  const d = e.data;
  if (!d || d.source !== "vya-ext" || d.type !== "queued") return;
  // The extension's reply carries the item but not the marketplace, so settle whichever cell for
- // that item is currently waiting — never every cell for it.
+ // that item is currently waiting, never every cell for it.
  setQueueState((st) => {
   const next = { ...st };
   for (const k of Object.keys(st)) if (k.endsWith(`:${d.itemId}`) && st[k] === "queuing") next[k] = d.ok ? "ok" : "err";
@@ -108,7 +108,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
    // A marketplace can refuse a piece outright (Vestiaire only takes designer brands). Its reason
    // is more useful than "couldn't queue", so it goes straight to the seller.
    if (!d.ok && d.error) setErrors((e) => ({ ...e, [d.itemId]: String(d.error) }));
- // A reconciled item was already pending server-side, so its status can't have changed — skip the
+ // A reconciled item was already pending server-side, so its status can't have changed. Skip the
  // reload, or staging a big backlog would refetch the board once per item.
  if (d.ok && !reconciledRef.current.has(d.itemId)) load();
  };
@@ -120,7 +120,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  // publishing a piece queues it server-side (createCrossListingsForItem), and so does the scheduled-
  // publish cron. But the extension only learns of an item when the board posts queue-{platform} at it,
  // which only happened on a click here. So a piece queued at publish showed as "queued" on this board
- // while the extension's own queue was empty — and "Open Depop to list" opened a create form with
+ // while the extension's own queue was empty, and "Open Depop to list" opened a create form with
  // nothing to fill in.
  //
  // Reconcile: whatever the server calls pending, stage into the extension too. vya.js replaces by item
@@ -144,7 +144,7 @@ export default function CrossListingView({ view }: { view: "listings" | "overvie
  * A blocking reason, short enough for a table cell.
  *
  * The full sentence is written for a seller reading it on its own ("Vestiaire only takes pieces
- * with a designer brand — add one first"), and in a column three words wide it wrapped over three
+ * with a designer brand. Add one first"), and in a column three words wide it wrapped over three
  * lines and pushed the row apart. The whole sentence is still there on hover.
  */
 function shortBlock(reason: string): string {
@@ -163,7 +163,7 @@ function shortBlock(reason: string): string {
  const vestReady = (it: BoardRow) => vestiaireReadiness({
   title: it.title, brand: it.brand, category: it.category, condition: it.condition,
   material: it.material, size: it.size, description: it.description, priceCents: it.priceCents,
-  // The board sends a count, not the URLs — enough to know whether Vestiaire's minimum is met.
+  // The board sends a count, not the URLs. Enough to know whether Vestiaire's minimum is met.
   images: Array.from({ length: it.photoCount ?? 0 }, (_, i) => `https://x/${i}`),
  });
 
@@ -176,7 +176,7 @@ function shortBlock(reason: string): string {
  if (r) setContent(r.content);
  }
 
- // Stage one item into an extension marketplace's queue (+ record intent server-side). Doesn't reload —
+ // Stage one item into an extension marketplace's queue (+ record intent server-side). Doesn't reload,
  // callers reload once so a single click and a bulk run behave the same.
  async function queueOne(itemId: string, title: string, platformKey: string) {
  if (!QUEUEABLE.has(platformKey)) return;
@@ -187,11 +187,11 @@ function shortBlock(reason: string): string {
  try { window.postMessage({ source: "vya-crosslist", type: `queue-${platformKey}`, itemId, title }, window.location.origin); } catch { /* ignore */ }
  // …and record intent so the board shows "Queued" and it survives a reload.
  // Reported, not swallowed. When this fails the row still says "Queued ✓" from the optimistic
- // settle below, and the disagreement between the two is invisible — which is how a queued piece
+ // settle below, and the disagreement between the two is invisible, which is how a queued piece
  // ended up with no "Open … to list" card and no explanation.
  const rec = await fetch(`/api/store/cross-listing/${platformKey}/queue`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId }) })
   .then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) as { error?: string } })).catch(() => null);
- if (!rec?.ok) setErrors((e) => ({ ...e, [itemId]: rec?.d?.error || "Staged for the extension, but VYA couldn't record it — the board won't remember after a reload." }));
+ if (!rec?.ok) setErrors((e) => ({ ...e, [itemId]: rec?.d?.error || "Staged for the extension, but VYA couldn't record it. The board won't remember after a reload." }));
  // No extension → no "queued" message comes back; settle the button optimistically off the server write.
  setTimeout(() => setQueueState((st) => (st[key] === "queuing" ? { ...st, [key]: "ok" } : st)), 1200);
  }
@@ -207,7 +207,7 @@ function shortBlock(reason: string): string {
  const targets = chosen.filter(eligible);
  const skipped = chosen.length - targets.length;
  for (const it of targets) await queueOne(it.itemId, it.title, platformKey);
- if (skipped > 0) setNotice(`${skipped} ${skipped === 1 ? "piece isn’t" : "pieces aren’t"} accepted on ${nameFor(platformKey)} — they need a designer brand.`);
+ if (skipped > 0) setNotice(`${skipped} ${skipped === 1 ? "piece isn’t" : "pieces aren’t"} accepted on ${nameFor(platformKey)}: they need a designer brand.`);
  setSelected(new Set());
  load();
  }
@@ -228,7 +228,7 @@ function shortBlock(reason: string): string {
  }
 
  const connected = platforms.filter((p) => acct(p.key) || (p.key === "ebay" && ebay?.connected) || (p.key === "etsy" && etsy?.connected));
- const extMarketplaces = connected.filter((p) => p.mode === "extension"); // Depop, Vestiaire — listed via the extension
+ const extMarketplaces = connected.filter((p) => p.mode === "extension"); // Depop, Vestiaire: listed via the extension
  const nameFor = (k: string) => (k === "vya" ? "VYA" : platforms.find((p) => p.key === k)?.name || k);
  const statTip = (bp?: Record<string, PlatformStats>) => {
  if (!bp) return "";
@@ -258,17 +258,17 @@ function shortBlock(reason: string): string {
  const allSelected = board.length > 0 && board.every((it) => selected.has(it.itemId));
  const toggleSelectAll = () => setSelected(allSelected ? new Set() : new Set(board.map((it) => it.itemId)));
 
- // One marketplace's cell for one piece — drawn in the table on a tablet/desktop and in the card
+ // One marketplace's cell for one piece. Drawn in the table on a tablet/desktop and in the card
  // list on a phone, so both always say the same thing.
  const channelCell = (it: BoardRow, p: Platform) => {
  const st = it.listings[p.key];
  const isExt = p.mode === "extension" && QUEUEABLE.has(p.key);
- // Vestiaire is curated — it only takes designer brands. Saying so in the cell beats letting her
+ // Vestiaire is curated. It only takes designer brands. Saying so in the cell beats letting her
  // queue it and meet a refusal at the end of their form.
- // Everything Vestiaire's five-step form would refuse — brand, three photos, material, condition,
-     // category, price — checked here so it's said before she opens their site, not four screens in.
+ // Everything Vestiaire's five-step form would refuse. Brand, three photos, material, condition,
+     // category, price: checked here so it's said before she opens their site, not four screens in.
      const vest = p.key === "vestiaire" && !st ? vestReady(it) : null;
- // A draft is on this board so she can find it, not so she can list it — nothing can go to a
+ // A draft is on this board so she can find it, not so she can list it. Nothing can go to a
  // marketplace before it is live on her own shop.
  const isDraft = it.status === "draft";
      // Per cell, not per row: this is the marketplace whose button we're drawing. Computed once
@@ -279,7 +279,7 @@ function shortBlock(reason: string): string {
  {isDraft && !st ? (
  <span className="text-[11px] text-stone-400">Publish first</span>
  ) : vest && !vest.ready ? (
-              // The first thing standing in the way, with the rest on hover — a cell can hold one
+              // The first thing standing in the way, with the rest on hover. A cell can hold one
               // sentence, and "only 1 photo" is the one that matters most often.
               <span className="inline-flex items-center gap-1 text-[11px] text-amber-700" title={vest.blocking.join("\n")}>
                <Ban size={12} />{shortBlock(vest.blocking[0])}
@@ -297,7 +297,7 @@ function shortBlock(reason: string): string {
  ) : p.hasApi ? (
  <button onClick={() => retry(it.itemId, [p.key])} disabled={retrying === it.itemId} className="rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] text-stone-500 transition hover:border-[var(--accent-ink,#0b7a5c)] hover:text-[var(--accent-ink,#0b7a5c)] disabled:opacity-60">{retrying === it.itemId ? "Listing…" : "List"}</button>
  ) : (
- <span className="text-[13px] text-stone-300">—</span>
+ <span className="text-[13px] text-stone-300">-</span>
  )}
  </>
  );
@@ -312,7 +312,7 @@ function shortBlock(reason: string): string {
  <AdminHeader
  eyebrow="Sell · Cross-listing"
  title="Cross-listing"
- subtitle="List your pieces on the other sites you sell on, and see what’s live, what’s waiting, and where your sales come from."
+ subtitle="See what’s live, what’s waiting, and where your sales come from."
  actions={<>{installBtn}{settingsBtn}</>}
  />
 
@@ -325,7 +325,7 @@ function shortBlock(reason: string): string {
 
    {/* Whether the extension is actually talking to this page.
        Depop and Vestiaire are filled by the extension, so if it isn't here NOTHING happens when a
-       piece is queued — the board says "queued", the server agrees, and the extension's own queue
+       piece is queued. The board says "queued", the server agrees, and the extension's own queue
        stays empty. That was invisible: the only hint was which button appeared. Now it's stated. */}
    {!extInstalled ? (
     <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -348,7 +348,7 @@ function shortBlock(reason: string): string {
  <TechEmpty
  icon={<Tag size={28} strokeWidth={1.5} />}
  title="No marketplaces connected yet"
- body="Connect eBay, Depop, Poshmark and others. Publish a piece once on VYA and it goes to all of them. You’ll see sales and offers from each site here."
+ body="Publish once on VYA and the piece goes to eBay, Depop, Poshmark and the rest. Their sales and offers come back here."
  action={<TechButtonLink href="/admin/cross-listing/settings">Connect a marketplace</TechButtonLink>}
  />
  ) : (
@@ -373,10 +373,10 @@ function shortBlock(reason: string): string {
  {settingsBtn}
  </div>
  {marketRows.length === 0 ? (
- <div className="px-5 py-8 text-center text-[13px] text-stone-400">No marketplaces connected — <a href="/admin/cross-listing/settings" className="text-[var(--accent-ink,#0b7a5c)] hover:underline">connect one</a> to start.</div>
+ <div className="px-5 py-8 text-center text-[13px] text-stone-400">No marketplaces connected. <a href="/admin/cross-listing/settings" className="text-[var(--accent-ink,#0b7a5c)] hover:underline">connect one</a> to start.</div>
  ) : (
  <div>
- {/* A phone gets a card per marketplace — six columns in a 340px card only scrolled sideways. */}
+ {/* A phone gets a card per marketplace. Six columns in a 340px card only scrolled sideways. */}
  <ul className="divide-y divide-stone-100 sm:hidden">
  {marketRows.map((m) => (
  <li key={m.key} className="px-5 py-3.5">
@@ -396,7 +396,7 @@ function shortBlock(reason: string): string {
  ] as const).map(([lab, v]) => (
  <div key={lab}>
  <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-stone-400">{lab}</dt>
- <dd className={v == null ? "text-stone-300" : "font-medium text-stone-800"}>{v ?? "—"}</dd>
+ <dd className={v == null ? "text-stone-300" : "font-medium text-stone-800"}>{v ?? "-"}</dd>
  </div>
  ))}
  </dl>
@@ -426,11 +426,11 @@ function shortBlock(reason: string): string {
  : <StatusPill tone="neutral" className="px-1.5 py-0.5 text-[10px]">Not connected</StatusPill>}
  </span>
  </TD>
- <TD right className="px-4 text-stone-600">{m.listed || <span className="text-stone-300">—</span>}</TD>
- <TD right className="px-4 text-stone-500">{platforms.find((p) => p.key === m.key)?.mode === "extension" && m.queued ? m.queued : <span className="text-stone-300">—</span>}</TD>
- <TD right className="px-4">{m.offers ? <span className="font-medium text-[var(--accent-ink,#0b7a5c)]">{m.offers}</span> : <span className="text-stone-300">—</span>}</TD>
- <TD right className="px-4 text-stone-600">{m.sold || <span className="text-stone-300">—</span>}</TD>
- <TD right className="px-5 font-medium text-stone-800">{m.revenueCents ? money(m.revenueCents) : <span className="font-normal text-stone-300">—</span>}</TD>
+ <TD right className="px-4 text-stone-600">{m.listed || <span className="text-stone-300">-</span>}</TD>
+ <TD right className="px-4 text-stone-500">{platforms.find((p) => p.key === m.key)?.mode === "extension" && m.queued ? m.queued : <span className="text-stone-300">-</span>}</TD>
+ <TD right className="px-4">{m.offers ? <span className="font-medium text-[var(--accent-ink,#0b7a5c)]">{m.offers}</span> : <span className="text-stone-300">-</span>}</TD>
+ <TD right className="px-4 text-stone-600">{m.sold || <span className="text-stone-300">-</span>}</TD>
+ <TD right className="px-5 font-medium text-stone-800">{m.revenueCents ? money(m.revenueCents) : <span className="font-normal text-stone-300">-</span>}</TD>
  </tr>
  ))}
  </tbody>
@@ -446,11 +446,11 @@ function shortBlock(reason: string): string {
  {/* One banner, not one per marketplace.
      Every queue was drawing its own full-width card with the same sentence in it, so two queues
      meant two stacked green boxes saying nearly the same thing above the only table on the page.
-     The counts differ; the explanation doesn't — so the explanation is said once. */}
+     The counts differ; the explanation doesn't, so the explanation is said once. */}
  {(() => {
  // Server-pending OR staged in this session. The extension's own queue is what "open the site and
  // list" actually depends on, so a piece that reached it should offer the button even when the
- // server write didn't land — otherwise a seller stages something and has nowhere to click.
+ // server write didn't land. Otherwise a seller stages something and has nowhere to click.
  const queues = extMarketplaces
   .map((p) => ({ p, n: board.filter((it) => it.listings[p.key] === "pending" || queuedHere[`${p.key}:${it.itemId}`]).length }))
   .filter((q) => q.n > 0);
@@ -482,7 +482,7 @@ function shortBlock(reason: string): string {
  </div>
  )}
 
- {/* Bulk action bar — queue many at once for one extension marketplace (eBay auto-lists, so it's not here). */}
+ {/* Bulk action bar: queue many at once for one extension marketplace (eBay auto-lists, so it's not here). */}
  {selected.size > 0 && (
  <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 shadow-sm">
  <span className="text-[13px] font-medium text-stone-700">{selected.size} selected</span>
@@ -500,7 +500,7 @@ function shortBlock(reason: string): string {
  </div>
  )}
 
- {/* the products board — a marketplace matrix: item on the left, one status cell per channel */}
+ {/* the products board: a marketplace matrix: item on the left, one status cell per channel */}
  <TechCard className="overflow-hidden">
  <div className="flex items-center gap-3 border-b border-stone-100 px-5 py-3">
  {board.length > 0 && (
@@ -595,7 +595,7 @@ function shortBlock(reason: string): string {
  {(Object.keys(it.errors || {}).length > 0 || errors[it.itemId]) && (
  <tr><td colSpan={connected.length + 2} className="px-5 pb-3">
  <div className="rounded-md border border-rose-200 bg-rose-50/70 px-3 py-2">
- {/* A marketplace can refuse a piece outright — Vestiaire only takes designer brands — and its
+ {/* A marketplace can refuse a piece outright, Vestiaire only takes designer brands, and its
      reason belongs on the row it's about, not in a separate banner. */}
  {errors[it.itemId] && <p className="text-[11px] leading-snug text-rose-700">{errors[it.itemId]}</p>}
  {Object.entries(it.errors || {}).map(([k, msg]) => (

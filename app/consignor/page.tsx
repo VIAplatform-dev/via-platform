@@ -8,7 +8,7 @@ type Ledger = { type: string; amountCents: number; orderId: string | null; creat
 type Consignment = { consignorId: number; store: string; storeName: string; name: string; connected: boolean; payoutMethod: string; payableCents: number; balanceCents: number; items: Item[]; ledger: Ledger[]; payouts: { amountCents: number; method: string; status: string; createdAt: string }[] };
 
 const METHOD_LABEL: Record<string, string> = { cash: "cash", check: "a check", store_credit: "store credit" };
-// For consignors paid out-of-band (cash / check / store credit) — VYA doesn't deposit their money,
+// For consignors paid out-of-band (cash / check / store credit). VYA doesn't deposit their money,
 // the store hands it over in person, so tell them where + when to collect it.
 function collectNote(con: Consignment): { text: string; tone: "ready" | "pending" | "none" } {
  const label = METHOD_LABEL[con.payoutMethod] || "store credit";
@@ -120,7 +120,7 @@ export default function ConsignorPortal() {
  );
  })()}
 
- {/* Embedded Stripe surface — only for direct-deposit consignors, no redirect. */}
+ {/* Embedded Stripe surface, only for direct-deposit consignors, no redirect. */}
  {con.payoutMethod === "stripe" && bank?.id === con.consignorId && (
  <div className="mt-4 rounded-xl border border-stone-200 bg-white p-4">
  <EmbeddedPayments

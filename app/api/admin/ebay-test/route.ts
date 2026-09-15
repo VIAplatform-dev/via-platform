@@ -4,7 +4,7 @@ import { testEbayConnection } from "@/app/lib/ebay";
 
 export const dynamic = "force-dynamic";
 
-// Does a store's eBay connection actually work — without posting anything? Confirms the token
+// Does a store's eBay connection actually work, without posting anything? Confirms the token
 // refreshes + the eBay API responds, and that the business policies needed to publish exist.
 // GET ?store=<slug>
 export async function GET(request: NextRequest) {

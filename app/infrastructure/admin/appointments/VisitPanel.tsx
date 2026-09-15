@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { X, Search, Mail, Check } from "lucide-react";
 import { TechButton, StatusPill, cn } from "../ui";
 
-// One visit, in full — who came, what they handled, and every other time they've been in.
+// One visit, in full, who came, what they handled, and every other time they've been in.
 //
 // The record is why a shop takes appointments: someone comes in, tries six things and leaves. Kept
 // here rather than on the diary tile because a tile has room for a name and a time and nothing else.
@@ -136,7 +136,7 @@ export default function VisitPanel({ appt, withStore, onClose, onChanged }: {
           <p className="truncate text-[12.5px] font-medium text-stone-800">{i.title || "A piece"}</p>
           <p className="text-[11.5px] tabular-nums text-stone-400">{money(i.priceCents, i.currency)}</p>
          </div>
-         {/* On a phone the outcomes drop under the title — beside it they left the title ~50px. */}
+         {/* On a phone the outcomes drop under the title. Beside it they left the title ~50px. */}
          <div className="flex shrink-0 gap-1 max-sm:w-full max-sm:pl-14">
           {OUTCOMES.map((o) => (
            <button key={o.key} type="button" disabled={busy} onClick={() => tag(i.itemId, o.key)}
@@ -180,7 +180,7 @@ export default function VisitPanel({ appt, withStore, onClose, onChanged }: {
        ) : (
         <>
          <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3}
-          placeholder={`Hi ${appt.customerName || "there"}, lovely to see you — the pieces you looked at are below if you'd like any of them.`}
+          placeholder={`Hi ${appt.customerName || "there"}, lovely to see you. The pieces you looked at are below if you'd like any of them.`}
           className="mt-2 w-full resize-y rounded-lg border border-stone-200 px-3 py-2 text-[12.5px] leading-relaxed outline-none focus:border-stone-400" />
          <p className="mt-1 text-[11.5px] text-stone-400">Everything noted above goes with it, with prices.</p>
          <TechButton className="mt-2" onClick={sendFollowUp} disabled={busy || !note.trim()}><Mail size={13} /> Send</TechButton>

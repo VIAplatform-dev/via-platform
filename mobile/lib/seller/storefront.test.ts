@@ -15,7 +15,7 @@ test("the address is the one the server computed", () => {
 test("a verified custom domain replaces it; an unverified one does not", () => {
   const verified = { configured: true, domain: "blummier.com", status: { domain: "blummier.com", verified: true, misconfigured: false } };
   assert.equal(storefrontAddress(sf, verified)?.host, "blummier.com");
-  // Connected, but the DNS record isn't in place — shoppers cannot reach it, so it is not her address.
+  // Connected, but the DNS record isn't in place. Shoppers cannot reach it, so it is not her address.
   const pending = { configured: true, domain: "blummier.com", status: { verified: false, misconfigured: false } };
   assert.equal(storefrontAddress(sf, pending)?.host, "blummier.vyasites.com");
   // Verified but pointed elsewhere is the same thing: not reachable here.
@@ -65,7 +65,7 @@ test("the shop in one line", () => {
 test("which storefront she is looking at", () => {
   assert.equal(describeServeMode({ settings: { serveMode: "imported" } }), "Your imported site");
   assert.equal(describeServeMode({ settings: { serveMode: "built" } }), "The storefront you built");
-  // Predates storefront versions — the server isn't saying, so neither do we.
+  // Predates storefront versions. The server isn't saying, so neither do we.
   assert.equal(describeServeMode({ settings: { serveMode: null } }), null);
   assert.equal(describeServeMode({ settings: {} }), null);
   assert.equal(describeServeMode(null), null);

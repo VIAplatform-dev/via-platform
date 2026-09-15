@@ -2,7 +2,7 @@
 import { createHmac } from "crypto";
 import { getEbayTokens, saveEbayTokens, updateEbayAccessToken } from "./ebay-tokens-db";
 
-// eBay Sell integration (the current, OAuth-based path — the legacy Trading API is being
+// eBay Sell integration (the current, OAuth-based path. The legacy Trading API is being
 // retired). Flow: connect account (authorization-code grant) → create an inventory item
 // (keyed by SKU = our itemId) → create an offer → publish it into a live listing. To pull
 // a piece, withdraw the offer. All env-gated: with no eBay app configured, callers no-op.
@@ -15,7 +15,7 @@ const AUTHORIZE_BASE = "https://auth.ebay.com/oauth2/authorize";
 const API = "https://api.ebay.com";
 const MARKETPLACE = "EBAY_US";
 
-// Scopes needed to create/publish listings AND manage the seller's business policies —
+// Scopes needed to create/publish listings AND manage the seller's business policies,
 // `sell.account` (write, not .readonly) lets us opt the account into Business Policies and
 // create default payment/shipping/return policies for them, so onboarding needs zero eBay setup.
 const SCOPES = [
@@ -34,9 +34,9 @@ function basicAuth(): string {
  return "Basic " + Buffer.from(`${process.env.EBAY_CLIENT_ID}:${process.env.EBAY_CLIENT_SECRET}`).toString("base64");
 }
 
-// Application token (client_credentials) for eBay's PUBLIC catalog APIs — Taxonomy category
+// Application token (client_credentials) for eBay's PUBLIC catalog APIs. Taxonomy category
 // suggestions + item aspects. These aren't seller-scoped, and the seller's user token (sell.inventory
-// + sell.account) is NOT permitted to call them — it returns 403 "Insufficient permissions", which
+// + sell.account) is NOT permitted to call them. It returns 403 "Insufficient permissions", which
 // silently left every listing without a category and failed publish. The base api_scope on an app
 // token is the right credential here. Cached until ~1min before expiry.
 let appTok: { token: string; exp: number } | null = null;
@@ -61,7 +61,7 @@ export function ebaySignState(slug: string): string {
  return `${slug}.${createHmac("sha256", secret).update(slug).digest("hex").slice(0, 16)}`;
 }
 
-// Step 1 — the consent URL the seller is sent to. `state` carries our store slug back.
+// Step 1: the consent URL the seller is sent to. `state` carries our store slug back.
 export function ebayAuthUrl(state: string): string {
  const p = new URLSearchParams({
  client_id: process.env.EBAY_CLIENT_ID || "",
@@ -73,7 +73,7 @@ export function ebayAuthUrl(state: string): string {
  return `${AUTHORIZE_BASE}?${p.toString()}`;
 }
 
-// Step 2 — exchange the authorization code for tokens and store them.
+// Step 2: exchange the authorization code for tokens and store them.
 export async function ebayExchangeCode(storeSlug: string, code: string): Promise<boolean> {
  const res = await fetch(OAUTH_BASE, {
  method: "POST",
@@ -106,9 +106,9 @@ async function accessToken(storeSlug: string): Promise<string | null> {
  return j.access_token;
 }
 
-/** The app's own token (client credentials) — for eBay's app-level endpoints (public keys, notification destinations). */
+/** The app's own token (client credentials), for eBay's app-level endpoints (public keys, notification destinations). */
 export const ebayAppToken = appToken;
-/** A store's valid user token, refreshed if needed — for calls made as her (her notification subscription). */
+/** A store's valid user token, refreshed if needed, for calls made as her (her notification subscription). */
 export const ebayUserAccessToken = accessToken;
 
 export async function ebayConnected(storeSlug: string): Promise<boolean> {
@@ -139,7 +139,7 @@ export async function getRecentEbaySoldSkus(storeSlug: string, sinceISO: string)
 // Per-listing item-page views from the Sell Analytics traffic report, keyed by eBay listing id.
 // Views are the one engagement metric the modern OAuth Sell API exposes cleanly; watch counts and
 // incoming Best Offers live only on the legacy Trading API, so they're not pulled here (yet).
-// Returns {} on any error — this is a best-effort background enrichment.
+// Returns {} on any error. This is a best-effort background enrichment.
 export async function getEbayListingViews(storeSlug: string, listingIds: string[]): Promise<Record<string, number>> {
  const ids = Array.from(new Set(listingIds.filter(Boolean)));
  if (!ids.length) return {};
@@ -186,7 +186,7 @@ async function ebayFetch(token: string, path: string, init: RequestInit = {}): P
  return { ok: res.ok, status: res.status, json };
 }
 
-// The seller's business policies (payment/return/fulfillment) — required to publish.
+// The seller's business policies (payment/return/fulfillment): required to publish.
 async function policyIds(token: string): Promise<{ fulfillment?: string; payment?: string; return?: string }> {
  const q = `?marketplace_id=${MARKETPLACE}`;
  const [f, p, r] = await Promise.all([
@@ -201,10 +201,10 @@ async function policyIds(token: string): Promise<{ fulfillment?: string; payment
  };
 }
 
-// The seller's inventory (ship-from) location — REQUIRED to publish an offer. Publishing without a
+// The seller's inventory (ship-from) location: REQUIRED to publish an offer. Publishing without a
 // merchantLocationKey fails with error 25002 ("The merchantLocationKey is required"), the silent
 // blocker behind "I'm a business account but it still won't list". We prefer an ENABLED location the
-// seller already has (established accounts do — correct address, no guessing); only if they have none
+// seller already has (established accounts do: correct address, no guessing); only if they have none
 // do we create a default one under their account. Idempotent + best-effort.
 /** The store's ship-from address, for the eBay location. Null when she hasn't set one yet. */
 async function shipFromFor(storeSlug: string) {
@@ -220,7 +220,7 @@ async function shipFromFor(storeSlug: string) {
 /**
  * The eBay location a listing ships from.
  *
- * Reuses whatever the seller already has. When she has none we create one — and it must be HER
+ * Reuses whatever the seller already has. When she has none we create one, and it must be HER
  * address: this hardcoded a US country with a New York postcode, so a London store with no existing
  * eBay location got listings that claimed to ship from Manhattan. VYA now collects a real ship-from
  * address (Settings → Locations), so use it and only fall back when there genuinely isn't one.
@@ -231,7 +231,7 @@ async function ensureLocationKey(token: string, from?: { city?: string | null; s
  const enabled = locs.find((l) => String(l?.merchantLocationStatus || "").toUpperCase() === "ENABLED");
  const reuse = enabled || locs[0];
  if (reuse?.merchantLocationKey) return String(reuse.merchantLocationKey);
- // None exists — create a default. postalCode is required for US; EBAY_DEFAULT_POSTAL lets ops set a
+ // None exists. Create a default. postalCode is required for US; EBAY_DEFAULT_POSTAL lets ops set a
  // real ship-from zip (shipping here is flat-rate, so distance doesn't affect buyer cost).
  const key = "VYA_DEFAULT";
  const res = await ebayFetch(token, `/sell/inventory/v1/location/${key}`, {
@@ -239,7 +239,7 @@ async function ensureLocationKey(token: string, from?: { city?: string | null; s
   body: JSON.stringify({
    location: {
     address: {
-     // NOT slice(0,2) — that turned the "United States" two stores had saved into "UN", which is
+     // NOT slice(0,2): that turned the "United States" two stores had saved into "UN", which is
      // not a country, and eBay took the listing location on faith. isoCountry maps the name.
      country: isoCountry(from?.country),
      // eBay requires a postcode for US locations and accepts one everywhere else.
@@ -258,11 +258,11 @@ async function ensureLocationKey(token: string, from?: { city?: string | null; s
 const CAT_TYPES = [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }];
 
 // Make a freshly-connected account able to list WITHOUT the seller ever touching eBay's settings:
-// (1) opt into the Business Policies program — the fix for eBay's "User is not eligible for Business
+// (1) opt into the Business Policies program. The fix for eBay's "User is not eligible for Business
 // Policy" error, which otherwise blocks every API publish; (2) create sane default payment / return /
 // shipping policies for any that are missing. Idempotent + best-effort: existing policies are left
 // alone, an already-opted account is fine, and a step eBay rejects is reported (not thrown). Requires
-// the `sell.account` write scope — so it only works after the seller reconnects under the new scope.
+// the `sell.account` write scope, so it only works after the seller reconnects under the new scope.
 export type EbaySetup = {
  ok: boolean; optedIn: boolean; created: string[];
  policies: { fulfillment: boolean; payment: boolean; return: boolean }; hasLocation?: boolean; error?: string;
@@ -270,10 +270,10 @@ export type EbaySetup = {
 export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  const empty = { ok: false, optedIn: false, created: [] as string[], policies: { fulfillment: false, payment: false, return: false } };
  const token = await accessToken(storeSlug);
- if (!token) return { ...empty, error: "eBay isn’t connected — reconnect the account." };
+ if (!token) return { ...empty, error: "eBay isn’t connected. Reconnect the account." };
  const problems: string[] = [];
 
- // 1) Opt into Business Policies (idempotent — an account that's already opted in returns an error we ignore).
+ // 1) Opt into Business Policies (idempotent: an account that's already opted in returns an error we ignore).
  const opt = await ebayFetch(token, `/sell/account/v1/program/opt_in`, { method: "POST", body: JSON.stringify({ programType: "SELLING_POLICY_MANAGEMENT" }) });
  const alreadyOpted = /already|opted[- ]?in/i.test(JSON.stringify(opt.json || ""));
  const optedIn = opt.ok || alreadyOpted;
@@ -318,7 +318,7 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  });
  }
 
- // 3) Ensure a ship-from inventory location exists — publish requires one, and the status check
+ // 3) Ensure a ship-from inventory location exists. Publish requires one, and the status check
  //    (testEbayConnection) reports "not ready" without it. Creating it here (not just on first list)
  //    is what makes "Set up automatically" actually stick on reload.
  const locationKey = await ensureLocationKey(token, await shipFromFor(storeSlug));
@@ -329,9 +329,9 @@ export async function ensureEbayReady(storeSlug: string): Promise<EbaySetup> {
  const pol = await policyIds(token);
  const policies = { fulfillment: !!pol.fulfillment, payment: !!pol.payment, return: !!pol.return };
  const ok = policies.fulfillment && policies.payment && policies.return && hasLocation;
- // If any policy exists, the account is provably opted in (creating one requires it) — reflect that.
+ // If any policy exists, the account is provably opted in (creating one requires it). Reflect that.
  const opted = optedIn || policies.payment || policies.return || policies.fulfillment;
- return { ok, optedIn: opted, created, policies, hasLocation, error: ok ? undefined : (problems[0] || "eBay setup didn’t complete — some business policies are still missing.") };
+ return { ok, optedIn: opted, created, policies, hasLocation, error: ok ? undefined : (problems[0] || "eBay setup didn’t complete. Some business policies are still missing.") };
 }
 
 // Suggest a leaf category from the title (eBay requires a categoryId to publish).
@@ -350,7 +350,7 @@ const CONDITION_MAP: Record<string, string> = {
 // eBay REST ConditionEnum → the numeric conditionId eBay maps it to. A category's policy lists which
 // IDs it ACCEPTS (fashion now uses the "Pre-owned" IDs 2990/3000/3010; the old 4000/5000/6000 "Used"
 // tiers are rejected on e.g. handbags). We map the piece's condition to an enum whose ID the category
-// actually allows — otherwise publish fails with "condition id is invalid for the primary category".
+// actually allows. Otherwise publish fails with "condition id is invalid for the primary category".
 const COND_ENUM_ID: Record<string, string> = {
  NEW: "1000", NEW_OTHER: "1500", NEW_WITH_DEFECTS: "1750", LIKE_NEW: "2750",
  PRE_OWNED_EXCELLENT: "2990", USED_EXCELLENT: "3000", PRE_OWNED_FAIR: "3010",
@@ -367,7 +367,7 @@ const CONDITION_PREFS: Record<string, string[]> = {
  vintage: ["USED_EXCELLENT", "PRE_OWNED_EXCELLENT", "USED_GOOD"],
 };
 
-// A category's accepted condition IDs (+ whether condition is required). Sell Metadata API — needs the
+// A category's accepted condition IDs (+ whether condition is required). Sell Metadata API: needs the
 // seller (user) token; the app token 404s here.
 async function conditionPolicies(token: string, categoryId: string): Promise<{ ids: string[]; required: boolean }> {
  const r = await ebayFetch(token, `/sell/metadata/v1/marketplace/${MARKETPLACE}/get_item_condition_policies?filter=${encodeURIComponent("categoryIds:{" + categoryId + "}")}`);
@@ -378,15 +378,15 @@ async function conditionPolicies(token: string, categoryId: string): Promise<{ i
 // Choose a ConditionEnum the category will accept, closest to the piece's actual condition.
 function pickCondition(raw: string, allowedIds: string[]): string {
  const prefs = CONDITION_PREFS[(raw || "").toLowerCase()] || CONDITION_PREFS.good;
- if (!allowedIds.length) return prefs[0]; // couldn't read the policy — send our best guess
+ if (!allowedIds.length) return prefs[0]; // couldn't read the policy. Send our best guess
  for (const en of prefs) if (allowedIds.includes(COND_ENUM_ID[en])) return en;
- // Nothing preferred matched — fall through any allowed used tier, then any new tier.
+ // Nothing preferred matched. Fall through any allowed used tier, then any new tier.
  for (const en of ["USED_EXCELLENT", "PRE_OWNED_EXCELLENT", "PRE_OWNED_FAIR", "USED_VERY_GOOD", "USED_GOOD", "USED_ACCEPTABLE"]) if (allowedIds.includes(COND_ENUM_ID[en])) return en;
  for (const en of ["NEW_OTHER", "NEW", "NEW_WITH_DEFECTS"]) if (allowedIds.includes(COND_ENUM_ID[en])) return en;
  return prefs[0];
 }
 
-// A category's allowed Size values (+ whether Size is required) — for the 2026 fashion
+// A category's allowed Size values (+ whether Size is required), for the 2026 fashion
 // size-standardization rule. Free-text sizes get blocked; we must send an allowed value.
 type AspectMeta = { name: string; required: boolean; selectionOnly: boolean; values: string[] };
 async function categoryAspects(categoryId: string): Promise<{ sizeValues: string[]; sizeRequired: boolean; all: AspectMeta[] }> {
@@ -422,7 +422,7 @@ function resolveAspect(a: AspectMeta, item: EbayItem, material?: string | null):
  const val = (v: string) => (a.selectionOnly ? inList(v) : v);
  if (n === "brand") return val(item.brand || "Unbranded") || item.brand || "Unbranded";
  if (n.includes("color") || n.includes("colour")) return val(parseColor(item) || "Multicolor") || "Multicolor";
- // The ADAPTED material — a fabric the seller put in the Size box lands here rather than being
+ // The ADAPTED material: a fabric the seller put in the Size box lands here rather than being
  // discarded along with the size that was rejected.
  if (n.includes("material")) { const m0 = material ?? item.material; return val(m0 || "Other") || (a.selectionOnly ? a.values[0] || null : m0 || "Other"); }
  if (n === "department") return inList("Women") || inList("Unisex Adults") || a.values[0] || (a.selectionOnly ? null : "Women");
@@ -445,7 +445,7 @@ function standardizeSize(raw: string, allowed: string[]): string | null {
  const r = (raw || "").trim();
  if (!r) return null;
  const norm = SIZE_NORMAL[r.toLowerCase()] || r;
- if (!allowed.length) return norm; // couldn't fetch the list — send our best guess
+ if (!allowed.length) return norm; // couldn't fetch the list. Send our best guess
  return allowed.find((v) => v.toLowerCase() === norm.toLowerCase()) || allowed.find((v) => v.toLowerCase() === r.toLowerCase()) || null;
 }
 
@@ -456,7 +456,7 @@ export type EbayResult = { ok: boolean; listingUrl?: string; error?: string; raw
 // Create/replace inventory item → create offer → publish. Returns the live listing URL.
 // Pre-flight: is this store's eBay account actually ready to list? Confirms the token refreshes and
 // the API responds (policyIds is an authenticated read), and that the required business policies
-// exist — the #1 silent blocker of a real publish. Creates NOTHING on eBay; safe to run anytime.
+// exist: the #1 silent blocker of a real publish. Creates NOTHING on eBay; safe to run anytime.
 type PolicyProbe = { status: number; count: number; error: string | null };
 export async function testEbayConnection(storeSlug: string): Promise<{
  ok: boolean; configured: boolean; tokenValid: boolean; marketplace: string; sellerRegistered: boolean;
@@ -466,9 +466,9 @@ export async function testEbayConnection(storeSlug: string): Promise<{
  const base = { ok: false, configured: ebayConfigured(), tokenValid: false, marketplace: MARKETPLACE, sellerRegistered: false, policies: { fulfillment: false, payment: false, return: false }, hasLocation: false, readyToList: false };
  if (!ebayConfigured()) return { ...base, error: "eBay app keys aren’t set on the server." };
  const token = await accessToken(storeSlug);
- if (!token) return { ...base, error: "No valid eBay token — the account isn’t connected, or the refresh token failed. Reconnect it." };
+ if (!token) return { ...base, error: "No valid eBay token. The account isn’t connected, or the refresh token failed. Reconnect it." };
  // Hit the three policy endpoints directly so we can surface eBay's ACTUAL response (status + any
- // error message), not just "empty" — that tells us opt-in vs wrong-marketplace vs a real error.
+ // error message), not just "empty". That tells us opt-in vs wrong-marketplace vs a real error.
  const q = `?marketplace_id=${MARKETPLACE}`;
  const [f, p, r] = await Promise.all([
  ebayFetch(token, `/sell/account/v1/fulfillment_policy${q}`),
@@ -486,7 +486,7 @@ export async function testEbayConnection(storeSlug: string): Promise<{
  const locRes = await ebayFetch(token, `/sell/inventory/v1/location?limit=1`);
  const hasLocation = Array.isArray(locRes.json?.locations) && locRes.json.locations.length > 0;
  // Is the connected account actually a registered seller? An account that only ever bought returns
- // sellerRegistrationCompleted=false and CANNOT list — the "wrong account connected" case. This is the
+ // sellerRegistrationCompleted=false and CANNOT list. The "wrong account connected" case. This is the
  // most fundamental gate, so it's checked and surfaced first.
  const priv = await ebayFetch(token, `/sell/account/v1/privilege`);
  const sellerRegistered = priv.json?.sellerRegistrationCompleted === true;
@@ -496,34 +496,34 @@ export async function testEbayConnection(storeSlug: string): Promise<{
  ok: true, configured: true, tokenValid: true, marketplace: MARKETPLACE, sellerRegistered, policies, hasLocation, readyToList, debug,
  error: readyToList ? undefined
  : !sellerRegistered
- ? "This eBay account isn’t set up to sell — it hasn’t completed seller registration on eBay (or a non-seller account was connected). Reconnect your eBay seller account, or finish seller sign-up on eBay."
+ ? "This eBay account isn’t set up to sell. It hasn’t completed seller registration on eBay (or a non-seller account was connected). Reconnect your eBay seller account, or finish seller sign-up on eBay."
  : !policiesOk
- ? "eBay business policies aren’t set up yet — click “Set up automatically” to create them."
- : "eBay needs a ship-from location — click “Set up automatically” to create one.",
+ ? "eBay business policies aren’t set up yet. Click “Set up automatically” to create them."
+ : "eBay needs a ship-from location. Click “Set up automatically” to create one.",
  };
 }
 
 export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<EbayResult> {
  if (!ebayConfigured()) return { ok: false, error: "eBay isn’t configured on the server." };
  const token = await accessToken(storeSlug);
- if (!token) return { ok: false, error: "eBay isn’t connected — reconnect the account." };
+ if (!token) return { ok: false, error: "eBay isn’t connected. Reconnect the account." };
  const sku = item.itemId;
- // 12 is the cap we send EBAY, not VYA's own limit — see app/lib/item-limits.ts.
+ // 12 is the cap we send EBAY, not VYA's own limit. See app/lib/item-limits.ts.
  const images = (item.images || []).filter((u) => /^https?:\/\//.test(u)).slice(0, 12);
  if (!images.length) return { ok: false, error: "eBay needs at least one hosted image." };
 
  // 1) category + policies + the category's STANDARD aspects, up front. eBay's 2026
- // fashion update blocks free-text sizes on Apparel/Footwear — so we pull the leaf
+ // fashion update blocks free-text sizes on Apparel/Footwear, so we pull the leaf
  // category's allowed Size values from the Taxonomy API and map the piece's size to one.
  const [pol0, categoryId] = await Promise.all([policyIds(token), suggestCategory(`${item.brand || ""} ${item.title}`)]);
  let pol = pol0;
  if (!pol.fulfillment || !pol.payment || !pol.return) {
  // Self-heal: opt in + create default policies, then re-read. Fixes accounts connected before
- // auto-setup existed, or where a policy was deleted — no manual eBay setup required.
+ // auto-setup existed, or where a policy was deleted, no manual eBay setup required.
  const setup = await ensureEbayReady(storeSlug);
  pol = await policyIds(token);
  if (!pol.fulfillment || !pol.payment || !pol.return) {
- return { ok: false, error: setup.error || "Couldn’t set up eBay business policies (payment, shipping, returns) automatically — reconnect eBay and try again." };
+ return { ok: false, error: setup.error || "Couldn’t set up eBay business policies (payment, shipping, returns) automatically. Reconnect eBay and try again." };
  }
  }
  let sizeAspect: string | null = null;
@@ -533,7 +533,7 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  if (categoryId) {
  const asp = await categoryAspects(categoryId);
  metaAll = asp.all;
- // Reshape the piece for eBay rather than asking her to reshape her listing — what she wrote, then
+ // Reshape the piece for eBay rather than asking her to reshape her listing. What she wrote, then
  // a size she wrote elsewhere, then "one size" where that is a fact about the piece. A fabric sitting
  // in the Size box becomes the MATERIAL instead of being rejected and discarded. See ebay-adapt.ts;
  // deliberately does not invent a garment size, because a wrong one is a return and she never chose it.
@@ -555,7 +555,7 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  cond = pickCondition(item.condition || "", cpol.ids);
  }
  const aspects: Record<string, string[]> = {};
- // eBay requires a Brand aspect on most fashion categories and refuses the listing without one —
+ // eBay requires a Brand aspect on most fashion categories and refuses the listing without one,
  // as "Input data for tag <BrandMPN> is invalid or missing", which reads like the brand we sent was
  // wrong rather than absent. "Unbranded" is eBay's own value for a piece with no maker, which is
  // most of vintage, so a no-brand piece now lists instead of failing.
@@ -587,7 +587,7 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  // GTIN fields, and we were only putting MPN in `aspects`, where that check never looks. So eBay
  // saw a branded product with no part number and no barcode and refused it.
  //
- // Vintage has none of these by definition — a 1970s jacket has no MPN and no UPC — and "Does Not
+ // Vintage has none of these by definition, a 1970s jacket has no MPN and no UPC, and "Does Not
  // Apply" is the exact value eBay documents for that case. Sent on every listing, because a piece
  // that genuinely has a barcode is the rare one here.
  brand: item.brand?.trim() || "Unbranded",
@@ -599,9 +599,9 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  });
  if (!inv.ok) return { ok: false, error: ebayErr(inv.json) || "Couldn’t create the inventory item.", raw: JSON.stringify(inv.json?.errors || inv.json).slice(0, 900) };
 
- // 3) offer (category resolved above) — needs a ship-from location, or publish 25002's.
+ // 3) offer (category resolved above): needs a ship-from location, or publish 25002's.
  const locationKey = await ensureLocationKey(token, await shipFromFor(storeSlug));
- if (!locationKey) return { ok: false, error: "eBay needs a ship-from inventory location and one couldn’t be set up — reconnect eBay and try again." };
+ if (!locationKey) return { ok: false, error: "eBay needs a ship-from inventory location and one couldn’t be set up. Reconnect eBay and try again." };
  const price = (item.priceCents / 100).toFixed(2);
  const offerBody = {
  sku, marketplaceId: MARKETPLACE, format: "FIXED_PRICE", availableQuantity: 1,
@@ -611,7 +611,7 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  listingPolicies: { fulfillmentPolicyId: pol.fulfillment, paymentPolicyId: pol.payment, returnPolicyId: pol.return },
  };
  const offer = await ebayFetch(token, `/sell/inventory/v1/offer`, { method: "POST", body: JSON.stringify(offerBody) });
- // Offer may already exist (re-list) — look it up and UPDATE it, so an offer created before this fix
+ // Offer may already exist (re-list): look it up and UPDATE it, so an offer created before this fix
  // (without a location) gets the merchantLocationKey + current price/policies before publishing.
  let offerId: string | undefined = offer.json?.offerId;
  if (!offer.ok) {
@@ -634,7 +634,7 @@ export async function listOnEbay(storeSlug: string, item: EbayItem): Promise<Eba
  * cross_listings stores what our publish call returned at the time. That is not the same thing as
  * the state of the listing now: a publish can answer 200 without a listingId, an offer can be
  * created but left unpublished, and a listing can be ended on eBay's side without telling us. All
- * three read as "Listed" on the board while the seller finds nothing on eBay — which is the worst
+ * three read as "Listed" on the board while the seller finds nothing on eBay, which is the worst
  * failure this feature has, because she trusts it and stops checking.
  *
  * So this asks eBay. Read-only; it publishes and changes nothing.
@@ -649,7 +649,7 @@ export async function ebayOfferStatus(storeSlug: string, sku: string): Promise<{
  if (!r.ok) return { ok: false, found: false, error: ebayErr(r.json) || `eBay answered HTTP ${r.status}.` };
  const offer = r.json?.offers?.[0];
  if (!offer) return { ok: true, found: false };
- // eBay nests the listing under `listing`, not at the top level — offer.status says whether the
+ // eBay nests the listing under `listing`, not at the top level. Offer.status says whether the
  // OFFER is published, listing.listingStatus says whether the resulting listing is still ACTIVE.
  // They differ: an offer stays PUBLISHED after its listing ends, so only the second answers
  // "can a shopper buy this right now".
@@ -662,7 +662,7 @@ export async function ebayOfferStatus(storeSlug: string, sku: string): Promise<{
  };
 }
 
-// Withdraw the offer for a SKU (ends the live listing) — used when it sells elsewhere.
+// Withdraw the offer for a SKU (ends the live listing). Used when it sells elsewhere.
 export async function endOnEbay(storeSlug: string, itemId: string): Promise<boolean> {
  if (!ebayConfigured()) return false;
  const token = await accessToken(storeSlug);
@@ -676,7 +676,7 @@ export async function endOnEbay(storeSlug: string, itemId: string): Promise<bool
 
 // eBay writes its errors for developers integrating the API, not for someone running a vintage
 // shop. "Input data for tag <BrandMPN> is invalid or missing. Please check API documentation."
-// means "this piece has no brand on it" — but a seller reading it has no way to know that, and
+// means "this piece has no brand on it", but a seller reading it has no way to know that, and
 // nothing in the sentence tells her what to go and change.
 //
 // So: translate the failures we actually hit into the one action that fixes each, and keep eBay's
@@ -685,7 +685,7 @@ export async function endOnEbay(storeSlug: string, itemId: string): Promise<bool
 // named in the parameters.
 const EBAY_PLAIN: { match: RegExp; say: string }[] = [
  // Deliberately NOT "this piece has no brand". eBay says <BrandMPN> whenever the brand/MPN pair
- // doesn't satisfy the category — including when a brand IS set and eBay simply doesn't accept it
+ // doesn't satisfy the category, including when a brand IS set and eBay simply doesn't accept it
  // for that category. Telling a seller to add a brand she can see on the screen sends her to check
  // the one thing that is not wrong. This says what we know and what to try.
  { match: /brandmpn|\bbrand\b[^.]*\b(missing|invalid|required)/i,
@@ -697,7 +697,7 @@ const EBAY_PLAIN: { match: RegExp; say: string }[] = [
  { match: /categor(y|ies)[^.]*\b(missing|invalid|required|not found)/i,
    say: "eBay couldn’t work out the category. Set one on the piece, then retry." },
  { match: /(item specific|aspect)[^.]*\b(missing|invalid|required)/i,
-   say: "eBay wants more detail for this category — add the piece’s brand, size and material." },
+   say: "eBay wants more detail for this category. Add the piece’s brand, size and material." },
  { match: /(picture|image)[^.]*\b(missing|invalid|required)/i,
    say: "there’s no photo on this piece. Add one, then retry." },
  { match: /\bprice\b[^.]*\b(missing|invalid|required)/i,
@@ -707,7 +707,7 @@ const EBAY_PLAIN: { match: RegExp; say: string }[] = [
 function ebayErr(j: any): string | null {
  const e = j?.errors?.[0];
  if (!e) return null;
- // eBay's `message` is often a template like "Invalid ." with the field left blank — the actual
+ // eBay's `message` is often a template like "Invalid ." with the field left blank. The actual
  // offending field is in `parameters`. Surface longMessage + the parameters so errors are usable.
  const params = Array.isArray(e.parameters) ? e.parameters.map((p: any) => `${p.name}=${p.value}`).filter(Boolean).join(", ") : "";
  const msg = e.longMessage || e.message || "error";

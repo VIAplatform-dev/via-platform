@@ -1,12 +1,12 @@
-// Measurements as structure. Pure — no I/O.
+// Measurements as structure. Pure, no I/O.
 //
 // A buyer can't try it on, so the measurements are the size. They used to be one free-text field
 // ("Bust 34 · Waist 28"), which reads fine and filters on nothing. This gives every category a short
-// template — the four numbers a buyer of THAT kind of piece actually checks — and a stored shape
+// template, the four numbers a buyer of THAT kind of piece actually checks, and a stored shape
 // `{ key, value, unit }[]` that the product page, the phone and the edit form all agree on.
 //
 // The unit is the store's, chosen once (unitFor) and stamped on every entry so a row never has to
-// remember which. `in` for US stores, `cm` everywhere else — a London seller measures in cm and a
+// remember which. `in` for US stores, `cm` everywhere else. A London seller measures in cm and a
 // New York one in inches, and mixing them is how a 19" chest becomes a 19 cm one.
 
 import { toCategorySlug } from "./item-tags.ts";

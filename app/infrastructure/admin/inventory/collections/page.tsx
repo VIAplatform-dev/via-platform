@@ -1,6 +1,6 @@
 "use client";
 
-// Collections manager — stores create collections, add/remove items, and move pieces between them.
+// Collections manager: stores create collections, add/remove items, and move pieces between them.
 // An item can live in as many collections as you like (adding to one never removes it from another).
 import { useEffect, useState } from "react";
 import { FolderPlus, Trash2, Pencil, X, Plus, Search, Package, Check, ImagePlus, GripVertical } from "lucide-react";
@@ -97,7 +97,7 @@ export default function CollectionsPage() {
  }
 
  async function removeCollection(id: string, title: string) {
- if (!confirm(`Delete the "${title}" collection? Your items stay — they're just no longer grouped here.`)) return;
+ if (!confirm(`Delete the "${title}" collection? Your items stay: they're just no longer grouped here.`)) return;
  await fetch(`/api/store/collections/${id}`, { method: "DELETE" }).catch(() => {});
  if (selId === id) setSelId(null);
  loadCols(false);
@@ -116,7 +116,7 @@ export default function CollectionsPage() {
  async function commitOrder() {
  setDragIdx(null);
  if (!selId) return;
- // Optimistic: the grid already shows the new order. If the write fails, reload puts it back —
+ // Optimistic: the grid already shows the new order. If the write fails, reload puts it back,
  // better than blocking the gesture on a round trip.
  await fetch(`/api/store/collections/${selId}/items`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: items.map((i) => i.id) }) }).catch(() => {});
  }
@@ -144,7 +144,7 @@ export default function CollectionsPage() {
  {loading ? (
  <p className="px-1 py-4 text-[13px] text-stone-400">Loading…</p>
  ) : cols.length === 0 ? (
- <p className="px-1 py-4 text-[13px] text-stone-400">No collections yet — create one above.</p>
+ <p className="px-1 py-4 text-[13px] text-stone-400">No collections yet. Create one above.</p>
  ) : cols.map((c, i) => (
  <div
  key={c.id}
@@ -157,7 +157,7 @@ export default function CollectionsPage() {
  >
  <GripVertical size={13} className="shrink-0 cursor-grab text-stone-300 opacity-0 transition group-hover:opacity-100" />
  {/* The cover photo shoppers see on this collection's tile. A collection with none falls back to
-     whatever picture the theme captured, which is the same picture for every one of them — so an
+     whatever picture the theme captured, which is the same picture for every one of them, so an
      empty frame here is a real gap, not decoration. */}
  <label
  title={c.imageUrl ? `Change the cover photo for ${c.title}` : `Add a cover photo for ${c.title}`}
@@ -189,7 +189,7 @@ export default function CollectionsPage() {
  </div>
  {cols.length > 1 && (
  <p className="mt-2.5 px-1 text-[11px] leading-relaxed text-stone-400">
-  Drag to reorder. This is the order your collections appear in on your site — and where a row only
+  Drag to reorder. This is the order your collections appear in on your site, and where a row only
   has space for a few, these are the ones that get it.
  </p>
  )}
@@ -231,7 +231,7 @@ export default function CollectionsPage() {
  >
  <span className="absolute left-1.5 top-1.5 z-10 grid h-5 min-w-[20px] place-items-center rounded-full bg-stone-900/75 px-1 text-[10px] font-semibold tabular-nums text-white">{i + 1}</span>
  <button type="button" title="Remove from collection" onClick={() => removeItem(it.id)} className="absolute right-1.5 top-1.5 z-10 grid h-6 w-6 place-items-center rounded-full bg-white/90 text-stone-500 opacity-0 shadow transition hover:text-rose-600 group-hover:opacity-100 [@media(hover:none)]:opacity-100"><X size={13} /></button>
- {/* The tile opens the piece. A grid of photos that can't be clicked into is a dead end —
+ {/* The tile opens the piece. A grid of photos that can't be clicked into is a dead end,
      a seller looking at a collection is usually looking for the piece, not the grid.
      Dragging still works: a drag never fires a click. */}
  <a href={`/admin/inventory?item=${it.id}`} title={`Open ${it.title}`} className="block">

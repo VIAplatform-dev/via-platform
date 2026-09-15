@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { resolveAppointmentSettings, type AppointmentSettings } from "./settings-core";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Appointments — storage.
+// Appointments: storage.
 //
 // Its own tables, because appointments are their own feature. They were briefly kept alongside
 // rentals while being built, which made a shop that only sells switch on renting to open its diary.
@@ -48,7 +48,7 @@ export async function ensureAppointmentTables(): Promise<void> {
  // Added after the table shipped: the marker that stops a reminder going twice.
  await sql`ALTER TABLE store_appointments ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ`;
  // What a shopper actually handled while they were in. The reason a store takes appointments is
- // that someone comes in, tries six things and leaves — and without a record of which six, the
+ // that someone comes in, tries six things and leaves, and without a record of which six, the
  // follow-up is "hope you enjoyed your visit" instead of "the black slip you loved is still here".
  await sql`CREATE TABLE IF NOT EXISTS appointment_items (
   appointment_id UUID NOT NULL,
@@ -116,7 +116,7 @@ export async function listAppointments(sellerId: string, from: string, to: strin
  * Just the times, for the scheduler.
  *
  * A pending booking still consumes its slot: while the shop decides, nobody else can take that 2pm.
- * An unpaid deposit does NOT hold it — otherwise abandoning a payment page blocks the diary.
+ * An unpaid deposit does NOT hold it. Otherwise abandoning a payment page blocks the diary.
  */
 export async function bookedSlots(sellerId: string, from: string, to: string): Promise<{ day: string; start: string }[]> {
  return (await listAppointments(sellerId, from, to))
@@ -155,7 +155,7 @@ export async function getAppointment(id: string): Promise<Appointment | null> {
  return rows[0] ? row(rows[0] as any) : null;
 }
 
-/** A no-show is kept, not deleted — it's why a shop stops holding things for someone. */
+/** A no-show is kept, not deleted. It's why a shop stops holding things for someone. */
 export async function setAppointmentStatus(id: string, sellerId: string, status: AppointmentStatus): Promise<Appointment | null> {
  await ensureAppointmentTables();
  const rows = await db()`UPDATE store_appointments SET status = ${status}, updated_at = now()
@@ -199,7 +199,7 @@ export type RemindableAppointment = Appointment & { storeSlug: string };
  * Confirmed appointments in the next `withinDays` that have never been reminded.
  *
  * Deliberately NOT filtered by lead time here: every store sets its own, so the cron reads each
- * store's setting and decides. Pending ones are skipped — reminding someone about a time the shop
+ * store's setting and decides. Pending ones are skipped. Reminding someone about a time the shop
  * hasn't agreed to yet is worse than saying nothing.
  */
 export async function listRemindable(withinDays = 14): Promise<RemindableAppointment[]> {
@@ -229,7 +229,7 @@ export async function claimReminder(id: string): Promise<boolean> {
  * Everything waiting on an answer, whatever week it falls in.
  *
  * The diary showed pending bookings inside the week you happened to be looking at, so a request for
- * a fortnight away was invisible until you navigated to it — a store clicked "approve" in its email,
+ * a fortnight away was invisible until you navigated to it. A store clicked "approve" in its email,
  * landed on this week, and found nothing to approve.
  */
 export async function listPending(sellerId: string, limit = 100): Promise<Appointment[]> {
@@ -240,7 +240,7 @@ export async function listPending(sellerId: string, limit = 100): Promise<Appoin
  return rows.map(row);
 }
 
-/** This person's history with this shop — every visit, newest first. Matched on email, which is the
+/** This person's history with this shop. Every visit, newest first. Matched on email, which is the
  *  only thing a walk-in and a web booking reliably share. */
 export async function listCustomerVisits(sellerId: string, email: string, limit = 40): Promise<Appointment[]> {
  await ensureAppointmentTables();

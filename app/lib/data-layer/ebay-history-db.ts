@@ -2,9 +2,9 @@ import { neon } from "@neondatabase/serverless";
 import { searchComps, type EbayComps } from "./ebay";
 
 // ── eBay price history ─────────────────────────────────────────────────────────────────────────
-// eBay Browse is free, so we always fetch fresh — but we also LOG each result (once per term per day)
+// eBay Browse is free, so we always fetch fresh, but we also LOG each result (once per term per day)
 // so VYA accrues its own price history. That history is what turns a snapshot ("asks ~$210") into a
-// trend ("asks ~$210, up 22% in 3 weeks") — a proprietary dataset that compounds with every search
+// trend ("asks ~$210, up 22% in 3 weeks"). A proprietary dataset that compounds with every search
 // and scan. Every lookup a store does makes the dataset richer.
 
 function db() {
@@ -37,7 +37,7 @@ export async function getOrFetchEbayComps(query: string): Promise<EbayCompsHist 
 
  const sql = db();
  await ensure();
- // Bank at most one snapshot per term per day — enough for momentum without bloating the table.
+ // Bank at most one snapshot per term per day. Enough for momentum without bloating the table.
  const already = (await sql`SELECT 1 FROM ebay_comp_snapshots
   WHERE lower(query) = lower(${q}) AND captured_at >= date_trunc('day', now()) LIMIT 1`.catch(() => [])) as unknown[];
  if (!already.length) {

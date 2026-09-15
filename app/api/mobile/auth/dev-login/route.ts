@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  *
  * Mints a mobile session for an email WITHOUT the magic-link email round-trip
  * (which can't complete in Expo Go, where deep links don't open the app). Gated
- * by ADMIN_PASSWORD so it can't be used to take over accounts — only someone who
+ * by ADMIN_PASSWORD so it can't be used to take over accounts, only someone who
  * already holds the admin secret can mint a token.
  */
 export async function POST(request: Request) {

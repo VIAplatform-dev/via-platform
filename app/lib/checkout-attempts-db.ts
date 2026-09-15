@@ -40,7 +40,7 @@ export async function recordCheckoutAttempt(a: { storeSlug: string; email: strin
  `.catch(() => {});
 }
 
-/** A piece sold (or the buyer completed) — no more nudging for it. */
+/** A piece sold (or the buyer completed), no more nudging for it. */
 export async function markCheckoutRecovered(itemId: string): Promise<void> {
  await ensureTable();
  await db()`UPDATE checkout_attempts SET status = 'recovered' WHERE item_id = ${itemId} AND status IN ('pending', 'emailed')`.catch(() => {});
@@ -48,7 +48,7 @@ export async function markCheckoutRecovered(itemId: string): Promise<void> {
 
 export type AbandonedCart = { id: number; storeSlug: string; email: string; name: string | null; itemId: string; itemTitle: string | null; itemImage: string | null };
 
-/** Pending checkouts older than `minAgeMinutes` (and newer than 3 days) — to nudge. */
+/** Pending checkouts older than `minAgeMinutes` (and newer than 3 days), to nudge. */
 export async function getAbandonedCarts(minAgeMinutes = 60): Promise<AbandonedCart[]> {
  await ensureTable();
  const rows = (await db()`
@@ -71,7 +71,7 @@ export type CheckoutAttempt = AbandonedCart & { status: "pending" | "emailed" | 
 
 const iso = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v) : null);
 
-/** Every checkout attempt for a store — the seller's recovery view (who abandoned, when, status). Newest first. */
+/** Every checkout attempt for a store. The seller's recovery view (who abandoned, when, status). Newest first. */
 export async function getStoreCheckoutAttempts(storeSlug: string, limit = 200): Promise<CheckoutAttempt[]> {
  await ensureTable();
  const rows = (await db()`
@@ -82,7 +82,7 @@ export async function getStoreCheckoutAttempts(storeSlug: string, limit = 200): 
  return rows.map((r) => ({ id: Number(r.id), storeSlug: r.store_slug, email: r.email, name: r.name ?? null, itemId: r.item_id, itemTitle: r.item_title ?? null, itemImage: r.item_image ?? null, status: r.status, createdAt: iso(r.created_at) || "", emailedAt: iso(r.emailed_at) }));
 }
 
-/** One attempt, scoped to the store — for sending a manual reminder. */
+/** One attempt, scoped to the store, for sending a manual reminder. */
 export async function getCheckoutAttempt(id: number, storeSlug: string): Promise<AbandonedCart | null> {
  await ensureTable();
  const rows = (await db()`

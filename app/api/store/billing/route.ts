@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { storeHasCardOnFile } from "@/app/lib/store-card";
 import { stripeGet, stripeConfigured } from "@/app/lib/stripe";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { getStorePlan } from "@/app/lib/store-plans-db";
@@ -27,7 +28,7 @@ async function stripePriceAmount(priceId: string): Promise<{ amount: number; cur
  }
 }
 
-// GET /api/store/billing — current plan + the tier catalog with live prices.
+// GET /api/store/billing. Current plan + the tier catalog with live prices.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -47,17 +48,17 @@ export async function GET(request: NextRequest) {
    tagline: t.tagline,
    order: t.order,
    priced: !!(priceIdFor(t.id, "month") || priceIdFor(t.id, "year")),
-   price, // { month:{amount,currency}|null, year:{...}|null } — amount in cents
+   price, // { month:{amount,currency}|null, year:{...}|null }: amount in cents
    features: featuresForTier(t.id).map((f) => FEATURE_LABELS[f]),
    // The subset of `features` this tier introduces, so the cards can mark what upgrading buys.
-   // Sent alongside rather than reshaping `features` into objects — that field is public API.
+   // Sent alongside rather than reshaping `features` into objects. That field is public API.
    newFeatures: addedFeaturesForTier(t.id).map((f) => FEATURE_LABELS[f]),
   };
  }),
  );
 
  // Whether she has already asked to cancel. This lives on the Stripe subscription, not in our
- // table, because it is a fact about the schedule rather than about entitlement — she keeps the
+ // table, because it is a fact about the schedule rather than about entitlement. She keeps the
  // tier until the period ends either way. Best-effort: a Stripe hiccup must not blank the screen,
  // it just means the "cancels on…" line is absent for one load.
  let cancelAtPeriodEnd = false;
@@ -66,8 +67,14 @@ export async function GET(request: NextRequest) {
  cancelAtPeriodEnd = Boolean(sub?.cancel_at_period_end);
  }
 
+ // Whether VYA holds a card it can bill. Shipping's two absorb-the-postage modes are gated on it
+ // (store-card.ts), and this page is where the seller is sent to fix that, so it has to be able to
+ // say whether there is one rather than leaving her to guess from a plan summary.
+ const hasCard = await storeHasCardOnFile(slug);
+
  return NextResponse.json({
  configured: plansConfigured(),
+ hasCard,
  trialDays: TRIAL_DAYS,
  annualDiscountPct: ANNUAL_DISCOUNT_PCT,
  // The phone mounts Stripe's native payment sheet, which needs this before any card is entered.

@@ -28,18 +28,18 @@ import { parcelsToPost, parcelsToPostLabel, type Parcel } from "../../lib/seller
 // Home, the hub.
 //
 // Uber's shape: one fat action first, then big tappable tiles, then a short list of what is
-// actually waiting. Takings sit under the greeting rather than inside a card — it is the question
+// actually waiting. Takings sit under the greeting rather than inside a card. It is the question
 // she opened the app to answer, not a widget.
 //
 // EVERY TILE RESOLVES INDEPENDENTLY. Five queries, no Promise.all: a slow consignment rollup must
 // not blank the takings. Each tile shows its own resting state until its own data lands, and a
-// tile whose number is zero still occupies its space — this is a fixed hub, not a feed, and a
+// tile whose number is zero still occupies its space. This is a fixed hub, not a feed, and a
 // screen that reflows as data arrives is one she cannot learn the shape of.
 
 /* ── response shapes, read off the routes rather than guessed ──────────── */
 
 type Me = { storeName: string; currency: string; website: string; storeFollowers?: number };
-/** Everything /api/store/home returns — one payload, already shaped for what this screen draws. */
+/** Everything /api/store/home returns. One payload, already shaped for what this screen draws. */
 type HomeData = {
   takings: { revenueCents: number; priorRevenueCents: number };
   inventory: { live: number; drafts: number; aging: AgingBuckets };
@@ -105,7 +105,7 @@ function Row({ icon, title, subtitle, onPress }: { icon: React.ComponentProps<ty
 export default function SellerHome() {
   const { user, storeSlug, loading } = useAuth();
   const isFocused = useIsFocused();
-  // This screen draws its own header rather than using AppHeader, so it owns its top inset —
+  // This screen draws its own header rather than using AppHeader, so it owns its top inset,
   // without it the greeting sits under the status bar and the notch.
   const insets = useSafeAreaInsets();
 
@@ -130,19 +130,19 @@ export default function SellerHome() {
   // <Redirect> volleys with the one it points at.
   if (!storeSlug && isFocused) return <Redirect href="/(tabs)" />;
   // DO NOT navigate on an API error. A 403 from /api/store/* means "this account is not a store
-  // partner" — not "you are signed out" — and ApiError lumps 401 and 403 together as `needsAuth`.
+  // partner", not "you are signed out", and ApiError lumps 401 and 403 together as `needsAuth`.
   // Redirecting to sign-in on it produced an infinite loop: login sees a valid user and sends us
   // straight back here, which 403s again. A genuinely expired token is already cleared by the
   // launch check in lib/auth.tsx, so this screen has no navigating left to do; it just says so.
   const blocked = me.error instanceof ApiError && me.error.status === 403;
 
   const currency = me.data?.currency ?? "USD";
-  const takings = d ? formatMoney(d.takings.revenueCents, currency) : "—";
+  const takings = d ? formatMoney(d.takings.revenueCents, currency) : "-";
   const delta = d ? percentDelta(d.takings.revenueCents, d.takings.priorRevenueCents) : null;
   const netProfit = netProfitLine(profit.data?.margin, currency);
 
   // All of these arrive ready. Parcels are already grouped, unread threads already filtered, the
-  // aging buckets already counted — the server did it beside the data instead of the phone doing it
+  // aging buckets already counted. The server did it beside the data instead of the phone doing it
   // after downloading everything.
   const postingParcels = parcelsToPost(d?.parcels ?? []);
   // The individual pieces inside those bags, for the "Coat, boots and 2 more" line.
@@ -204,7 +204,7 @@ export default function SellerHome() {
         </Pressable>
       </View>
 
-      {/* takings — the question she opened the app to answer */}
+      {/* takings. The question she opened the app to answer */}
       <View style={{ flexDirection: "row", alignItems: "baseline", gap: spacing.sm, marginTop: spacing.xl }}>
         <Text style={{ fontFamily: fonts.serif, fontSize: 34, color: colors.text }}>{takings}</Text>
         <Text style={{ fontSize: 14, color: colors.textMuted }}>today</Text>
@@ -214,7 +214,7 @@ export default function SellerHome() {
           </Text>
         ) : null}
       </View>
-      {/* net profit, 30 days — the same number the web Home prints; absent when no sold piece has a cost */}
+      {/* net profit, 30 days. The same number the web Home prints; absent when no sold piece has a cost */}
       {netProfit !== null ? (
         <Pressable onPress={() => router.push("/(seller)/analytics")} style={{ flexDirection: "row", alignItems: "baseline", gap: spacing.sm, marginTop: spacing.xs }}>
           <Text style={{ fontSize: 13, color: colors.textMuted }}>Net profit · 30d</Text>
@@ -222,12 +222,12 @@ export default function SellerHome() {
         </Pressable>
       ) : null}
 
-      {/* set up your store — until every required step is done; the domain is optional and says so */}
+      {/* set up your store, until every required step is done; the domain is optional and says so */}
       {setup.data && Array.isArray(setup.data.setup) && setup.data.setup.length > 0 && !setup.data.setupComplete ? (() => {
         const steps = setup.data.setup;
         const sum = setupSummary(steps);
         // All six known steps now have a screen (lib/seller/setup.ts). This fallback fires only for
-        // a step a newer server added that this build cannot route — never for anything shipped.
+        // a step a newer server added that this build cannot route, never for anything shipped.
         const open = (s: SetupStep) => {
           const route = phoneRouteFor(s);
           if (route) router.push(route);
@@ -270,7 +270,7 @@ export default function SellerHome() {
         );
       })() : null}
 
-      {/* orders — widest tile, top, because it is the most time-critical thing she does */}
+      {/* orders. Widest tile, top, because it is the most time-critical thing she does */}
       <View style={{ marginTop: spacing.lg }}><SearchBox /></View>
 
       <Tile onPress={() => router.push("/(seller)/orders")} style={{ marginTop: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.md }}>
@@ -315,7 +315,7 @@ export default function SellerHome() {
         </Tile>
       </View>
 
-      {/* Today's diary and today's rentals — only for the stores that run them. Both answer the
+      {/* Today's diary and today's rentals, only for the stores that run them. Both answer the
           standing-up question on the tile itself, so opening the screen is a choice not a chore. */}
       {apptsOn ? (
         <Tile onPress={() => router.push("/(seller)/appointments")} style={{ marginTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md }}>
@@ -346,19 +346,19 @@ export default function SellerHome() {
         );
       })() : null}
 
-      {/* market mode — the whole screen when she's at a stall, so it gets a row of its own */}
+      {/* market mode: the whole screen when she's at a stall, so it gets a row of its own */}
       <Tile onPress={() => router.push("/market")} style={{ marginTop: spacing.md, flexDirection: "row", alignItems: "center", gap: spacing.md }}>
         <Feather name="shopping-bag" size={18} color={d?.market.enabled ? colors.positive : colors.text} />
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }}>Market Mode</Text>
           <Text style={{ fontSize: 13, color: d?.market.enabled ? colors.positive : colors.textMuted, marginTop: 2 }} numberOfLines={1}>
-            {d?.market.enabled ? "Running — take the till with you" : "Sell in person, off the phone"}
+            {d?.market.enabled ? "Running, take the till with you" : "Sell in person, off the phone"}
           </Text>
         </View>
         <Feather name="chevron-right" size={18} color={colors.textDim} />
       </Tile>
 
-      {/* storefront — the address is HER VYA SHOP, never me.website.
+      {/* storefront: the address is HER VYA SHOP, never me.website.
           
           `me.website` is the seller's own external site (the Shopify or Squarespace shop VYA syncs
           from), and printing it here told her that was her VYA address. lib/seller/storefront.ts
@@ -372,8 +372,8 @@ export default function SellerHome() {
               is part of how a 404 went unnoticed. The Store tab checks the address and says. */}
           {/* NO ADDRESS HERE, AND THAT IS THE POINT.
               
-              Printing the real one cost two extra requests — /api/store/domain and
-              /api/store/storefront — on every single open of the busiest screen in the app, to
+              Printing the real one cost two extra requests. /api/store/domain and
+              /api/store/storefront, on every single open of the busiest screen in the app, to
               render a line of text on a tile nobody opens Home to read. The Store tab needs both
               anyway and fetches them there. What Home owes this tile is that the shop exists and
               how many people follow it. */}

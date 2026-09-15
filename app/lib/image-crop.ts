@@ -2,7 +2,7 @@
 //
 // The editor shows the photo scaled to *cover* a fixed frame, then lets the seller drag it around
 // and zoom in. What the server needs is the region of the ORIGINAL image now sitting behind that
-// frame. Keeping the arithmetic here — rather than in the component or the route — means it can be
+// frame. Keeping the arithmetic here, rather than in the component or the route. Means it can be
 // tested against the cases that actually break: a photo narrower than the frame, a photo wider than
 // it, and a drag pushed past the edge.
 
@@ -14,7 +14,7 @@ export const CARD_ASPECT = 0.82;
 /**
  * `zoom` is 1 at "just covers the frame". `panX`/`panY` are -1…1, where 0 is centred and ±1 is as
  * far as the photo can slide before showing an edge. Expressing the pan as a fraction of the
- * available slack — rather than in pixels — means the same numbers work whatever size the editor
+ * available slack, rather than in pixels. Means the same numbers work whatever size the editor
  * is drawn at, so a crop set on a phone lands identically on a laptop.
  */
 export function cropRect(

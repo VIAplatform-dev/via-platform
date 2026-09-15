@@ -64,7 +64,7 @@ async function trySendStoreSaleEmail(
  return true;
 }
 
-// GET /api/admin/conversions/[id] — candidate clicks for matching
+// GET /api/admin/conversions/[id]: candidate clicks for matching
 export async function GET(
  request: NextRequest,
  { params }: { params: Promise<{ id: string }> }
@@ -87,7 +87,7 @@ export async function GET(
  const windowEnd = new Date(ts.getTime() + 6 * 60 * 60 * 1000).toISOString();
 
  // Candidate clicks: same store, within 48h before + 6h after the order.
- // Also check if the clicked product is still in inventory — if it's gone, that's
+ // Also check if the clicked product is still in inventory, if it's gone, that's
  // a strong signal the click led to the purchase (product sold out after click).
  const clicks = await sql`
  SELECT
@@ -151,7 +151,7 @@ export async function GET(
  LIMIT 10
  `;
 
- // Other conversions from this store within ±7 days — helps identify sold-out items by context
+ // Other conversions from this store within ±7 days. Helps identify sold-out items by context
  const nearbyOrders = await sql`
  SELECT conversion_id, order_id, order_total, currency, timestamp, matched_click_data, items
  FROM conversions
@@ -182,7 +182,7 @@ export async function GET(
  });
 }
 
-// POST /api/admin/conversions/[id] — manually match to a click or user
+// POST /api/admin/conversions/[id]: manually match to a click or user
 export async function POST(
  request: NextRequest,
  { params }: { params: Promise<{ id: string }> }
@@ -237,12 +237,12 @@ export async function POST(
  return NextResponse.json({ error: "Provide clickId, userId, or userEmail" }, { status: 400 });
  }
 
- // Email is NOT sent automatically on match — it only goes out when the admin
+ // Email is NOT sent automatically on match. It only goes out when the admin
  // clicks "Send store notification" (the send_email action below).
  return NextResponse.json({ ok: true });
 }
 
-// PUT — update order total
+// PUT: update order total
 export async function PUT(
  request: NextRequest,
  { params }: { params: Promise<{ id: string }> }
@@ -264,7 +264,7 @@ export async function PUT(
  return NextResponse.json({ ok: true });
 }
 
-// PATCH — unmatch a conversion OR mark it as returned
+// PATCH: unmatch a conversion OR mark it as returned
 // Body: {} = unmatch, { action: "return" } = mark returned, { action: "unreturn" } = undo return
 export async function PATCH(
  request: NextRequest,
@@ -303,10 +303,10 @@ export async function PATCH(
  SET matched_click_data = COALESCE(matched_click_data, '{}'::jsonb) || ${JSON.stringify({ productName: body.productName })}::jsonb
  WHERE conversion_id = ${id}
  `;
- // No email here — it only sends from the "Send store notification" action below.
+ // No email here: it only sends from the "Send store notification" action below.
  return NextResponse.json({ ok: true });
  } else if (body.action === "send_email") {
- // Manual resend — force=true bypasses the already-sent guard
+ // Manual resend: force=true bypasses the already-sent guard
  let emailSent = false;
  let emailError: string | null = null;
  try {
@@ -327,7 +327,7 @@ export async function PATCH(
  return NextResponse.json({ ok: true });
 }
 
-// DELETE — permanently delete a conversion record
+// DELETE: permanently delete a conversion record
 export async function DELETE(
  request: NextRequest,
  { params }: { params: Promise<{ id: string }> }
@@ -339,7 +339,7 @@ export async function DELETE(
  if (!dbUrl) return NextResponse.json({ error: "No database" }, { status: 500 });
 
  const sql = neon(dbUrl);
- // Grab the order_id + store before deleting so we can tombstone it — otherwise the
+ // Grab the order_id + store before deleting so we can tombstone it. Otherwise the
  // next Carroll/Nello/Square re-sync (or a replayed webhook) re-creates the row.
  const rows = await sql`SELECT order_id, store_slug FROM conversions WHERE conversion_id = ${id} LIMIT 1`;
  await sql`DELETE FROM conversions WHERE conversion_id = ${id}`;

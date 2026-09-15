@@ -9,7 +9,7 @@ import { getQualityMetrics, type QualityMetrics } from "./quality";
 import { getMarginMetrics, type MarginMetrics } from "./margin";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — the suite orchestrator.
+// Analytics: the suite orchestrator.
 //
 // Resolves the store and the period ONCE, then fans the six metric sections out
 // in parallel. Sections are individually selectable so a dashboard tab can ask
@@ -17,13 +17,13 @@ import { getMarginMetrics, type MarginMetrics } from "./margin";
 // keystroke of the date picker.
 //
 // Section boundaries mirror the questions a store owner actually asks:
-//   sales      — did I make money, and is that up or down?
-//   customers  — who bought, and do they come back?
-//   catalog    — what am I asking, what do things go for, what's moving?
-//   products   — which pieces are carrying the store, and which are dead weight?
-//   engagement — where do people come from and where do they fall out?
-//   quality    — what about how I list makes a piece sell?
-//   margin     — what did I actually keep?
+//   sales. Did I make money, and is that up or down?
+//   customers, who bought, and do they come back?
+//   catalog: what am I asking, what do things go for, what's moving?
+//   products, which pieces are carrying the store, and which are dead weight?
+//   engagement, where do people come from and where do they fall out?
+//   quality: what about how I list makes a piece sell?
+//   margin: what did I actually keep?
 // ───────────────────────────────────────────────────────────────────────────
 
 export const SECTIONS = ["sales", "customers", "catalog", "products", "engagement", "quality", "margin"] as const;
@@ -93,11 +93,11 @@ export class StoreNotFoundError extends Error {
  * A valid, all-zero suite for a store with no seller row yet.
  *
  * Every metric getter keys off seller.id, so a store that has signed up but never written anything
- * — no import, no listing, no market session — has nothing to key off. That is not an error, it is
+ * no import, no listing, no market session. Has nothing to key off. That is not an error, it is
  * the first five minutes of every store's life, and answering 404 turned the seller's first look at
  * Analytics into "Analytics unavailable. Try refreshing." on a page where refreshing cannot help.
  *
- * The period still resolves (it needs a clock, not a seller), and every section is simply absent —
+ * The period still resolves (it needs a clock, not a seller), and every section is simply absent,
  * which the dashboard already reads as zero, because it optional-chains all of them.
  */
 export function emptyAnalyticsSuite(slug: string, input: PeriodInput & { sections?: Section[] } = {}): AnalyticsSuite {
@@ -126,7 +126,7 @@ export async function getAnalyticsSuite(slug: string, input: PeriodInput & { sec
   want("catalog") ? getCatalogMetrics(seller.id, period) : undefined,
   want("products") ? getProductMetrics(seller.id, seller.slug, period) : undefined,
   want("engagement") ? getEngagementMetrics(seller.id, seller.slug, period) : undefined,
-  // Structural, not period-scoped — see quality.ts.
+  // Structural, not period-scoped. See quality.ts.
   want("quality") ? getQualityMetrics(seller.id) : undefined,
   want("margin") ? getMarginMetrics(seller.id, seller.slug, period) : undefined,
  ]);

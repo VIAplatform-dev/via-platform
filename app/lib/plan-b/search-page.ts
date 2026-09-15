@@ -1,21 +1,21 @@
 // The store's own search, answered from live VYA inventory.
 //
 // Every captured storefront has a search box in its header, and on a hosted store every one of them
-// led to "Page not found." — the crawl never stored a `/search` page (there is nothing to crawl: the
+// led to "Page not found.". The crawl never stored a `/search` page (there is nothing to crawl: the
 // source renders it per-query), so the route had nothing to serve. Predictive search already worked
 // (see /api/plan-b/search/suggest), which made it worse: the drawer showed matches, and pressing
-// Enter — or clicking "View all results" — threw the shopper into a 404.
+// Enter, or clicking "View all results". Threw the shopper into a 404.
 //
 // The fix reuses the machinery the collection pages already run on. A search result page IS a
 // collection page whose contents happen to be a query result, so we borrow the store's own
 // collection template, fill its grid with the matches (injectCollectionItems), and restate the
-// page's chrome — heading, <title>, and the search box's own value — as a search.
+// page's chrome, heading, <title>, and the search box's own value, as a search.
 //
-// Pure — no database, no network. The route hands the items in.
+// Pure, no database, no network. The route hands the items in.
 import * as cheerio from "cheerio";
 import type { Element as DomElement } from "domhandler";
 
-/** The item fields search reads. Everything is optional but the title — a portal-created listing may
+/** The item fields search reads. Everything is optional but the title. A portal-created listing may
  *  have nothing else filled in yet, and it still has to be findable. */
 export type SearchableItem = {
  title: string;
@@ -29,21 +29,21 @@ export type SearchableItem = {
 
 /** Split a query the way a shopper means it: "prada heels" is both words, in any order and any field. */
 function terms(q: string): string[] {
- // Bounded on both axes — a query is shopper input, and both the number of terms and the length of
+ // Bounded on both axes. A query is shopper input, and both the number of terms and the length of
  // any one of them end up in a regex run against every item in the catalogue.
  return q.toLowerCase().split(/[\s,]+/).map((t) => t.trim().slice(0, 64)).filter(Boolean).slice(0, 8);
 }
 
 /**
- * A term matches where a WORD starts with it — never mid-word.
+ * A term matches where a WORD starts with it, never mid-word.
  *
  * Raw substring matching looked reasonable and was not: searching "zz" on Vintage Archives LA
  * returned a sold-out Prada heel, because its description contains "dazzling". A shopper reads that
  * as search being broken, and it also put the results page at odds with the predictive drawer, which
  * matched titles only and correctly found nothing.
  *
- * Prefix-of-a-word is what people actually expect — "boot" finds "Boots", "shirt" finds "T-Shirt"
- * (the hyphen is a word boundary), "gabbana" finds "Dolce & Gabbana" — and "zz" finds neither
+ * Prefix-of-a-word is what people actually expect. "boot" finds "Boots", "shirt" finds "T-Shirt"
+ * (the hyphen is a word boundary), "gabbana" finds "Dolce & Gabbana", and "zz" finds neither
  * "dazzling" nor anything else it shouldn't.
  */
 function startsWord(term: string): (haystack: string) => boolean {
@@ -54,7 +54,7 @@ function startsWord(term: string): (haystack: string) => boolean {
 /**
  * Rank one item against the query terms, or 0 for "no match".
  *
- * EVERY term must hit something, or a two-word search returns the whole catalogue — which on
+ * EVERY term must hit something, or a two-word search returns the whole catalogue, which on
  * one-of-one vintage is indistinguishable from search being broken. Where a term hits decides the
  * order: a title match beats a brand match beats a description match, so searching "prada" puts the
  * pieces actually called Prada above the ones that merely mention it in a care note.
@@ -94,7 +94,7 @@ export function searchItems<T extends SearchableItem>(items: T[], query: string)
 
 /** Text destined for markup we build ourselves. cheerio escapes anything it sets via .text(); these
  *  two go into a template string, so they escape here. */
-/** Site chrome — a heading in here belongs to the storefront, not to this page. */
+/** Site chrome: a heading in here belongs to the storefront, not to this page. */
 const CHROME_ANCESTORS = "header,nav,footer,[role='banner'],[role='contentinfo'],[class*='header' i],[id*='header' i],[class*='footer' i],[id*='footer' i],[class*='masthead' i]";
 
 function escText(s: string): string {
@@ -118,7 +118,7 @@ function storeName($: cheerio.CheerioAPI): string {
 /**
  * Turn a borrowed collection template into this store's search results page.
  *
- * Only the chrome — the grid itself is filled by injectCollectionItems, exactly as a collection page
+ * Only the chrome: the grid itself is filled by injectCollectionItems, exactly as a collection page
  * is, so the cards, pagination and "N products" count all come from the store's own theme.
  */
 export function applySearchChrome(html: string, opts: { query: string; count: number; action?: string }): string {
@@ -128,17 +128,17 @@ export function applySearchChrome(html: string, opts: { query: string; count: nu
   ? `Search results for “${q}”`
   : q ? `No results for “${q}”` : "Search";
 
- // The page's own heading — the collection title we borrowed. Anything in the site header, nav or
+ // The page's own heading. The collection title we borrowed. Anything in the site header, nav or
  // footer is chrome (usually the logo), and renaming it would retitle the whole storefront.
  // A store's own name is not this page's heading. Two signals, because either alone misses a real
  // store: Bag Crush's masthead is `<div class="site-header">` rather than `<header>`, and plenty of
- // themes put the logo in a bare <h1> with no chrome wrapper at all — it's an <img>, not a title.
+ // themes put the logo in a bare <h1> with no chrome wrapper at all. It's an <img>, not a title.
  const headings = $("h1").toArray() as DomElement[];
  const isChrome = (h: DomElement) => $(h).parents(CHROME_ANCESTORS).length > 0;
  const isLogo = (h: DomElement) => $(h).find("img, svg").length > 0;
  const existing = headings.find((h) => !isChrome(h) && !isLogo(h));
  if (existing) $(existing).text(heading);
- // Some themes have NO page heading to borrow — Bag Crush's only <h1> is its logo, which must never
+ // Some themes have NO page heading to borrow. Bag Crush's only <h1> is its logo, which must never
  // be renamed. Without this the shopper got a page of results (or none) with nothing saying what was
  // searched for. Inserted rather than substituted, and marked so a re-run replaces it in place.
  let $heading = existing ? $(existing) : $("[data-vya-search-heading]").first();
@@ -157,7 +157,7 @@ export function applySearchChrome(html: string, opts: { query: string; count: nu
   $(el).attr("value", q);
  });
  // Send it back here rather than to the collection we borrowed the template from. On a VYA origin
- // "here" is /site/{slug}/search — the theme's own bare `/search` would post to VYA's root and 404,
+ // "here" is /site/{slug}/search: the theme's own bare `/search` would post to VYA's root and 404,
  // which is the same dead end this whole module exists to close.
  const action = opts.action || "/search";
  $('form[action*="/search"], form[role="search"]').each((_: number, el: DomElement) => {
@@ -183,7 +183,7 @@ export function applySearchChrome(html: string, opts: { query: string; count: nu
  *
  * A real captured `/search` is best (a couple of themes render one for an empty query); otherwise the
  * shop-all page, which is the closest thing every Shopify store has to a "list of everything" layout.
- * The homepage is the last resort — it has grids, so injectCollectionItems still has somewhere to put
+ * The homepage is the last resort. It has grids, so injectCollectionItems still has somewhere to put
  * the results, but its layout is a hero, not a catalogue.
  */
 export function pickSearchTemplatePath(paths: string[]): string | null {

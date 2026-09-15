@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// POST /api/admin/backfill-size-keys?onlyMissing=1 — recompute products.size_keys
+// POST /api/admin/backfill-size-keys?onlyMissing=1: recompute products.size_keys
 // from the derived display size. Run once after deploying the migration; the
 // daily cron keeps it fresh thereafter.
 export async function POST(request: NextRequest) {

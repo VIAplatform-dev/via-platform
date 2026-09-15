@@ -7,7 +7,7 @@ import { spacing } from "../lib/theme";
 //
 // Two visible at a time with the next one peeking, so the row obviously scrolls rather than looking
 // like a block of four that happens to end. These sections are a sideline to the piece you are
-// looking at — giving them a full grid competes with it.
+// looking at: giving them a full grid competes with it.
 
 export default function ProductRail({
   products, favorited, onToggleFavorite,

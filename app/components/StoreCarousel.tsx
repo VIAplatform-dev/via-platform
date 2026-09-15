@@ -5,7 +5,7 @@ import Image from "next/image";
 import { visibleStores as stores } from "../lib/stores";
 import TrackedStoreLink from "./TrackedStoreLink";
 
-// Auto-scroll speed in px per animation frame (~60fps) — 1.0px ≈ 60px/s
+// Auto-scroll speed in px per animation frame (~60fps). 1.0px ≈ 60px/s
 const SPEED = 1.0;
 
 function StoreCard({ store }: { store: (typeof stores)[number] }) {
@@ -68,7 +68,7 @@ export default function StoreCarousel() {
  const el = scrollRef.current;
  if (!el) return;
 
- // Auto-scroll tick — scrolls forward and loops seamlessly at the halfway point
+ // Auto-scroll tick: scrolls forward and loops seamlessly at the halfway point
  const tick = () => {
  if (!pausedRef.current) {
  el.scrollLeft += SPEED;
@@ -128,7 +128,7 @@ export default function StoreCarousel() {
  scheduleResume(1200);
  };
 
- // Mobile: browser handles native touch scroll — pause auto-scroll during it
+ // Mobile: browser handles native touch scroll. Pause auto-scroll during it
  const onTouchStart = () => {
  pausedRef.current = true;
  if (resumeTimer) clearTimeout(resumeTimer);

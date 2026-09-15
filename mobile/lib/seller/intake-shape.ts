@@ -4,13 +4,13 @@
 // not what the request side suggests, and both broke the flow silently:
 //
 //   1. The drafted fields arrive under `draft`, not `fields`.
-//   2. Several of them are {value, confidence} OBJECTS, not strings — brand, era, material and
-//      condition — while title, description, category and conditionGrade are plain strings.
+//   2. Several of them are {value, confidence} OBJECTS, not strings. Brand, era, material and
+//      condition, while title, description, category and conditionGrade are plain strings.
 //      Putting one of those objects into a <Text> throws in React Native, so the flow died on the
 //      Review screen, after the AI call had already been paid for.
 //
 // The confidence numbers are dropped on purpose. They are real and could be shown, but a seller
-// reading "Fendi (0.85)" learns nothing she can act on — she either recognises the brand or she
+// reading "Fendi (0.85)" learns nothing she can act on. She either recognises the brand or she
 // corrects it, and every row already has a Change button.
 
 export type DraftFields = {
@@ -30,7 +30,7 @@ export type DraftFields = {
   cost?: string;
   /** Specific visible flaws, one per entry. Edited as a comma-separated line on Review. */
   flaws?: string[];
-  /** Beyond the grade — the model's sentence about the wear, hers to edit. */
+  /** Beyond the grade: the model's sentence about the wear, hers to edit. */
   conditionNote?: string;
   /** The parcel the model judged this piece to ship as (packed). Review shows the tier from it. */
   parcel?: { weightOz: number; lengthIn?: number; widthIn?: number; heightIn?: number };
@@ -40,7 +40,7 @@ export type DraftFields = {
   measurements?: { key: string; value: number; unit: "cm" | "in" }[];
 };
 
-// The condition scale — mirror of app/lib/condition-core.ts, best first.
+// The condition scale: mirror of app/lib/condition-core.ts, best first.
 export const CONDITION_GRADES = ["Mint", "Excellent", "Very good", "Good", "Fair"] as const;
 export type ConditionGrade = (typeof CONDITION_GRADES)[number];
 
@@ -61,7 +61,7 @@ export function normalizeCondition(text: string | null | undefined): ConditionGr
 /**
  * Whether a drafted value is worth writing into a field.
  *
- * The model answers "N/A" or "Unknown" when it cannot tell — a sentence, not a value. Written into
+ * The model answers "N/A" or "Unknown" when it cannot tell. A sentence, not a value. Written into
  * a blank field it reads as an answer, and a listing that says its material is "Unknown" is worse
  * than one that says nothing: the blank invites her to fill it, the word closes the question.
  * Mirrors hasRealValue in app/infrastructure/admin/add-listing/page.tsx.
@@ -123,7 +123,7 @@ export function costFromText(v: string | number | null | undefined): number | un
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
-/** "scuffed toe, light pilling" ⇄ ["scuffed toe", "light pilling"] — the Review row's shape. */
+/** "scuffed toe, light pilling" ⇄ ["scuffed toe", "light pilling"]. The Review row's shape. */
 export function flawsFromLine(line: string): string[] {
   return line.split(",").map((f) => f.trim()).filter(Boolean);
 }
@@ -140,7 +140,7 @@ export type Estimate = {
 /**
  * The price, and how many comparable sales stand behind it.
  *
- * `priceCents` is null rather than 0 when there is no estimate — pricing can legitimately come
+ * `priceCents` is null rather than 0 when there is no estimate. Pricing can legitimately come
  * back empty, and a zero here would be published as the asking price.
  */
 export function readEstimate(estimate: Estimate | null | undefined): { priceCents: number | null; compsCount: number } {

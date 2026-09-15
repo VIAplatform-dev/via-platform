@@ -2,16 +2,16 @@
 // Event-quality filtering for the events ETL.
 //
 // Pure, dependency-free predicates (no config import at runtime, so they stay
-// node-testable — the ETL injects the thresholds from config.ts, exactly like
+// node-testable: the ETL injects the thresholds from config.ts, exactly like
 // privacy.ts injects PRIVACY). The ETL feeds raw capture rows through
 // `partitionEvents`, which drops bots, internal/seller traffic, and implausible
 // bursts, and returns a reason breakdown (for the "% filtered" report).
 //
-// We never touch the legacy capture tables — this filters on the way INTO the
+// We never touch the legacy capture tables. This filters on the way INTO the
 // unified `events` log only.
 // ───────────────────────────────────────────────────────────────────────────
 
-// Mirror of config.EVENT_FILTERS — passed in by the ETL so no threshold is ever
+// Mirror of config.EVENT_FILTERS: passed in by the ETL so no threshold is ever
 // hardcoded here.
 export type EventFilterConfig = {
  botUserAgentPatterns: readonly string[];
@@ -21,7 +21,7 @@ export type EventFilterConfig = {
 };
 
 // True when the user-agent looks like a bot/crawler/automation tool. A null UA
-// is NOT treated as a bot (most capture tables don't store one — we don't want to
+// is NOT treated as a bot (most capture tables don't store one. We don't want to
 // drop all of them; bursts/internal still apply).
 export function isBotUserAgent(ua: string | null | undefined, patterns: readonly string[]): boolean {
  if (!ua) return false;
@@ -29,7 +29,7 @@ export function isBotUserAgent(ua: string | null | undefined, patterns: readonly
  return patterns.some((p) => s.includes(p));
 }
 
-// True when the email is ours (internal/admin/test) or a seller — never consumer
+// True when the email is ours (internal/admin/test) or a seller, never consumer
 // demand. `sellerEmails` is injected by the ETL from storeContactEmails.
 export function isInternalOrSeller(
  email: string | null | undefined,
@@ -124,7 +124,7 @@ export type FilterableEvent = BurstInput & {
 
 // Drop bots, internal/seller traffic, and bursts. Per-row checks (bot, internal)
 // first so burst detection only sees real consumer events; then burst across the
-// survivors. `skipBurst` is for orders (real money, null productId — they'd all
+// survivors. `skipBurst` is for orders (real money, null productId. They'd all
 // group under one key and a multi-item order would be collapsed). Returns the
 // kept items + a reason breakdown.
 export function partitionEvents<T extends FilterableEvent>(

@@ -9,7 +9,7 @@ import { flattenHits, hitTarget, isPiece, searchPlaceholder, type SearchGroup } 
 import { matchDestinations } from "../../lib/seller/destinations";
 import { imageUrl, IMG } from "../../lib/imageUrl";
 
-// The search box — the same "look up anything" the desktop has, on Home and Inventory.
+// The search box: the same "look up anything" the desktop has, on Home and Inventory.
 //
 // A customer at the counter says "the green Fendi" and she needs the price and whether it is
 // still here in the time it takes them to finish the sentence. The route already writes the
@@ -90,7 +90,7 @@ export function SearchBox({ autoFocus }: { autoFocus?: boolean }) {
               >
                 {/* THE PIECE, NOT THE WORD "INVENTORY". A column of identical grey category labels
                     is something you have to read; a column of photographs is something you
-                    recognise. Anything that isn't a piece — an order, a customer — keeps its label,
+                    recognise. Anything that isn't a piece, an order, a customer. Keeps its label,
                     because there is no picture of a customer and a blank square would be worse. */}
                 {isPiece(r.group) ? (
                   r.image ? (
@@ -105,7 +105,7 @@ export function SearchBox({ autoFocus }: { autoFocus?: boolean }) {
                 )}
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{r.label}</Text>
-                  {/* the status rides in here already — "SKU-1042 · $420 · active" */}
+                  {/* the status rides in here already. "SKU-1042 · $420 · active" */}
                   <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }} numberOfLines={1}>{r.sub}</Text>
                 </View>
                 <Feather name="chevron-right" size={16} color={colors.textDim} />

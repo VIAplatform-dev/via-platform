@@ -22,9 +22,9 @@ async function sendResetEmail(email: string, token: string) {
   <div style="max-width:480px;margin:0 auto;padding:40px 16px;">
    <div style="background:#fff;padding:40px 32px;text-align:center;">
     <p style="font-size:13px;color:#5D0F17;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 24px;">VYA Admin</p>
-    <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0 0 24px;">We received a request to reset your VYA admin password. Choose a new one below — then sign in with your email, your new password, and the one-time code sent to this address.</p>
+    <p style="font-size:15px;color:#5D0F17;line-height:1.7;margin:0 0 24px;">We received a request to reset your VYA admin password. Choose a new one below, then sign in with your email, your new password, and the one-time code sent to this address.</p>
     <a href="${link}" style="display:inline-block;background:#5D0F17;color:#FFFDF8;text-decoration:none;padding:14px 28px;font-size:14px;letter-spacing:0.05em;">Reset your password</a>
-    <p style="font-size:12px;color:rgba(93,15,23,0.5);margin:24px 0 0;">This link expires in 1 hour. If you didn't request this, ignore it — your password won't change.</p>
+    <p style="font-size:12px;color:rgba(93,15,23,0.5);margin:24px 0 0;">This link expires in 1 hour. If you didn't request this, ignore it. Your password won't change.</p>
    </div></div></body></html>`,
  });
 }
@@ -41,6 +41,6 @@ export async function POST(request: NextRequest) {
  // Only email a link if this is a known active admin; otherwise silently no-op.
  const reset = email ? await requestPasswordReset(email).catch(() => null) : null;
  if (reset) await sendResetEmail(reset.email, reset.token).catch(() => {});
- // Generic response regardless — no user enumeration.
+ // Generic response regardless, no user enumeration.
  return NextResponse.json({ ok: true });
 }

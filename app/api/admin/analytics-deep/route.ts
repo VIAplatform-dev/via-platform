@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
  const cutoff = getCutoff(range);
  const cutoffIso = cutoff ? cutoff.toISOString() : null;
 
- // Ensure utm_source column exists — migration normally runs inside saveClick,
+ // Ensure utm_source column exists. Migration normally runs inside saveClick,
  // but if no click has fired since deployment the column won't exist yet and
  // the clicksBySource query would silently return [] via .catch(() => []).
  await sql`ALTER TABLE clicks ADD COLUMN IF NOT EXISTS utm_source TEXT`.catch(() => {});
@@ -87,10 +87,10 @@ export async function GET(request: NextRequest) {
  ? sql`SELECT COUNT(*)::int AS total FROM product_views WHERE timestamp >= ${cutoffIso}`
  : sql`SELECT COUNT(*)::int AS total FROM product_views`,
 
- // totalRevenue + totalConversions + matched breakdown — always all-time, excluding returned orders
+ // totalRevenue + totalConversions + matched breakdown. Always all-time, excluding returned orders
  sql`SELECT COALESCE(SUM(order_total), 0)::float AS revenue, COUNT(*)::int AS conversions, COUNT(*) FILTER (WHERE matched = true)::int AS matched, COUNT(*) FILTER (WHERE matched = false OR matched IS NULL)::int AS unmatched FROM conversions WHERE order_total > 0 AND (returned IS NULL OR returned = false)`,
 
- // totalCustomers — registered accounts (users table) + pilot/waitlist breakdown
+ // totalCustomers. Registered accounts (users table) + pilot/waitlist breakdown
  sql`
  SELECT
  (SELECT COUNT(*)::int FROM users)::int AS total,
@@ -100,12 +100,12 @@ export async function GET(request: NextRequest) {
  WHERE LOWER(email) NOT IN (SELECT LOWER(email) FROM pilot_access))::int AS waitlist_only
  `,
 
- // newSignupsInPeriod — new registered accounts from the users table
+ // newSignupsInPeriod: new registered accounts from the users table
  cutoffIso
  ? sql`SELECT COUNT(*)::int AS total FROM users WHERE created_at >= ${cutoffIso}`
  : sql`SELECT COUNT(*)::int AS total FROM users`,
 
- // totalCommission — tiered commission on all conversions, always all-time, excluding returned orders
+ // totalCommission: tiered commission on all conversions, always all-time, excluding returned orders
  sql`SELECT COALESCE(SUM(CASE WHEN order_total < 1000 THEN order_total * 0.07 WHEN order_total <= 5000 THEN order_total * 0.05 ELSE order_total * 0.03 END), 0)::float AS commission FROM conversions WHERE order_total > 0 AND (returned IS NULL OR returned = false)`,
 
  // topProductsByClicks
@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
  LIMIT 15
  `,
 
- // topProductsByViews — falls back to clicks table for name/store when product is sold out/removed
+ // topProductsByViews. Falls back to clicks table for name/store when product is sold out/removed
  cutoffIso
  ? sql`
  SELECT
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
  LIMIT 15
  `,
 
- // topStores — product views on VYA + conversions + revenue joined by store slug
+ // topStores. Product views on VYA + conversions + revenue joined by store slug
  // sorted by revenue DESC so highest-earning stores appear first
  cutoffIso
  ? sql`
@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
  ORDER BY revenue DESC, clicks DESC
  `,
 
- // signupsByDay — for "all" use last 60 days, otherwise use cutoff
+ // signupsByDay, for "all" use last 60 days, otherwise use cutoff
  (() => {
  const dayCutoff = range === "all"
  ? new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
@@ -280,7 +280,7 @@ export async function GET(request: NextRequest) {
  LIMIT 15
  `,
 
- // recentActivity — last 50 product views (clicking a product on VYA)
+ // recentActivity: last 50 product views (clicking a product on VYA)
  sql`
  SELECT
  pv.timestamp,
@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
  LIMIT 50
  `,
 
- // recentConversions — all orders with attribution + buyer identity
+ // recentConversions. All orders with attribution + buyer identity
  cutoffIso
  ? sql`
  SELECT
@@ -410,7 +410,7 @@ export async function GET(request: NextRequest) {
  ? sql`SELECT query, COUNT(*)::int AS count FROM searches WHERE timestamp >= ${cutoffIso} GROUP BY query ORDER BY count DESC LIMIT 25`.catch(() => [])
  : sql`SELECT query, COUNT(*)::int AS count FROM searches GROUP BY query ORDER BY count DESC LIMIT 25`.catch(() => []),
 
- // pageFunnel — views by page type so we can see UX drop-off
+ // pageFunnel: views by page type so we can see UX drop-off
  cutoffIso
  ? sql`
  SELECT page_type, COUNT(*)::int AS views
@@ -424,7 +424,7 @@ export async function GET(request: NextRequest) {
  GROUP BY page_type
  `.catch(() => []),
 
- // trafficSources — UTM visits grouped by source + medium + campaign
+ // trafficSources. UTM visits grouped by source + medium + campaign
  cutoffIso
  ? sql`
  SELECT
@@ -452,7 +452,7 @@ export async function GET(request: NextRequest) {
  LIMIT 50
  `.catch(() => []),
 
- // dropOffProducts — products with the most views relative to clicks (browsed but not bought)
+ // dropOffProducts. Products with the most views relative to clicks (browsed but not bought)
  cutoffIso
  ? sql`
  SELECT
@@ -486,7 +486,7 @@ export async function GET(request: NextRequest) {
  LIMIT 15
  `.catch(() => []),
 
- // clicksBySource — store clicks grouped by utm_source
+ // clicksBySource: store clicks grouped by utm_source
  cutoffIso
  ? sql`
  SELECT utm_source, COUNT(*)::int AS clicks
@@ -503,7 +503,7 @@ export async function GET(request: NextRequest) {
  ORDER BY clicks DESC
  `.catch(() => []),
 
- // conversionsBySource — ONE ROW PER ORDER, carrying every attribution candidate,
+ // conversionsBySource: ONE ROW PER ORDER, carrying every attribution candidate,
  // so first-touch and last-touch can both be computed without running the join twice.
  // There are fewer than a hundred orders, so aggregating in JS is cheaper than two
  // GROUP BY passes and keeps the two definitions provably consistent.
@@ -561,7 +561,7 @@ export async function GET(request: NextRequest) {
  `.catch(() => []),
  ]);
 
- // Parse Shopify Collabs cached data (all-time totals — for the Collabs tab display only)
+ // Parse Shopify Collabs cached data (all-time totals, for the Collabs tab display only)
  let collabsTotalOrders = 0;
  let collabsEstimatedRevenue = 0;
  let collabsTotalCommission = 0;
@@ -645,7 +645,7 @@ export async function GET(request: NextRequest) {
  views: r.views,
  })),
 // Rolled up through normalizeStoredSource so legacy browser-name rows (chrome,
- // safari, edge — written by the old user-agent fallback in GlobalPageTracker)
+ // safari, edge: written by the old user-agent fallback in GlobalPageTracker)
  // collapse into a single honest "Direct" row instead of showing as four fake
  // sources. Same helper the customers list uses, so the two now reconcile.
  trafficSources: rollUpBySource(
@@ -669,7 +669,7 @@ export async function GET(request: NextRequest) {
  // LAST touch   = the click that carried them to the order, else their most recent visit.
  //                (What the panel showed before, and all it showed.)
  // Both are computed from the SAME order rows, so the two columns always sum to the
- // same order count and the same revenue — they only disagree about who gets credit.
+ // same order count and the same revenue. They only disagree about who gets credit.
  ...(() => {
   const orderRows = conversionsBySourceResult as {
    order_total: number;

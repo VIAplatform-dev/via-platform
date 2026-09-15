@@ -5,11 +5,11 @@
 //
 // The two worlds:
 //
-//  • US and Canada — sales tax depends on the BUYER's address. The same dress is 0% in Portland
+//  • US and Canada. Sales tax depends on the BUYER's address. The same dress is 0% in Portland
 //    and 10.25% in Chicago. There is no single all-in number a seller could print, so prices are
 //    shown before tax and it's added at the till. "200" means $200 plus whatever applies.
 //
-//  • UK, EU, Australia and most of the rest — VAT/GST is one rate for the destination country, so
+//  • UK, EU, Australia and most of the rest. VAT/GST is one rate for the destination country, so
 //    an all-in price is possible, and consumer law REQUIRES that shoppers see it. "200" means
 //    £200 total, with the VAT already inside it.
 //
@@ -25,7 +25,7 @@ export type TaxBehavior = "inclusive" | "exclusive";
 /**
  * Countries where consumer prices are shown tax-inclusive.
  *
- * Not exhaustive for the whole world — it covers everywhere VYA's stores actually are, plus the
+ * Not exhaustive for the whole world. It covers everywhere VYA's stores actually are, plus the
  * places they sell into. Anything unlisted falls to exclusive, which is the safe direction: a
  * price shown before tax and then taxed is a normal US checkout, whereas wrongly treating an
  * exclusive price as inclusive silently eats the seller's margin.
@@ -56,7 +56,7 @@ export function normalizeCountry(raw: unknown): string | null {
 /**
  * Whether a store in this country types tax-inclusive prices.
  *
- * Unknown countries default to EXCLUSIVE. That's the conservative direction — see the note on
+ * Unknown countries default to EXCLUSIVE. That's the conservative direction. See the note on
  * TAX_INCLUSIVE_COUNTRIES.
  */
 export function pricesIncludeTaxFor(country: unknown): boolean {
@@ -80,7 +80,7 @@ export function taxBehaviorFor(country: unknown): TaxBehavior {
  * The case this exists for is the export. A UK seller ships to the US: UK VAT is zero-rated on
  * exports, so the only tax that could apply is US sales tax. Marked "inclusive", Stripe would take
  * that US tax OUT of her £200 and she would absorb it silently. Marked "exclusive", it is added on
- * top the way a US buyer expects — and where she has no US registration, nothing is added at all,
+ * top the way a US buyer expects, and where she has no US registration, nothing is added at all,
  * which is the common case and the correct one.
  *
  * Domestic sales are unaffected: a UK seller to a UK buyer is still inclusive, which UK consumer
@@ -88,7 +88,7 @@ export function taxBehaviorFor(country: unknown): TaxBehavior {
  */
 export function taxBehaviorForSale(sellerCountry: unknown, buyerCountry: unknown): TaxBehavior {
  const buyer = normalizeCountry(buyerCountry);
- // No destination yet (the address comes later in some flows) — fall back to the seller's own
+ // No destination yet (the address comes later in some flows). Fall back to the seller's own
  // convention, which is right for the domestic sale that most orders are.
  if (!buyer) return taxBehaviorFor(sellerCountry);
  return pricesIncludeTaxFor(sellerCountry) && pricesIncludeTaxFor(buyer) ? "inclusive" : "exclusive";
@@ -97,7 +97,7 @@ export function taxBehaviorForSale(sellerCountry: unknown, buyerCountry: unknown
 /**
  * The seller's actual revenue from a gross, tax-inclusive amount.
  *
- * `taxCents` is what was actually collected, which is the only number worth trusting — rates vary
+ * `taxCents` is what was actually collected, which is the only number worth trusting. Rates vary
  * by destination and by what the piece is, so a store-level rate would be a guess. When we don't
  * know the tax, the gross is returned unchanged and the caller is expected to SAY so rather than
  * quietly present a number that's up to a fifth too high.
@@ -113,14 +113,14 @@ export function netRevenueCents(grossCents: number, taxCents: number | null | un
 /**
  * Split a tax-inclusive gross into net and tax at a known rate.
  *
- * Used where a rate genuinely is known (a store's own standard VAT rate, for a projection) — never
+ * Used where a rate genuinely is known (a store's own standard VAT rate, for a projection), never
  * for reporting money that has actually moved, which uses the collected figure instead.
  */
 export function splitInclusive(grossCents: number, ratePercent: number): { netCents: number; taxCents: number } {
  const gross = Math.round(Number(grossCents) || 0);
  const rate = Number(ratePercent) || 0;
  if (!Number.isFinite(gross) || gross <= 0 || rate <= 0) return { netCents: Math.max(0, gross), taxCents: 0 };
- // £200 at 20% is £166.67 + £33.33 — divide by 1.20, don't take 20% off.
+ // £200 at 20% is £166.67 + £33.33. Divide by 1.20, don't take 20% off.
  const net = Math.round(gross / (1 + rate / 100));
  return { netCents: net, taxCents: gross - net };
 }

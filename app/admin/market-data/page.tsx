@@ -225,7 +225,7 @@ export default function MarketDataPage() {
  const d = await r.json();
  if (d.error) { setBackfillResult(`Error: ${d.error}`); }
  else {
- setBackfillResult(`Done — ${d.inserted} items imported. Reloading…`);
+ setBackfillResult(`Done: ${d.inserted} items imported. Reloading…`);
  setTimeout(() => { setDays((v) => { fetch(`/api/admin/market-data?days=${v}`).then(r => r.json()).then(d => { if (!d?.error && d?.summary) setData(d); }); return v; }); }, 800);
  }
  } catch (e) {
@@ -343,7 +343,7 @@ export default function MarketDataPage() {
  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 32 }}>
  <StatCard label="Total GMV" value={fmt(totalGmv)} sub={days >= 3650 ? "All time" : `Last ${days} days`} />
  <StatCard label="Total Orders" value={fmt(totalOrders, false)} sub={days >= 3650 ? "All time" : `Last ${days} days`} />
- <StatCard label="Avg Order Value" value={avgOrder > 0 ? fmt(avgOrder) : "—"} sub="Per conversion" />
+ <StatCard label="Avg Order Value" value={avgOrder > 0 ? fmt(avgOrder) : "-"} sub="Per conversion" />
  </div>
 
  {weekly.length > 0 && (
@@ -378,7 +378,7 @@ export default function MarketDataPage() {
  {/* Stats row */}
  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
  <StatCard label="Product Views on VYA" value={fmt(d.totalClicks, false)} sub={days >= 3650 ? "All time" : `Last ${days} days`} />
- <StatCard label="Unique Shoppers" value={fmt(d.uniqueUsers, false)} sub="Logged-in users only — most browsing is anonymous" />
+ <StatCard label="Unique Shoppers" value={fmt(d.uniqueUsers, false)} sub="Logged-in users only. Most browsing is anonymous" />
  <StatCard label="Stores Browsed" value={fmt(d.storesActive, false)} sub="Active in period" />
  <StatCard label="Unique Products Viewed" value={fmt(d.uniqueProducts, false)} sub="Distinct items browsed" />
  </div>
@@ -413,7 +413,7 @@ export default function MarketDataPage() {
  {/* Most wanted products */}
  <div style={{ background: "#fff", border: "1px solid #e4e4e7", borderRadius: 8, padding: 24 }}>
  <h2 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "#a1a1aa", fontWeight: 500, marginBottom: 4 }}>Most-Viewed Items</h2>
- <p style={{ fontSize: 12, color: "#71717a", marginBottom: 16 }}>Products viewed most on VYA — source more like these</p>
+ <p style={{ fontSize: 12, color: "#71717a", marginBottom: 16 }}>Products viewed most on VYA. Source more like these</p>
  {d.topProducts.length === 0
  ? <p style={{ fontSize: 13, color: "#a1a1aa" }}>No click data yet.</p>
  : (
@@ -439,7 +439,7 @@ export default function MarketDataPage() {
  {d.topDesigners.length > 0 && (
  <div style={{ background: "#fff", border: "1px solid #e4e4e7", borderRadius: 8, padding: 24 }}>
  <h2 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "#a1a1aa", fontWeight: 500, marginBottom: 4 }}>Trending Designers / Brands</h2>
- <p style={{ fontSize: 12, color: "#71717a", marginBottom: 16 }}>Based on product views on VYA — source more from these labels</p>
+ <p style={{ fontSize: 12, color: "#71717a", marginBottom: 16 }}>Based on product views on VYA. Source more from these labels</p>
  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 8 }}>
  {d.topDesigners.map((des, i) => {
  const maxClicks = d.topDesigners[0]?.clicks ?? 1;
@@ -571,7 +571,7 @@ export default function MarketDataPage() {
  const thStyle: React.CSSProperties = { padding: "10px 16px", textAlign: "left", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "#a1a1aa", fontWeight: 500 };
  const tdBase: React.CSSProperties = { padding: "10px 16px" };
  const engCol = (n: number) => (
- <td style={{ ...tdBase, color: n > 0 ? "#09090b" : "#d4d4d8" }}>{n > 0 ? fmt(n, false) : "—"}</td>
+ <td style={{ ...tdBase, color: n > 0 ? "#09090b" : "#d4d4d8" }}>{n > 0 ? fmt(n, false) : "-"}</td>
  );
 
  const InventoryTable = ({ label, note, nameKey, rows }: {
@@ -622,13 +622,13 @@ export default function MarketDataPage() {
  <div style={{ display: "grid", gap: 24 }}>
  <InventoryTable
  label="Designers / Brands"
- note="From Shopify vendor field — sorted by most viewed on VYA"
+ note="From Shopify vendor field. Sorted by most viewed on VYA"
  nameKey="Designer"
  rows={brands.map((b) => ({ name: b.brand, ...b }))}
  />
  <InventoryTable
  label="Categories"
- note="From Shopify product type field — sorted by most viewed on VYA"
+ note="From Shopify product type field. Sorted by most viewed on VYA"
  nameKey="Category"
  rows={categories.map((c) => ({ name: c.category, ...c }))}
  />
@@ -690,7 +690,7 @@ export default function MarketDataPage() {
  <div style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.title}</div>
  <div style={{ fontSize: 11, color: "#a1a1aa" }}>{p.storeSlug}</div>
  </td>
- <td style={{ padding: "10px 16px", color: "#71717a" }}>{p.designer ?? "—"}</td>
+ <td style={{ padding: "10px 16px", color: "#71717a" }}>{p.designer ?? "-"}</td>
  <td style={{ padding: "10px 16px", color: "#a1a1aa", textDecoration: "line-through" }}>{fmt(p.oldPrice)}</td>
  <td style={{ padding: "10px 16px", fontWeight: 600 }}>{fmt(p.newPrice)}</td>
  <td style={{ padding: "10px 16px", color: "#dc2626", fontWeight: 600 }}>

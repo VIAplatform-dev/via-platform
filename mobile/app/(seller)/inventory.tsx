@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
-import { Link, useLocalSearchParams } from "expo-router";
+import { Link, router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
@@ -12,11 +12,11 @@ import { daysListed, ageLabel, AGING_THRESHOLDS } from "../../lib/seller/aging";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { SearchBox } from "../../components/seller/Search";
 
-// Inventory — a list, not a table.
+// Inventory: a list, not a table.
 //
 // Photo, name, price, and a dot for state. Bulk selection and multi-column editing stay on the
 // desktop, where a table earns its keep and a mouse makes it quick. The search box at the top is
-// the counter question — "do we still have the green Fendi?" — answered without scrolling.
+// the counter question, "do we still have the green Fendi?". Answered without scrolling.
 
 type Item = {
   id: string;
@@ -57,15 +57,15 @@ export default function InventoryScreen() {
   const { storeSlug } = useAuth();
   const [filter, setFilter] = useState<InventoryFilter>("all");
   // List or grid. A list answers "what is this and what does it cost"; a grid answers "which one
-  // was it" — and on a rail of forty vintage pieces the second question is the common one, because
+  // was it", and on a rail of forty vintage pieces the second question is the common one, because
   // she remembers the garment, not the title she typed for it.
   const [grid, setGrid] = useState(false);
-  // Home's "Needs you" rows arrive here with ?missing=photo|price|cost|confidence — the web
+  // Home's "Needs you" rows arrive here with ?missing=photo|price|cost|confidence: the web
   // Inventory's own keys. Seeded once from the URL; the chip clears it like any other filter.
   const params = useLocalSearchParams<{ missing?: string }>();
   const [missing, setMissing] = useState(() => parseMissing(params.missing));
 
-  // ?view=list — photo, name, price, cost, state, dates, and nothing else. The whole row is 44
+  // ?view=list: photo, name, price, cost, state, dates, and nothing else. The whole row is 44
   // columns and 12.5 MB on the largest store on the platform, most of it descriptions this screen
   // never draws. Opening a piece fetches that piece. See app/lib/item-list-shape.ts.
   const q = useQuery({
@@ -73,7 +73,7 @@ export default function InventoryScreen() {
     queryFn: () => apiGet<{ items: Item[] }>("/api/store/items?view=list"),
     enabled: !!storeSlug,
   });
-  // Which reserved pieces a PERSON is holding — the rest are buyers mid-checkout, and the two
+  // Which reserved pieces a PERSON is holding. The rest are buyers mid-checkout, and the two
   // must not share a word (lib/seller/inventory.ts reservedWord).
   const holds = useQuery({
     queryKey: ["store", "holds"],
@@ -97,7 +97,7 @@ export default function InventoryScreen() {
   const visible = lacks(filterItems(all, filter), missing, attention.data?.lowConfidenceIds ?? []);
   // "Sold this week" comes from the SERVER, not from reading the device clock during render.
   // Two reasons: reading the clock in render is impure, and the store's week is the server's
-  // week — a seller in another timezone should not see a different number than her dashboard.
+  // week: a seller in another timezone should not see a different number than her dashboard.
   const soldThisWeek = week.data?.orders ?? 0;
 
   return (
@@ -108,7 +108,23 @@ export default function InventoryScreen() {
       refreshing={q.isRefetching}
     >
       <SearchBox />
-      <View style={{ height: spacing.md }} />
+
+      {/* A SECOND DOOR TO LISTING A RAIL. The screen exists. Forty photos in, grouped into pieces,
+          priced or drafted in one pass, and until now the only way in was an unlabelled icon
+          inside the camera, which is not a place anyone looks for a bulk import. Inventory is where
+          she stands when she is thinking about a rail rather than a piece.
+
+          Its own row, above the filters rather than beside them: the words are the point, and the
+          chips wrap onto a second line if this sits in with them. */}
+      <Pressable
+        onPress={() => router.push("/(seller)/new/bulk")}
+        accessibilityLabel="List multiple items"
+        style={{ alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, borderWidth: 1, borderColor: colors.border }}
+      >
+        <Feather name="layers" size={15} color={colors.text} />
+        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }} numberOfLines={1}>List multiple items</Text>
+      </Pressable>
+
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <View style={{ flex: 1 }}>
           <Chips options={CHIPS} value={filter} onChange={setFilter} />
@@ -132,7 +148,7 @@ export default function InventoryScreen() {
       {q.isError ? (
         <Empty>Couldn&apos;t load your inventory. Pull to try again.</Empty>
       ) : visible.length === 0 && !q.isPending ? (
-        <Empty>{missing ? `Nothing with ${missingLabel(missing).toLowerCase()}.` : filter === "all" ? "Nothing listed yet. Tap + to add a piece." : `Nothing ${filter === "drafts" ? "in drafts" : filter}.`}</Empty>
+        <Empty>{missing ? `Nothing with ${missingLabel(missing).toLowerCase()}.` : filter === "all" ? "Nothing listed yet. Tap + for one piece, or List multiple items for a whole rail." : `Nothing ${filter === "drafts" ? "in drafts" : filter}.`}</Empty>
       ) : grid ? (
         // Photos only, three across. No price, no title: the point of this view is the picture, and
         // a caption under every tile turns it back into the list it is meant to be an alternative to.
@@ -147,7 +163,7 @@ export default function InventoryScreen() {
                     <Text style={{ fontSize: 11, color: colors.textDim, textAlign: "center", paddingHorizontal: 6 }} numberOfLines={2}>{it.title}</Text>
                   </View>
                 )}
-                {/* The state dot still shows — a grid you cannot tell sold from live in is a grid
+                {/* The state dot still shows. A grid you cannot tell sold from live in is a grid
                     she has to leave to answer the question she opened it with. */}
                 <View style={{ position: "absolute", top: 6, right: 6 }}>
                   <Dot status={it.status} />

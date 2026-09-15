@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 // Placeholder imagery for the template gallery, served as a real URL rather than a data: URI.
 //
 // Why a route and not a data URI: several block types store their image lists as ONE string and
-// split it on commas as well as newlines (see ITEM_SCHEMAS `loose` in storefront-items.ts — the
+// split it on commas as well as newlines (see ITEM_SCHEMAS `loose` in storefront-items.ts. The
 // gallery and marquee accept either, because sellers paste both). Every data URI contains a comma
 // by definition, so each one was torn into two broken fragments. A plain URL has no comma and
 // survives any of those parsers.
@@ -21,7 +21,7 @@ export function GET(req: NextRequest) {
  const bg = HEX.test(q.get("bg") || "") ? `#${q.get("bg")}` : "#FFFFFF";
  const tone = TONES[Math.abs(Number(q.get("i")) || 0) % TONES.length];
 
- // preserveAspectRatio="none" — the panel STRETCHES to whatever box it lands in rather than being
+ // preserveAspectRatio="none": the panel STRETCHES to whatever box it lands in rather than being
  // cropped. That matters because these slots run from a 5-up thumbnail to a full-bleed band: with
  // the default slice behaviour any artwork inside is scaled up with the box, which is how a small
  // picture icon became a two-metre-wide drawing across the top of the page.

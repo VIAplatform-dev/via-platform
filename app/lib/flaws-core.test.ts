@@ -20,7 +20,7 @@ test("at most 12 flaws, each at most 140 characters", () => {
 });
 
 test("a flaw that merely repeats the condition word is not a flaw", () => {
- // The AI sometimes echoes the grade back ("Good", "very good condition") — that's the condition
+ // The AI sometimes echoes the grade back ("Good", "very good condition"). That's the condition
  // field's job, and printing it twice under a Flaws heading reads as a defect that isn't there.
  assert.deepEqual(normalizeFlaws(["Good", "good condition", "scuffed heel"], "Good"), ["scuffed heel"]);
  assert.deepEqual(normalizeFlaws(["Very good"], "Very Good"), []);

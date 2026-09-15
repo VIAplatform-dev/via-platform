@@ -13,7 +13,7 @@ import crypto from "crypto";
 export const dynamic = "force-dynamic";
 
 // Create a self-onboarded store from the signup wizard. The caller must be signed in
-// (magic link) — we take the owner email from the session, never the request body, so a
+// (magic link): we take the owner email from the session, never the request body, so a
 // store can't be created for someone else. Idempotent: a refresh/double-submit returns the
 // store already made rather than creating a duplicate. Does its own auth (in PUBLIC_ROUTES).
 
@@ -21,7 +21,7 @@ const CATEGORIES = new Set(["vintage", "designer", "streetwear", "y2k", "denim",
 const CHANNELS = new Set(["shopify", "square", "depop", "instagram", "in-person", "none"]);
 
 export async function POST(request: NextRequest) {
- // A seller's own session, and nothing else. The owner's admin cookie is not a store identity —
+ // A seller's own session, and nothing else. The owner's admin cookie is not a store identity,
  // a store needs an email to attach, and there is no sensible one to invent. Anyone reaching this
  // without a seller session is sent to sign in BEFORE the wizard, not after they've filled it in.
  const session = await auth();
@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
  // what stops a seller ending up with two half-built shops she didn't mean to create.
  //
  // But the flow itself has to be testable and demonstrable, and it could only ever be walked once
- // per email address — so trying a change to it meant inventing a new address every time. An admin
+ // per email address, so trying a change to it meant inventing a new address every time. An admin
  // who passes `startOver` skips the early return and gets a genuinely new store, its slug
  // uniquified by generateUniqueSlug (gianna-test, gianna-test-2, …). Never automatic: without the
  // flag an admin behaves exactly like a seller, so a stray refresh still can't fork her store.
  const startOver = body?.startOver === true && isAdminEmail(email);
 
- // Already attached to a store? Return it (idempotent) — never a second store for the same owner.
+ // Already attached to a store? Return it (idempotent), never a second store for the same owner.
  if (!startOver) {
  const existingSlug = await storeSlugForEmail(email);
  if (existingSlug) return NextResponse.json({ ok: true, slug: existingSlug, existing: true });
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
   try { websiteUrl = new URL(withScheme).toString(); } catch { websiteUrl = null; }
  }
  const sellsCategory = CATEGORIES.has(body?.sellsCategory) ? String(body.sellsCategory) : null;
- // The full multi-select (preset keys + any free-typed categories) — kept for pricing/category tuning.
+ // The full multi-select (preset keys + any free-typed categories). Kept for pricing/category tuning.
  const sellsCategories = Array.isArray(body?.sellsCategories) ? body.sellsCategories.map((c: unknown) => String(c).slice(0, 40)).filter(Boolean).slice(0, 12) : [];
  const sellsChannel = CHANNELS.has(body?.sellsChannel) ? String(body.sellsChannel) : null;
 
@@ -102,20 +102,20 @@ export async function POST(request: NextRequest) {
  logActivity({ storeSlug: slug, email, kind: seeded ? "store-claimed" : "store-created", detail: name });
  // And a seller row, now rather than on her first write.
  //
- // Everything downstream keys off seller.id — inventory, orders, every analytics metric — and it
+ // Everything downstream keys off seller.id, inventory, orders, every analytics metric, and it
  // was created lazily by whichever write happened first: an import, a market session, a publish.
  // A store that had signed up and not yet listed anything therefore had no identity to key off, so
  // her Analytics answered 404 and the page said "Analytics unavailable. Try refreshing." That is a
  // seller's first look at the screen meant to convince her to stay, on the one day she has no data
  // and most needs to see what she is going to get.
- await getOrCreateSeller(slug, name, email).catch(() => null); /* allow-swallow: additive — the store is created either way, and the lazy path still creates this on first write */
+ await getOrCreateSeller(slug, name, email).catch(() => null); /* allow-swallow: additive: the store is created either way, and the lazy path still creates this on first write */
 
  // The 30-day trial starts now (store_accounts.created_at); payouts/going-live stay held
  // until they pick a paid tier (store_plans / isEntitled). hasWebsite tells the client
  // whether to route into import (paste URL → scrape) or the builder.
- // `seeded` tells the client her pieces are already in — so it can send her to inventory rather
+ // `seeded` tells the client her pieces are already in, so it can send her to inventory rather
  // than to a "paste your website" step that would re-import what she already has.
- // A seeded store may ALSO have had its site captured ahead of time — pages, theme, the lot. When
+ // A seeded store may ALSO have had its site captured ahead of time. Pages, theme, the lot. When
  // it has, there is nothing left to import and re-scraping would only rebuild what's already live.
  // When it hasn't, she has her pieces but a stock storefront, and the capture still has to run.
  const alreadyCaptured = seeded ? await hasCaptures(slug).catch(() => false) : false;

@@ -8,7 +8,7 @@ import type { BookingEmbed } from "@/app/lib/appointments/embed-core";
 /**
  * Booking a time with the shop.
  *
- * Deliberately not tied to rentals — a store that only sells still takes fittings, sourcing chats
+ * Deliberately not tied to rentals. A store that only sells still takes fittings, sourcing chats
  * and collections. It works from a STORE (an appointments section anywhere on the site) or from a
  * PIECE (the rent box, which knows its item), and the shape is the same either way.
  *
@@ -29,9 +29,9 @@ export default function AppointmentBooker({
  const [slots, setSlots] = useState<Slot[] | null>(null);
  const [types, setTypes] = useState<string[]>([]);
  const [external, setExternal] = useState<{ url: string; embed: BookingEmbed | null } | null>(null);
- // The endpoint 404s when a shop hasn't turned appointments on — worth saying, not hiding.
+ // The endpoint 404s when a shop hasn't turned appointments on. Worth saying, not hiding.
  const [off, setOff] = useState(false);
- // Hours never set, versus set but nothing free — different problems, different words.
+ // Hours never set, versus set but nothing free. Different problems, different words.
  const [configured, setConfigured] = useState(true);
  const [day, setDay] = useState("");
  const [start, setStart] = useState("");
@@ -40,13 +40,13 @@ export default function AppointmentBooker({
  const [busy, setBusy] = useState(false);
  const [done, setDone] = useState<{ day: string; start: string } | null>(null);
  // A deposit the shop asks for to hold the slot. The booking row exists either way; until this is
- // paid the time isn't held and the sweep releases it — so it's a step, not a receipt.
+ // paid the time isn't held and the sweep releases it, so it's a step, not a receipt.
  const [deposit, setDeposit] = useState<Deposit | null>(null);
  const [err, setErr] = useState<string | null>(null);
 
  useEffect(() => {
   let live = true;
-  // Nothing to identify the shop by means we're in the editor — the API resolves it from the session.
+  // Nothing to identify the shop by means we're in the editor. The API resolves it from the session.
   const q = itemId ? `?itemId=${encodeURIComponent(itemId)}` : storeSlug ? `?store=${encodeURIComponent(storeSlug)}` : "";
   fetch(`/api/store/appointments/slots${q}`)
    .then(async (r) => (r.ok ? r.json() : { __off: r.status === 404 }))

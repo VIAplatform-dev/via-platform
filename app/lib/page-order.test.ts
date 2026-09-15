@@ -19,7 +19,7 @@ test("with no saved order the caller's order stands", () => {
 });
 
 test("a page added since she last dragged anything still appears", () => {
- // Appended, not inserted — anywhere else would shuffle the row she deliberately set.
+ // Appended, not inserted. Anywhere else would shuffle the row she deliberately set.
  const out = applyPageOrder(["/journal", "/"], ["/", "/journal", "/collections/new-in"]);
  assert.deepEqual(out, ["/journal", "/", "/collections/new-in"]);
 });
@@ -63,7 +63,7 @@ test("what gets stored is checked, because it arrives from a browser", () => {
  assert.deepEqual(sanitizePageOrder(null, actual), []);
 });
 
-test("the stored order is capped — an unbounded array from a client is an unbounded row", () => {
+test("the stored order is capped. An unbounded array from a client is an unbounded row", () => {
  const actual = Array.from({ length: 20 }, (_, i) => `/p${i}`);
  assert.equal(sanitizePageOrder(actual, actual, 5).length, 5);
 });

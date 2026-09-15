@@ -12,7 +12,7 @@ const HOLD_MINUTES = 10;
 // own path rather than as POST on the seller's /bookings.
 
 /**
- * POST — take the dates for a checkout in progress.
+ * POST, take the dates for a checkout in progress.
  *
  * Availability is re-checked here and then again by the database itself. The
  * second check is the one that counts: between quoting and inserting, someone

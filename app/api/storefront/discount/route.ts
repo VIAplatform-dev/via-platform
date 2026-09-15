@@ -6,7 +6,7 @@ import { getSellerById } from "@/app/lib/db/sellers";
 
 export const dynamic = "force-dynamic";
 
-// POST { code, subtotalCents?, storeSlug? | itemId? } — buyer-facing check that a code is
+// POST { code, subtotalCents?, storeSlug? | itemId? }: buyer-facing check that a code is
 // valid FOR THIS STORE. validateDiscount is scoped by store_slug, so a code only ever
 // resolves for its own store; another store's code returns { ok: false }.
 export async function POST(request: NextRequest) {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
  if (!d) return NextResponse.json({ ok: false, error: "That code isn’t valid for this store." });
 
  // The SAME rule the payment will use. If this quote and the intent disagree, the shopper is shown
- // one price and charged another — see app/lib/discount-scope.ts.
+ // one price and charged another. See app/lib/discount-scope.ts.
  const subtotal = Math.max(0, Math.round(Number(body.subtotalCents) || 0));
  const lines: OrderLine[] = Array.isArray(body.lines) && body.lines.length
  ? body.lines.filter((l): l is OrderLine => !!l && typeof l.itemId === "string").map((l) => ({ itemId: l.itemId, amountCents: Math.max(0, Math.round(Number(l.amountCents) || 0)) }))

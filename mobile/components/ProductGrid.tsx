@@ -4,7 +4,7 @@ import ProductCard from "./ProductCard";
 import type { Product } from "../lib/types";
 import { colors, fonts, spacing } from "../lib/theme";
 
-// The two-column grid. Edge-to-edge with a hairline gutter, so the photographs carry the page —
+// The two-column grid. Edge-to-edge with a hairline gutter, so the photographs carry the page,
 // the shipped app runs the images nearly full-bleed and lets the cream ground show only between
 // them, which is why the outer padding here is small and the cards have no rounding or shadow.
 
@@ -34,7 +34,7 @@ export default function ProductGrid({
   // They used to sit below the spinner branch, which crashed every marketplace screen the moment
   // its data arrived: the first render (loading, nothing yet) ran one hook, the next ran three, and
   // React aborts the tree with "Rendered more hooks than during the previous render." It reached a
-  // seller as "everything I tap on the marketplace breaks" — the feed, collections, search, every
+  // seller as "everything I tap on the marketplace breaks". The feed, collections, search, every
   // store page, because all of them render through here and all of them start empty.
   //
   // Hoisted out of the JSX for the reason the perf pass added them: an inline renderItem is a new

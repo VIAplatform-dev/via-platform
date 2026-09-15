@@ -6,10 +6,10 @@ import { recordIntakeExample } from "@/app/lib/training-data-db";
 
 export const dynamic = "force-dynamic";
 
-// Silent autosave of an in-progress intake as a DRAFT — so leaving the add-listing screen
+// Silent autosave of an in-progress intake as a DRAFT, so leaving the add-listing screen
 // (e.g. clicking out to consignment) before publishing/scheduling never loses the work.
 // Upserts by draftId so repeated saves update one row instead of piling up duplicates.
-// Deliberately lightweight: NO rememberItem / logPredictions / cross-listing — those belong
+// Deliberately lightweight: NO rememberItem / logPredictions / cross-listing. Those belong
 // to a real publish, not an autosave. Also serves navigator.sendBeacon on tab-close/unmount.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
  const input = sanitizeListingInput(body, store?.currency || "USD");
  input.status = "draft"; // an autosave is always a draft
 
- // Nothing worth persisting yet (no photos and no title) — no-op, don't create empty drafts.
+ // Nothing worth persisting yet (no photos and no title), no-op, don't create empty drafts.
  if (!input.images.length && !input.title) {
   return NextResponse.json({ ok: true, id: typeof body?.draftId === "string" ? body.draftId : null, skipped: true });
  }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
  let listing = draftId ? await updateListing(draftId, slug, input) : null; // upsert existing draft
  if (!listing) listing = await createListing(slug, input); // first save (or the draft was deleted)
 
- // Record the accuracy signal for this DRAFT (not only at publish) — the seller's edits to the AI
+ // Record the accuracy signal for this DRAFT (not only at publish). The seller's edits to the AI
  // draft are the label, and most test drafts are never published. Only when the AI actually drafted
  // (aiDraft present); upserts per draft id, so each save refreshes the same row. Best-effort.
  const ai = (body.aiDraft && typeof body.aiDraft === "object" ? body.aiDraft : {}) as Record<string, unknown>;
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
    ai: { brand: aiStr("brand"), era: aiStr("era"), material: aiStr("material"), condition: aiStr("condition"), category: aiStr("category"), title: aiStr("title"), description: aiStr("description"), runway: null, celebrity: null },
    reverseImage: body.reverseImage ?? null,
    promptVersion: typeof body.promptVersion === "string" ? body.promptVersion : null,
-   trust: "medium", // an unpublished draft — reviewed=high is only stamped at publish
+   trust: "medium", // an unpublished draft: reviewed=high is only stamped at publish
   }).catch(() => {});
  }
  return NextResponse.json({ ok: true, id: listing?.id ?? null });

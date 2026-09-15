@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { randomUUID } from "crypto";
 
-// Consumer price offers on a store's pieces — the Depop/Poshmark negotiation. A buyer offers a
+// Consumer price offers on a store's pieces. The Depop/Poshmark negotiation. A buyer offers a
 // price; the store accepts / declines / counters; either side can counter back until someone
 // accepts (or it expires). Every move is logged so both sides see the full back-and-forth.
 
@@ -25,24 +25,38 @@ export type Offer = {
  listPriceCents: number;
  amountCents: number; // the current offer on the table
  status: OfferStatus;
- lastActor: OfferActor; // whose move it was — the other side responds
+ lastActor: OfferActor; // whose move it was. The other side responds
  binding: boolean;
  consumedAt: string | null; // set once a binding offer has been redeemed at checkout (single-use)
  consumedOrderId: string | null;
+ /**
+  * What a BINDING offer needs so that accepting it can simply take the money.
+  *
+  * A non-binding offer carries none of this and never asks for it. A binding one is a checkout
+  * that hasn't been charged yet: the buyer authorises a card and says where it goes, and the
+  * seller pressing Accept is the moment it becomes a sale. Without both, accepting could only ever
+  * email her a link, which is the thing binding is supposed to remove.
+  *
+  * The card is stored as Stripe ids, never as a number. Neither VYA nor the seller ever sees one.
+  */
+ stripeCustomerId: string | null;
+ stripePaymentMethodId: string | null;
+ /** Where it goes, taken with the offer. JSON: name, line1, line2, city, state, zip, country, phone. */
+ shipTo: Record<string, string> | null;
  createdAt: string;
  updatedAt: string;
  expiresAt: string;
 };
 
 // The buyer's offer page is reachable by anyone holding the token (it's emailed, so it gets
-// forwarded and lands in shared history). This is the ONLY shape that may be served there —
+// forwarded and lands in shared history). This is the ONLY shape that may be served there,
 // an explicit allowlist, so a field added to Offer later is private by default rather than
 // silently published. Contact details (buyerName/buyerEmail) and internal bookkeeping
 // (consumedOrderId) stay server-side; the store sees those through its authenticated inbox.
 export type PublicOffer = Pick<
  Offer,
  "storeSlug" | "itemId" | "itemTitle" | "listPriceCents" | "amountCents" | "status" | "lastActor" | "binding" | "expiresAt"
->;
+> & { paid: boolean };
 
 export function publicOffer(o: Offer): PublicOffer {
  return {
@@ -55,6 +69,12 @@ export function publicOffer(o: Offer): PublicOffer {
  lastActor: o.lastActor,
  binding: o.binding,
  expiresAt: o.expiresAt,
+ // WHETHER THE MONEY WENT THROUGH, and nothing about the order behind it. A binding offer normally
+ // charges the moment the shop accepts, but a card can decline, and then the shop falls back to
+ // holding the piece and emailing a link. Without this the buyer's page tells a buyer who still
+ // owes money that she has paid. A yes or no is all it takes to say the right thing, and it gives
+ // away nothing that the accepted status does not already.
+ paid: Boolean(o.consumedAt),
  };
 }
 
@@ -84,6 +104,12 @@ async function ensure() {
  // Self-healing: existing tables predate the single-use redemption columns.
  await sql`ALTER TABLE storefront_offers ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMPTZ`;
  await sql`ALTER TABLE storefront_offers ADD COLUMN IF NOT EXISTS consumed_order_id TEXT`;
+ // What a binding offer carries so that accepting it can take the money: a card the buyer has
+ // already authorised, and somewhere to send the piece. Stripe ids only; no card number is stored
+ // by VYA or ever seen by the seller.
+ await sql`ALTER TABLE storefront_offers ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
+ await sql`ALTER TABLE storefront_offers ADD COLUMN IF NOT EXISTS stripe_payment_method_id TEXT`;
+ await sql`ALTER TABLE storefront_offers ADD COLUMN IF NOT EXISTS ship_to JSONB`;
  await sql`CREATE TABLE IF NOT EXISTS storefront_offer_events (
  id SERIAL PRIMARY KEY,
  offer_id INTEGER NOT NULL REFERENCES storefront_offers(id) ON DELETE CASCADE,
@@ -119,6 +145,9 @@ function mapOffer(r: any): Offer {
  status: effectiveStatus(r),
  lastActor: (r.last_actor as OfferActor) || "buyer",
  binding: !!r.binding,
+ stripeCustomerId: (r.stripe_customer_id as string | null) ?? null,
+ stripePaymentMethodId: (r.stripe_payment_method_id as string | null) ?? null,
+ shipTo: r.ship_to ? (typeof r.ship_to === "string" ? JSON.parse(r.ship_to as string) : (r.ship_to as Record<string, string>)) : null,
  consumedAt: r.consumed_at ?? null,
  consumedOrderId: r.consumed_order_id ?? null,
  createdAt: r.created_at,
@@ -166,10 +195,30 @@ export async function getRedeemableBindingOffer(token: string, itemId: string): 
  return o;
 }
 
-/** Mark a binding offer as redeemed (single-use). Idempotent — only the first order wins. */
+/**
+ * Mark a binding offer as redeemed (single-use). Idempotent, only the first order wins.
+ *
+ * Keyed on the ORDER ID being unset rather than on consumed_at, because a binding offer charged at
+ * acceptance is already stamped consumed by then (markOfferPaid, below) and the order id would
+ * never be written. The single-use guarantee is unchanged: a second order still finds it taken.
+ */
 export async function markOfferConsumed(token: string, orderId: string): Promise<void> {
  await ensure();
- await db()`UPDATE storefront_offers SET consumed_at = now(), consumed_order_id = ${orderId}, updated_at = now()
+ await db()`UPDATE storefront_offers SET consumed_at = COALESCE(consumed_at, now()), consumed_order_id = ${orderId}, updated_at = now()
+ WHERE token = ${token} AND consumed_order_id IS NULL`.catch(() => {});
+}
+
+/**
+ * The money is taken. Stamped by the accept itself, not by the webhook that follows it.
+ *
+ * WHY NOT WAIT FOR THE WEBHOOK. It is the webhook that writes the order, and it arrives a second or
+ * two later, sometimes more. In that gap the offer is charged but not marked, and a buyer refreshing
+ * her offer page is told we could not take her card. She has just been charged. Stamping it here
+ * closes the gap, and also shuts the checkout link the token unlocks the instant the charge lands.
+ */
+export async function markOfferPaid(token: string): Promise<void> {
+ await ensure();
+ await db()`UPDATE storefront_offers SET consumed_at = now(), updated_at = now()
  WHERE token = ${token} AND consumed_at IS NULL`.catch(() => {});
 }
 
@@ -233,4 +282,26 @@ export async function respondToOffer(
  WHERE id = ${offer.id} RETURNING *`;
  await sql`INSERT INTO storefront_offer_events (offer_id, actor, action, amount_cents) VALUES (${offer.id}, ${actor}, ${action}, ${action === "counter" ? amount : null})`;
  return mapOffer(rows[0]);
+}
+
+/**
+ * Attach the card and address a binding offer was made with.
+ *
+ * Written once, at the moment the buyer authorises, and never exposed through publicOffer: the
+ * offer page is reachable by anyone holding the emailed token, and a forwarded email must not hand
+ * over somebody's address.
+ */
+export async function attachOfferPayment(token: string, v: {
+ stripeCustomerId: string;
+ stripePaymentMethodId: string;
+ shipTo: Record<string, string>;
+}): Promise<void> {
+ await ensure();
+ const sql = db();
+ await sql`UPDATE storefront_offers
+  SET stripe_customer_id = ${v.stripeCustomerId},
+      stripe_payment_method_id = ${v.stripePaymentMethodId},
+      ship_to = ${JSON.stringify(v.shipTo)}::jsonb,
+      updated_at = now()
+  WHERE token = ${token}`;
 }

@@ -5,7 +5,7 @@ import { listCollections, getOrCreateCollection } from "@/app/lib/db/collections
 
 export const dynamic = "force-dynamic";
 
-// GET [?all=1] — the store's collections with live item counts. Default hides empty ones (for the listing
+// GET [?all=1]: the store's collections with live item counts. Default hides empty ones (for the listing
 // picker + storefront nav); ?all=1 includes empties for the Collections manager.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ collections: cols.map((c) => ({ id: c.id, title: c.title, slug: c.slug, itemCount: c.itemCount, imageUrl: c.imageUrl ?? null })) });
 }
 
-// POST { title } — create a new (empty) collection. Idempotent by slug.
+// POST { title }: create a new (empty) collection. Idempotent by slug.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

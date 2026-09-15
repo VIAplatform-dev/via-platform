@@ -4,7 +4,7 @@ const PHOTOROOM_ENDPOINT = "https://image-api.photoroom.com/v2/edit";
 
 export function isPhotoroomConfigured(): boolean {
  // Requires BOTH the API key AND an explicit enable flag, so PhotoRoom stays
- // dormant — no calls, no spend — until you intentionally switch it on, even if a
+ // dormant, no calls, no spend, until you intentionally switch it on, even if a
  // key is already present. Flip PHOTOROOM_ENABLED=true when the subscription is live.
  return Boolean(process.env.PHOTOROOM_API_KEY) && process.env.PHOTOROOM_ENABLED === "true";
 }

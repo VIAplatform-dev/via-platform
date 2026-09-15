@@ -1,4 +1,4 @@
-// Profit on the phone — the same statement the web Home and P&L print (app/lib/analytics/
+// Profit on the phone. The same statement the web Home and P&L print (app/lib/analytics/
 // profit-core.ts), read off /api/store/analytics/suite?sections=margin and formatted here. Pure.
 //
 // The server decides the arithmetic and the lines; this only decides how they read on a phone:
@@ -13,7 +13,7 @@ export type MarginSection = { netProfitCents: number | null; profit?: { lines?: 
 
 export type ProfitRow = { key: string; label: string; amount: string; negative: boolean; total: boolean };
 
-/** The statement as rows. Empty when profit is unknown — the screen prints the prompt instead. */
+/** The statement as rows. Empty when profit is unknown. The screen prints the prompt instead. */
 export function profitRows(margin: MarginSection | null | undefined, currency: string): ProfitRow[] {
   if (!margin || margin.netProfitCents === null || margin.netProfitCents === undefined) return [];
   const lines = margin.profit?.lines ?? [];

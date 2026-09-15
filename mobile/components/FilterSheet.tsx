@@ -11,7 +11,7 @@ import { colors, eyebrow, fonts, spacing } from "../lib/theme";
 // The filter sheet.
 //
 // Edits a DRAFT and only hands it back on Apply. Filtering live as you tap would refetch on every
-// chip — and worse, the list behind the sheet would reshuffle under a half-made decision.
+// chip, and worse, the list behind the sheet would reshuffle under a half-made decision.
 //
 // Cancel throws the draft away; Clear resets it but leaves the sheet open, because clearing is
 // usually the start of choosing again rather than the end of filtering.

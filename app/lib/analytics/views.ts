@@ -3,7 +3,7 @@ import { ensureStoreEngagementTables } from "../store-favorites-db";
 import { ensureAnalyticsEventsTable } from "../analytics-events-db";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — the canonical read model.
+// Analytics: the canonical read model.
 //
 // The platform captures the same facts in more than one place for historical
 // reasons, and a metric that reads only one of them is simply wrong:
@@ -19,17 +19,17 @@ import { ensureAnalyticsEventsTable } from "../analytics-events-db";
 //     the captured-site route and the storefront beacon) AND in the newer
 //     `analytics_events` stream, so a naive union double-counts storefront
 //     views. This view takes storefront views from the capture table and takes
-//     only what is unique to the event stream — marketplace views, favourites,
-//     clicks, checkout starts — from `analytics_events`.
+//     only what is unique to the event stream. Marketplace views, favourites,
+//     clicks, checkout starts, from `analytics_events`.
 //
 //     Favourites come from `analytics_events` alone, deliberately. There are two
-//     different `store_favorites` table definitions in the codebase —
+//     different `store_favorites` table definitions in the codebase,
 //     favorites-db.ts owns the live one (a user FOLLOWING a store: user_id +
 //     store_slug) and store-favorites-db.ts tries to create a different table of
 //     the same name (a shopper SAVING an item: item_id + shopper_id). The second
 //     CREATE TABLE IF NOT EXISTS is therefore a permanent no-op and its writes
 //     fail silently, so that table holds nothing to read. Renaming it is a
-//     migration, not an analytics change — until then the event stream is the
+//     migration, not an analytics change, until then the event stream is the
 //     only honest source of item favourites.
 //
 // Both are plain views, so they cost nothing to keep current and every metric

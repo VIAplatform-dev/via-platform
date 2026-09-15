@@ -20,7 +20,7 @@ export async function GET(request: Request) {
  const raw = (searchParams.get("url") || "").trim();
  if (!raw) return NextResponse.json({ error: "url required" }, { status: 400 });
 
- const result = await importStoreFromUrl(raw, 12); // demo preview — a handful is enough
+ const result = await importStoreFromUrl(raw, 12); // demo preview: a handful is enough
  const status = result.ok ? 200 : result.error === "Enter a valid store URL." ? 400 : 200;
  return NextResponse.json(result, { status });
 }

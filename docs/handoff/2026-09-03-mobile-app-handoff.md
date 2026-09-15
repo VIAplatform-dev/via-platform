@@ -1,4 +1,4 @@
-# VYA mobile — handoff, 3 September 2026
+# VYA mobile: handoff, 3 September 2026
 
 Branch `app-changes`. **Nothing from this session is committed.** Run `git status` before anything
 destructive.
@@ -15,14 +15,14 @@ https://claude.ai/code/artifact/eacd3a56-d59c-404e-af1a-f53bc5bb6805
 | Launch / sign-in screen | done | `mobile/app/auth/login.ios.tsx` |
 | Photo collage (7 images) | done | `mobile/assets/collage/01–07.jpg` |
 | Seller gate screen | written, **not wired** | `mobile/app/become-a-store.tsx` |
-| Babel config | done — critical | `mobile/babel.config.js` |
+| Babel config | done: critical | `mobile/babel.config.js` |
 | Native iOS build | installed | `com.vyaplatform.app` |
-| Seller tabs / Home / Inventory | not started | — |
+| Seller tabs / Home / Inventory | not started | |
 
 ### The launch screen
 Two columns of photographs drifting in opposite directions behind the wordmark, headline, email
 field and two buttons (*Join as a customer*, *Get started as a store*). Reanimated, 48s linear, no
-easing — an eased loop pulses.
+easing. An eased loop pulses.
 
 Three decisions to preserve:
 
@@ -32,7 +32,7 @@ Three decisions to preserve:
 - **The fade is measured, not guessed.** `onLayout` on the wordmark gives its real y; wall and
   gradient end at `y - CLEARANCE` (5pt). A screen-height fraction is wrong on every other device.
 - **The images are bundled, not fetched.** This screen renders before anyone has a token and every
-  route — `/api/public/*` included — returns 403 without one.
+  route, `/api/public/*` included. Returns 403 without one.
 
 Tuning surface: `CLEARANCE = 5`, `FADE_SPAN = 0.42`.
 
@@ -41,7 +41,7 @@ Tuning surface: `CLEARANCE = 5`, `FADE_SPAN = 0.42`.
 > it. This only exists because of the permission problem in §4.
 
 ### The seller gate
-`mobile/app/become-a-store.tsx` is written but unreachable — the button still opens
+`mobile/app/become-a-store.tsx` is written but unreachable. The button still opens
 `/store/signup` in a web sheet. To wire it, in `login.ios.tsx`:
 
 ```tsx
@@ -50,10 +50,10 @@ onPress={() => router.push("/become-a-store")}
 
 ---
 
-## 2. The babel fix — why the app runs at all
+## 2. The babel fix: why the app runs at all
 
 `ReferenceError: Property 'MessageQueue' doesn't exist` on launch, in Expo Go and native builds.
-Not a stale cache, not the worklets version — both were tested and ruled out.
+Not a stale cache, not the worklets version. Both were tested and ruled out.
 
 Cause: **no `babel.config.js` and `babel-preset-expo` not installed.** Metro transformed React
 Native's Flow-typed core with no Expo preset.
@@ -65,7 +65,7 @@ module.exports = function (api) {
 };
 ```
 
-**Tell the founder:** `MOBILE-SETUP.md` lists six gotchas; this is a seventh and the worst — its own
+**Tell the founder:** `MOBILE-SETUP.md` lists six gotchas; this is a seventh and the worst. Its own
 quickstart fails on a fresh clone. The doc also says to copy `.env.local.example`, which does not
 exist in the repo.
 
@@ -82,7 +82,7 @@ npx expo start          # NO --port flag
 - **Never `--port 8082`.** The native binary has 8081 compiled in; moving Metro leaves the app
   looking at an empty port (`unsanitizedScriptURLString = (null)`).
 - **`--offline`** suppresses the LAN broadcast so the server never appears in Expo Go's list.
-- GutBliss is SDK 57, this is SDK 54, only one Expo Go can be installed — the native build sidesteps
+- GutBliss is SDK 57, this is SDK 54, only one Expo Go can be installed. The native build sidesteps
   it. If both need to run, give *GutBliss* the non-default port.
 
 Dev sign-in is currently **off** (`mobile/.env.local`, backup at `.env.local.bak`) so the sign-in
@@ -93,7 +93,7 @@ restart Metro with `--clear`.
 
 ## 4. The permission problem
 
-Claude Code could not read any pre-existing file under `~/Documents` — it could create files and
+Claude Code could not read any pre-existing file under `~/Documents`. It could create files and
 read those back, but not list directories or run `git`. Ruled out: config (no deny rules), session
 state (restart changed nothing), file flags/ACLs (clean), the sandbox
 (`dangerouslyDisableSandbox` made no difference).
@@ -102,10 +102,10 @@ Claude Code runs under `launchd` and appears nowhere in Privacy & Security → F
 Terminal, Cursor and VS Code all have Full Disk Access; Claude has none.
 
 ```bash
-# A — inherit Terminal's grant (Cmd-Q Claude first)
+# A: inherit Terminal's grant (Cmd-Q Claude first)
 cd ~/Documents/via-platform && claude --continue
 
-# B — give Claude its own grant
+# B, give Claude its own grant
 # Full Disk Access → + → Shift-Cmd-G →
 /opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/bin/claude.exe
 ```
@@ -121,25 +121,25 @@ cd ~/Documents/via-platform && claude --continue
 *seller* app. Same palette, nothing else shared.
 
 Five tabs, no labels: **Home · Inventory · List (+) · Inbox · Store**. The centre **+** is the only
-filled control in the app — listing is the one action that makes money. The bag lives in the header,
+filled control in the app. Listing is the one action that makes money. The bag lives in the header,
 which is what makes five tabs possible.
 
 Screens: Home (hub), Inventory, Inbox, Listing flow (Capture → Details → Loading → Review → Add
 many), Orders, Settings drawer, Analytics, Consignment, Payouts, Plan & billing, Customers,
 Discounts, Notifications, Help, Piece, Message, Market Mode (takes over the whole screen, no tab
-bar), Store tab (A vs B — unresolved). The artifact link at the top has each one written out.
+bar), Store tab (A vs B: unresolved). The artifact link at the top has each one written out.
 
 **Deliberately desktop-only:** shipping zones/duties/carriers, sales tax, policies/domains/storefront
 editing, full P&L/cost imports/bulk editing, people and seats.
 
 ### Building it
-Put it at `mobile/app/(seller)/` alongside `(tabs)/` and route on `storeSlug` — sign-in already
+Put it at `mobile/app/(seller)/` alongside `(tabs)/` and route on `storeSlug`. Sign-in already
 returns it (null for shoppers). Not a second Expo app: that means a second bundle id, listing and
 review cycle, and sellers are shoppers too.
 
 `app/api/store/` already has analytics, orders, inventory, listings, consignment, market, payments,
 billing, customers, discounts, messages, inbox, offers, price-check, me, profile, storefront, domain.
-**Read each route before binding a screen to it — do not guess response shapes.**
+**Read each route before binding a screen to it. Do not guess response shapes.**
 
 Every route including `/api/public/*` is behind the pilot approval gate; for the app a valid bearer
 token *is* approval. Omit it and you get 403, not an empty list.
@@ -150,13 +150,13 @@ token *is* approval. Omit it and you get 403, not an empty list.
 
 1. Fix the file permission (§4).
 2. Collapse the two login files.
-3. Commit: babel config, collage, login screen, gate. **Leave the capture/plan-b work alone** —
+3. Commit: babel config, collage, login screen, gate. **Leave the capture/plan-b work alone**,
    it is someone else's in-flight work sitting uncommitted in the same tree.
 4. Wire the gate to `/become-a-store`.
 5. Re-share the 21 mockups (they are gone from cache) and confirm scope.
 6. Settle the Store tab, A or B.
-7. Build `(seller)/` — tab shell, then Home.
+7. Build `(seller)/`: tab shell, then Home.
 8. Tell the founder about the babel config and the missing `.env.local.example`.
 
-Smaller: only 7 collage photos means each column repeats (every 4th left, 3rd right) — twelve
+Smaller: only 7 collage photos means each column repeats (every 4th left, 3rd right). Twelve
 removes it. And "Look around first" is impossible today: browsing without a token 403s everywhere.

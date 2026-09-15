@@ -16,7 +16,7 @@ import { cn } from "../ui";
 // "where do I change that?".
 //
 // The rail is always visible inside Settings, so a seller can see every section she has without
-// going back out to look for it — which is the entire point of the pattern.
+// going back out to look for it, which is the entire point of the pattern.
 
 const INDEX_HREF: string = "/admin/settings";
 

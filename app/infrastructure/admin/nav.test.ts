@@ -68,7 +68,7 @@ test("Analytics expands to its own pages", () => {
  assert.deepEqual(item!.children?.map((c) => c.label), ["Overview", "Profit & loss"]);
 });
 
-test("Rentals and Appointments stay flat — one page each, so a child would only add a click", () => {
+test("Rentals and Appointments stay flat. One page each, so a child would only add a click", () => {
  const items = GROUPS.flatMap((g) => g.items);
  for (const label of ["Rentals", "Appointments"]) {
   const it = items.find((i) => i.label === label);
@@ -90,7 +90,7 @@ test("a path finds its section, and which page in it is current", () => {
  assert.equal(inv?.current, "/admin/inventory/drafts");
  // The section's own page counts as being in the section.
  assert.equal(sectionFor("/admin/inventory")?.item.label, "Inventory");
- // `match` keeps a related page inside its section — adding a listing is Inventory's work.
+ // `match` keeps a related page inside its section. Adding a listing is Inventory's work.
  assert.equal(sectionFor("/admin/add-listing")?.item.label, "Inventory");
  assert.equal(sectionFor("/admin/bulk-upload")?.item.label, "Inventory");
  assert.equal(sectionFor("/admin/cross-listing/analytics")?.item.label, "Cross-listing");

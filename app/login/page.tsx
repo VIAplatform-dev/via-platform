@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import LoginClient from "./LoginClient";
 
 export const metadata: Metadata = {
- title: "Join VYA — The first online department store for vintage and secondhand.",
+ title: "Join VYA: The first online department store for vintage and secondhand.",
  description: "Discover the best vintage and secondhand stores, all in one place. Sign in or create an account to be added to our pilot.",
  openGraph: {
  title: "The world's best vintage, all in one place.",

@@ -100,7 +100,7 @@ test("the past can't be booked, including earlier today", () => {
 // next START; it must never change what the customer was told they were booking.
 
 test("a buffer spaces the next appointment without lengthening this one", () => {
- // 11–1, 45-minute appointments, 15 minutes to tidy up: 11:00, 12:00 — and 13:00 would run past.
+ // 11–1, 45-minute appointments, 15 minutes to tidy up: 11:00, 12:00, and 13:00 would run past.
  const slots = slotsOn(THU, S({ bufferMinutes: 15 }));
  assert.deepEqual(slots.map((x) => x.start), ["11:00", "12:00"]);
  // Still a 45-minute appointment. The gap is after it, not inside it.
@@ -110,7 +110,7 @@ test("a buffer spaces the next appointment without lengthening this one", () => 
 test("no buffer books back to back, exactly as before", () => {
  const before = slotsOn(THU, S());
  assert.deepEqual(slotsOn(THU, S({ bufferMinutes: 0 })), before);
- // Absent entirely — an older stored settings row — must behave the same way.
+ // Absent entirely, an older stored settings row. Must behave the same way.
  assert.deepEqual(slotsOn(THU, S({ bufferMinutes: undefined })), before);
 });
 

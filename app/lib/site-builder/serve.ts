@@ -1,5 +1,5 @@
-// The builder's serve-time pass, wired to the database. Every hosted page type calls this — the
-// catch-all route (home, pages, collections, search), the product route and the cart page — so a grid
+// The builder's serve-time pass, wired to the database. Every hosted page type calls this. The
+// catch-all route (home, pages, collections, search), the product route and the cart page, so a grid
 // she adds renders from live inventory wherever she put it, and her menu order reaches every one of
 // them.
 //
@@ -30,7 +30,7 @@ export function hrefForStore(slug: string, onStoreOrigin: boolean): HrefFor {
 }
 
 /** Live pieces for one grid: every live piece for "all", else the collection the way its page shows it
- *  (including her own answer about sold pieces — see collection-sold-policy.ts). */
+ *  (including her own answer about sold pieces. See collection-sold-policy.ts). */
 export async function liveItemsFor(sellerId: string, collection: string): Promise<CollectionCardItem[]> {
  if (collection === "all") return (await listStorefrontItems(sellerId)).map(toCardItem);
  const c = await getCollectionWithSyncState(sellerId, collection).catch(() => null);
@@ -57,7 +57,7 @@ export async function hostedPageState(slug: string, path: string): Promise<Hoste
   const rows = await loadStoreBuilderRows(slug);
   const p = normalisePath(path);
   const row = rows.pages.get(p) ?? rows.pages.get(path) ?? null;
-  // A renamed page wears its new name in the menu too, from its own row — so renaming is ONE write
+  // A renamed page wears its new name in the menu too, from its own row, so renaming is ONE write
   // and it reaches the menu even on a store that has never had an order of its own stored.
   const menuLabels = new Map<string, string>();
   for (const [at, r] of rows.pages) {
@@ -80,7 +80,7 @@ export async function applySiteBuilderForRequest(
   const ctx = { menu: state.menu, hiddenPaths: state.hiddenPaths, menuLabels: state.menuLabels, pageTitle: state.title };
   if (!needsSiteBuilder(html, ctx)) return html;
   // The seller, her collections and her card kit are read ONLY for a page that actually has a grid on
-  // it — a menu order must not put three queries on every page of every store.
+  // it: a menu order must not put three queries on every page of every store.
   if (!grids) return await applySiteBuilder(html, ctx);
 
   const seller = await getSellerBySlug(opts.slug);

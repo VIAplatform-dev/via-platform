@@ -40,7 +40,7 @@ async function request(method: "GET" | "POST" | "DELETE", path: string, params?:
  "Content-Type": "application/x-www-form-urlencoded",
  // Acting on a connected account = a direct charge on the seller (merchant of record).
  ...(stripeAccount ? { "Stripe-Account": stripeAccount } : {}),
- // Idempotency-Key makes a POST safe to retry — Stripe returns the SAME result instead of a
+ // Idempotency-Key makes a POST safe to retry. Stripe returns the SAME result instead of a
  // second charge/transfer/refund. Pass a STABLE key per logical action on any money-moving call.
  ...(idempotencyKey && method === "POST" ? { "Idempotency-Key": idempotencyKey } : {}),
  },

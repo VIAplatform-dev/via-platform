@@ -5,7 +5,7 @@ import { formatPrice } from "@/app/lib/formatPrice";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/mobile/favorites — the signed-in user's favorited products, shaped
+/** GET /api/mobile/favorites. The signed-in user's favorited products, shaped
  * for the app's ProductCard (live data when available, snapshot otherwise). */
 export async function GET(request: Request) {
  const userId = getMobileUserId(request);
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
  return NextResponse.json({ products });
 }
 
-/** POST /api/mobile/favorites — idempotently add/remove a favorite.
+/** POST /api/mobile/favorites. Idempotently add/remove a favorite.
  * Body: { productId: number, favorited: boolean }. Writes to product_favorites,
  * which feeds the For-You ranking (favorites are the strongest signal). */
 export async function POST(request: Request) {

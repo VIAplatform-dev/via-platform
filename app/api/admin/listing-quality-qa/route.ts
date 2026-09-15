@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { getListingQualityQA } from "@/app/lib/listing-quality-db";
 
 // Read-only QA: every currently-flagged listing with a description excerpt + the
-// inferred category + which checks failed — so false flags can be spotted and the
+// inferred category + which checks failed, so false flags can be spotted and the
 // detection tuned. Optional ?store=<slug> and ?issue=size/measurements|description|image.
 //   /api/admin/listing-quality-qa?issue=size/measurements
 

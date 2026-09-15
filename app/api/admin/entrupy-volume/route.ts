@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
 
 // Read-only sizing for the Entrupy partnership: how many DESIGNER BAGS (bag category + a recognized
 // brand = authenticatable) are in the catalog, what share of stores sell them, and the monthly
-// listing + sale rate — so authentication-volume projections use real data, not a guess.
+// listing + sale rate, so authentication-volume projections use real data, not a guess.
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;

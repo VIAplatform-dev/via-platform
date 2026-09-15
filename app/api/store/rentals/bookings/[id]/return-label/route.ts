@@ -8,14 +8,14 @@ export const dynamic = "force-dynamic";
 const WHY: Record<string, string> = {
  "shipping-not-configured": "Shipping labels aren't switched on for VYA yet.",
  "collected-in-person": "This one was collected in person, so there's nothing to post back.",
- "no-renter-address": "We don't have an address for this renter — it was booked before addresses were saved.",
+ "no-renter-address": "We don't have an address for this renter. It was booked before addresses were saved.",
  "store-does-not-prepay": "Your rental settings say the renter pays return postage. Turn on prepaid labels to buy one here.",
  "no-store-address": "Add your ship-from address in Settings › Locations first.",
- "no-rates": "No carrier would quote that parcel — check the piece's weight and size.",
+ "no-rates": "No carrier would quote that parcel. Check the piece's weight and size.",
  "label-failed": "The carrier refused the label. Try again in a moment.",
 };
 
-// Buy the return label for a rental — the thing "a prepaid return label is in the box" promises.
+// Buy the return label for a rental. The thing "a prepaid return label is in the box" promises.
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
  const acting = await seller(request);
  if (!acting) return unauthorized();

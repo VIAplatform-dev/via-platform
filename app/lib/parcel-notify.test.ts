@@ -32,7 +32,7 @@ test("a three-piece parcel gets ONE email, listing every piece, and every order 
  assert.deepEqual(marked, [["a", "b", "c"]]);
 });
 
-test("once any piece of the bag has been told, nothing more is sent — the per-order button and the parcel button agree", async () => {
+test("once any piece of the bag has been told, nothing more is sent. The per-order button and the parcel button agree", async () => {
  const { deps, sent, marked } = fakes();
  const r = await notifyParcelPosted({ storeSlug: "s", storeName: "Sourced", replyTo: null, orders: [order("a", { trackingNumber: "TRK1", trackingEmailSentAt: "2026-09-07T10:00:00Z" }), order("b")] }, deps);
  assert.deepEqual(r, { sent: false, reason: "already-sent" });

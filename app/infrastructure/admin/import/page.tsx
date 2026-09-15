@@ -1,2 +1,2 @@
-// Mirrored into the infrastructure workspace — same page the /store portal served.
+// Mirrored into the infrastructure workspace. Same page the /store portal served.
 export { default } from "@/app/store/import/page";

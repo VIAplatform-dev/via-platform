@@ -7,15 +7,15 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   // Plan B serves each store from its own hostname, and in DEV those are `{slug}.vyasites.test`.
   // Next blocks cross-origin requests for dev-only assets by default, so on a store host every
-  // `/_next/static/chunks/*.js` came back 403 — which meant VYA's own checkout page, the one page
+  // `/_next/static/chunks/*.js` came back 403, which meant VYA's own checkout page, the one page
   // every hosted-store shopper is sent to, never hydrated and sat on "Loading…" forever. Dev only:
   // in production those assets are served normally and this setting does nothing.
   //
   // 127.0.0.1 is here for the same reason and a different cause: Mailchimp refuses "localhost" as an
-  // OAuth redirect URI, so testing a connection has to happen on that host — and without this the
+  // OAuth redirect URI, so testing a connection has to happen on that host, and without this the
   // admin loads its shell and none of its JavaScript.
   //
-  // ONE declaration. There were briefly two, and the second silently won — a duplicate key in an
+  // ONE declaration. There were briefly two, and the second silently won. A duplicate key in an
   // object literal doesn't merge and doesn't warn.
   allowedDevOrigins: ["*.vyasites.test", "*.vyasites.com", "127.0.0.1", "localhost"],
   // Don't advertise the framework/version.
@@ -66,12 +66,12 @@ const nextConfig: NextConfig = {
       // four were removed from /store, so redirecting them is safe (they 404 otherwise);
       // the rest of /store stays live for real sellers.
       // Sellers' store portal lands on the classic dashboard (performance + sales), not the
-      // newer infra-style home. Repointed per the store owner — keep sellers on /store/dashboard.
+      // newer infra-style home. Repointed per the store owner. Keep sellers on /store/dashboard.
       { source: "/store/home", destination: "/store/dashboard", permanent: false },
       // Sellers are told "getvya.ai/store/signup" out loud, and people type the hyphen.
       { source: "/store/sign-up", destination: "/store/signup", permanent: false },
       { source: "/store/register", destination: "/store/signup", permanent: false },
-      // "/onboarding" is what people actually type — it is what the flow is CALLED, and there has
+      // "/onboarding" is what people actually type. It is what the flow is CALLED, and there has
       // never been a route at it. Typing it landed on a 404 (or, worse, looked like a silent bounce)
       // while the real page sat at /admin/onboarding. Straight to the workspace path, which works on
       // both hosts because /infrastructure is rewritten by the proxy rather than by host.
@@ -90,7 +90,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     // getvya.ai serves the Owner Workspace at a clean /admin, but the routes physically
     // live at /infrastructure/admin (the /admin namespace is taken by the legacy internal
-    // panel on vyaplatform.com). This host-conditional rewrite maps them — and because it
+    // panel on vyaplatform.com). This host-conditional rewrite maps them, and because it
     // lives in next.config (not middleware), the client router honors it, so in-workspace
     // navigation is proper SPA nav rather than full reloads. Scoped to the getvya.ai host,
     // so vyaplatform.com/admin (the legacy panel) is untouched.
@@ -99,13 +99,13 @@ const nextConfig: NextConfig = {
       { type: "host" as const, value: "www.getvya.ai" },
     ];
     // The LEGACY internal panel lives at app/admin/* (served on vyaplatform.com). These are its
-    // top-level segments — in local dev we DON'T rewrite them, so the owner's internal tools stay
+    // top-level segments, in local dev we DON'T rewrite them, so the owner's internal tools stay
     // reachable at /admin/* on localhost alongside the workspace.
     // NOTE: `customers` and `golden-review` exist in BOTH trees. Production has two hosts and the
     // host decides; local dev has one, so one tree has to win at /admin/*. It is the WORKSPACE,
     // deliberately: getvya.ai rewrites both to the workspace, so listing them here made the same
     // nav link open the seller's Customers page on the live site and the old marketplace buyer
-    // list on localhost — local testing that lies about the product is worse than a page you have
+    // list on localhost: local testing that lies about the product is worse than a page you have
     // to reach another way. The legacy pages still serve on vyaplatform.com, where that panel
     // lives; they have no second path, so on localhost they yield.
     const LEGACY_ADMIN = "login|set-password|analytics|category-sweep|collabs-links|collections|conversions|data|editors-picks|emails|giveaway|intake-accuracy|key-metrics|listing-quality|market-data|removed-items|returns|search-analytics|session-flows|sourcing|stores|summary|sync|users|waitlist|webhooks";
@@ -115,7 +115,7 @@ const nextConfig: NextConfig = {
         // ── PostHog reverse proxy ────────────────────────────────────────────────────────────
         // Analytics served from our own origin. Sent straight to us.i.posthog.com it is blocked by
         // ad-blockers and by Safari's tracker rules, which would silently take out exactly the
-        // sellers whose behaviour we're trying to learn from — a half-sampled funnel is worse than
+        // sellers whose behaviour we're trying to learn from. A half-sampled funnel is worse than
         // none, because it looks like data. The assets host is separate from the ingest host, so
         // the /static rule has to come first.
         { source: "/ingest/static/:path*", destination: "https://us-assets.i.posthog.com/static/:path*" },
@@ -124,7 +124,7 @@ const nextConfig: NextConfig = {
           { source: "/admin", has: [h], destination: "/infrastructure/admin" },
           // Exclude the auth pages: /admin/login and /admin/set-password must serve the LEGACY
           // app/admin/* pages, which render unauthenticated. The workspace routes are wrapped by
-          // a layout that redirects to /admin/login when logged out — so a login page mapped into
+          // a layout that redirects to /admin/login when logged out, so a login page mapped into
           // the workspace tree would redirect to itself forever.
           {
             source: "/admin/:path((?!login|set-password).*)",

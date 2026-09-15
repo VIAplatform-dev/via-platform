@@ -4,12 +4,12 @@ import crypto from "crypto";
 // ─────────────────────────────────────────────────────────────────────────────
 // Re-host an external product image onto VYA's own Vercel Blob storage. Migrated
 // inventory otherwise hot-links to the seller's old CDN (cdn.shopify.com etc.), so
-// every image 404s the day they cancel that platform — the single biggest thing
+// every image 404s the day they cancel that platform. The single biggest thing
 // stopping a store from fully leaving Shopify. Re-hosting copies the bytes to our
 // storage so the listing survives.
 //
 // Idempotent: the blob path is a hash of the source URL, so re-imports reuse the
-// same object (allowOverwrite) instead of piling up duplicates. Fails SOFT — returns
+// same object (allowOverwrite) instead of piling up duplicates. Fails SOFT: returns
 // the original URL if the copy fails, so one bad image never breaks an import.
 // ─────────────────────────────────────────────────────────────────────────────
 

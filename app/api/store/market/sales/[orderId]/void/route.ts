@@ -12,7 +12,7 @@ import { logError } from "@/app/lib/error-log";
 
 export const dynamic = "force-dynamic";
 
-// POST — void a sale at the stall. Cash: the amount comes off the tin (the order is refunded, so
+// POST: void a sale at the stall. Cash: the amount comes off the tin (the order is refunded, so
 // every total that already skips refunded sales drops it). Card: the SAME Stripe refund the Orders
 // page performs, on the seller's connected account; if Stripe says no, nothing changes. Either way
 // the piece goes back to the status it had before the sale (a quick-listed draft stays a draft).
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
  const pay = await getSellerPayments(acting.slug).catch(() => null);
  if (!pay?.stripeAccountId || !order.stripePaymentIntent) {
  await revertOrderRefundClaim(orderId);
- return NextResponse.json({ error: "Card refunds need the store's Stripe account — refund this one from Orders." }, { status: 409 });
+ return NextResponse.json({ error: "Card refunds need the store's Stripe account. Refund this one from Orders." }, { status: 409 });
  }
  const sharedIntent = (await getOrdersByPaymentIntent(order.stripePaymentIntent).catch(() => [])).length > 1;
  const refunded = await refundOrderPayment({

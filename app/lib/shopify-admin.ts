@@ -2,7 +2,7 @@
 // Shopify Admin API client. Shopify is migrating every store to the new Dev
 // Dashboard, which issues an ADMIN API token (shpat_…) rather than a Storefront
 // token. The Admin API also (a) works on password-protected stores and (b) gives
-// exact, structured product data — so it's our preferred Shopify import path.
+// exact, structured product data, so it's our preferred Shopify import path.
 // Read-only: we only ever query products/shop.
 // ───────────────────────────────────────────────────────────────────────────
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -29,8 +29,8 @@ export async function adminQuery(shop: string, token: string, query: string, var
  body: JSON.stringify({ query, variables }),
  signal: AbortSignal.timeout(20000),
  });
- if (res.status === 401 || res.status === 403) throw new Error("Token rejected — make sure the app has read_products and is installed on the store.");
- if (res.status === 404) throw new Error("Store not found — use your .myshopify.com domain (e.g. your-store.myshopify.com).");
+ if (res.status === 401 || res.status === 403) throw new Error("Token rejected. Make sure the app has read_products and is installed on the store.");
+ if (res.status === 404) throw new Error("Store not found: use your .myshopify.com domain (e.g. your-store.myshopify.com).");
  const json = await res.json().catch(() => ({}));
  if (json.errors) throw new Error(Array.isArray(json.errors) ? json.errors[0]?.message || "Admin API error" : json.errors.message || "Admin API error");
  return json.data;
@@ -45,7 +45,7 @@ export async function adminVerify(shop: string, token: string): Promise<{ ok: bo
  }
 }
 
-// `handle` and variant ids are the store's OWN identity for each product — the importer matches on
+// `handle` and variant ids are the store's OWN identity for each product. The importer matches on
 // them so a re-sync updates rather than duplicates. `collections` comes back with the product, so a
 // connected store gets exact category membership instead of us scraping each collection page.
 // Variants are fetched in full (not just the first) so multi-size listings survive.
@@ -65,7 +65,7 @@ const PRODUCTS_QUERY = `query($cursor: String) {
 
 /** Map ONE product node from the Admin API into an ImportedProduct.
  *
- *  Split out from the paging loop so it can be unit-tested without a live store token — a
+ *  Split out from the paging loop so it can be unit-tested without a live store token. A
  *  connected store is supposed to import BETTER than a scraped one (exact prices, real currency,
  *  full size runs, true collection membership), so this mapping is worth pinning down. */
 export function adminProductToImported(n: any, currency: string): ImportedProduct {
@@ -79,7 +79,7 @@ export function adminProductToImported(n: any, currency: string): ImportedProduc
  const amount = pick.price ?? 0;
  const sizeOpt = (n.options || []).find((o: any) => /size/i.test(o.name));
  const desc = n.descriptionHtml ? String(n.descriptionHtml).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 2000) : null;
- // The full size run, not just the first variant — reproduction-vintage sellers list one style
+ // The full size run, not just the first variant. Reproduction-vintage sellers list one style
  // across a dozen sizes, and a single price+size can't represent that. Rental options are not part
  // of it: they are not sizes, and nobody can buy one.
  const optionValue = (v: any, re: RegExp) => (v?.selectedOptions || []).find((o: any) => re.test(String(o?.name || "")))?.value ?? null;
@@ -113,7 +113,7 @@ export function adminProductToImported(n: any, currency: string): ImportedProduc
   sourcePlatform: "shopify",
   sourceId: n.handle ? String(n.handle) : n.id ? String(n.id) : null,
   sourceUrl: n.onlineStoreUrl ? String(n.onlineStoreUrl) : null,
-  // Exact collection membership, straight from the API — no scraping each collection page.
+  // Exact collection membership, straight from the API, no scraping each collection page.
   collectionHandles: (n.collections?.edges || []).map((c: any) => c?.node?.handle).filter(Boolean),
  };
 }

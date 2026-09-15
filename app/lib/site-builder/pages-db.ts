@@ -7,7 +7,7 @@
 // exactly wrong for this one: the dev server points at the PRODUCTION database, so the first request
 // from a developer's laptop would run DDL against the live store. The owner runs
 // `POST /api/admin/site-builder/migrate` once, and until then every read here answers empty and every
-// write answers `false` — the panel says the feature is not switched on yet, and no shopper's page
+// write answers `false`: the panel says the feature is not switched on yet, and no shopper's page
 // changes in any way.
 //
 // Reads are cached for a few seconds per store because the serve path asks on every hosted page
@@ -26,7 +26,7 @@ function db() {
  return neon(url);
 }
 
-/** Postgres for "that table does not exist" — i.e. the owner has not run the migration yet. */
+/** Postgres for "that table does not exist". I.e. the owner has not run the migration yet. */
 function notMigrated(e: unknown): boolean {
  const code = e && typeof e === "object" ? String((e as { code?: unknown }).code ?? "") : "";
  if (code === "42P01") return true;
@@ -118,7 +118,7 @@ export async function loadStoreBuilderRows(slug: string): Promise<StoreBuilderRo
  }
 }
 
-/** The paths she has hidden — what the serve path gates on, and what the menu drops links to. */
+/** The paths she has hidden. What the serve path gates on, and what the menu drops links to. */
 export function hiddenPathsOf(rows: StoreBuilderRows): Set<string> {
  const out = new Set<string>();
  for (const [path, row] of rows.pages) if (row.hidden) out.add(path.length > 1 ? path.replace(/\/+$/, "") : path);
@@ -163,7 +163,7 @@ export async function deletePageRow(slug: string, path: string): Promise<boolean
  } catch { return false; /* allow-swallow: nothing to clean up is not a failure the seller can act on */ }
 }
 
-/** Pages she added here rather than imported — the rows a re-import must spare. */
+/** Pages she added here rather than imported. The rows a re-import must spare. */
 export async function listAddedPaths(slug: string): Promise<string[]> {
  if (Date.now() < missingUntil) return [];
  try {

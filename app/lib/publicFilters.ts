@@ -8,7 +8,7 @@ function escapeRe(s: string): string {
 }
 
 // Postgres ~* (case-insensitive regex) patterns for selected designer slugs. Short
-// keywords (≤3) AND whole-word aliases (etro/boss/coach… — substrings of common
+// keywords (≤3) AND whole-word aliases (etro/boss/coach… substrings of common
 // words) get \y boundaries so they never match inside a word ("etro" must not hit
 // "retro"); other keywords match as substrings so plurals still work. Kept in sync
 // with resolveBrand / detectBrand / inferBrandFromTitle via WHOLE_WORD_ALIASES.
@@ -27,7 +27,7 @@ export function designerPatterns(designerSlugs: string[]): string[] {
 }
 
 // Size matching ignores the regional prefix so a filter of "8" matches "US 8",
-// "EU 8", "UK 8", "8", etc. — we group by the bare size value. The SQL side strips
+// "EU 8", "UK 8", "8", etc. we group by the bare size value. The SQL side strips
 // the same prefix from the stored size (see SIZE_CORE_SQL).
 export function stripSizePrefix(s: string): string {
  return s.trim().toUpperCase().replace(/^(US|UK|EU|IT|FR|DE)\s*/, "").trim();
@@ -97,7 +97,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
  accessories: [
  "belt", "scarf", "hat", "jewelry", "earring", "necklace", "bracelet",
  "ring", "sunglasses", "glasses", "tie", "watch", "headband",
- // Brooches/charms + small leather goods (wallets/SLGs live here, not bags —
+ // Brooches/charms + small leather goods (wallets/SLGs live here, not bags,
  // "wallet on chain" is the exception and is matched under bags above)
  "brooch", "charm", "pendant", "choker", "bangle", "cufflink",
  "key holder", "key case", "key ring", "key chain", "card holder", "cardholder",
@@ -124,7 +124,7 @@ export function categoryClauseSql(categories: string[]): {
  };
 }
 
-// Returns the keyword list for a set of categories — used when we do JS-side
+// Returns the keyword list for a set of categories. Used when we do JS-side
 // post-filtering (because neon serverless doesn't easily support dynamic OR lists).
 export function categoryKeywords(categories: string[]): string[] {
  return categories.flatMap((c) => CATEGORY_KEYWORDS[c] ?? []);

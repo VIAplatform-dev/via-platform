@@ -18,7 +18,7 @@ async function applyCollections(sellerId: string, itemId: string, titles?: strin
 // "Listings" are now a thin VIEW over the canonical product table (db/items).
 // Historically a store's storefront products lived in a separate
 // `storefront_listings` table; that's been unified so there is ONE source of
-// truth — `db/items` — which is also what checkout/orders/fulfillment use. This
+// truth, `db/items`, which is also what checkout/orders/fulfillment use. This
 // module keeps the old Listing shape so existing readers/writers keep working,
 // but every call reads or writes items. (One-time data migration lives in
 // migrateListingsToItems below.)
@@ -81,7 +81,7 @@ function itemToListing(it: Item, storeSlug: string): Listing {
 }
 
 /** All listings for a store. `activeOnly` for the public storefront: what is on the shelf right
- * now — live pieces and held ones (badged "On hold"), never sold or drafts. Returns [] for a store
+ * now: live pieces and held ones (badged "On hold"), never sold or drafts. Returns [] for a store
  * that isn't a transacting seller yet (no db/seller row). */
 export async function getListingsByStore(storeSlug: string, activeOnly = false): Promise<Listing[]> {
  const seller = await getSellerBySlug(storeSlug);
@@ -110,7 +110,7 @@ export async function createListing(storeSlug: string, l: ListingInput): Promise
  return itemToListing(item, storeSlug);
 }
 
-/** Update a listing — scoped to the store so a store can only edit its own. */
+/** Update a listing. Scoped to the store so a store can only edit its own. */
 export async function updateListing(id: string, storeSlug: string, l: ListingInput): Promise<Listing | null> {
  const seller = await getSellerBySlug(storeSlug);
  if (!seller) return null;

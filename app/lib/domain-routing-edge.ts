@@ -38,8 +38,8 @@ export async function capturedSlugForDomain(host: string): Promise<string | null
 
 // Edge-safe: has this store brought its own site over, or is its storefront built from sections?
 //
-// Both are served from the store's own origin ({slug}.vyasites.com) — a captured site from
-// /site/{slug}, a built one from /s/{slug} — so the middleware has to know which before it can
+// Both are served from the store's own origin ({slug}.vyasites.com): a captured site from
+// /site/{slug}, a built one from /s/{slug}, so the middleware has to know which before it can
 // rewrite. Cached like the domain lookup above: a store rarely changes which kind it is, and the
 // answer is needed on every page view of every storefront.
 const captureCache = new Map<string, { has: boolean; at: number }>();

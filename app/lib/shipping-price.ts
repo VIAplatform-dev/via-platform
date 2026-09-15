@@ -8,7 +8,7 @@ import type { ParcelDims } from "./shipping-tiers";
 // What the buyer is charged for postage. ONE answer, for every caller.
 //
 // THIS EXISTS BECAUSE THE QUOTE AND THE CHARGE MUST BE THE SAME NUMBER. Three routes need a
-// shipping price — /shipping-rates and /cart-shipping (what she is SHOWN) and /cart-intent (what
+// shipping price: /shipping-rates and /cart-shipping (what she is SHOWN) and /cart-intent (what
 // she is CHARGED, server-authoritative, because a client could otherwise post zero and dodge the
 // label). When those were three separate calculations, showing one price and charging another was
 // one edit away, and that edit is invisible in testing until a buyer complains about their
@@ -17,13 +17,13 @@ import type { ParcelDims } from "./shipping-tiers";
 // STORES CHOOSE HOW THEY PRICE. It is their own website, not a marketplace stall, so the policy is
 // theirs the way it is on Shopify:
 //
-//   "live" — the real carrier rate for this parcel on this route, plus VYA's markup. Fairer per
+//   "live": the real carrier rate for this parcel on this route, plus VYA's markup. Fairer per
 //            order (a near buyer pays less), and it can never be sold below cost. This is the
 //            default, and the right one at a 1% platform fee: VYA takes all of the buyer's
 //            shipping and buys the label, so absorbing distance variance comes straight out of a
 //            margin that is already thin.
 //
-//   "flat" — the store's own per-zone, per-size prices (shipping-zones.ts). One number the buyer
+//   "flat": the store's own per-zone, per-size prices (shipping-zones.ts). One number the buyer
 //            can predict, which is what most resale sellers are used to quoting. The store owns
 //            the risk that a far parcel costs more than it charged.
 //
@@ -35,10 +35,14 @@ export type BuyerShipping = {
   amountCents: number;
   service: string;
   estDays: number | null;
-  /** Which rule produced this number — worth logging, and worth showing in the seller's settings. */
+  /** Which rule produced this number. Worth logging, and worth showing in the seller's settings. */
   source: "live" | "flat";
   /** Set when the store does not ship to this destination at all. */
   refusedCountry?: boolean;
+  /** Set when NOBODY on VYA may: an embargo or a carrier suspension, not the store's choice. */
+  restricted?: boolean;
+  /** Shown to the shopper when `restricted`. See shipping-embargo.ts. */
+  message?: string;
 };
 
 export type ShipAddressish = {
@@ -67,10 +71,21 @@ export async function resolveBuyerShipping(opts: {
   const flat = quoteShipping({
     fromCountry: isoCountry(from?.country),
     toCountry: isoCountry(to.country),
+    // The state/province, which only exists once a shopper has typed an address. It is what lets
+    // an embargoed REGION be refused inside a country that is otherwise fine: Ukraine is shippable
+    // and Crimea is not, and a product page cannot know which of the two it is looking at.
+    toRegion: to.state,
     parcel,
     zones: settings.zones,
   });
-  if (!flat.ok) return { ok: false, amountCents: 0, service: "", estDays: null, source: "flat", refusedCountry: true };
+  if (!flat.ok) {
+    return {
+      ok: false, amountCents: 0, service: "", estDays: null, source: "flat", refusedCountry: true,
+      // Why, when it is not the shop's decision. "This store doesn't post here" is a lie about a
+      // destination the store DID tick, and the shopper has no way to tell the two apart.
+      ...(flat.reason === "restricted" ? { restricted: true as const, message: flat.message } : {}),
+    };
+  }
 
   const flatAnswer: BuyerShipping = {
     ok: true, amountCents: flat.amountCents, service: "Standard", estDays: null, source: "flat",
@@ -98,7 +113,7 @@ export async function resolveBuyerShipping(opts: {
     const q = quoteFromRate(rates[0]);
     return { ok: true, amountCents: q.buyerPaysCents, service: q.service, estDays: q.estDays, source: "live" };
   } catch {
-    /* allow-swallow: never block a sale on a carrier hiccup — the flat price is a safe answer */
+    /* allow-swallow: never block a sale on a carrier hiccup. The flat price is a safe answer */
     return flatAnswer;
   }
 }
@@ -106,7 +121,7 @@ export async function resolveBuyerShipping(opts: {
 /**
  * The faster option, when the store offers one.
  *
- * Only ever returned alongside the standard quote, and only when it is genuinely quicker — a
+ * Only ever returned alongside the standard quote, and only when it is genuinely quicker. A
  * second line at the same speed for more money is not a choice, it is a trick.
  */
 export async function resolveExpedited(opts: {
@@ -145,3 +160,4 @@ export async function resolveExpedited(opts: {
     return null;
   }
 }
+

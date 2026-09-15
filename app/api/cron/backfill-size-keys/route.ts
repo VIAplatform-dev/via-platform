@@ -13,7 +13,7 @@ export async function GET(request: Request) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  }
  try {
- // ?full=1 recomputes size_keys for the WHOLE catalog — used after a size-derivation
+ // ?full=1 recomputes size_keys for the WHOLE catalog. Used after a size-derivation
  // change (e.g. the shoe-size fix) so the filter tokens match the corrected display.
  // The nightly run (no param) only fills rows that are missing keys.
  const full = new URL(request.url).searchParams.get("full") === "1";

@@ -3,7 +3,7 @@ import { listEbayConnectedStores } from "@/app/lib/ebay-tokens-db";
 import { getEbayListingViews, ebayConfigured } from "@/app/lib/ebay";
 import { getCrossListingsByPlatform, upsertCrossListingStats } from "@/app/lib/cross-listing-db";
 
-// eBay engagement sync — pulls each connected store's live eBay listings' item-page views from the
+// eBay engagement sync: pulls each connected store's live eBay listings' item-page views from the
 // Sell Analytics traffic report and folds them into the unified cross_listing_stats, so the
 // cross-listing board's roll-up shows real eBay views alongside the extension-scraped channels.
 // Views are the metric the modern OAuth Sell API exposes cleanly; watch counts / Best Offers would

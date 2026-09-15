@@ -4,7 +4,7 @@ import { filterCustomers, audienceIsEmpty, type AudienceFilter } from "./custome
 
 // A seller's existing customer list, brought over at onboarding. Stored per store
 // and deduped by email so re-uploading is safe. This is the seller's own audience
-// (their relationship) — VYA holds it on their behalf.
+// (their relationship): VYA holds it on their behalf.
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -27,7 +27,7 @@ async function ensureTable() {
  UNIQUE (store_slug, email)
  )`;
  await sql`CREATE INDEX IF NOT EXISTS idx_store_customers_store ON store_customers (store_slug)`;
- // Marketing consent — defaults to subscribed; the seller's email campaigns honor it.
+ // Marketing consent: defaults to subscribed; the seller's email campaigns honor it.
  await sql`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS email_subscribed BOOLEAN NOT NULL DEFAULT true`;
  // CRM: free-form tags (segments) and a private note per contact.
  await sql`ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}'`;
@@ -64,8 +64,8 @@ export async function importCustomers(
  const total = await getCustomerCount(storeSlug);
 
  // A store that connected Klaviyo or Mailchimp expects someone who signs up or buys to appear there
- // now, not at the next full sync. A CSV import of ten thousand is a different case — that's what
- // "Send everyone now" is for — so only small, live additions go across immediately.
+ // now, not at the next full sync. A CSV import of ten thousand is a different case. That's what
+ // "Send everyone now" is for, so only small, live additions go across immediately.
  if (rows.length <= 50) {
   const { mirrorToEsp } = await import("./esp-mirror");
   for (const r of rows) {
@@ -91,7 +91,7 @@ export async function listCustomers(storeSlug: string, limit = 50): Promise<{ em
 // A unified customer = the store's brought-over audience PLUS anyone who has
 // actually bought on VYA, merged by email. Buyers carry order count / total spent /
 // last order; imported-only contacts carry when they were added. This is the
-// seller's CRM view — their relationship, held on their behalf.
+// seller's CRM view: their relationship, held on their behalf.
 export type CustomerProfile = {
  email: string;
  name: string | null;
@@ -102,10 +102,10 @@ export type CustomerProfile = {
  orders: number;
  spentCents: number;
  lastOrderAt: string | null; // ISO
- addedAt: string | null; // ISO — when imported
+ addedAt: string | null; // ISO, when imported
  tags: string[]; // seller-defined segments
  notes: string | null; // seller's private note
- /** Categories of the pieces they have bought here, lower-cased — "bought in category" filters on it. */
+ /** Categories of the pieces they have bought here, lower-cased. "bought in category" filters on it. */
  categories: string[];
 };
 
@@ -188,12 +188,12 @@ export async function listCustomerProfiles(storeSlug: string): Promise<CustomerP
 
 /**
  * The real email audience: the UNIFIED customer list (imported + anyone who bought), deduped by
- * email and limited to those who are subscribed and have a valid address. This — not the raw
- * imported table — is who a campaign actually reaches, so campaigns count and send consistently.
+ * email and limited to those who are subscribed and have a valid address. This, not the raw
+ * imported table: is who a campaign actually reaches, so campaigns count and send consistently.
  */
 export async function listSubscribers(storeSlug: string, audience?: AudienceFilter | null): Promise<{ email: string; name: string | null }[]> {
  const all = await listCustomerProfiles(storeSlug);
- // The SAME filter the customer list runs — so "Send to 38" is 38 people, not a different 40.
+ // The SAME filter the customer list runs, so "Send to 38" is 38 people, not a different 40.
  const profiles = audience && !audienceIsEmpty(audience) ? filterCustomers(all, audience) : all;
  const seen = new Set<string>();
  const out: { email: string; name: string | null }[] = [];
@@ -206,7 +206,7 @@ export async function listSubscribers(storeSlug: string, audience?: AudienceFilt
  return out;
 }
 
-/** Every category this store has sold, lower-cased — the choices for "bought in category". */
+/** Every category this store has sold, lower-cased. The choices for "bought in category". */
 export async function listSoldCategories(storeSlug: string): Promise<string[]> {
  const profiles = await listCustomerProfiles(storeSlug).catch(() => []);
  return Array.from(new Set(profiles.flatMap((p) => p.categories))).sort();
@@ -289,7 +289,7 @@ export async function setCustomerNote(storeSlug: string, email: string, note: st
  await db()`UPDATE store_customers SET notes = ${note && note.trim() ? note.trim().slice(0, 2000) : null} WHERE store_slug = ${storeSlug} AND email = ${e}`;
 }
 
-/** Every distinct tag in use for this store, with how many contacts carry it — the segment list. */
+/** Every distinct tag in use for this store, with how many contacts carry it. The segment list. */
 export async function listCustomerTags(storeSlug: string): Promise<{ tag: string; count: number }[]> {
  await ensureTable();
  const rows = (await db()`
@@ -305,14 +305,14 @@ export async function listCustomerTags(storeSlug: string): Promise<{ tag: string
  * Every store this email holds a customer record at.
  *
  * FOR VYA ONLY. A seller must never see this. Showing Scottie that her buyer also shops at four
- * other vintage stores hands her a competitor list assembled from other sellers' customers — the
+ * other vintage stores hands her a competitor list assembled from other sellers' customers. The
  * same rule the Data Layer runs on, where a seller sees market-level signal and never another
  * store's individual numbers. Every caller must be an admin route or an internal job.
  *
  * Useful because it is exactly the marketplace-conversion signal: someone who is a customer of five
  * of our stores and has never signed in to VYA is the best person there is to invite.
  *
- * An email is a strong hint at one person, not proof of it — households share addresses, people use
+ * An email is a strong hint at one person, not proof of it. Households share addresses, people use
  * different emails at different shops. Good enough to greet someone by name or to spot a good
  * invitation; never good enough to merge order histories or show one seller's data on another's page.
  */

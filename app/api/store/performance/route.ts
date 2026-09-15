@@ -9,7 +9,7 @@ const EMPTY = { rows: [], totals: { clicks: 0, orders: 0, sales: 0, convPct: 0, 
 const EMPTY_TRAFFIC = { total: 0, byType: [], topSources: [] };
 const EMPTY_PAGES = { total: 0, byType: [], pages: [] };
 
-// GET — marketing performance for the acting store: per-channel sessions/conversion
+// GET: marketing performance for the acting store: per-channel sessions/conversion
 // plus the share of total store sales attributed to marketing. ?days=30 (default) | all
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

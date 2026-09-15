@@ -6,7 +6,7 @@ import HeartButton from "./HeartButton";
 import type { Product } from "../lib/types";
 import { colors, spacing } from "../lib/theme";
 
-// One piece in the grid. Swipe the photograph, tap it to open, tap the heart to save — three
+// One piece in the grid. Swipe the photograph, tap it to open, tap the heart to save. Three
 // different gestures on the same card, which is why none of them may wrap the others.
 
 function ProductCard({
@@ -53,7 +53,7 @@ function ProductCard({
 }
 
 // Memoized on the things that actually change what's drawn. Without it, one favourite tap
-// re-rendered every card on screen — and each of those re-rendered a gallery.
+// re-rendered every card on screen, and each of those re-rendered a gallery.
 export default memo(ProductCard, (a, b) =>
   a.product.id === b.product.id &&
   a.width === b.width &&

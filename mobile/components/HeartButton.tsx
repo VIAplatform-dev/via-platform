@@ -4,7 +4,7 @@ import { colors } from "../lib/theme";
 
 // The save control.
 //
-// Feather has no filled heart — only an outline — so a "saved" state could do nothing but darken,
+// Feather has no filled heart, only an outline, so a "saved" state could do nothing but darken,
 // which is what it did. Ionicons ships both, and the state now reads at a glance from across the
 // grid: outline for unsaved, solid burgundy for saved.
 

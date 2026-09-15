@@ -9,7 +9,7 @@ import { sendSourcingOfferToCustomer } from "@/app/lib/email";
 /**
  * Which shop this person is acting for.
  *
- * store_users FIRST, the hardcoded roster second — the same order storeAuth.ts uses, for the same
+ * store_users FIRST, the hardcoded roster second. The same order storeAuth.ts uses, for the same
  * reason. These routes read the static map alone, which is a list of OWNER addresses: a teammate
  * invited into a shop exists only in store_users, so sourcing told her she was unauthorised in a
  * workspace she had just been given access to.
@@ -66,7 +66,7 @@ export async function POST(
  return NextResponse.json({ error: "You have already submitted an offer for this request" }, { status: 409 });
  }
 
- // Fetch request to get customer email (no userId check — stores can see open requests)
+ // Fetch request to get customer email (no userId check: stores can see open requests)
  // We use a raw DB lookup via sourcing-db helper that doesn't filter by user
  const { neon } = await import("@neondatabase/serverless");
  const sql = neon(process.env.DATABASE_URL || process.env.POSTGRES_URL || "");

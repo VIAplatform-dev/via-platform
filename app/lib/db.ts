@@ -5,11 +5,11 @@ import { SHOPIFY_STORES } from "./storeConfig";
 import { logError } from "./error-log";
 
 // Products from these slugs are hidden site-wide: manually disabled + stores without Collabs ID.
-// "venus-vintage" — removed as a store, but her product rows remain in the DB and sync as $0
+// "venus-vintage": removed as a store, but her product rows remain in the DB and sync as $0
 // (she rents most pieces). Keep her disabled so nothing surfaces until the rows are purged.
 export const DISABLED_STORE_SLUGS: string[] = ["velvet-archive", "venus-vintage", ...HIDDEN_STORE_SLUGS];
 
-// Slugs of Shopify-powered stores. Used to gate collabs_link requirement — only Shopify
+// Slugs of Shopify-powered stores. Used to gate collabs_link requirement, only Shopify
 // products need a collabs_link to be visible; non-Shopify products are always shown.
 const SHOPIFY_STORE_SLUGS: string[] = SHOPIFY_STORES.map((s) => s.slug);
 
@@ -30,8 +30,8 @@ const getDatabaseUrl = () => {
 
 // One-time / self-healing cleanup for scrape pollution: a "Condition Guide" nav link once matched as
 // a Condition field and swallowed the store's whole menu into condition/materials/measurements. The
-// scraper no longer does this, but the COALESCE upsert keeps old junk — so null it out. Idempotent:
-// a real value ("Excellent — light wear") never contains these nav phrases, so it's left untouched.
+// scraper no longer does this, but the COALESCE upsert keeps old junk, so null it out. Idempotent:
+// a real value ("Excellent: light wear") never contains these nav phrases, so it's left untouched.
 export async function cleanScrapedNavJunk(): Promise<number> {
  const sql = neon(getDatabaseUrl());
  const junk = "(contact us|shop all|sourcing requests?|summer arrivals|private sourcing|add to (cart|bag)|log ?in|newsletter|search cart)";
@@ -113,7 +113,7 @@ export async function initDatabase() {
  ALTER TABLE products ADD COLUMN IF NOT EXISTS images TEXT
  `;
 
- // Add video_url column — a hosted product video (mp4) when the store lists one
+ // Add video_url column: a hosted product video (mp4) when the store lists one
  // instead of (or alongside) images.
  await sql`
  ALTER TABLE products ADD COLUMN IF NOT EXISTS video_url TEXT
@@ -131,15 +131,15 @@ export async function initDatabase() {
  ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_id TEXT
  `;
  // Captured from the seller's own product page (scrapeProductPage stores): the condition,
- // fibre/materials, and measurements they already wrote — stored structured so intake,
+ // fibre/materials, and measurements they already wrote. Stored structured so intake,
  // pricing, and training use the truth instead of re-guessing it from the photo.
  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS condition TEXT`;
  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS materials TEXT`;
  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS measurements TEXT`;
- // The seller's own Shopify tags — they encode era/style/collection (e.g. "y2k", "1990s",
+ // The seller's own Shopify tags. They encode era/style/collection (e.g. "y2k", "1990s",
  // "archive"). Kept so we stop discarding a strong era/style signal at import.
  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS tags TEXT[]`;
- // The store's own collections this piece belongs to (e.g. "1990s", "Chanel", "Bags") — the
+ // The store's own collections this piece belongs to (e.g. "1990s", "Chanel", "Bags"). The
  // richest seller-labeled signal for era/brand/category. `era` is derived from them (see
  // collections-sync.ts) so the intake accuracy loop learns from real labels, not guesses.
  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS collections TEXT[]`;
@@ -165,7 +165,7 @@ export async function initDatabase() {
  ALTER TABLE products ADD COLUMN IF NOT EXISTS size TEXT
  `;
 
- // The set of bare size tokens this product should match a size filter on —
+ // The set of bare size tokens this product should match a size filter on,
  // the DERIVED display size (deriveSize), expanded so a ranged fit like
  // "US 2-4" → {2,3,4}. NULL means "not yet computed" (falls back to raw size
  // matching); populated by the size-keys backfill. GIN index for fast overlap.
@@ -240,7 +240,7 @@ export async function initDatabase() {
  // inferred at feed-drop. Populated by recordConfirmedSales; lets the price eval grade against truth.
  await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
  // Reconcile sold_items schema DRIFT: two historical CREATE TABLE definitions disagreed (this one vs
- // the market-data one), so whichever ran first won and the other's columns were missing — making the
+ // the market-data one), so whichever ran first won and the other's columns were missing. Making the
  // insert below throw silently. Add every column BOTH definitions and the insert paths reference, so
  // the table converges no matter which shape exists on a given environment.
  await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS product_id TEXT`.catch(() => {});
@@ -254,7 +254,7 @@ export async function initDatabase() {
  await sql`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS first_seen_at TIMESTAMPTZ`.catch(() => {});
 
  // Preserve the identity of products removed from the catalog (sold out / renamed) so the
- // events ETL can still resolve their views — otherwise that history orphans and demand for
+ // events ETL can still resolve their views. Otherwise that history orphans and demand for
  // our best-selling items gets undercounted. Keyed by the original products.id; composite_id
  // matches how product_views/clicks reference a product ("{store_slug}-{id}").
  await sql`
@@ -284,7 +284,7 @@ export async function initDatabase() {
  )
  `;
 
- // Enforce unique (store_slug, title) — safe to run on existing tables
+ // Enforce unique (store_slug, title): safe to run on existing tables
  await sql`
  CREATE UNIQUE INDEX IF NOT EXISTS idx_products_store_title
  ON products(store_slug, title)
@@ -322,7 +322,7 @@ export async function initDatabase() {
  )
  `;
 
- // Search indexes — required for full-text and fuzzy search in /api/search
+ // Search indexes. Required for full-text and fuzzy search in /api/search
  await sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`.catch(() => {});
  await sql`
  CREATE INDEX IF NOT EXISTS idx_products_title_fts
@@ -376,9 +376,9 @@ export async function syncProducts(
 ): Promise<{ count: number; inserted: number; updated: number; priceDrops: PriceDrop[] }> {
  const sql = neon(getDatabaseUrl());
 
- // Titles that should never appear on VYA — blocked globally across all stores.
+ // Titles that should never appear on VYA. Blocked globally across all stores.
  // Checked as case-insensitive substrings. Includes non-catalog "products" that
- // sellers create as custom invoices (bulk orders, deposits, balance payments) —
+ // sellers create as custom invoices (bulk orders, deposits, balance payments),
  // e.g. Nello's "Custom Bulk Order (6 items)" with a photo of a receipt.
  const BLOCKED_TITLE_PATTERNS = [
  "gift card",
@@ -410,7 +410,7 @@ export async function syncProducts(
 
  // A title is blocked if it matches a global pattern, an exact removed/excluded title,
  // or an excluded keyword. Used both to delete existing rows AND to skip re-inserting
- // on this same sync run (see the upsert loop below — `if (isBlocked) continue`).
+ // on this same sync run (see the upsert loop below. `if (isBlocked) continue`).
  const isBlocked = (title: string) => {
  const lower = title.toLowerCase();
  return BLOCKED_TITLE_PATTERNS.some((p) => lower.includes(p))
@@ -463,7 +463,7 @@ export async function syncProducts(
 
  // Sold out at the source: preserve its listing data (feeds pricing comps + demand) but keep it
  // OUT of the live catalog. If it was already live on VYA, the stale-product sweep below captures
- // the transition with real dwell time; here we only capture pieces NEW to us — a store's existing
+ // the transition with real dwell time; here we only capture pieces NEW to us. A store's existing
  // sold history at import. Don't push its title, so the sweep removes any stale live row. Deduped
  // by store+title so repeated imports/syncs don't pile up.
  if (product.available === false) {
@@ -474,13 +474,13 @@ export async function syncProducts(
   ${(product.brand || product.productType || "").trim() || null}, ${product.price}, ${product.compareAtPrice ?? product.price}, ${product.currency || "USD"},
   ${product.image || (product.images && product.images[0]) || null}, ${product.size || null}, ${product.productType || null}, ${product.shopifyProductId || null}, NOW()
  WHERE NOT EXISTS (SELECT 1 FROM sold_items s WHERE s.store_slug = ${storeSlug} AND lower(s.title) = lower(${product.title}))
- `.catch((e) => logError("sold_items-import-insert", e, { context: { storeSlug, title: product.title } })); // never swallow — this path silently starved the data layer for months
+ `.catch((e) => logError("sold_items-import-insert", e, { context: { storeSlug, title: product.title } })); // never swallow: this path silently starved the data layer for months
  }
  continue;
  }
 
  titles.push(product.title);
- // VYA is a visual marketplace — never add a product with no image (it renders a
+ // VYA is a visual marketplace, never add a product with no image (it renders a
  // broken card and is filtered out of every grid anyway). Video-only products
  // carry the video's poster frame as their image (see shopifyClient), so they
  // still have one and pass. The title stays in `titles` (above) so an existing
@@ -582,7 +582,7 @@ export async function syncProducts(
 
  // Capture sold items (products dropping off the feed) before deleting them
  if (titles.length > 0) {
- // Column list MUST match the sold_items table exactly — the previous list referenced
+ // Column list MUST match the sold_items table exactly. The previous list referenced
  // shopify_product_id/collabs_link/first_seen_at (which don't exist), so every insert threw and
  // the swallowed catch left sold_items frozen for months, starving the data layer. Log, don't hide.
  try {
@@ -621,7 +621,7 @@ export async function syncProducts(
  }
 
  // Preserve product identity (id + composite key) BEFORE deletion so the events ETL can
- // resolve renamed/sold-out products — otherwise their views orphan and demand undercounts
+ // resolve renamed/sold-out products. Otherwise their views orphan and demand undercounts
  // the very items that sold. (sold_items above lacks the id needed to match a view/click.)
  if (titles.length > 0) {
  await sql`
@@ -634,7 +634,7 @@ export async function syncProducts(
  }
 
  // Remove products that are no longer in the feed.
- // Skip deletion entirely when 0 products come back — that almost always means
+ // Skip deletion entirely when 0 products come back. That almost always means
  // a transient API failure (rate limit, brief outage, empty JSON response).
  // Deleting all rows in that case would make every product look brand-new on
  // the next successful sync. If a store genuinely goes to 0 products, use the
@@ -707,13 +707,13 @@ const _getAllProductsUncached = async (): Promise<DBProduct[]> => {
  }
 };
 
-// Not cached — result exceeds Next.js 2MB unstable_cache limit
+// Not cached. Result exceeds Next.js 2MB unstable_cache limit
 export const getAllProducts = _getAllProductsUncached;
 
 // Idempotently ensure products.size_keys exists. initDatabase only runs during
-// syncs, but the public list endpoints reference size_keys on every request —
+// syncs, but the public list endpoints reference size_keys on every request,
 // and Postgres validates the column at parse time even when the size filter is
-// off — so they must guarantee it exists first. Memoised: the ALTER runs once
+// off, so they must guarantee it exists first. Memoised: the ALTER runs once
 // per server instance, then this resolves instantly.
 let _sizeKeysEnsured: Promise<void> | null = null;
 export function ensureSizeKeysColumn(): Promise<void> {
@@ -908,7 +908,7 @@ export async function getProductsMissingCollabsLink(storeSlug?: string): Promise
 /**
  * Delete products that have a shopify_product_id but no collabs_link and
  * no created_at (meaning they predate Collabs support and have never been
- * visible on VYA). Safe to remove — they'll be re-added by the next sync
+ * visible on VYA). Safe to remove: they'll be re-added by the next sync
  * if the store enrolls them in Collabs.
  */
 export async function deletePermanentlyStuckProducts(storeSlug?: string, minDaysStuck?: number): Promise<number> {

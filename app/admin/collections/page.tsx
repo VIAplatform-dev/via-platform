@@ -7,7 +7,7 @@ import { COLLECTIONS } from "@/app/lib/collections-config";
 
 type Collection = (typeof COLLECTIONS)[number];
 
-// Not a public collection — curating this list sets exactly which pieces go in
+// Not a public collection. Curating this list sets exactly which pieces go in
 // the weekly New Arrivals email (leave it empty for automatic selection).
 const EMAIL_PICKS_COLLECTION = {
  slug: "new-arrivals-email",
@@ -45,7 +45,7 @@ export default function CollectionsAdminPage() {
  const [activeSlugs, setActiveSlugs] = useState<Set<string> | null>(null);
  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
- // Weekly New Arrivals subject line — stored server-side so it can change every week
+ // Weekly New Arrivals subject line. Stored server-side so it can change every week
  // without a deploy.
  const [subject, setSubject] = useState("");
  const [subjectSaved, setSubjectSaved] = useState("");
@@ -327,7 +327,7 @@ export default function CollectionsAdminPage() {
  </div>
  )}
 
- {/* Collection tabs — show EVERY collection so empty ones can be curated. A dot marks the
+ {/* Collection tabs. Show EVERY collection so empty ones can be curated. A dot marks the
    ones that already have items (from activeSlugs). */}
  <div style={{ display: "flex", gap: 0, borderTop: "1px solid #e4e4e7", overflowX: "auto" }}>
  {[EMAIL_PICKS_COLLECTION, ...COLLECTIONS].map((col) => (
@@ -368,7 +368,7 @@ export default function CollectionsAdminPage() {
  {!loadingPicks && picks.length > 0 && (
  <div style={{ background: "#fff", border: "1px solid #e4e4e7", borderRadius: 8, padding: 20, marginBottom: 24 }}>
  <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "#a1a1aa", fontWeight: 500, marginBottom: 12 }}>
- Current Selections — {activeCollection.name} · click any item to remove
+ Current Selections. {activeCollection.name} · click any item to remove
  </p>
  <div className="flex flex-wrap gap-2">
  {picks.map((pick) => {
@@ -414,7 +414,7 @@ export default function CollectionsAdminPage() {
  </div>
  )}
 
- {/* From User Collection — import a user's own saved collection into this VYA collection */}
+ {/* From User Collection: import a user's own saved collection into this VYA collection */}
  <div style={{ background: "#fff", border: "1px solid #e4e4e7", borderRadius: 8, padding: 20, marginBottom: 24 }}>
  <p style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "#a1a1aa", fontWeight: 500, marginBottom: 4 }}>
  From User Collection
@@ -566,7 +566,7 @@ export default function CollectionsAdminPage() {
  type="text"
  value={query}
  onChange={(e) => setQuery(e.target.value)}
- placeholder="Search like a shopper — runway, ysl, leather boots…"
+ placeholder="Search like a shopper. Runway, ysl, leather boots…"
  className="flex-1 px-4 py-2.5 text-sm outline-none"
  style={{ border: "1px solid #e4e4e7", borderRadius: 6, background: "#fff", color: "#09090b" }}
  />

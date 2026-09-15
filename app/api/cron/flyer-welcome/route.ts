@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  * The day-after thank-you for people who joined from a printed flyer.
  *
  * THIS JOB GRANTS NOTHING. Access was given the moment they typed their email; if this never ran,
- * they would still be browsing. That separation is deliberate — an email job that is also an
+ * they would still be browsing. That separation is deliberate. An email job that is also an
  * access job is one whose failure locks people out.
  *
  * Each address is marked only after its send succeeds, so a bad minute at the mail provider means

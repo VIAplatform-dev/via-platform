@@ -10,7 +10,7 @@ const WORKSPACE = "/infrastructure/admin/marketing/instagram";
 
 // Handles the Meta OAuth return: code → user token → the Page's linked IG Business account →
 // save { ig_user_id, page access_token } for that store. The Page access token is what the
-// Content Publishing API uses. Untested end-to-end until the Meta app exists — the token-paste
+// Content Publishing API uses. Untested end-to-end until the Meta app exists. The token-paste
 // path in the main route is the one that works before App Review.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export async function GET(request: NextRequest) {

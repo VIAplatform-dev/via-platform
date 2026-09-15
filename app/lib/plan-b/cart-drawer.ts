@@ -1,7 +1,7 @@
 // Rendering the theme's CART DRAWER after an Add-to-cart.
 //
 // cart-sections.ts builds the three sections Dawn's `cart-notification` variant asks for. Stores on
-// the `cart-drawer` variant ask for a different one — `cart-drawer` — which we could not build, so
+// the `cart-drawer` variant ask for a different one, `cart-drawer`, which we could not build, so
 // it fell through to buildFallbackSection() and echoed the page's EXISTING drawer markup back. That
 // markup was captured while the crawler's cart was empty, so the drawer faithfully re-rendered an
 // empty cart every time. The item really was added; the shopper was shown an empty bag and
@@ -14,7 +14,7 @@
 //       .querySelector('#CartDrawer').innerHTML
 //
 // so the response must CONTAIN #CartDrawer, and everything inside it has to be the theme's own
-// markup — which is why rows are cloned from the captured cart page rather than hand-built. Anything
+// markup, which is why rows are cloned from the captured cart page rather than hand-built. Anything
 // we invent arrives unstyled, because only the theme's classes have CSS behind them.
 //
 // Pure: HTML and cart lines in, HTML out. The route fetches what it needs and hands it over.
@@ -24,7 +24,7 @@ import type { CartPageLine } from "../site-capture.ts";
 import type { CartTemplate } from "./derive-cart-template.ts";
 import { renderCartRows } from "./render-cart.ts";
 
-/** Where the drawer lives, most specific first — Dawn's id, then the custom element, then a class. */
+/** Where the drawer lives, most specific first. Dawn's id, then the custom element, then a class. */
 const DRAWER = "#CartDrawer, cart-drawer, .cart-drawer";
 /** Where rows go inside it. */
 const ITEMS = "#CartDrawer-CartItems, .drawer__contents.js-contents, .drawer__contents, .js-contents";
@@ -48,7 +48,7 @@ function fillRow($: cheerio.CheerioAPI, $row: cheerio.Cheerio<DomEl>, line: Cart
  $row.find("style, link, script").remove();
  $row.removeAttr("id");
 
- // Image: keep one, and only one — a theme's hover-swap second <img> shows through otherwise.
+ // Image: keep one, and only one. A theme's hover-swap second <img> shows through otherwise.
  const $img = $row.find("img").first();
  if (line.image && $img.length) $img.attr("src", line.image).attr("alt", line.title).removeAttr("srcset").removeAttr("data-srcset").removeAttr("sizes");
  else if (!line.image) $img.remove();
@@ -99,7 +99,7 @@ function fillRow($: cheerio.CheerioAPI, $row: cheerio.Cheerio<DomEl>, line: Cart
 }
 
 /**
- * Anything a theme might call a cart line. Deliberately broad — and deliberately NOT trusted on its
+ * Anything a theme might call a cart line. Deliberately broad, and deliberately NOT trusted on its
  * own, because breadth is exactly how the header row got cloned.
  */
 const ROW_CANDIDATES = "[class*='cart-item'], [class*='cart_item'], [class*='cart__item'], [class*='line-item'], [class*='line_item']";
@@ -108,7 +108,7 @@ const MONEY = /[£$€¥]\s?[\d,]+(\.\d{2})?|\d[\d,]*[.,]\d{2}/;
 /**
  * The theme's own line-item markup, picked out of its captured cart page.
  *
- * Class names alone are not enough. Horizon calls its rows `cart-items__table-row` — and so is its
+ * Class names alone are not enough. Horizon calls its rows `cart-items__table-row`, and so is its
  * table HEADER row, so `[class*='cart-item']` matched the header first and every cart line rendered
  * as "Product image / Product information". Structure is what separates them: a header holds <th>
  * column labels, a line holds a picture and a price.
@@ -129,13 +129,13 @@ export function pickRowTemplateHtml(html: string): string | null {
 
   const hasImg = $el.find("img").length > 0;
   const hasMoney = MONEY.test($el.text() || "");
-  // Nothing product-shaped in it at all — a wrapper, a status region, an empty-state block.
+  // Nothing product-shaped in it at all. A wrapper, a status region, an empty-state block.
   if (!hasImg && !hasMoney) continue;
 
   // COMPLETENESS FIRST: a whole line has a picture, a price and a link to the product. A single
   // cell of one has only some of those, so it must never beat the row that contains it.
   const complete = (hasImg ? 1 : 0) + (hasMoney ? 1 : 0) + ($el.find("a[href]").length ? 1 : 0);
-  // Among equally complete candidates, take the SMALLEST — otherwise a wrapper sharing the class
+  // Among equally complete candidates, take the SMALLEST. Otherwise a wrapper sharing the class
   // prefix (`cart-items` contains `cart-item`) wins and swallows the entire table.
   const nested = $el.find(ROW_CANDIDATES).length;
 
@@ -160,13 +160,13 @@ function plainRow(line: CartPageLine, index: number): string {
  * Build the `cart-drawer` section for this visitor's real cart.
  *
  * `pageHtml` is the page the shopper added from (the theme sends it as `sections_url`), which is
- * where the drawer's own markup lives. `rowTemplateHtml` is the captured /cart page — captured with
+ * where the drawer's own markup lives. `rowTemplateHtml` is the captured /cart page. Captured with
  * a product in it by captureCartTemplate, so it carries a real row to clone. Returns null when the
  * page has no drawer at all, so the caller can fall back.
  */
 type FillOpts = {
  rowTemplateHtml?: string;
- /** The layout derived at import time. Preferred over guessing at class names — see
+ /** The layout derived at import time. Preferred over guessing at class names. See
   *  derive-cart-template.ts. */
  template?: CartTemplate | null;
  lines: CartPageLine[];
@@ -178,7 +178,7 @@ function fillDrawer($: cheerio.CheerioAPI, $drawer: cheerio.Cheerio<DomEl>, opts
  const { rowTemplateHtml, template, lines } = opts;
 
  // The crawler stamps onsubmit="return false" on every /cart form so a captured page can never post
- // to the old platform. Plan B keeps scripts, so that guard survives — and it also blocks the
+ // to the old platform. Plan B keeps scripts, so that guard survives, and it also blocks the
  // theme's OWN Checkout button, which is a native submit of this form. Ours is the live drawer, and
  // POST /cart is answered by VYA, so the guard has to come off or Checkout does nothing.
  $drawer.find("form").removeAttr("onsubmit");
@@ -187,7 +187,7 @@ function fillDrawer($: cheerio.CheerioAPI, $drawer: cheerio.Cheerio<DomEl>, opts
  const $btn = $drawer.find("[name='checkout'], #CartDrawer-Checkout").first();
 
  // Whatever the capture happened to have in it. A drawer captured mid-crawl can hold the crawler's
- // OWN cart, and leaving it there showed a shopper a stranger's product — beside the words "Your
+ // OWN cart, and leaving it there showed a shopper a stranger's product. Beside the words "Your
  // cart is empty" when their own bag was empty. It is never right to keep it.
  const $items = $drawer.find(ITEMS).first();
  const stale = $drawer.find(ROW_CANDIDATES).toArray().filter((el) => !$(el).closest("thead").length && !$(el).find("th").length);
@@ -266,7 +266,7 @@ export function buildCartDrawerSection(opts: FillOpts & { pageHtml: string }): s
 /**
  * The same work, applied to a page being SERVED rather than a section being answered.
  *
- * Clicking the cart icon opens the drawer already in the page — no request is made — so a drawer
+ * Clicking the cart icon opens the drawer already in the page, no request is made, so a drawer
  * captured with an empty cart told every shopper their bag was empty while the badge beside it said
  * otherwise. Every page carries the drawer (it lives in the site header), so every page needs this.
  */

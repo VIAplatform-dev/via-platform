@@ -6,7 +6,7 @@ import RentCalendar, { type Span } from "./RentCalendar";
 // Renting, from the customer's side.
 //
 // The order follows what a renter decides: is it my size, what's it worth, what does it cost, when
-// do I need it, how do I get it. Dates come before the button because the price depends on them —
+// do I need it, how do I get it. Dates come before the button because the price depends on them,
 // "From $195" is a starting point, not the price, and the real number only exists once two dates
 // are picked and the server has agreed they're free.
 //
@@ -159,7 +159,7 @@ export default function RentBox({ itemId, accent, alsoForSale }: { itemId: strin
 
    <p className="mt-5 text-2xl">From {usd(from)}</p>
 
-   {/* One control, two fields — clicking either opens the calendar, as the reference does. */}
+   {/* One control, two fields. Clicking either opens the calendar, as the reference does. */}
    <div className="relative mt-4">
     <div className="vya-round flex border border-current/20">
      {([["Arrive by", start], ["Return by", end]] as const).map(([label, val], i) => (

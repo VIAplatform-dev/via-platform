@@ -1,4 +1,4 @@
-# getvya.ai Admin — Build Roadmap
+# getvya.ai Admin: Build Roadmap
 
 Full project briefs for features to build into the getvya.ai admin (Owner Workspace).
 Each: **Goal** -> **Core features** (the meat) -> **User flow** -> **Builds on** -> **Watch**.
@@ -10,10 +10,10 @@ Full metric-level spec for Deeper Analytics lives in `deeper-analytics-spec.md`.
 
 ## HIGH PRIORITY
 
-## Deeper analytics — what each store gets
+## Deeper analytics. What each store gets
 
-**Goal:** A store-owner analytics dashboard that answers real business questions — average customer
-spend, average item price, how each quarter is trending — from the store's own catalog and order
+**Goal:** A store-owner analytics dashboard that answers real business questions. Average customer
+spend, average item price, how each quarter is trending, from the store's own catalog and order
 data, with anonymized market benchmarks alongside. VYA already syncs each store's full order +
 catalog data, so this is their whole-business dashboard, with "via VYA" as a filter.
 
@@ -29,19 +29,19 @@ catalog data, so this is their whole-business dashboard, with "via VYA" as a fil
 event tables, canonical inferBrandFromTitle / normalizeCategory, data-layer benchmarks (N >= 5).
 
 **Watch:** decide whole-business vs VYA-only (examples read as whole-business = stronger product);
-some metrics gated by the deferred availability column — see the spec doc for the full dependency list.
+some metrics gated by the deferred availability column. See the spec doc for the full dependency list.
 
 ---
 
 ## Storefront builder
 
 **Goal:** A full visual storefront editor so any store can import their existing site or build one
-on VYA, then edit every section themselves — no code.
+on VYA, then edit every section themselves, no code.
 
 **Core features**
 - **Two entry modes**
-  - *Import* — paste your live URL; VYA captures the homepage + sections into an editable storefront. One-time direction; **admin-only re-sync** to pull updates from the source.
-  - *Build* — start from a VYA template and add sections.
+  - *Import* paste your live URL; VYA captures the homepage + sections into an editable storefront. One-time direction; **admin-only re-sync** to pull updates from the source.
+  - *Build* start from a VYA template and add sections.
 - **Section-based editor**
   - Section library: hero, featured products, collection grid, about/story, lookbook/editorial, testimonials, newsletter signup, FAQ, contact, Instagram feed, rich-text/custom.
   - Add / remove / **drag-reorder** sections.
@@ -50,7 +50,7 @@ on VYA, then edit every section themselves — no code.
   - Text (headings, body), images (upload to Vercel Blob or re-host from cdn.shopify), product pickers, collection pickers.
   - Product/collection binding: choose which items or collections a section displays.
 - **Design system (global theme)**
-  - Palette, typography pairing, spacing/density, button style, corner radius — applied as tokens across all sections for consistency, with per-section overrides.
+  - Palette, typography pairing, spacing/density, button style, corner radius. Applied as tokens across all sections for consistency, with per-section overrides.
 - **Media / SEO ownership**
   - Re-host images off cdn.shopify onto a VYA domain (needed for reverse-image/Lens SEO + so the imagery is attributed to VYA, not the seller's Shopify).
   - Auto product/home metadata + Product/Store JSON-LD; sitemap discovery of live storefronts.
@@ -65,15 +65,15 @@ or Build (template + sections) -> edit -> preview -> publish.
 storefront SEO/JSON-LD.
 
 **Watch:**
-- ~~Collections **rendering** is still orphaned~~ — **done.** Collection pages render (`/s/{handle}/collections/{slug}` → `StorefrontView` filters by membership), collections appear in the storefront nav, and the "Shop by category" tiles now deep-link: a tile naming a real collection goes to that collection, anything else filters the shop by category.
-- Import **fidelity** is the hard part (capture must actually look like their real site) — biggest quality risk.
+- ~~Collections **rendering** is still orphaned~~ **done.** Collection pages render (`/s/{handle}/collections/{slug}` → `StorefrontView` filters by membership), collections appear in the storefront nav, and the "Shop by category" tiles now deep-link: a tile naming a real collection goes to that collection, anything else filters the shop by category.
+- Import **fidelity** is the hard part (capture must actually look like their real site). Biggest quality risk.
 
 ---
 
 ## Apps / extensions
 
-**Goal:** An app marketplace inside the admin where stores connect the tools they already use —
-Klaviyo, Instagram, Google Shopping, and more — with one-click connect, per-store settings, and
+**Goal:** An app marketplace inside the admin where stores connect the tools they already use,
+Klaviyo, Instagram, Google Shopping, and more, with one-click connect, per-store settings, and
 VYA handling the catalog/data sync behind each. Plus a browser extension for channels with no API.
 
 **Core features**
@@ -88,7 +88,7 @@ VYA handling the catalog/data sync behind each. Plus a browser extension for cha
   - *Analytics:* GA4 / Meta Pixel.
   - *Ops (later):* accounting (QuickBooks), reviews, SMS.
 - **Shared plumbing (build once, reuse across apps)**
-  - *Product feed engine:* one normalized catalog export, formatted per channel — powers Google Shopping, Meta/IG catalog, and Pinterest.
+  - *Product feed engine:* one normalized catalog export, formatted per channel. Powers Google Shopping, Meta/IG catalog, and Pinterest.
   - *Customer/event sync:* push customers + events (views/favorites/orders) to marketing apps (Klaviyo/Mailchimp).
   - *OAuth connection manager:* per-store, per-app token storage + refresh + permissions.
 - **Browser extension (the no-API channels)**
@@ -102,24 +102,24 @@ extension for Depop/Poshmark.
 (KLAVIYO_CLIENT_SECRET), Meta Graph (IG), eBay/Etsy/Depop creds, cross-listing hybrid architecture.
 
 **Watch:**
-- The **product feed engine** is the shared dependency for Google Shopping + Meta/IG/Pinterest — build it first.
+- The **product feed engine** is the shared dependency for Google Shopping + Meta/IG/Pinterest. Build it first.
 - Overlap: the **Integration with IG** roadmap item is the deep build of the Instagram app listed here.
 - Google Merchant Center / Meta catalog approval + feed-spec compliance.
 - Depop API pending -> extension is the workaround; extension maintenance + Chrome Web Store review.
 
 ---
 
-## In-person payments (Tap to Pay) — build spec
+## In-person payments (Tap to Pay): build spec
 
-**Why:** capture the *offline half* of every seller's GMV (markets, pop-ups, physical shop) — the sales that
+**Why:** capture the *offline half* of every seller's GMV (markets, pop-ups, physical shop). The sales that
 today leak to Venmo/cash. Every in-person sale then runs the **same 1% commission** as online. Offered on **all
-tiers** (§8) — it costs VYA ~$0 and is the biggest lever on commission capture-rate. **No hardware** — the
+tiers** (§8): it costs VYA ~$0 and is the biggest lever on commission capture-rate. **No hardware** the
 seller's phone IS the reader (Tap to Pay on iPhone / Android).
 
 **Home:** the existing **`../via-app` (Expo/RN)**, behind the store-partner sign-in it already has (the mobile
 JWT `storeAuth` falls back to). New "Sell in person" screen in seller mode. **No separate app.**
 
-**Reuses the entire direct-charge stack** — an in-person charge is just a **card-present PaymentIntent on the
+**Reuses the entire direct-charge stack** an in-person charge is just a **card-present PaymentIntent on the
 seller's connected account** with `application_fee_amount` = our 1% (`applicationFeeCents`, `payments-config.ts`),
 identical to `item-intent`/`cart-intent`. Same `markSold` → `createPaidOrder` → webhook → receipt path.
 
@@ -130,17 +130,17 @@ identical to `item-intent`/`cart-intent`. Same `markSold` → `createPaidOrder` 
 4. Backend creates a **card-present PaymentIntent** on the connected account (`application_fee_amount` = 1%).
 5. `collectPaymentMethod(clientSecret)` → customer taps card / Apple-Google Pay → `confirmPaymentIntent`.
 6. Success → existing webhook fulfils: `markSold`, `createPaidOrder`, 1% captured, buyer receipt (the new
-   store-branded order/tracking page + email — reuse `sendBuyerOrderConfirmation`).
+   store-branded order/tracking page + email. Reuse `sendBuyerOrderConfirmation`).
 
-### Backend to build (thin — mostly reuse)
-- `POST /api/store/terminal/connection-token` — `stripe.terminal.connectionTokens.create()` **on the store's
+### Backend to build (thin: mostly reuse)
+- `POST /api/store/terminal/connection-token`: `stripe.terminal.connectionTokens.create()` **on the store's
   connected account** (`stripeAccount` header). Store-authed.
-- `POST /api/store/terminal/payment-intent` — card-present PaymentIntent on the connected account:
+- `POST /api/store/terminal/payment-intent`: card-present PaymentIntent on the connected account:
   `payment_method_types:['card_present']`, `capture_method:'automatic'`, `application_fee_amount: applicationFeeCents(amt)`,
   `metadata:{ itemId, storeSlug, channel:'in_person' }`. Returns `client_secret`.
-- Ensure a Stripe **Location** per store (`stripe.terminal.locations.create()` on the connected account) — create
+- Ensure a Stripe **Location** per store (`stripe.terminal.locations.create()` on the connected account). Create
   lazily on first in-person sale, cache the id on the store's payments record.
-- Webhook: `payment_intent.succeeded` already fulfils — add nothing except read `metadata.channel` so in-person
+- Webhook: `payment_intent.succeeded` already fulfils. Add nothing except read `metadata.channel` so in-person
   vs online is distinguishable in analytics (feeds the §8.1 capture-rate story).
 
 ### Client (via-app)
@@ -150,19 +150,19 @@ identical to `item-intent`/`cart-intent`. Same `markSold` → `createPaidOrder` 
 - "Sell in person" screen: item picker / amount pad → collect → confirm → success (mark sold, show receipt).
 
 ### Prerequisites / gotchas (the real work is setup, not logic)
-1. **Native build required** — Terminal needs native code + entitlements, so **EAS dev/prod build, not Expo Go.**
+1. **Native build required** Terminal needs native code + entitlements, so **EAS dev/prod build, not Expo Go.**
    Confirm via-app is on EAS.
-2. **Apple entitlement** — request `com.apple.developer.proximity-reader.payment.acceptance` from Apple; requires
+2. **Apple entitlement** request `com.apple.developer.proximity-reader.payment.acceptance` from Apple; requires
    **iOS 16.4+**, **iPhone XS or newer**, supported region (US ✅). Android Tap to Pay on supported devices.
-3. **Connect capability** — enable **`card_present` / Terminal** on connected accounts (small add to onboarding);
+3. **Connect capability** enable **`card_present` / Terminal** on connected accounts (small add to onboarding);
    each store needs a **Location** record.
-4. **Card-present fees** are the seller's (direct charge) and *lower* than online (~2.6% + 10¢) — an easy yes.
+4. **Card-present fees** are the seller's (direct charge) and *lower* than online (~2.6% + 10¢): an easy yes.
 
 ### Test
 - Stripe Terminal **simulated reader** for logic; then a real device with the entitlement in a Stripe **test**
   connected account before requesting Apple prod entitlement.
 
-**Scope:** a few weeks — most of it is Apple entitlement + EAS config + Connect capability; the payment logic is a
+**Scope:** a few weeks. Most of it is Apple entitlement + EAS config + Connect capability; the payment logic is a
 thin reuse of the existing direct-charge PaymentIntent + fulfilment.
 
 ---
@@ -171,7 +171,7 @@ thin reuse of the existing direct-charge PaymentIntent + fulfilment.
 
 ## Live selling
 
-**Goal:** Let stores run live shopping events inside VYA — video + real-time drops with instant
+**Goal:** Let stores run live shopping events inside VYA. Video + real-time drops with instant
 checkout and inventory sync.
 
 **Core features**
@@ -191,15 +191,15 @@ checkout and inventory sync.
 **Builds on:** buyer messaging + Linq notify, sold_items availability, Stripe checkout, catalog.
 
 **Watch:**
-- Video infra is a **build-vs-buy** decision (self-host WebRTC/HLS vs. a provider like Mux) — biggest cost/effort driver.
+- Video infra is a **build-vs-buy** decision (self-host WebRTC/HLS vs. a provider like Mux). Biggest cost/effort driver.
 - Real-time infra (websockets) + inventory-hold concurrency are the hard engineering.
-- Live is a **new conversion source** — attribution + commission path needs wiring.
+- Live is a **new conversion source** attribution + commission path needs wiring.
 
 ---
 
 ## Rental Model  [CONFIRM: garment rental, Rent-the-Runway style?]
 
-**Goal:** Support rental — not just resale — so stores can rent pieces out with reservations,
+**Goal:** Support rental, not just resale, so stores can rent pieces out with reservations,
 deposits, and returns.
 
 **Core features**
@@ -224,7 +224,7 @@ returns -> condition check -> deposit released.
 **Goal:** Connect Instagram so stores can sell from and sync with their IG presence.
 
 **Core features**
-- Connect IG business account (OAuth via Meta Graph — token already wired).
+- Connect IG business account (OAuth via Meta Graph. Token already wired).
 - **Auto-post** new arrivals / drops to feed + story from the admin (on-publish or scheduled).
 - **IG Shopping**: product tagging tied to the VYA catalog (catalog synced to Meta commerce).
 - **Import from IG**: pull posts/photos to seed listings at onboarding.
@@ -249,46 +249,46 @@ Voyage embeddings for taste matching, `check-saved-searches` cron, marketplace c
 (eBay/Etsy/Depop), reverse-image search; demand-db for the secondary demand overlay.
 
 **Watch:**
-- **Marketplace access** is the hard part — Depop/Poshmark/Vestiaire have no open API, so it's search/scrape (ToS, rate limits, maintenance — same class of problem as the cross-listing extension).
-- **Valuation accuracy IS the product** — the buy signal is only as good as the resale estimate; lean hard on the existing price engine + comps + condition.
+- **Marketplace access** is the hard part, Depop/Poshmark/Vestiaire have no open API, so it's search/scrape (ToS, rate limits, maintenance. Same class of problem as the cross-listing extension).
+- **Valuation accuracy IS the product** the buy signal is only as good as the resale estimate; lean hard on the existing price engine + comps + condition.
 - Cross-source dedup (one piece listed on multiple marketplaces).
 
 ### Cost & data flywheel
 
-**Cost drivers — really just one variable: data acquisition.**
-- *API channels (eBay, Etsy)* — ~free within rate limits. SerpApi (already paid, $0.015/search) covers the `ebay` + `google_shopping` engines, so part of this is sunk cost.
-- *No-API channels (Depop, Poshmark, Vestiaire, Grailed, Vinted, Mercari, TheRealReal)* — scraping; this is where the money goes.
-- *Valuation* — only value items matching an **active saved search / brief**, and **cache comps by product identity** (reuse the lens-cache pattern) + reuse the existing price engine. Turns "value the whole internet" into "value a few hundred candidates per store/month" — bounded and cheap.
-- *Embeddings + storage* — negligible.
+**Cost drivers. Really just one variable: data acquisition.**
+- *API channels (eBay, Etsy)* ~free within rate limits. SerpApi (already paid, $0.015/search) covers the `ebay` + `google_shopping` engines, so part of this is sunk cost.
+- *No-API channels (Depop, Poshmark, Vestiaire, Grailed, Vinted, Mercari, TheRealReal)* scraping; this is where the money goes.
+- *Valuation* only value items matching an **active saved search / brief**, and **cache comps by product identity** (reuse the lens-cache pattern) + reuse the existing price engine. Turns "value the whole internet" into "value a few hundred candidates per store/month". Bounded and cheap.
+- *Embeddings + storage* negligible.
 - **The one lever that sets the whole cost: pull-on-demand (per active search), NOT crawl-everything.**
 
-**The flywheel — the same scraping spend does triple duty:**
+**The flywheel: the same scraping spend does triple duty:**
 - Every listing pulled is a fresh comp -> sharper valuations -> better deal flags AND better seller-facing pricing.
-- Feeds the **Data Layer**: near-real-time supply + price across the whole secondhand market by brand/category/condition — a rare, auto-sourced, objective dataset.
+- Feeds the **Data Layer**: near-real-time supply + price across the whole secondhand market by brand/category/condition. A rare, auto-sourced, objective dataset.
 - Powers **Deeper Analytics benchmarks** ("your avg item price vs. the live market", not just vs. other VYA stores).
-- Demand (VYA already has it) x live supply/price = "wanted AND underpriced right now" — the strongest buy signal, unproducible by any single marketplace.
-- *Caveat:* use scraped data **internally** (valuation, sourcing, derived stats). Reselling raw listings breaches marketplace ToS — monetize **derived** market stats (medians/trends), not republished listings.
+- Demand (VYA already has it) x live supply/price = "wanted AND underpriced right now". The strongest buy signal, unproducible by any single marketplace.
+- *Caveat:* use scraped data **internally** (valuation, sourcing, derived stats). Reselling raw listings breaches marketplace ToS. Monetize **derived** market stats (medians/trends), not republished listings.
 
 **Build our own scraper + storage tool?** Right frame: own the parts that are your moat and cheap to own; rent the adversarial parts until scale justifies owning them.
-- **Own from day one — storage + price history.** An append-only price-observations store (listing -> price -> timestamp) is the compounding asset: you can't buy back history you didn't capture, and it's what makes the data product + valuation models possible. Never rent this.
-- **Own — scraper logic + normalization** for the high-value no-API channels (Depop, Vestiaire, Grailed): custom parsers tuned to the exact fields (brand, condition, size) + cross-source dedup. This is your extraction-quality edge.
-- **Rent (at first) — proxies + anti-bot.** Marketplaces run serious bot detection (Cloudflare / DataDome / PerimeterX); rotating residential proxies + fingerprinting is an arms race vendors (Bright Data / Zyte / Apify) already solve. Bring proxies in-house only when volume makes the vendor markup hurt.
-- **Cost shape:** *buy* (scraping API) ≈ $0.001–0.01/page, zero fixed cost — cheapest to START. *Build* ≈ similar per-page proxy cost + eng build/maintenance — wins at HIGH volume and gives you the owned data asset. So: start on APIs + SerpApi + a scraping vendor for the hard channels; graduate to owned proxies as volume grows.
-- **Compliance:** APIs-first is cheaper AND safer — respect robots/ToS, rate-limit, never bypass CAPTCHAs; keep to public listing data and derive stats rather than redistribute.
-- **Maintenance tax:** every marketplace = a scraper to maintain (their DOMs change) — same recurring cost as the cross-listing extension. Budget for it.
+- **Own from day one. Storage + price history.** An append-only price-observations store (listing -> price -> timestamp) is the compounding asset: you can't buy back history you didn't capture, and it's what makes the data product + valuation models possible. Never rent this.
+- **Own: scraper logic + normalization** for the high-value no-API channels (Depop, Vestiaire, Grailed): custom parsers tuned to the exact fields (brand, condition, size) + cross-source dedup. This is your extraction-quality edge.
+- **Rent (at first): proxies + anti-bot.** Marketplaces run serious bot detection (Cloudflare / DataDome / PerimeterX); rotating residential proxies + fingerprinting is an arms race vendors (Bright Data / Zyte / Apify) already solve. Bring proxies in-house only when volume makes the vendor markup hurt.
+- **Cost shape:** *buy* (scraping API) ≈ $0.001–0.01/page, zero fixed cost. Cheapest to START. *Build* ≈ similar per-page proxy cost + eng build/maintenance. Wins at HIGH volume and gives you the owned data asset. So: start on APIs + SerpApi + a scraping vendor for the hard channels; graduate to owned proxies as volume grows.
+- **Compliance:** APIs-first is cheaper AND safer. Respect robots/ToS, rate-limit, never bypass CAPTCHAs; keep to public listing data and derive stats rather than redistribute.
+- **Maintenance tax:** every marketplace = a scraper to maintain (their DOMs change): same recurring cost as the cross-listing extension. Budget for it.
 
 ---
 
 ## Vendor Model
 
-**Goal:** Let a store run its own mini-marketplace — sell pieces from OTHER vendors (other stores,
+**Goal:** Let a store run its own mini-marketplace. Sell pieces from OTHER vendors (other stores,
 sellers, consignors) under that vendor's name and collect commission. For the store with an in-person
 spot or curated shop that carries other people's inventory alongside its own.
 
 **Core features**
 - **Vendors:** add/manage vendors (other stores, sellers, consignors); each has a name/profile the items display under.
 - **List under a vendor:** add a piece attributed to a vendor; it shows under that vendor's name in the store + storefront.
-- **Commission / splits:** set a commission rate per vendor (or per item) — the store's cut vs. what's owed to the vendor.
+- **Commission / splits:** set a commission rate per vendor (or per item): the store's cut vs. what's owed to the vendor.
 - **Vendor ledger + payouts:** running balance per vendor; each sale records the split; payout history + what's owed.
 - **Per-vendor inventory & sales:** which items belong to which vendor; per-vendor sales reports.
 - **Online + in-person:** works for online listings and in-person/consignment intake.
@@ -301,7 +301,7 @@ sells -> the commission split is recorded -> the vendor's payout is tracked in a
 "vendors"), Stripe for splits/payouts, per-vendor inventory attribution.
 
 **Watch:** payout mechanics (Stripe Connect splits) + who's merchant of record; commission accounting;
-heavy overlap with the Consignment module — likely one shared build.
+heavy overlap with the Consignment module. Likely one shared build.
 
 ---
 
@@ -309,7 +309,7 @@ heavy overlap with the Consignment module — likely one shared build.
 
 ## A/B Agentic Website Testing
 
-**Goal:** An AI agent that generates and A/B-tests storefront variants to lift conversion —
+**Goal:** An AI agent that generates and A/B-tests storefront variants to lift conversion,
 hands-off optimization.
 
 **Core features**
@@ -330,15 +330,15 @@ owner publishes (or auto-publishes within guardrails).
 
 ## Wholesale docs uploader
 
-**Goal:** Upload wholesale documents easily — even in another language — and have AI extract and
+**Goal:** Upload wholesale documents easily, even in another language, and have AI extract and
 translate the info, load it straight into inventory, and keep the original on file as a record.
 
 **Core features**
 - **Upload any doc:** PDF / CSV / image / phone photo of a line sheet, invoice, or packing slip.
-- **Multi-language extraction + translation:** AI reads docs in any language (Italian, French, Japanese, Korean — common in vintage/luxury wholesale) and translates the fields to English (Claude vision + translation).
+- **Multi-language extraction + translation:** AI reads docs in any language (Italian, French, Japanese, Korean. Common in vintage/luxury wholesale) and translates the fields to English (Claude vision + translation).
 - **Structured extraction:** pull SKU, product name, brand, qty, wholesale cost, MSRP/retail, size, material.
 - **Straight into inventory:** create inventory records / draft listings from the rows, with COGS + margin set.
-- **Records kept on file:** store the original document + parsed data as a permanent purchase record (cost basis, supplier, date) — reconcile against goods received.
+- **Records kept on file:** store the original document + parsed data as a permanent purchase record (cost basis, supplier, date). Reconcile against goods received.
 - **Review before commit:** bulk-review the extracted table, fix anything, then push to inventory.
 
 **User flow:** upload a foreign-language line sheet -> AI extracts + translates -> review the table

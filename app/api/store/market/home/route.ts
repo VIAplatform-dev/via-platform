@@ -7,7 +7,7 @@ import { listCheckouts } from "@/app/lib/market/checkout-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — everything the Market Mode home screen needs in one round trip.
+// GET: everything the Market Mode home screen needs in one round trip.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

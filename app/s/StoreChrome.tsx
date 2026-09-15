@@ -1,13 +1,13 @@
 import React from "react";
 
-// The persistent site chrome — the header (logo · nav · search) and footer that wrap EVERY page of a
+// The persistent site chrome. The header (logo · nav · search) and footer that wrap EVERY page of a
 // storefront. Presentational only (plain <a>, no hooks), so it renders identically in the live
-// StorefrontView (server) and in the editor studio (client) — one source of truth for the header/footer
+// StorefrontView (server) and in the editor studio (client): one source of truth for the header/footer
 // look, which is why they stay consistent across the whole site.
 export type ChromeNav = { label: string; href?: string; active?: boolean; slug?: string };
 export type Socials = { instagram?: string; tiktok?: string; facebook?: string; youtube?: string; pinterest?: string; email?: string };
 
-// Presentational social glyphs (inline SVG, currentColor) — no external icon deps.
+// Presentational social glyphs (inline SVG, currentColor), no external icon deps.
 const SOCIAL_ICON: Record<keyof Socials, React.ReactNode> = {
  instagram: <><rect x="2.5" y="2.5" width="19" height="19" rx="5.5" /><circle cx="12" cy="12" r="4.2" /><circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none" /></>,
  tiktok: <path d="M14 3.5c.4 2.3 1.9 3.8 4.2 4.1v3c-1.6.1-3-.4-4.2-1.2v5.9a5.7 5.7 0 1 1-5.7-5.7c.3 0 .6 0 .9.1v3.1a2.7 2.7 0 1 0 1.9 2.6V3.5H14Z" strokeWidth="0" fill="currentColor" />,
@@ -16,7 +16,7 @@ const SOCIAL_ICON: Record<keyof Socials, React.ReactNode> = {
  pinterest: <path d="M12 3.5a8.5 8.5 0 0 0-3.1 16.4c-.1-.7-.2-1.8 0-2.6l1-4.3s-.3-.5-.3-1.3c0-1.2.7-2.1 1.6-2.1.7 0 1.1.6 1.1 1.3 0 .8-.5 2-.8 3.1-.2.9.5 1.6 1.4 1.6 1.6 0 2.8-1.7 2.8-4.1 0-2.2-1.5-3.7-3.7-3.7a3.9 3.9 0 0 0-4 3.9c0 .8.3 1.6.7 2 .1.1.1.2.1.3l-.3 1c0 .2-.2.2-.3.1-1.1-.5-1.8-2.1-1.8-3.4 0-2.8 2-5.3 5.9-5.3 3.1 0 5.5 2.2 5.5 5.1 0 3.1-1.9 5.6-4.6 5.6-.9 0-1.7-.5-2-1l-.6 2.1c-.2.7-.7 1.7-1 2.2A8.5 8.5 0 1 0 12 3.5Z" strokeWidth="0" fill="currentColor" />,
  email: <><rect x="2.5" y="4.5" width="19" height="15" rx="2.5" /><path d="m3.5 6 8.5 6 8.5-6" /></>,
 };
-// A seller can enter a full URL OR just a handle — normalise handles into real profile links so the
+// A seller can enter a full URL OR just a handle. Normalise handles into real profile links so the
 // footer icons always work (a bare "@store" shouldn't 404).
 const handle = (base: string) => (v: string) => (/^https?:\/\//i.test(v) ? v : `https://${base}/${v.replace(/^@|^\/+/g, "")}`);
 const SOCIAL_HREF: Record<keyof Socials, (v: string) => string> = {
@@ -53,13 +53,13 @@ function NavItem({ n, onNav, className, style }: { n: ChromeNav; onNav?: (i: Chr
 }
 
 /**
- * Header layouts. The same three parts — brand, nav, utilities — arranged the ways real storefronts
+ * Header layouts. The same three parts, brand, nav, utilities. Arranged the ways real storefronts
  * arrange them. This is the axis Shopify and Squarespace both expose, and it is the difference
  * between a store that looks like a template and one that looks like itself.
- *   inline  — brand left, nav centre, utilities right (what every VYA storefront has today)
- *   center  — brand centred with the nav on the row beneath it; the classic boutique masthead
- *   split   — brand centred with the nav divided either side of it
- *   stacked — brand left with the nav on its own row below, left-aligned
+ *   inline: brand left, nav centre, utilities right (what every VYA storefront has today)
+ *   center: brand centred with the nav on the row beneath it; the classic boutique masthead
+ *   split: brand centred with the nav divided either side of it
+ *   stacked. Brand left with the nav on its own row below, left-aligned
  */
 export type HeaderLayout = "inline" | "center" | "split" | "stacked";
 export const HEADER_LAYOUTS: { id: HeaderLayout; label: string; description: string }[] = [
@@ -89,10 +89,10 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
  //
  // These were viewport breakpoints (`md:`), which is the wrong ruler for a storefront: the studio
  // renders the page into a 390px artboard inside a 1440px window, so `md:flex` was true and the phone
- // preview drew the DESKTOP nav — five items on one row, wrapping onto three lines and running off
+ // preview drew the DESKTOP nav. Five items on one row, wrapping onto three lines and running off
  // the edge. The header measured the window and reported on a phone that wasn't there.
  //
- // @3xl is 48rem/768px, the same number `md:` used, so a real desktop is unchanged — the threshold is
+ // @3xl is 48rem/768px, the same number `md:` used, so a real desktop is unchanged. The threshold is
  // now measured against the thing the header actually sits in.
  <header className="@container">
  {announcement && (
@@ -125,7 +125,7 @@ export function StoreHeader({ storeName, logo, nav, colors, headingFontFamily, a
   {utils}
  </nav>
  )}
- {/* Mobile nav — the links under the brand, whatever the desktop layout does. It WRAPS; it does not
+ {/* Mobile nav: the links under the brand, whatever the desktop layout does. It WRAPS; it does not
      scroll. A horizontally-scrollable strip is technically fine (nothing overflows the page) but it
      reads as broken: the last label is sliced mid-word against the screen edge with nothing to say
      the row can be swiped, so a store with seven pages looks like a store whose header is cut off.
@@ -149,11 +149,11 @@ export const DEFAULT_FOOTER_NEWSLETTER = {
 export function StoreFooter({ storeName, logo, nav, tagline, colors, headingFontFamily, year, socials, footerAbout, newsletter, newsletterHeading, newsletterText, onNav }: ChromeProps & { tagline?: string | null; socials?: Socials; footerAbout?: string; newsletter?: React.ReactNode; newsletterHeading?: string; newsletterText?: string }) {
  const links = socialList(socials);
  return (
- // Container, not viewport — same reasoning as the header above. The footer's columns stack at the
+ // Container, not viewport: same reasoning as the header above. The footer's columns stack at the
  // storefront's own width, so a phone preview stacks them and a desktop doesn't.
  <footer className="@container mt-10 border-t border-black/[0.08]" style={{ color: colors.text }}>
  <div className="mx-auto max-w-6xl px-6 @xl:px-8 py-16">
- {/* Email signup band — every page ends with a chance to subscribe (the "Sign up" the seller asked for). */}
+ {/* Email signup band: every page ends with a chance to subscribe (the "Sign up" the seller asked for). */}
  {newsletter && (
  <div className="mb-14 flex flex-col items-center gap-3 border-b border-black/[0.06] pb-14 text-center">
  {/* These two lines were hardcoded, so every VYA storefront ended every page with the same

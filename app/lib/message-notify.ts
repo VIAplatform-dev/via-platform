@@ -9,7 +9,7 @@ const OS_INBOX_URL = "https://getvya.ai/admin/inbox";
 
 // Notify a store of an inbound buyer message: email (they reply from their inbox), an optional
 // text to the seller's phone via the shared VYA Linq number, and a push to the app when she has
-// one (gated by her notification preferences). The conversation itself stays in the VYA inbox —
+// one (gated by her notification preferences). The conversation itself stays in the VYA inbox,
 // the text and the push are nudges, so there's no inbound routing. Best-effort, never throws;
 // the text no-ops unless the store set a phone + Linq is configured.
 export async function notifyStoreOfMessage(
@@ -21,7 +21,7 @@ export async function notifyStoreOfMessage(
  const storeName = store?.name || storeSlug;
  // The address SHE can set, then the one we recorded, then the one she signs in with. Reading the
  // hardcoded map alone meant a shop that signed up for itself had no entry, `storeEmail` was
- // undefined, the `if` below never ran — and a shopper's message was sent to nobody while the
+ // undefined, the `if` below never ran, and a shopper's message was sent to nobody while the
  // screen said it had been delivered.
  const { storeContactOrNone } = await import("./email");
  const storeEmail = await storeContactOrNone(storeSlug);
@@ -40,13 +40,13 @@ export async function notifyStoreOfMessage(
  if (settings?.notifySms && settings.notifyPhone && linqConfigured()) {
  const about = opts.itemTitle ? ` about "${opts.itemTitle}"` : "";
  const preview = opts.message.length > 140 ? `${opts.message.slice(0, 140)}…` : opts.message;
- sendLinqText(settings.notifyPhone, `[${storeName}] New message${about}: "${preview}" — reply: ${OS_INBOX_URL}`).catch(() => {});
+ sendLinqText(settings.notifyPhone, `[${storeName}] New message${about}: "${preview}": reply: ${OS_INBOX_URL}`).catch(() => {});
  }
 
  if (opts.conversationId != null) {
  void pushSellerMessage(storeSlug, { buyerName: opts.buyerName, itemTitle: opts.itemTitle, message: opts.message, conversationId: opts.conversationId, source: "storefront" });
  }
  } catch {
- /* best-effort — a notification failure must never block the message */
+ /* best-effort: a notification failure must never block the message */
  }
 }

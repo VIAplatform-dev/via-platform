@@ -1,14 +1,14 @@
 // ───────────────────────────────────────────────────────────────────────────
-// VYA platform economics — the single source of truth for what VYA charges.
+// VYA platform economics. The single source of truth for what VYA charges.
 // Money model: the seller is merchant of record (Stripe Connect *direct* charges);
 // VYA earns a seller subscription (primary) PLUS a per-order application fee taken
 // off the top of each direct charge (secondary). Never hardcode the fee or the
-// subscription price anywhere else — import from here.
+// subscription price anywhere else. Import from here.
 // ───────────────────────────────────────────────────────────────────────────
 
 // Revenue model: the seller's monthly SUBSCRIPTION is the primary revenue; a
 // small per-transaction commission rides on top. Both numbers are still being
-// figured out — they live here so there's one place to change them.
+// figured out: they live here so there's one place to change them.
 export const PAYMENTS = {
  // VYA's small cut of each sale, collected as a Stripe application fee on the
  // direct charge to the seller's connected account. 100 bps = 1% (working number).

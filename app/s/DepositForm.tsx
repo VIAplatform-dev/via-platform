@@ -8,14 +8,14 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
  * Paying the deposit that holds an appointment slot.
  *
  * The booking API has always created the PaymentIntent; there was nowhere to type a card, so a shop
- * that set a deposit took bookings that could never be confirmed — the slot sat unpaid until the
+ * that set a deposit took bookings that could never be confirmed. The slot sat unpaid until the
  * sweep cancelled it half an hour later.
  *
  * Charged on the STORE's own Stripe account (`stripeAccount`), like every other payment on the
  * platform, so the money never routes through VYA's balance.
  *
  * `redirect: "if_required"` keeps the shopper on the page for a normal card. The webhook is what
- * actually confirms the appointment and sends the emails — this only reports what the browser saw,
+ * actually confirms the appointment and sends the emails. This only reports what the browser saw,
  * so a closed tab or a dropped connection still lands the booking.
  */
 
@@ -65,7 +65,7 @@ export default function DepositForm({ deposit, accent, cta = "Pay deposit", onPa
   [deposit.publishableKey, deposit.stripeAccount],
  );
 
- // No publishable key means card entry can't be built. Say so rather than render an empty box —
+ // No publishable key means card entry can't be built. Say so rather than render an empty box,
  // the time is still held, and the shop can take the deposit another way.
  if (!stripe) {
   return (

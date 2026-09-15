@@ -6,7 +6,7 @@
  *
  *   • The seller's own platform reported it sold out while still listing it. That is their
  *     statement, and repeating it is honest.
- *   • It simply disappeared from their feed. Sold, deleted, unpublished, moved — the platform does
+ *   • It simply disappeared from their feed. Sold, deleted, unpublished, moved. The platform does
  *     not say, and we cannot tell. blummier's nine were all dead links on her own store.
  *
  * Saying "Sold" for the second kind asserts a sale nobody can evidence. 244 pieces across the fleet
@@ -20,15 +20,15 @@ export type UnavailableReason = "sold_out" | "vanished" | "on_hold" | null | und
 const LABEL: Record<string, string> = {
  sold_out: "Sold out",
  vanished: "No longer available",
- // Kept back for a named customer (holds-core.ts). Not sold — it comes back on sale by itself when
- // the hold lapses — so the badge must not say so. Never stored: computed from `status`.
+ // Kept back for a named customer (holds-core.ts). Not sold: it comes back on sale by itself when
+ // the hold lapses, so the badge must not say so. Never stored: computed from `status`.
  on_hold: "On hold",
 };
 
 /**
  * The words on the badge and on the dead buy button.
  *
- * An unlabelled piece — imported before the reason was recorded — keeps "Sold out". Relabelling it
+ * An unlabelled piece, imported before the reason was recorded. Keeps "Sold out". Relabelling it
  * on no evidence would be the same overreach in the opposite direction.
  */
 export function unavailableLabel(reason: string | null | undefined): string {
@@ -50,7 +50,7 @@ export function reasonForVanished(): "vanished" {
  *
  * `reserved` covers two things the shopper cannot tell apart and should not be able to buy: a
  * buyer mid-checkout (gone in ten minutes, one way or the other) and a hold for a named customer
- * (gone for days). Both read "On hold" on the shelf — a piece that vanished from the grid the
+ * (gone for days). Both read "On hold" on the shelf. A piece that vanished from the grid the
  * moment someone was holding it looked, to the seller, like a piece that had been deleted.
  */
 export function storefrontAvailability(it: { status?: string | null; unavailableReason?: string | null }): { available: boolean; unavailableReason: string | null } {

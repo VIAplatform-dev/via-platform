@@ -64,7 +64,7 @@ export async function listStoreReviews(slug: string, limit = 50): Promise<StoreR
 
 /** The two facts the edit gate needs, in one read: which pages the latest check put a side-by-side
  *  in front of her, and which of those she has answered (any answer, `skip` included).
- *  `screens: null` means no check has ever run for this store — which is NOT the same as "she
+ *  `screens: null` means no check has ever run for this store, which is NOT the same as "she
  *  hasn't reviewed"; see app/lib/capture-review-gate.ts. */
 export async function getReviewState(slug: string): Promise<ReviewState> {
  const [health, reviews] = await Promise.all([getStoreHealth(slug), listStoreReviews(slug, 500)]);

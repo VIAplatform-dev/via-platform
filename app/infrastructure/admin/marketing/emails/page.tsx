@@ -10,7 +10,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, Toggle } from "../../ui";
 //
 // Before this they lived in three: automations under one tab, scheduled sends invisible until they
 // went out, and drafts nowhere at all. A seller had no way to answer "what is my shop about to
-// send?" — which is the question you ask before you go to bed.
+// send?", which is the question you ask before you go to bed.
 
 type Builtin = { kind: "builtin"; key: string; name: string; body: string; cadence: string; enabled: boolean };
 type Custom = { kind: "custom"; id: number; name: string; trigger: string; subject: string; body: string; enabled: boolean };
@@ -72,7 +72,7 @@ export default function EmailsPage() {
    ) : (
     <div className="flex flex-col gap-4">
 
-     {/* Waiting for her — first, because it's the only section with something to do in it. */}
+     {/* Waiting for her: first, because it's the only section with something to do in it. */}
      {drafts.length > 0 && (
       <TechCard className="overflow-hidden">
        <div className="flex items-center gap-2 border-b border-stone-100 px-5 py-3">
@@ -122,7 +122,7 @@ export default function EmailsPage() {
        <Zap size={14} className="text-stone-400" />
        <div className="flex-1">
         <h2 className="text-[13px] font-semibold text-stone-800">Sent on their own</h2>
-        <p className="mt-0.5 text-[12px] text-stone-500">These fire when something happens — an order, a basket left behind. You don&rsquo;t send them.</p>
+        <p className="mt-0.5 text-[12px] text-stone-500">These fire when something happens. An order, a basket left behind. You don&rsquo;t send them.</p>
        </div>
       </div>
       <div className="divide-y divide-stone-100">
@@ -137,7 +137,7 @@ export default function EmailsPage() {
         </div>
        ))}
       </div>
-      {/* The seller's own automatic emails, in the same card as VYA's — one list of what sends
+      {/* The seller's own automatic emails, in the same card as VYA's. One list of what sends
           without her. They lived on a separate page whose other half duplicated the rows above. */}
       <div className="border-t border-stone-100 px-5 pb-4 pt-3">
        <CustomAutomations />

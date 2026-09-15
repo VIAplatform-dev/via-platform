@@ -50,7 +50,7 @@ test("the domain is optional: shown, never blocking, and says so", () => {
  const dom = steps.find((s) => s.id === "domain")!;
  assert.equal(dom.optional, true);
  assert.equal(dom.done, false);
- assert.equal(dom.hint, "Optional — your VYA address works today");
+ assert.equal(dom.hint, "Optional: your VYA address works today");
  const sum = setupSummary(steps);
  assert.equal(sum.complete, true);
  assert.equal(sum.done, 5);
@@ -59,7 +59,7 @@ test("the domain is optional: shown, never blocking, and says so", () => {
  assert.equal(setupSummary(setupSteps(ALL)).done, 6);
 });
 
-test("the summary names the next thing to do — the first undone required step", () => {
+test("the summary names the next thing to do. The first undone required step", () => {
  const sum = setupSummary(setupSteps({ ...ALL, shippingConfigured: false, liveListings: 0 }));
  assert.equal(sum.complete, false);
  assert.equal(sum.done, 4); // ship_from, payments, returns, domain

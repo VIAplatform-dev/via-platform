@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
  const byCurrency = await sql`SELECT COALESCE(currency,'(null)') AS currency, count(*)::int AS n, min(price) AS min_price, max(price) AS max_price FROM products WHERE store_slug = ${slug} GROUP BY currency`;
 
  // Fetch the live feed SERVER-SIDE (same egress the sync uses) to see the price it actually
- // receives — if this is ~334 (USD) rather than ~245 (GBP), Shopify Markets is localizing and
+ // receives, if this is ~334 (USD) rather than ~245 (GBP), Shopify Markets is localizing and
  // our GBP conversion is the double-count.
  let feedSample: unknown = null;
  if (searchParams.get("feed") === "1") {

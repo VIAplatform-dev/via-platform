@@ -2,9 +2,9 @@ import { neon } from "@neondatabase/serverless";
 
 // RN (Registered Identification Number) → brand. The RN is the US FTC number printed on garment
 // labels; it maps to the company that made/imported the piece and is often legible even when the
-// brand name has faded — the single most reliable brand key on a vintage tag.
+// brand name has faded. The single most reliable brand key on a vintage tag.
 //
-// We resolve from a LEARNED table (never fabricated mappings): it's seeded/grown two ways —
+// We resolve from a LEARNED table (never fabricated mappings): it's seeded/grown two ways,
 //  1. the feedback loop: when a seller confirms/corrects a brand on an item whose tag had an RN,
 //     we record RN → that brand (learnRnBrand), so the platform gets smarter about its own inventory;
 //  2. an optional live FTC lookup (gated by RN_FTC_LOOKUP=true), cached back into the table.
@@ -31,7 +31,7 @@ async function ensure() {
 
 const cleanRn = (rn: string): string => String(rn || "").replace(/[^0-9]/g, "");
 
-/** Record that an RN belongs to a brand — from a seller-confirmed listing. Confirmed wins over a
+/** Record that an RN belongs to a brand, from a seller-confirmed listing. Confirmed wins over a
  *  prior guess; repeated confirmations bump `hits` so the strongest signal sticks. */
 export async function learnRnBrand(rn: string, brand: string, source = "seller"): Promise<void> {
  const r = cleanRn(rn), b = (brand || "").trim();

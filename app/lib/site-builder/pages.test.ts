@@ -70,7 +70,7 @@ test("a page she adds takes her platform's own address shape, and never an addre
 });
 
 test("the page her chrome is borrowed from is the simplest one she has, never the shop", () => {
- // Her shortest ordinary page — never the shop, a product, the cart, or the homepage.
+ // Her shortest ordinary page, never the shop, a product, the cart, or the homepage.
  assert.equal(pickBlankTemplatePath(PATHS, "shopify"), "/pages/about-us");
  assert.equal(pickBlankTemplatePath(["/", "/cart", "/collections/all"], "shopify"), "/");
  assert.equal(pickBlankTemplatePath(["/", "/shop", "/contact", "/our-story"], "squarespace"), "/contact");

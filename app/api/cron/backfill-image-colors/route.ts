@@ -5,7 +5,7 @@ import { backfillImageColors } from "@/app/lib/data-layer/image-color-backfill";
 export const maxDuration = 300;
 
 // Daily: colour any NEW products (newly synced) off their image, so the colour
-// filter stays complete without a manual backfill. Incremental + cheap — only
+// filter stays complete without a manual backfill. Incremental + cheap, only
 // processes products that don't have a colour yet. No-op when vision is off.
 export async function GET(request: Request) {
  const authHeader = request.headers.get("authorization");

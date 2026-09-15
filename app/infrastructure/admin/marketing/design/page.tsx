@@ -13,7 +13,7 @@ type Brand = {
  buttonStyle?: "rounded" | "pill" | "square"; headerAlign?: "center" | "left";
 };
 
-// One-click looks — each sets colours + type + layout together so a store never has to touch a
+// One-click looks. Each sets colours + type + layout together so a store never has to touch a
 // hex value unless they want to. Content (logo, button label, footer) is preserved when applied.
 type Preset = { name: string; b: Partial<Brand> };
 const PRESETS: Preset[] = [
@@ -29,7 +29,7 @@ const PALETTE = ["#5D0F17", "#1c1917", "#b5533b", "#0e6b52", "#1f3a5f", "#a9744f
 
 // Serif display faces for headings + the store wordmark; sans faces for body copy. "" = the
 // classic default (Georgia / system sans). Values are Google font family names the renderer loads.
-// Grouped, because a list of thirty names in one column is not a choice — it's a wall. The groups
+// Grouped, because a list of thirty names in one column is not a choice. It's a wall. The groups
 // are what a seller is actually picking between: how do I want to sound.
 const HEADING_FONTS: { group: string; fonts: string[] }[] = [
  { group: "Fashion serif", fonts: ["Playfair Display", "Bodoni Moda", "Prata", "DM Serif Display", "Italiana", "Marcellus", "Cormorant Garamond", "Gilda Display", "Yeseva One"] },
@@ -47,7 +47,7 @@ const BODY_FONTS: { group: string; fonts: string[] }[] = [
 // A representative email so the store sees headings, body, a list, the button and the footer at once.
 const SAMPLE = `# Just landed
 
-A few new favourites, hand-picked for you — we don't think they'll last long.
+A few new favourites, hand-picked for you. We don't think they'll last long.
 
 - Vintage Levi's 501s
 - 1990s silk slip dress
@@ -64,7 +64,7 @@ export default function EmailDesignPage() {
  const [savedSnap, setSavedSnap] = useState("");
  const [busy, setBusy] = useState(false);
  const [note, setNote] = useState<string | null>(null);
- // Which of the two shapes to show. Automatic emails — new arrivals, abandoned basket, welcome —
+ // Which of the two shapes to show. Automatic emails, new arrivals, abandoned basket, welcome,
  // all share one simple format, and a store had no way to see it: this page only ever previewed a
  // campaign, which is the one kind of email they design by hand.
  const [kind, setKind] = useState<"automated" | "campaign">("automated");
@@ -84,7 +84,7 @@ export default function EmailDesignPage() {
  return () => window.removeEventListener("vya:store-updated", onUpd);
  }, []);
 
- // Live preview through the real renderer — exactly what will send.
+ // Live preview through the real renderer. Exactly what will send.
  useEffect(() => {
  if (!brand) return;
  const id = setTimeout(() => {
@@ -95,7 +95,7 @@ export default function EmailDesignPage() {
  }, [brand, kind]);
 
  const set = (patch: Partial<Brand>) => { setBrand((b) => (b ? { ...b, ...patch } : b)); setNote(null); };
- const applyPreset = (p: Preset) => set(p.b); // theme fields only — logo/label/footer are kept
+ const applyPreset = (p: Preset) => set(p.b); // theme fields only: logo/label/footer are kept
  const dirty = brand != null && JSON.stringify(brand) !== savedSnap;
 
  async function save() {
@@ -104,7 +104,7 @@ export default function EmailDesignPage() {
  try {
  const r = await fetch("/api/store/email-brand", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brand }) });
  const d = await r.json();
- if (r.ok) { setBrand(d.brand); setSavedSnap(JSON.stringify(d.brand)); setCustom(true); setCanUndo(!!d.canUndo); setNote("Saved — every campaign uses this look now."); }
+ if (r.ok) { setBrand(d.brand); setSavedSnap(JSON.stringify(d.brand)); setCustom(true); setCanUndo(!!d.canUndo); setNote("Saved. Every campaign uses this look now."); }
  else setNote(d.error || "Couldn’t save.");
  } catch { setNote("Couldn’t save."); }
  setBusy(false);
@@ -184,7 +184,7 @@ export default function EmailDesignPage() {
 
  {/* Controls */}
  <div className="space-y-5">
- {/* Start from a theme — the easy path: one tap sets colours, type & layout at once. */}
+ {/* Start from a theme. The easy path: one tap sets colours, type & layout at once. */}
  <TechCard className="p-4">
  <SectionLabel className="mb-2.5 flex items-center gap-1.5"><Sparkles size={12} /> Start from a theme</SectionLabel>
  <div className="grid grid-cols-3 gap-2">
@@ -306,7 +306,7 @@ function ColorRow({ label, hint, value, onChange }: { label: string; hint: strin
 }
 
 /**
- * Picking a typeface by name is guesswork, so each option is SET IN ITSELF — the list is the
+ * Picking a typeface by name is guesswork, so each option is SET IN ITSELF. The list is the
  * specimen. The faces load on demand rather than up front: thirty families fetched to draw one
  * dropdown is a slow page for a choice most stores make once.
  */

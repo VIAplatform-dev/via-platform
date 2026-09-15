@@ -142,7 +142,7 @@ export default function MarketingPage() {
  {(newKind === "percent" || newKind === "fixed") && <div className="w-20"><Input value={newValue} onChange={(e) => setNewValue(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={newKind === "percent" ? "10" : "25"} /></div>}
  <Button onClick={addDiscount} disabled={dBusy || !newCode.trim()}>Add</Button>
  </div>
- <p className="mt-2 text-[11px] text-stone-400">★ auto-applies the code when a shopper clicks through from VYA — only one can. Others are for campaigns + your store page.</p>
+ <p className="mt-2 text-[11px] text-stone-400">★ auto-applies the code when a shopper clicks through from VYA, only one can. Others are for campaigns + your store page.</p>
  </div>
  </Card>
 
@@ -150,7 +150,7 @@ export default function MarketingPage() {
  <Card className="mb-5">
  <CardHeader
  title="Where your audience comes from"
- subtitle="Attribution by channel — clicks, orders, revenue"
+ subtitle="Attribution by channel: clicks, orders, revenue"
  action={
  <div className="flex gap-1">
  {(["30", "all"] as const).map((r) => (
@@ -206,10 +206,10 @@ export default function MarketingPage() {
 
  {/* Email campaign */}
  <Card>
- <CardHeader title="Email campaign" subtitle={`Sends with your store’s name — replies go to ${camp?.storeEmail || "your contact email"}`} />
+ <CardHeader title="Email campaign" subtitle={`Sends with your store’s name. Replies go to ${camp?.storeEmail || "your contact email"}`} />
  <div className="space-y-3 px-5 py-4">
  <Field label="Subject"><Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="New drop just landed ✨" /></Field>
- <Field label="Message"><textarea className={cn(inputCls, "h-32 py-2 leading-relaxed")} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Write to your customers — what just landed, a sale, a restock…" /></Field>
+ <Field label="Message"><textarea className={cn(inputCls, "h-32 py-2 leading-relaxed")} value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Write to your customers. What just landed, a sale, a restock…" /></Field>
  <Field label="Button link" hint="Where “Shop now” points. Defaults to your store.">
  <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://yourstore.com" />
  </Field>

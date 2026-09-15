@@ -34,7 +34,7 @@ export default function TrackProductView({
  }).catch(() => {});
 
  // Per-store VYA-marketplace analytics: log this product-page view for the store, and (once per
- // session per store) the acquisition source — so marketplace discovery counts as "Discovered via VYA".
+ // session per store) the acquisition source, so marketplace discovery counts as "Discovered via VYA".
  try {
  const key = `vs_${storeSlug}`;
  const entry = !sessionStorage.getItem(key);

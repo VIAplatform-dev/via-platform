@@ -9,7 +9,7 @@ import type { RentalSettings } from "@/app/lib/rentals/settings-core";
 //
 // Nothing about how a rental works is decided by us. A bridal archive renting one gown a month and
 // a stylist showroom pulling forty pieces a week both have to fit, so every number here is the
-// store's — and every one has a default, so a shop that opens this page and saves gets a sensible
+// store's, and every one has a default, so a shop that opens this page and saves gets a sensible
 // rental business without reading a word.
 //
 // Presets exist because thirteen switches is a lot to face cold. They write the whole block; nothing
@@ -33,12 +33,12 @@ const WARNING_TEXT: Record<Warning, string> = {
 // an audience and a venue while the settings underneath describe two mechanics: whether a booking
 // is confirmed instantly or comes to you first, and whether the piece is posted or collected. A
 // boutique renting to ordinary customers who wants to approve each booking had to pick the one
-// called "Stylists only" — and, worse, could reasonably read that name as restricting WHO may
+// called "Stylists only", and, worse, could reasonably read that name as restricting WHO may
 // rent, which no setting here does. Nothing on this page gates access; "Stylists only" changed the
 // booking mode and nothing else.
 //
 // So each one is named for its booking mechanic and says both answers out loud. Everything stays
-// changeable below — a preset writes the block once and locks nothing.
+// changeable below: a preset writes the block once and locks nothing.
 const PRESETS: { name: string; blurb: string; values: Partial<RentalSettings> }[] = [
  {
   name: "On demand",
@@ -61,7 +61,7 @@ const PRESETS: { name: string; blurb: string; values: Partial<RentalSettings> }[
  * Which preset the current settings match, if any.
  *
  * Derived, never remembered. A preset that stayed lit because it was clicked would keep claiming to
- * describe settings that had since been changed — and a store whose setup is a mix of two would see
+ * describe settings that had since been changed, and a store whose setup is a mix of two would see
  * one of them highlighted, which is worse than seeing neither. Comparing the values means the
  * highlight is always true, and "your own mix" is a real answer rather than a missing one.
  */
@@ -96,13 +96,13 @@ function Row({ label, hint, children, className }: { label: string; hint?: strin
 function Num({ value, onChange, suffix, width = "w-20" }: { value: number | string; onChange: (v: string) => void; suffix?: string; width?: string }) {
  // A BOX YOU CAN EMPTY.
  //
- // Every caller clamps on the way in — Math.max(1, …) for "how many at once", Math.max(5, …) for
+ // Every caller clamps on the way in. Math.max(1, …) for "how many at once", Math.max(5, …) for
  // the slot length. With the input fully controlled, that clamp ran on each keystroke, so pressing
  // backspace turned "" into the minimum and the box refilled itself instantly. The seller could see
  // the 1, could not delete the 1, and had no way to type a 2 except in front of it.
  //
  // While the box has focus it shows what she typed, empty included; the clamped value is what she
- // gets back the moment she leaves. The clamp still happens on every keystroke — it just isn't what
+ // gets back the moment she leaves. The clamp still happens on every keystroke. It just isn't what
  // is on screen while she is mid-edit.
  const [draft, setDraft] = useState<string | null>(null);
  return (
@@ -189,7 +189,7 @@ export default function RentalSettingsPage() {
    <AdminHeader
     eyebrow="Settings"
     title="Rentals"
-    subtitle="Rent pieces out instead of selling them once. These settings apply to every rental, unless you change them on a single piece."
+    subtitle="Rent pieces out instead of selling them. These apply to every rental unless you change them on a piece."
     actions={
      <div className="flex items-center gap-3">
       {saved && <StatusPill tone="live" dot>Saved</StatusPill>}
@@ -232,8 +232,8 @@ export default function RentalSettingsPage() {
     <Card
      title="Common setups"
      blurb={matched
-      ? "A starting point for the two questions that matter — who can book, and how they get it. Yours match this one. Change anything below and it updates on its own."
-      : "A starting point for the two questions that matter — who can book, and how they get it. Yours are a mix, which is fine. Pick one to replace them all, or leave it and set them below."}
+      ? "A starting point for the two questions that matter, who can book, and how they get it. Yours match this one. Change anything below and it updates on its own."
+      : "A starting point for the two questions that matter, who can book, and how they get it. Yours are a mix, which is fine. Pick one to replace them all, or leave it and set them below."}
     >
      <div className="grid gap-2.5 sm:grid-cols-3">
       {PRESETS.map((p) => {
@@ -307,7 +307,7 @@ export default function RentalSettingsPage() {
      <div className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] leading-relaxed text-stone-600">
       So a <b className="font-semibold text-stone-900">{sample}-day</b> rental blocks{" "}
       <b className="font-semibold text-stone-900">{offFloor} days</b> on the calendar
-      {offFloor > sample ? <> — the {sample} you're paid for, plus {offFloor - sample} you aren't.</> : "."}
+      {offFloor > sample ? <>, the {sample} you're paid for, plus {offFloor - sample} you aren't.</> : "."}
       {s.prepaidLabel && (
        <>
         {" "}Once a return label is scanned, your rentals page uses the carrier&rsquo;s date instead of
@@ -361,7 +361,7 @@ export default function RentalSettingsPage() {
      {/* A rental is three numbers, so "15% off" needs an answer before a code can mean anything.
          The deposit is deliberately not offered: it is the renter's money coming back to her, so
          taking a discount off it would refund more than she ever paid. */}
-     <Row label="What a code comes off" hint="Your deposit is never discounted — that money goes back to the renter, so taking a percentage off it would refund more than she paid.">
+     <Row label="What a code comes off" hint="Discounts apply to the rental fee only, never the deposit. The deposit goes back to the renter in full.">
       <span className="flex flex-wrap gap-1.5">
        <Tag on={s.discountApplies === "none"} onClick={() => set("discountApplies", "none")}>No codes on rentals</Tag>
        <Tag on={s.discountApplies === "rent"} onClick={() => set("discountApplies", "rent")}>The rental fee</Tag>

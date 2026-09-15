@@ -7,7 +7,7 @@ import { PACKAGING, packagingById, packedWeightOz, suggestPackaging, packagingFr
 test("the phone's packaging list is IDENTICAL to the web's", () => {
   // This is the point of the file. The buyer pays a flat tier chosen by the larger of weight and
   // girth, so a dimension that drifts from app/lib/packaging.ts is money the store eats on every
-  // parcel — silently, and only on pieces listed from the phone.
+  // parcel: silently, and only on pieces listed from the phone.
   const web = fs.readFileSync(path.join(process.cwd(), "..", "app", "lib", "packaging.ts"), "utf8");
   const rows = [...web.matchAll(
     /\{\s*id:\s*"([^"]+)",\s*label:\s*"([^"]+)",\s*hint:\s*"([^"]+)",\s*lengthIn:\s*(\d+),\s*widthIn:\s*(\d+),\s*heightIn:\s*(\d+),\s*tareOz:\s*(\d+)\s*\}/g,
@@ -16,7 +16,7 @@ test("the phone's packaging list is IDENTICAL to the web's", () => {
     lengthIn: Number(m[4]), widthIn: Number(m[5]), heightIn: Number(m[6]), tareOz: Number(m[7]),
   }));
 
-  assert.ok(rows.length >= 7, `parsed only ${rows.length} options from the web list — has its shape changed?`);
+  assert.ok(rows.length >= 7, `parsed only ${rows.length} options from the web list. Has its shape changed?`);
   assert.deepEqual(PACKAGING, rows);
 });
 
@@ -72,7 +72,7 @@ test("every option is a real, distinct id", () => {
   assert.equal(packagingById(null), null);
 });
 
-// A box and its weight move together — the same rule the web form follows.
+// A box and its weight move together. The same rule the web form follows.
 test("every box's weight lands back on that same box", () => {
   for (const b of PACKAGING) {
     assert.equal(suggestPackaging(weightForPackaging(b.id)), b.id, `${b.id} does not round-trip`);

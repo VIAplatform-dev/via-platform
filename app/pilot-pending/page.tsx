@@ -35,10 +35,10 @@ export default function PilotPendingPage() {
 
  return (
  <div className="fixed inset-0 z-[200] flex">
- {/* Left — solid red */}
+ {/* Left: solid red */}
  <div className="hidden lg:block lg:w-1/2 bg-[#5D0F17]" />
 
- {/* Right — content */}
+ {/* Right: content */}
  <div className="w-full lg:w-1/2 bg-white flex flex-col overflow-y-auto">
  <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 py-12 max-w-xl w-full mx-auto text-center">
  <div className="flex items-start gap-1.5 mb-10 justify-center">

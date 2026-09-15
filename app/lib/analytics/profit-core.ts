@@ -8,12 +8,12 @@
 // as £0.
 //
 // This module is pure so the arithmetic is testable on its own. margin.ts gathers the inputs
-// over the COVERED slice — sales whose piece has a cost on record — and both surfaces render what
+// over the COVERED slice, sales whose piece has a cost on record, and both surfaces render what
 // comes out of here. Where a figure is estimated (card fees: Stripe's per-charge fee isn't stored)
 // the line says so, and the seller can tell an estimate from a fact.
 
 export type ProfitInputs = {
- /** Net of tax collected — the government's share is not revenue. */
+ /** Net of tax collected. The government's share is not revenue. */
  revenueCents: number;
  /** What she paid for the pieces that sold. Only known on the covered slice. */
  costCents: number;
@@ -23,7 +23,7 @@ export type ProfitInputs = {
  cardFeeCents: number;
  /** Shipping labels bought through VYA, as charged. */
  labelCostCents: number;
- /** The consignor's share of consigned sales — never the store's money. */
+ /** The consignor's share of consigned sales, never the store's money. */
  consignorCutCents: number;
  /** Everything else the store spent to trade: booth fees, packaging, the monthly list. */
  operatingCents: number;
@@ -47,8 +47,8 @@ export type ProfitLine = {
 /**
  * Net profit in cents, or null when there is no cost on record for anything that sold.
  *
- * Null, not zero: a month with no costed sales has an unknown profit, and printing 0 — or worse,
- * printing revenue as profit — is the exact error this replaces. Negative is allowed and expected;
+ * Null, not zero: a month with no costed sales has an unknown profit, and printing 0, or worse,
+ * printing revenue as profit. Is the exact error this replaces. Negative is allowed and expected;
  * a month where postage and booth fees ate the margin is a fact she needs to see.
  */
 export function netProfit(p: ProfitInputs): number | null {
@@ -85,13 +85,13 @@ export function profitLines(p: ProfitInputs): ProfitLine[] {
 }
 
 /**
- * "Cost missing on 3 sold pieces — not counted above." or null when every sale is covered.
+ * "Cost missing on 3 sold pieces, not counted above." or null when every sale is covered.
  *
- * Said plainly because the alternative — silently computing over 6 of 9 sales — is how a
+ * Said plainly because the alternative, silently computing over 6 of 9 sales. Is how a
  * seller ends up trusting a margin that describes two thirds of her month.
  */
 export function missingCostNote(p: ProfitInputs): string | null {
  const missing = Math.max(0, p.totalSales - p.coveredSales);
  if (missing === 0) return null;
- return `Cost missing on ${missing} sold ${missing === 1 ? "piece" : "pieces"} — not counted above.`;
+ return `Cost missing on ${missing} sold ${missing === 1 ? "piece" : "pieces"}, not counted above.`;
 }

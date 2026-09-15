@@ -19,7 +19,7 @@ function db() {
  return neon(url);
 }
 
-// GET /api/store/demand-search?q=cavalli&window=30d — the "Should I buy this?"
+// GET /api/store/demand-search?q=cavalli&window=30d: the "Should I buy this?"
 // tool. Matches the query against any segment (brand / category / era), gates
 // for privacy, and attaches a plain-language sourcing verdict to each result.
 export async function GET(request: NextRequest) {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
  const sql = db();
  try {
- // VYA's own demand + external eBay comps in parallel. eBay is the fallback for the long tail —
+ // VYA's own demand + external eBay comps in parallel. eBay is the fallback for the long tail,
  // brands with too little VYA engagement to clear the privacy floor (e.g. Escada) still get a call.
  const [rows, ebay, google] = await Promise.all([
   sql`
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
   };
   });
 
- // Headline verdict blends the top VYA match (if any) with eBay — so a query with no VYA signal
+ // Headline verdict blends the top VYA match (if any) with eBay, so a query with no VYA signal
  // still gets an eBay-led call ("sells well on eBay ~X/mo") instead of a dead end.
  const primary = results[0] ?? null;
  const primaryVya = primary
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
  const ebayOut = ebay ? { medianPrice: ebay.medianPrice, p25: ebay.p25, p75: ebay.p75, activeCount: ebay.activeCount, soldPer30d: ebay.soldPer30d ?? null, priceMomentumPct: ebay.priceMomentumPct } : null;
  const googleOut = google ? { momentumPct: google.momentumPct, avgInterest: google.avgInterest, breakout: google.breakout } : null;
 
- // A wide/ambiguous brand ("Valentino") isn't one market — cluster the live eBay listings into the
+ // A wide/ambiguous brand ("Valentino") isn't one market. Cluster the live eBay listings into the
  // real sub-markets (Garavani / Mario Valentino / RED / fragrance…), each with its own price, so a
  // single median never lies. Only fires with a decent sample; returns [] when the market is uniform.
  let clusters: Awaited<ReturnType<typeof clusterCompListings>> = [];

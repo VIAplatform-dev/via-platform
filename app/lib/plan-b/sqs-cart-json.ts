@@ -21,11 +21,11 @@
 // is derived from `subtotalCents`. The product page's own "is this already in my cart?" test reads
 // `entries[].itemId` and `entries[].chosenVariant.sku`.
 //
-// Pure — no database, no network. The routes fetch items and hand them here.
+// Pure, no database, no network. The routes fetch items and hand them here.
 import type { CartLineItem } from "./cart-json";
 
 /** Squarespace money: a currency code and a STRING amount with two decimals ("550.00"). Its cart
- *  totals are integer cents instead — both shapes appear, so both are built here. */
+ *  totals are integer cents instead. Both shapes appear, so both are built here. */
 export type SqsMoney = { currency: string; value: string };
 
 export type SqsChosenVariant = {
@@ -56,7 +56,7 @@ export type SqsCartEntry = {
   *   const m = Gp(successData.subTotal, successData.item?.price?.currency || variant?.price?.currency)
   *   function Gp(u, h) { … const _ = u / Math.pow(10, digits); return formatMoney(new Money(_, M)) }
   *
-  * so `subTotal` — capital T, cents — is what it divides by 100. The cart TOTALS on the model next
+  * so `subTotal`, capital T, cents. Is what it divides by 100. The cart TOTALS on the model next
   * to it are spelled `subtotalCents` instead; both spellings are real and neither substitutes for
   * the other, which is why a cart that showed the right piece still showed it at $0.00.
   */
@@ -71,7 +71,7 @@ export type SqsCartEntry = {
 export type SqsShoppingCart = {
  id: string;
  websiteId: string;
- // Absent, not null, when there's no order/shipping choice yet — see buildSqsCart() for why.
+ // Absent, not null, when there's no order/shipping choice yet. See buildSqsCart() for why.
  orderId?: string;
  created: number;
  expiresAt: number;
@@ -95,7 +95,7 @@ export type SqsShoppingCart = {
  requiresShipping: boolean;
 };
 
-/** What Squarespace itself answers when the visitor has never had a cart — verified against a live
+/** What Squarespace itself answers when the visitor has never had a cart. Verified against a live
  *  Squarespace store, which returns it with a 404. Their bundle treats that as "empty", so matching
  *  it exactly is what stops the pill rendering a phantom item on a first visit. */
 export const NO_CART_MESSAGE = "You have no shopping cart yet.";
@@ -105,7 +105,7 @@ export const NO_CART_MESSAGE = "You have no shopping cart yet.";
  * ReservedCartController mounts a live countdown banner ("Your cart is reserved for 19:41") for any
  * value in the future, and its mini-cart repeats it. VYA holds a piece for ten minutes AT CHECKOUT
  * (DEFAULT_RESERVATION_TTL_SECONDS) and not a second at add-to-cart, so any countdown here is a
- * promise the platform doesn't keep — the first version sent a 14-day expiry and the banner duly
+ * promise the platform doesn't keep. The first version sent a 14-day expiry and the banner duly
  * offered the shopper a 20,159-minute reservation. Zero is in the past, so the banner never mounts.
  */
 const CART_TTL_MS = 0;
@@ -154,10 +154,10 @@ export function buildSqsCart(lines: CartLineItem[], token: string, now = 0, stor
  return {
   id: token,
   websiteId: "",
-  // NOT `orderId: null` — read off the real bundle: its ShoppingCart model declares
+  // NOT `orderId: null`: read off the real bundle: its ShoppingCart model declares
   // `orderId: {validator: Lang.isString}` (and the same for selectedShippingOption/shippingLocation
   // below, validated as `isObject`) with no fallback value for any of them. YUI's Model.setAttrs()
-  // validates the WHOLE incoming object before applying any of it — one attribute failing its
+  // validates the WHOLE incoming object before applying any of it. One attribute failing its
   // validator throws the ENTIRE update out, `entries` included. That's not a guess: an unpurchased
   // VYA cart with a correct, non-empty `entries` array sent this way still rendered the empty-cart
   // state, because these three fields were `null` and their validators reject that. Omitting a key

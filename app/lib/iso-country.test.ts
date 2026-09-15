@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { isoCountry } from "./ship-from-core.ts";
 
 test("the spelled-out names two live stores actually had saved", () => {
- // These were real values in store_shipping — and they made every rate lookup come back empty.
+ // These were real values in store_shipping, and they made every rate lookup come back empty.
  assert.equal(isoCountry("United States"), "US");
  assert.equal(isoCountry("United Kingdom"), "GB");
 });

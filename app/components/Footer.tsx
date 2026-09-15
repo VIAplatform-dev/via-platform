@@ -6,7 +6,7 @@ export default function Footer() {
  return (
  <footer className="bg-[#FFFDF8]">
  <div className="relative overflow-hidden rounded-t-[1.75rem] sm:rounded-t-[2.5rem]">
- {/* Background — same croc image as the hero */}
+ {/* Background: same croc image as the hero */}
  <div
  className="absolute inset-0"
  style={{ backgroundImage: "url(/hero-v10.jpg)", backgroundSize: "cover", backgroundPosition: "center" }}

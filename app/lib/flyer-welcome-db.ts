@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 
 // Who is due the next-day thank-you from a printed flyer.
 //
-// Access is granted at signup, not here — this is only the email. If this job never ran, everyone
+// Access is granted at signup, not here. This is only the email. If this job never ran, everyone
 // would still be browsing; they would simply not have heard from us.
 //
 // It is worth more than a courtesy, though: the access cookie lives in the phone that scanned the
@@ -29,7 +29,7 @@ export type FlyerSignup = { email: string; source: string };
 /**
  * Approved flyer signups from at least `afterHours` ago that have not been thanked.
  *
- * The delay is the point — "next day", not "immediately", so it lands as a note rather than a
+ * The delay is the point. "next day", not "immediately", so it lands as a note rather than a
  * receipt. The lower bound also means a run that is late (or re-run) still finds them.
  */
 export async function getFlyerSignupsDueWelcome(afterHours = 20, limit = 200): Promise<FlyerSignup[]> {

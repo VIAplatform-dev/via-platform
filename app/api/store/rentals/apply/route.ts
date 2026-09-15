@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic";
 
 // Public: applying to rent. The seller reads and answers these at /rentals/requests;
 // this path exists so the allowlist can open the application form without also
-// opening the store's inbox — the gate matches on path, not on method.
+// opening the store's inbox. The gate matches on path, not on method.
 
-// POST — anyone may apply. No account needed; the store is vetting by hand anyway.
+// POST: anyone may apply. No account needed; the store is vetting by hand anyway.
 export async function POST(request: NextRequest) {
  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
  const itemId = typeof body.itemId === "string" ? body.itemId : "";
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: false, reason: "open-booking" }, { status: 200 });
  }
 
- // Applications are held to the same window and price ladder as open bookings —
+ // Applications are held to the same window and price ladder as open bookings,
  // there's no point taking an enquiry the store could never fulfil.
  const taken = ctx.settings.requestHoldsDates ? await takenBands(itemId) : [];
  const q = quote(wanted, ctx.settings, ctx.tiers, today(), taken);
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
  if (!made) return NextResponse.json({ ok: false, reason: "unavailable" }, { status: 200 });
 
  // INTO THE INBOX AS WELL AS THE REQUESTS QUEUE. A rental application is somebody asking the store
- // a question; the seller looks in the inbox for those. Best-effort — the request is already made,
+ // a question; the seller looks in the inbox for those. Best-effort: the request is already made,
  // and a messaging hiccup must not turn a successful application into an error the renter sees.
  void getItem(itemId)
   .then((item) =>

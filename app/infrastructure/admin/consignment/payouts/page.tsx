@@ -7,7 +7,7 @@ import { AdminPage, AdminHeader, TechCard, TechButton, TechEmpty, TH, TD } from 
 type Row = { id: number; name: string; method: string; portalToken: string | null; balanceCents: number; payableCents: number;
  // Owed for sales that happened on a marketplace, which paid the store directly.
  offPlatform?: { totalCents: number; byChannel: Record<string, number> };
- // Reserved by a bank debit that hasn't cleared yet — owed, but already on its way.
+ // Reserved by a bank debit that hasn't cleared yet. Owed, but already on its way.
  inFlightCents?: number };
 type Bank = { ready: boolean; bank: string | null; since: string | null };
 
@@ -51,7 +51,7 @@ export default function PayoutsPage() {
  const d = await r.json().catch(() => null);
  setPaying(null);
  if (!r.ok) { setErr(d?.error || "Couldn't record the payout."); return; }
- // An ACH payout isn't done when the button stops spinning — it is days away, and saying so here
+ // An ACH payout isn't done when the button stops spinning. It is days away, and saying so here
  // is the difference between a store waiting patiently and a store pressing Pay again.
  setNote(d?.message ?? null);
  reload();
@@ -95,14 +95,14 @@ export default function PayoutsPage() {
  </>
  );
 
- // Owed on a marketplace (+ anything clearing) — shown in both layouts.
+ // Owed on a marketplace (+ anything clearing). Shown in both layouts.
  const offPlatformCell = (c: Row) => (
  <>
   {c.offPlatform && c.offPlatform.totalCents > 0 ? (
-   <span className="text-amber-700" title={`${Object.entries(c.offPlatform.byChannel).map(([ch, v]) => `${ch}: ${money(v)}`).join(" · ")} — these marketplaces paid you directly, so pay her yourself and record it below.`}>
+   <span className="text-amber-700" title={`${Object.entries(c.offPlatform.byChannel).map(([ch, v]) => `${ch}: ${money(v)}`).join(" · ")}: these marketplaces paid you directly, so pay her yourself and record it below.`}>
     {money(c.offPlatform.totalCents)}
    </span>
-  ) : <span className="text-stone-300">—</span>}
+  ) : <span className="text-stone-300">-</span>}
   {(c.inFlightCents ?? 0) > 0 && (
    <div className="text-[11px] text-stone-400">{money(c.inFlightCents!)} clearing</div>
   )}
@@ -117,7 +117,7 @@ export default function PayoutsPage() {
  <AdminHeader
  eyebrow="Sell · Consignment · Payouts"
  title="Payouts"
- subtitle={`What each consignor is owed, and what’s ready to pay now (sale credits older than your ${holdDays}-day return hold). Anything sold on eBay or Depop is owed too — those marketplaces paid you directly, so pay her yourself and record it as cash or a bank transfer.`}
+ subtitle={`What each consignor is owed, and what’s ready to pay now (sale credits older than your ${holdDays}-day return hold). Anything sold on eBay or Depop is owed too. Those marketplaces paid you directly, so pay her yourself and record it as cash or a bank transfer.`}
  />
 
  <div className="flex items-center gap-3">
@@ -144,7 +144,7 @@ export default function PayoutsPage() {
  {bank.ready ? (
  <>Off-marketplace payouts come from <b className="text-stone-800">{bank.bank || "your connected bank"}</b>. We debit you, then pay her once it clears.</>
  ) : (
- <>Items sold on eBay or Depop were paid to you directly. Connect your bank and VYA can debit you and pay your consignors for those too — otherwise pay them yourself and record it as cash.</>
+ <>Marketplace sales were paid straight to you. Connect your bank and VYA pays those consignors too, or pay them yourself and record it as cash.</>
  )}
  </div>
  <TechButton variant="secondary" className="px-3 py-1.5 text-[12px] max-sm:py-2.5" disabled={linking} onClick={connectBank}>

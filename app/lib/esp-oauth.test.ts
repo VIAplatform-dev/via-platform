@@ -7,7 +7,7 @@ const base = "https://getvya.ai";
 test("PKCE makes a verifier of legal length and a matching S256 challenge", () => {
  const { verifier, challenge } = makePkce();
  assert.ok(verifier.length >= 43 && verifier.length <= 128, `verifier was ${verifier.length}`);
- assert.doesNotMatch(verifier + challenge, /[+/=]/, "base64url only — a '+' in a query string becomes a space");
+ assert.doesNotMatch(verifier + challenge, /[+/=]/, "base64url only: a '+' in a query string becomes a space");
  assert.notEqual(verifier, challenge);
 });
 
@@ -92,7 +92,7 @@ test("the base URL is usable even when the environment omits the scheme", () => 
 });
 
 test("only the email tools we have an app for are offered", () => {
- // Klaviyo was listed and greyed out, saying "we're finishing the approval with them" — which was
+ // Klaviyo was listed and greyed out, saying "we're finishing the approval with them", which was
  // not true. A shop that uses Klaviyo read that as "next week" and waited for something nobody was
  // building. If it cannot be connected it is not offered.
  const both = { MAILCHIMP_CLIENT_ID: "a", MAILCHIMP_CLIENT_SECRET: "b", KLAVIYO_CLIENT_ID: "c", KLAVIYO_CLIENT_SECRET: "d" };

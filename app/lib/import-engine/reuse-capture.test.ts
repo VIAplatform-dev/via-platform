@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { shouldReuseExistingCapture } from "./reuse-capture.ts";
 
-test("a seller's first import runs — there is nothing to protect", () => {
+test("a seller's first import runs. There is nothing to protect", () => {
  assert.equal(shouldReuseExistingCapture({ captured: 0, isOwner: false }), false);
  assert.equal(shouldReuseExistingCapture({ captured: 0, isOwner: true }), false);
 });
@@ -12,7 +12,7 @@ test("a seller's SECOND import never re-crawls the site she already has", () => 
  assert.equal(shouldReuseExistingCapture({ captured: 94, isOwner: false }), true);
 });
 
-test("the owner may still re-import — that is how a store gets repaired", () => {
+test("the owner may still re-import. That is how a store gets repaired", () => {
  assert.equal(shouldReuseExistingCapture({ captured: 94, isOwner: true }), false);
 });
 

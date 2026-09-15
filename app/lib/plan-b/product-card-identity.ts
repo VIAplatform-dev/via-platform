@@ -1,13 +1,13 @@
 // Tie a captured product card back to the piece it stands for in the seller's inventory.
 //
-// WHY. The visual editor serves the CAPTURED page — frozen markup from crawl day — while shoppers
+// WHY. The visual editor serves the CAPTURED page, frozen markup from crawl day, while shoppers
 // get the same page with its grids refilled from live inventory. So the seller opens the editor,
 // clicks a product's name or its price, and gets a text box. Typing in it does nothing she can ever
 // see: the live render regenerates that text from Inventory on the next page load. She reported it
-// as "the name is editable and it shouldn't be — it should link back to that item in inventory".
+// as "the name is editable and it shouldn't be. It should link back to that item in inventory".
 //
-// This finds the piece behind each captured card by its `/products/{handle}` link — the same handle
-// stored on the item as `sourceId` — and stamps it on the card. The editor reads it back off the DOM
+// This finds the piece behind each captured card by its `/products/{handle}` link: the same handle
+// stored on the item as `sourceId`, and stamps it on the card. The editor reads it back off the DOM
 // to say whose card it is and to offer the piece in Inventory instead of a text box that lies.
 
 import * as cheerio from "cheerio";
@@ -19,7 +19,7 @@ export type CardIdentity = { id: string; title: string };
  * What a shopper would call "the card": the smallest thing around this link that holds the piece's
  * picture AND its words.
  *
- * Never the link itself when that link wraps only the photo — themes routinely split a card into a
+ * Never the link itself when that link wraps only the photo. Themes routinely split a card into a
  * picture link and a caption link, and stamping each would mark one card as two different pieces.
  * A link with no picture anywhere above it (a "shop the dress" mention in a paragraph) is its own
  * card, so a sentence never gets treated as product markup.

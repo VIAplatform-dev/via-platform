@@ -7,7 +7,7 @@ import { colors, spacing } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ToggleRow, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
 
-// Her returns policy — the "Set your returns policy" step on Home, which used to open the website.
+// Her returns policy: the "Set your returns policy" step on Home, which used to open the website.
 //
 // Two things make this more than a form. The window she sets here decides how long VYA holds her
 // money (a refund has to come out of a Stripe balance, not her bank), so saving it reports the new
@@ -16,7 +16,7 @@ import { Field, ToggleRow, ChoiceRow, Button, Notice, Loading } from "../../comp
 // instead of leaving "Final sale" to be inferred from a switch.
 //
 // Saved on one button, not per field. Every other settings screen in the app saves as you go, but a
-// policy is a sentence — half-saving it would publish "returns accepted" with a blank window to a
+// policy is a sentence. Half-saving it would publish "returns accepted" with a blank window to a
 // storefront a buyer is reading.
 
 type Policy = {
@@ -65,7 +65,7 @@ export default function PolicyScreen() {
         policyText: p.policyText ?? "",
       });
       setDraft(r.policy);
-      // The payout hold moves with the window — say so here rather than letting her find out later.
+      // The payout hold moves with the window, say so here rather than letting her find out later.
       setSaved(
         r.payoutNotice
           ? r.payoutNotice

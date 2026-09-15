@@ -22,7 +22,7 @@ export async function GET(request: Request) {
  try {
  await sendWinbackEmail(candidate.email, tier);
  // The "come back" moment, on the phone as well. This was email-only, so someone with the
- // app installed heard nothing from it — which is the wrong way round.
+ // app installed heard nothing from it, which is the wrong way round.
  await pushAlso(candidate.user_id, tier);
  await recordWinbackSent(candidate.user_id, tier);
  sent++;

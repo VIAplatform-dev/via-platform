@@ -1,9 +1,9 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — enrichment (pure functions, no DB / no imports beyond config types).
+// Data Layer: enrichment (pure functions, no DB / no imports beyond config types).
 //
 // These classify a listing's ERA and CONDITION from its text. They are the only
 // "computed" pieces of the events foundation, so they're unit-tested. Guiding
-// rule: NEVER guess. If the signal isn't clearly present, return null — a wrong
+// rule: NEVER guess. If the signal isn't clearly present, return null. A wrong
 // era/condition would mislead a seller into a bad sourcing decision.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ const DECADE_WORDS: Record<string, number> = {
  *  3. "Y2K",
  *  4. a decade word ("nineties").
  * Returns the matching bucket slug, or null when there's no confident signal.
- * Bare "vintage"/"retro" is intentionally NOT enough — too vague to classify.
+ * Bare "vintage"/"retro" is intentionally NOT enough. Too vague to classify.
  */
 export function inferEra(text: string | null | undefined, buckets: EraBucket[]): string | null {
  if (!text) return null;
@@ -89,7 +89,7 @@ const CONDITION_PATTERNS: { label: Condition; re: RegExp }[] = [
 ];
 
 /**
- * Infer condition from a listing description — but ONLY when the seller states
+ * Infer condition from a listing description, but ONLY when the seller states
  * it clearly. Returns null otherwise (never a guess). Style words like
  * "distressed" are deliberately excluded (they describe a look, not condition).
  */

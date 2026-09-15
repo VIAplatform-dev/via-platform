@@ -223,7 +223,7 @@ export async function getTopDesigners(days = 90, limit = 25): Promise<DesignerSt
 
 export async function getTopBrands(limit = 50): Promise<BrandStat[]> {
  const sql = neon(getDatabaseUrl());
- // Fetch per-product data — brand is inferred from title in TypeScript
+ // Fetch per-product data: brand is inferred from title in TypeScript
  // because stores set Shopify vendor to their store name, not the designer
  const rows = await sql`
  SELECT
@@ -294,7 +294,7 @@ export async function getTopBrands(limit = 50): Promise<BrandStat[]> {
 export function normalizeCategory(raw: string): string | null {
  const lower = raw.toLowerCase().trim();
 
- // Hard blocklist — business model labels, not product categories
+ // Hard blocklist: business model labels, not product categories
  const BLOCKED = new Set([
  'consignment', 'gift card', 'gift cards', 'authentication', 'authentication fee',
  'item authentication', 'listing fee', 'service', 'fee', 'fees', 'new arrivals',
@@ -347,7 +347,7 @@ export function normalizeCategory(raw: string): string | null {
 
 // ── Category families ───────────────────────────────────────────────────────────────────────────
 // The tier ABOVE normalizeCategory's buckets. A shopper looking for a skirt starts at "Clothing",
-// not at a flat list of thirteen buckets — so a storefront menu can read Clothing → Tops · Skirts
+// not at a flat list of thirteen buckets, so a storefront menu can read Clothing → Tops · Skirts
 // while the buckets underneath stay exactly the ones every other number on VYA is counted by.
 // Ordered as a shopper scans: what you wear, then what you carry, then the rest.
 export const CATEGORY_FAMILIES: { label: string; members: string[] }[] = [

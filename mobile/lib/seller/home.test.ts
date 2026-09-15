@@ -21,7 +21,7 @@ test("thousands are grouped, because £4820 is misread at a glance", () => {
   assert.equal(formatMoney(199500, "GBP"), "£1,995");
 });
 
-test("money rounds to whole units — Home has no room for pennies", () => {
+test("money rounds to whole units. Home has no room for pennies", () => {
   assert.equal(formatMoney(84049, "GBP"), "£840");
   assert.equal(formatMoney(84050, "GBP"), "£841");
 });
@@ -84,7 +84,7 @@ test("an empty inventory is stated plainly, since this is a new store's first sc
 
 /* ── which orders are waiting on her ────────────────────────────────────── */
 
-test("orders to post are the paid ones — not shipped, delivered or cancelled", () => {
+test("orders to post are the paid ones, not shipped, delivered or cancelled", () => {
   // Money is in and the parcel has not left. `shipped` is already in transit; `cancelled` and
   // `refunded` are nobody's work. Counting those would send her to the post office for nothing.
   const orders = [
@@ -98,7 +98,7 @@ test("orders to post are the paid ones — not shipped, delivered or cancelled",
   assert.deepEqual(toPostOrders(orders).map((o) => o.itemTitle), ["Valentino gown", "Miu Miu heels"]);
 });
 
-test("pending orders are not hers to post — the money has not landed", () => {
+test("pending orders are not hers to post. The money has not landed", () => {
   assert.deepEqual(toPostOrders([{ status: "pending", itemTitle: "Yohji coat" }]), []);
 });
 

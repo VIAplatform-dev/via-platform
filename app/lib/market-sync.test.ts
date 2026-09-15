@@ -21,7 +21,7 @@ test("queued, failed and pulled listings are not live anywhere, so nothing to ch
  ]), []);
 });
 
-test("only marketplaces with a sale feed are checked — a paste-only channel can't be asked", () => {
+test("only marketplaces with a sale feed are checked. A paste-only channel can't be asked", () => {
  // Poshmark and the rest have no API; we could not learn about a sale there even if we tried.
  assert.deepEqual(platformsToCheck([
   { itemId: "a", platform: "poshmark", status: "listed", externalUrl: null },

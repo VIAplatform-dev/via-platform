@@ -1,4 +1,4 @@
-// A product grid she added to her imported site — its settings, bounded.
+// A product grid she added to her imported site. Its settings, bounded.
 //
 // The grid lives in her page as an EMPTY MARKER carrying these settings, never as cards:
 //   <div data-vya-block="1" data-vya-newtype="products" data-vya-grid-id="g_x7k2" data-vya-grid="{…}"></div>
@@ -6,7 +6,7 @@
 // sells or is repriced changes on her site without anyone saving anything.
 //
 // Everything read back from a page goes through parseGridConfig. A value outside the bounds falls
-// back to the default — a shopper's page never errors because a setting was hand-edited or stale.
+// back to the default. A shopper's page never errors because a setting was hand-edited or stale.
 import { MAX_FEATURED } from "../storefront-blocks.ts";
 
 export const GRID_RATIOS = ["theme", "portrait", "square", "landscape"] as const;
@@ -30,7 +30,7 @@ export const GRID_BOUNDS = { count: { min: 1, max: MAX_FEATURED }, cols: { min: 
 
 export const GRID_DEFAULTS: GridConfig = { v: 1, collection: "all", count: 8, cols: 4, mcols: 2, ratio: "theme", card: "theme" };
 
-// A collection slug as VYA writes them (slugify of a title) — letters, digits, hyphens, underscores.
+// A collection slug as VYA writes them (slugify of a title). Letters, digits, hyphens, underscores.
 const HANDLE_RE = /^[a-z0-9][a-z0-9_-]{0,119}$/i;
 
 function int(v: unknown, fallback: number, min: number, max: number): number {
@@ -44,7 +44,7 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[], fallback: T)
 }
 
 /**
- * Settings from anywhere — the marker attribute (a JSON string), a save payload, a query string.
+ * Settings from anywhere: the marker attribute (a JSON string), a save payload, a query string.
  *
  * `collections` is her collection slugs when known. When given, a collection that is not hers becomes
  * "all". When null (not looked up), any well-formed handle is kept and checked again where it is used.
@@ -111,7 +111,7 @@ export function ratioPercent(r: GridRatio): number | null {
  return r === "portrait" ? 133.33 : r === "square" ? 100 : r === "landscape" ? 75 : null;
 }
 
-/** The first of her collections her page links to — what a new grid shows before she picks one. */
+/** The first of her collections her page links to. What a new grid shows before she picks one. */
 export function firstLinkedCollection(html: string, collections: readonly string[]): string {
  const mine = new Set(collections);
  const re = /\/collections\/([a-z0-9][a-z0-9_-]*)/gi;

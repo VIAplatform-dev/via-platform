@@ -14,7 +14,7 @@ import type { ImportedProduct } from "./store-import";
 import { MAX_ITEM_IMAGES } from "./item-limits";
 
 // Pure helpers (money, identity, hashing) live in capture-commerce-core.ts so they can be unit
-// tested without the database layer — same split as inventory-core.ts.
+// tested without the database layer. Same split as inventory-core.ts.
 export { productContentHash, centsOf, currencyOf, identityKey, slugifyHandle } from "./capture-commerce-core.ts";
 import { membershipSubjects, mergeCapturedMembership, unfileVanished, taggedSlugs, membershipToWrite, worthImporting, updateNeeded, centsOf, currencyOf, norm, identityKey, isTitleDuplicate, plannedCollectionOrder, priorForProduct, productContentHash, unreadCollectionSlugs, rentOnlyAction, rentOnlyWarning } from "./capture-commerce-core.ts";
 
@@ -23,7 +23,7 @@ import { membershipSubjects, mergeCapturedMembership, unfileVanished, taggedSlug
  *  Matching is by SOURCE IDENTITY (platform + the source's own id/handle), not title. Title
  *  matching broke both ways on one-of-one vintage: two listings called "Vintage Levi's 501"
  *  collapsed into one, and retitling an item re-imported it as a duplicate. Identity also makes
- *  this re-runnable — a second import UPDATES the store's catalog instead of wiping and re-adding
+ *  this re-runnable: a second import UPDATES the store's catalog instead of wiping and re-adding
  *  it, which is what lets inventory stay in sync without a destructive re-crawl.
  *
  *  Items a human has edited (`origin = 'user'`) are never overwritten. */
@@ -58,7 +58,7 @@ export async function importProductsAsItems(
  const byTitle = new Map<string, (typeof previous)[number]>();
  for (const it of previous) {
   // A row WITH an identity is matched by that identity and nothing else. Indexing it by title too
-  // meant the source's SECOND piece of the same name — a different bag, with its own handle — found
+  // meant the source's SECOND piece of the same name, a different bag, with its own handle. Found
   // this row by title and overwrote it, so the store still ended up one listing short and the
   // survivor was whichever of the two came last.
   if (it.sourceId) byIdentity.set(identityKey(it.sourcePlatform, it.sourceId), it);
@@ -68,10 +68,10 @@ export async function importProductsAsItems(
  const existing = await listAvailableItems(seller.id);
  const have = new Set(existing.map((i) => i.title.toLowerCase().trim()));
  // A sold-out piece still on the seller's page is the SAME sale that arrives (authoritatively)
- // in their uploaded order history — importing it here as a phantom `sold` item would double-
+ // in their uploaded order history. Importing it here as a phantom `sold` item would double-
  // count it. Skip any sold-out product the order list already covers (matched by title).
  // Degradation, not a failure: without the order list a sold-out product may be imported as a
- // phantom `sold` item that the order history also covers. Worth continuing — worth reporting.
+ // phantom `sold` item that the order history also covers. Worth continuing. Worth reporting.
  const stats: ImportStats = { added: 0, updated: 0, unchanged: 0, skipped: 0, removed: 0, warnings: [] };
  // Per-product failures are collected rather than thrown: one unwritable listing must not cost the
  // seller the other 300. They're summarised into a warning at the end so they're still visible.
@@ -79,7 +79,7 @@ export async function importProductsAsItems(
  // Pieces her shop only rents, and how many of those were pulled back off sale. Reported, not silent.
  let rentOnlyDrafted = 0;
  let rentOnlyMovedBack = 0;
- // Only touched when this import actually has a rent-only piece — ensureRentalTables runs a real
+ // Only touched when this import actually has a rent-only piece. EnsureRentalTables runs a real
  // CREATE EXTENSION on first use, which a store with no rentals in its feed has no reason to pay for.
  let saveItemTerms: typeof import("./rentals/rentals-db.ts").saveItemTerms | null = null;
  let coveredByOrders = new Set<string>();
@@ -92,11 +92,11 @@ export async function importProductsAsItems(
 
  for (const p of products) {
  const title = (p.name || "").trim();
- // A piece her shop only RENTS has no buy price and must never be for sale — but it is real
+ // A piece her shop only RENTS has no buy price and must never be for sale, but it is real
  // inventory with a real rental price, so it is saved as a DRAFT (visible to her in Store OS, never
  // to a shopper: STOREFRONT_STATUSES excludes drafts from every grid, the hosted cart, and
  // cross-listing) with its rental ladder saved to rental_terms. See rentOnlyAction for what this
- // does to a piece already held here, and what is left alone. It still counts as seen — otherwise a
+ // does to a piece already held here, and what is left alone. It still counts as seen. Otherwise a
  // complete read would sweep it to "sold" the moment it's on her site at all.
  if (p.rentOnly) {
   if (p.sourceId) seen.add(identityKey(p.sourcePlatform, p.sourceId));
@@ -120,7 +120,7 @@ export async function importProductsAsItems(
      });
      itemId = created.id;
     } else {
-     // held is non-null whenever action is "update-draft" — rentOnlyAction only returns it for a
+     // held is non-null whenever action is "update-draft". RentOnlyAction only returns it for a
      // prior row. Photos we've already copied are left alone, same reasoning as the normal path.
      const keepCopies = sameImagesAlreadyCopied((held!.images as string[]) || [], images);
      await updateItemFromSource(held!.id, {
@@ -148,7 +148,7 @@ export async function importProductsAsItems(
  }
  const cents = centsOf(p);
  // A price of zero used to disqualify a piece outright. A vintage seller zeroes the price when
- // something SELLS and keeps it published as her archive — bag-crush has 24 such pieces with 19 to
+ // something SELLS and keeps it published as her archive. Bag-crush has 24 such pieces with 19 to
  // 28 photographs each, and every one was silently dropped. See worthImporting().
  if (!worthImporting({ title, cents, available: p.available })) { stats.skipped++; continue; }
  if (p.available === false && coveredByOrders.has(norm(title))) { stats.skipped++; continue; }
@@ -166,26 +166,26 @@ export async function importProductsAsItems(
  // Store the source URLs now (fast import); the rehost-images cron copies them onto
  // OUR storage in the background so the interactive import doesn't wait on hundreds of
  // image uploads. Durability without the slow import.
- // MAX_ITEM_IMAGES is main's — a deliberate raise from 8 so a seller's fuller galleries survive.
+ // MAX_ITEM_IMAGES is main's. A deliberate raise from 8 so a seller's fuller galleries survive.
  const images = (p.images?.length ? p.images : p.image ? [p.image] : []).slice(0, MAX_ITEM_IMAGES);
  // A re-sync writes the seller's own image URLs back over our copies. Left alone, that undoes the
- // photo copying AND keeps the "copied" marker set — we-thieves lost all 163 of its items that way
+ // photo copying AND keeps the "copied" marker set. We-thieves lost all 163 of its items that way
  // an hour after they were copied. Hand the work back instead. See needsCopyAfterImport.
  const imagesRehosted = !needsCopyAfterImport(images);
  // Sort the unstructured signal (title + description) into brand/era/condition/category/material.
  const inf = inferItemFields(title, p.description);
 
  if (prior) {
-  // The seller edited this item — their version wins, always.
+  // The seller edited this item. Their version wins, always.
   if (prior.origin === "user") { stats.skipped++; continue; }
   // Everything this re-sync would write. Built first so the decision to skip can be made by
-  // comparing it with what we already hold — see updateNeeded. Asking "has the source changed?"
+  // comparing it with what we already hold. See updateNeeded. Asking "has the source changed?"
   // needed a hand-maintained list of fields to fingerprint, and four separate fixes were silently
   // skipped because their field was not on it. A piece coming back from sold and an availability
   // disagreement both simply show up here as a changed `status`, with no special rule needed.
   // Photos we have already copied are the SAME photos, so leave them alone rather than writing the
   // seller's URLs back over our copies. Without this the importer and the copier undo each other on
-  // every run and nothing is ever "unchanged" — blummier reported 155 updated on a run where nothing
+  // every run and nothing is ever "unchanged". Blummier reported 155 updated on a run where nothing
   // had changed. See sameImagesAlreadyCopied.
   const keepCopies = sameImagesAlreadyCopied((prior.images as string[]) || [], images);
   const patch = {
@@ -198,7 +198,7 @@ export async function importProductsAsItems(
    sourcePlatform: p.sourcePlatform ?? null, sourceId: p.sourceId ?? null, sourceUrl: p.sourceUrl ?? null,
   };
   if (!updateNeeded(prior as unknown as Record<string, unknown>, patch as unknown as Record<string, unknown>)) { stats.unchanged++; continue; }
-  // A failed update must not be counted as an update — that's how a broken sync reported success.
+  // A failed update must not be counted as an update. That's how a broken sync reported success.
   try {
    await updateItemFromSource(prior.id, patch);
    stats.updated++;
@@ -210,11 +210,11 @@ export async function importProductsAsItems(
  }
 
  // Never on a piece that carries its own source identity. This guard exists for listings imported
- // before source ids did — with no id to match on, a same-titled product really was the same
+ // before source ids did, with no id to match on, a same-titled product really was the same
  // product coming round again. A product WITH a source id has already been matched on it above
  // (`prior`), so reaching here means the source genuinely lists two different pieces under one
  // name, which is ordinary on one-of-one vintage: Love Again Vintage lists two "Louis Vuitton Mini
- // Papillon Pouch"es, two "Gucci Boat Pochette"s, two "Dior Trotter Pouch"es — different handles,
+ // Papillon Pouch"es, two "Gucci Boat Pochette"s, two "Dior Trotter Pouch"es. Different handles,
  // different photos, different bags. Skipping the second lost four of that store's pieces on
  // import, which is the exact collapse source identity was added to prevent.
  if (isTitleDuplicate({ ...p, name: title }, have)) { stats.skipped++; continue; }
@@ -278,7 +278,7 @@ export async function importProductsAsItems(
    stats.removed = await markItemsMissingFromSource(goneKeys.map((k) => byIdentity.get(k)!.id).filter(Boolean));
   } catch (e) {
    // Reported, not fatal: the import succeeded, but pieces the store has taken down are still
-   // showing as available on VYA — which the seller needs to know about.
+   // showing as available on VYA, which the seller needs to know about.
    stats.warnings.push(`${goneKeys.length} piece${goneKeys.length === 1 ? "" : "s"} your store no longer lists couldn’t be marked sold (${msgOf(e)}).`);
   }
  }
@@ -297,7 +297,7 @@ export type ImportStats = { added: number; updated: number; unchanged: number; s
  * Put imported items INTO the collections their captured pages render.
  *
  * The capture pre-creates a VYA collection per captured `/collections/{handle}` page, and the
- * storefront swaps each captured grid for live VYA inventory — but only for collections that
+ * storefront swaps each captured grid for live VYA inventory, but only for collections that
  * actually contain items. Nothing was ever linking the two, so every collection sat empty and the
  * live-inventory swap silently fell back to the frozen source grid. This is that missing link.
  *
@@ -316,20 +316,20 @@ export async function syncCollectionMembership(
  const { getShopifyCollectionMembership } = await import("./store-import.ts");
 
  // Not caught: an empty collection list reads as "this store has no collections", which silently
- // turns a database blip into "membership sync did nothing" — the failure that left every captured
+ // turns a database blip into "membership sync did nothing". The failure that left every captured
  // collection page falling back to the frozen source grid.
  const cols = await listCollections(seller.id, true);
  if (!cols.length) return { collections: 0, links: 0, warnings: [] };
  const colBySlug = new Map(cols.map((c) => [c.slug, c.id]));
 
  // handle → [collection slugs]. A CONNECTED store already told us each product's collections
- // (adminGetProducts returns collectionHandles), so we use that and skip the crawl entirely —
+ // (adminGetProducts returns collectionHandles), so we use that and skip the crawl entirely,
  // exact, and one API call instead of up to 25 collection listings. Only scrape when we have to.
  let membership = new Map<string, string[]>();
  // Collections we could NOT read from the source on this pass. Their membership below is partial,
- // so anything we already hold for them has to be left alone — see the preserve step in the loop.
+ // so anything we already hold for them has to be left alone. See the preserve step in the loop.
  let unreadSlugs: string[] = [];
- // How much of each collection SHE lists as unavailable — the evidence for whether she keeps sold
+ // How much of each collection SHE lists as unavailable. The evidence for whether she keeps sold
  // pieces there. Empty for a scrape we could not do, which is correctly "we do not know".
  let stockBySlug = new Map<string, { unavailable: number; total: number }>();
  // Collections read to the end without error. Only their EMPTY answers are believed.
@@ -338,7 +338,7 @@ export async function syncCollectionMembership(
  // paged through. Handed back so syncCollectionOrder can use today's order instead of the one the
  // collection page happened to have on crawl day. Only the scrape rung fills it: the CONNECTED
  // rung's collectionHandles arrive grouped by product, in whole-catalogue order, which is not the
- // order of any one collection — so those stores keep the captured fallback.
+ // order of any one collection, so those stores keep the captured fallback.
  let liveOrder: Map<string, string[]> | undefined;
  const fromApi = products.filter((p) => p.sourceId && p.collectionHandles?.length);
  if (fromApi.length) {
@@ -353,7 +353,7 @@ export async function syncCollectionMembership(
    unreadSlugs = read.incomplete;
   } catch {
    // The listing pass failed outright, so we know NOTHING about membership. Falling through to
-   // tags alone (the old behaviour) would then rewrite every item's collections from tags — which
+   // tags alone (the old behaviour) would then rewrite every item's collections from tags, which
    // is how a throttled re-import silently emptied the store's curated collections.
    unreadSlugs = [...colBySlug.keys()];
   }
@@ -362,7 +362,7 @@ export async function syncCollectionMembership(
  // it". One query, and it is also what makes the empty-collection guard below possible.
  const policyWarnings: string[] = [];
  const currentByItem = await listItemCollectionIds(seller.id);
- // Which of the pieces we hold are sold — needed to tell "she cleared this collection out" from
+ // Which of the pieces we hold are sold. Needed to tell "she cleared this collection out" from
  // "nothing in it has sold yet", which look identical from her feed alone.
  // If this read fails we must NOT carry on with an empty set: zero sold pieces would make every
  // collection look like one she had cleared out, and we would hide her archive on the strength of a
@@ -376,7 +376,7 @@ export async function syncCollectionMembership(
  }
  if (!fromApi.length) {
   // See unreadCollectionSlugs(): a scraped collection that reads as empty while we already hold
-  // members for it is a failed read, not an emptied collection. A CONNECTED store is exempt —
+  // members for it is a failed read, not an emptied collection. A CONNECTED store is exempt,
   // its API answer is exact, so an empty collection there really is empty.
   const readCount = new Map<string, number>();
   for (const [, colSlugs] of membership) for (const s of colSlugs) readCount.set(s, (readCount.get(s) ?? 0) + 1);
@@ -390,7 +390,7 @@ export async function syncCollectionMembership(
   }
   unreadSlugs = unreadCollectionSlugs({ readCount, storedCount, unread: unreadSlugs, completed: completedSlugs });
  }
- // Collections the live pass could not reach hold nothing at all — 461 of 2nd Street's 761 on every
+ // Collections the live pass could not reach hold nothing at all. 461 of 2nd Street's 761 on every
  // run. Their pages are already in our capture from the crawl, so fill them from those: no outbound
  // requests, and a stale page one beats an empty collection. Additive only, and they stay marked
  // UNREAD below, so nothing already filed can be removed on a captured page's say-so.
@@ -419,16 +419,16 @@ export async function syncCollectionMembership(
   }
  }
  const unreadIds = new Set(unreadSlugs.map((s) => colBySlug.get(s)).filter(Boolean) as string[]);
- // A collection we have judged unread must not hand over an order either. Belt and braces — an
- // unread collection records no order in the first place — but the two judgements are made in
+ // A collection we have judged unread must not hand over an order either. Belt and braces. An
+ // unread collection records no order in the first place, but the two judgements are made in
  // different places and only one of them knows about the empty-read heuristic above.
  if (liveOrder) for (const s of unreadSlugs) liveOrder.delete(s);
  // Remember which ones we DID read. The serve path needs to tell "never read" from "read, and
- // empty" — without it a collection the seller has emptied keeps showing the pieces that were in
+ // empty", without it a collection the seller has emptied keeps showing the pieces that were in
  // it on capture day. See app/lib/plan-b/collection-contents.ts.
  // WHAT SHE DOES WITH SOLD PIECES, recorded per collection from the pages we just read. Six of
  // eight sellers list sold pieces in their collections; two clear them out, and on those two we
- // were putting the archive back — the whole of the "31 here, 21 on hers" difference the parity
+ // were putting the archive back. The whole of the "31 here, 21 on hers" difference the parity
  // check reported against us. Her decision is observable, so we stop making it for her.
  // See app/lib/collection-sold-policy.ts for why "unknown" is a third answer and not a default.
  if (soldItemIds) {
@@ -461,7 +461,7 @@ export async function syncCollectionMembership(
   await markCollectionsRead(readIds);
  } catch (e) {
   // Said out loud, not swallowed. If this stamp fails the serve path keeps falling back to the
-  // captured grid for these collections — the exact bug this is here to end — and a silent failure
+  // captured grid for these collections, the exact bug this is here to end, and a silent failure
   // would look identical to it working.
   stampWarnings.push(`couldn't record which collections were read (${String((e as Error).message).slice(0, 60)})`);
  }
@@ -482,14 +482,14 @@ export async function syncCollectionMembership(
   if (!item) continue;
 
   const handleSlugs = subject.sourceId ? membership.get(subject.sourceId) || [] : [];
-  // Tags only get a vote on collections we could NOT read this pass — see taggedSlugs.
+  // Tags only get a vote on collections we could NOT read this pass. See taggedSlugs.
   const tagSlugs = taggedSlugs({ tags: subject.tags, known: new Set(colBySlug.keys()), unread: new Set(unreadSlugs) });
   const slugs = [...new Set([...handleSlugs, ...tagSlugs])].filter((s) => colBySlug.has(s));
 
   const ids = slugs.map((s) => colBySlug.get(s)!).filter(Boolean);
   const held = currentByItem.get(item.id) || [];
-  // NO `continue` when the feed places this piece nowhere. That empty answer IS an answer — she has
-  // taken it out of everything we read — and skipping it left the old links standing for ever:
+  // NO `continue` when the feed places this piece nowhere. That empty answer IS an answer. She has
+  // taken it out of everything we read, and skipping it left the old links standing for ever:
   // shop-vintage-charm's "USA" kept all 34 pieces even after the read was believed. What it keeps
   // is its place in collections we could NOT read. See membershipToWrite.
   if (!slugs.length && !held.length) continue; // nothing filed, nothing to say
@@ -499,11 +499,11 @@ export async function syncCollectionMembership(
    slugs.forEach((s) => used.add(s));
    links += finalIds.length;
   } catch (e) {
-   // Counted as a failure rather than a link — otherwise the tally claims work that didn't happen.
+   // Counted as a failure rather than a link. Otherwise the tally claims work that didn't happen.
    failed.push(`“${item.title}” (${msgOf(e)})`);
   }
  }
- // Pieces her store no longer lists at all. The loop above can't reach them — it walks the feed —
+ // Pieces her store no longer lists at all. The loop above can't reach them, it walks the feed,
  // so they are handled here, from the decision the item sweep already recorded on the row.
  const vanished = new Set(items.filter((i) => i.origin !== "user" && i.unavailableReason === reasonForVanished()).map((i) => i.id));
  for (const [id, keep] of unfileVanished({ held: currentByItem, vanished, unread: [...unreadIds] })) {
@@ -519,11 +519,11 @@ export async function syncCollectionMembership(
   ? [`${failed.length} product${failed.length === 1 ? "" : "s"} couldn’t be filed into their collections: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? ` and ${failed.length - 3} more` : ""}.`]
   : [];
  // An unread collection is REPORTED, never silent. Its contents were kept as they were, which is
- // the safe outcome — but "we kept what we had" and "we confirmed this against your store" are
+ // the safe outcome, but "we kept what we had" and "we confirmed this against your store" are
  // different facts, and the seller is entitled to know which one they got.
  if (unreadSlugs.length) {
   warnings.push(
-   `We couldn’t read ${unreadSlugs.length} of your collections from your store this time (${unreadSlugs.slice(0, 3).join(", ")}${unreadSlugs.length > 3 ? ` and ${unreadSlugs.length - 3} more` : ""}) — their contents were left as they were rather than overwritten. Re-run the import to refresh them.`,
+   `We couldn’t read ${unreadSlugs.length} of your collections from your store this time (${unreadSlugs.slice(0, 3).join(", ")}${unreadSlugs.length > 3 ? ` and ${unreadSlugs.length - 3} more` : ""}): their contents were left as they were rather than overwritten. Re-run the import to refresh them.`,
   );
  }
  return { collections: used.size, links, warnings: [...warnings, ...stampWarnings], order: liveOrder };
@@ -535,19 +535,19 @@ export async function syncCollectionMembership(
  * Adopt the SOURCE store's ordering for each collection.
  *
  * Membership alone isn't fidelity: a curated collection has an order the seller chose, and without
- * it their archive page came back sorted by import date — the same 37 pieces, but nobody's first
+ * it their archive page came back sorted by import date. The same 37 pieces, but nobody's first
  * four matched.
  *
- * That order used to be read off the CAPTURED collection page — a photograph of crawl day, frozen
+ * That order used to be read off the CAPTURED collection page. A photograph of crawl day, frozen
  * for good. Which pieces a rail shows, and in what sequence, is the most volatile thing about a
  * shop: bag-crush's "crush-edit" still opened with three sold Guccis and a Dior months after she
  * had put an LV Looping first, and every piece the parity check flagged as missing from that rail
- * was sitting in our catalogue the whole time — we were simply asking for the wrong ones.
+ * was sitting in our catalogue the whole time. We were simply asking for the wrong ones.
  *
  * So the live order wins when we have it. `liveOrder` (collection slug → product handles) comes
  * from syncCollectionMembership, which already pages through /collections/{slug}/products.json IN
  * FEED ORDER and used to throw the order away: zero extra outbound requests. A collection missing
- * from it — a store with no readable feed, a read that failed or came back partial — falls back to
+ * from it, a store with no readable feed, a read that failed or came back partial. Falls back to
  * the captured page, which is still the best answer when nothing better exists.
  *
  * Best-effort per collection: a collection we can order from neither is left untouched.
@@ -591,7 +591,7 @@ export async function syncCollectionOrder(
   if (!fromFeed?.length && !capturePathFor(col.slug)) continue;
   const members = await listCollectionItems(col.id, { manage: true });
   // Live first, and the capture is only loaded when the live feed had nothing to say about this
-  // collection — no point parsing a page whose order we are about to overrule.
+  // collection, no point parsing a page whose order we are about to overrule.
   let plan = plannedCollectionOrder({ live: fromFeed, members });
   if (!plan) plan = plannedCollectionOrder({ captured: await capturedHandles(col.slug), members });
   if (!plan) continue;
@@ -605,7 +605,7 @@ export async function syncCollectionOrder(
 
 /**
  * Convert a store's SYNCED marketplace catalog (the read-only `products` rows from a
- * Shopify/Squarespace/etc. connection) into managed, sellable OS `items` — the self-serve
+ * Shopify/Squarespace/etc. connection) into managed, sellable OS `items`. The self-serve
  * fix for the two-table trap, so a connected store can actually edit/reprice/manage its
  * inventory instead of only browsing it. Re-hosts images (survives leaving the old platform),
  * carries over everything we captured (brand/era/material/condition/measurements/size), and
@@ -615,7 +615,7 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  const { getProductsByStore } = await import("./db");
  const seller = await getSellerBySlug(slug);
  if (!seller) return { added: 0, total: 0 };
- // Uncaught: returning [] on error would report "added 0 of 0" — a successful no-op — when the
+ // Uncaught: returning [] on error would report "added 0 of 0", a successful no-op, when the
  // seller's whole synced catalog simply failed to load.
  const products = await getProductsByStore(slug);
  const existing = await listAvailableItems(seller.id);
@@ -654,7 +654,7 @@ export async function convertCatalogToItems(slug: string): Promise<{ added: numb
  return { added, total: products.length };
 }
 
-/** Find the db/item id behind a captured product page — for its Buy button.
+/** Find the db/item id behind a captured product page, for its Buy button.
  *
  *  `handle` is the SOURCE's own product id (it's the /products/{handle} segment we captured), so
  *  matching on it is exact. Title matching is kept only as a fallback for items imported before
@@ -667,7 +667,7 @@ export async function matchItemId(slug: string, title: string, handle?: string |
   const { listItemsBySource } = await import("./db/inventory.ts");
   // Uncaught deliberately: swallowing here would drop through to the TITLE fallback below, whose
   // substring branch can point a Buy button at a different garment. On one-of-one stock that sells
-  // the wrong piece — far worse than the page failing to render a buy button at all.
+  // the wrong piece: far worse than the page failing to render a buy button at all.
   const imported = await listItemsBySource(seller.id, "captured");
   const exact = imported.find((i) => i.sourceId === handle);
   if (exact) return exact.id;
@@ -676,7 +676,7 @@ export async function matchItemId(slug: string, title: string, handle?: string |
  // Storefront visibility (active + sold), not just active: a vintage store's archive is part of
  // browsing, and this match feeds the SAME identity rewrite for every captured product page,
  // active or not (see plan-b/sqs-product.ts). Scoping it to active-only meant a SOLD piece's own
- // page never got wired to its VYA item at all — the button silently posted the source store's id,
+ // page never got wired to its VYA item at all. The button silently posted the source store's id,
  // which VYA can't resolve, so clicking it did nothing. isSellable() still stops anyone actually
  // buying a sold piece; this only decides whether the page even knows which item it's showing.
  const items = await listStorefrontItems(seller.id);

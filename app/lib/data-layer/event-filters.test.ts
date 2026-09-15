@@ -10,7 +10,7 @@ import {
 } from "./event-filters.ts";
 import { EVENT_FILTERS } from "./config.ts";
 
-// The real config drives the tests — exercises the actual shipped thresholds.
+// The real config drives the tests. Exercises the actual shipped thresholds.
 const CONFIG: EventFilterConfig = EVENT_FILTERS;
 const BURST = { minGapSeconds: 5, maxPerUserProductPerDay: 100 };
 
@@ -20,7 +20,7 @@ const IPHONE =
  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1";
 
 // ── isBotUserAgent ──────────────────────────────────────────────────────────
-test("isBotUserAgent — flags crawlers / automation, spares real browsers", () => {
+test("isBotUserAgent: flags crawlers / automation, spares real browsers", () => {
  const p = CONFIG.botUserAgentPatterns;
  assert.equal(isBotUserAgent("Googlebot/2.1 (+http://www.google.com/bot.html)", p), true);
  assert.equal(isBotUserAgent("facebookexternalhit/1.1", p), true);
@@ -32,14 +32,14 @@ test("isBotUserAgent — flags crawlers / automation, spares real browsers", () 
  assert.equal(isBotUserAgent(IPHONE, p), false);
 });
 
-test("isBotUserAgent — a missing UA is NOT a bot (most tables store none)", () => {
+test("isBotUserAgent: a missing UA is NOT a bot (most tables store none)", () => {
  const p = CONFIG.botUserAgentPatterns;
  assert.equal(isBotUserAgent(null, p), false);
  assert.equal(isBotUserAgent(undefined, p), false);
  assert.equal(isBotUserAgent("", p), false);
 });
 
-test("isBotUserAgent — custom pattern list is honored", () => {
+test("isBotUserAgent: custom pattern list is honored", () => {
  assert.equal(isBotUserAgent("MyScraper/1.0", ["myscraper"]), true);
  assert.equal(isBotUserAgent(CHROME, ["myscraper"]), false);
 });
@@ -50,7 +50,7 @@ const internalOpts = {
  internalEmailDomains: CONFIG.internalEmailDomains,
 };
 
-test("isInternalOrSeller — internal emails + domains excluded, consumers kept", () => {
+test("isInternalOrSeller: internal emails + domains excluded, consumers kept", () => {
  assert.equal(isInternalOrSeller("helster@me.com", internalOpts), true); // configured internal
  assert.equal(isInternalOrSeller("anyone@vyaplatform.com", internalOpts), true); // internal domain
  assert.equal(isInternalOrSeller("ANYONE@VYAPLATFORM.COM", internalOpts), true); // case-insensitive
@@ -59,7 +59,7 @@ test("isInternalOrSeller — internal emails + domains excluded, consumers kept"
  assert.equal(isInternalOrSeller("", internalOpts), false);
 });
 
-test("isInternalOrSeller — seller accounts excluded via injected set", () => {
+test("isInternalOrSeller: seller accounts excluded via injected set", () => {
  const sellerEmails = new Set(["kscarrone@gmail.com"]);
  assert.equal(isInternalOrSeller("KScarrone@gmail.com", { ...internalOpts, sellerEmails }), true);
  assert.equal(isInternalOrSeller("shopper@gmail.com", { ...internalOpts, sellerEmails }), false);
@@ -68,7 +68,7 @@ test("isInternalOrSeller — seller accounts excluded via injected set", () => {
 // ── markBursts ──────────────────────────────────────────────────────────────
 const s = (n: number) => n * 1000; // seconds → ms helper
 
-test("markBursts — debounces rapid same user·product·type repeats", () => {
+test("markBursts. Debounces rapid same user·product·type repeats", () => {
  const evs = [
  { userId: "u1", productId: 7, eventType: "view", tsMs: s(0) },
  { userId: "u1", productId: 7, eventType: "view", tsMs: s(2) }, // 2s later → dropped (<5s)
@@ -78,7 +78,7 @@ test("markBursts — debounces rapid same user·product·type repeats", () => {
  assert.deepEqual(markBursts(evs, BURST), [true, false, false, true]);
 });
 
-test("markBursts — caps per user·product·type per UTC day", () => {
+test("markBursts. Caps per user·product·type per UTC day", () => {
  const evs = Array.from({ length: 5 }, (_, i) => ({
  userId: "u1",
  productId: 7,
@@ -89,7 +89,7 @@ test("markBursts — caps per user·product·type per UTC day", () => {
  assert.deepEqual(keep, [true, true, true, false, false]);
 });
 
-test("markBursts — different products / types / users never merge", () => {
+test("markBursts. Different products / types / users never merge", () => {
  const evs = [
  { userId: "u1", productId: 7, eventType: "view", tsMs: s(0) },
  { userId: "u1", productId: 8, eventType: "view", tsMs: s(1) }, // diff product → kept
@@ -99,7 +99,7 @@ test("markBursts — different products / types / users never merge", () => {
  assert.deepEqual(markBursts(evs, BURST), [true, true, true, true]);
 });
 
-test("markBursts — anonymous (null user) events are always kept", () => {
+test("markBursts. Anonymous (null user) events are always kept", () => {
  const evs = [
  { userId: null, productId: 7, eventType: "view", tsMs: s(0) },
  { userId: null, productId: 7, eventType: "view", tsMs: s(1) },
@@ -125,7 +125,7 @@ function ev(p: Partial<FilterableEvent>): FilterableEvent {
  };
 }
 
-test("partitionEvents — drops bots, internal/seller, bursts; counts each reason", () => {
+test("partitionEvents. Drops bots, internal/seller, bursts; counts each reason", () => {
  const sellerEmails = new Set(["seller@store.com"]);
  const events: FilterableEvent[] = [
  ev({ tsMs: s(0) }), // keep (clean consumer)
@@ -144,14 +144,14 @@ test("partitionEvents — drops bots, internal/seller, bursts; counts each reaso
  assert.equal(kept[0].tsMs, s(0));
 });
 
-test("partitionEvents — skipBurst keeps simultaneous order line items", () => {
+test("partitionEvents. SkipBurst keeps simultaneous order line items", () => {
  // Two line items of the same order: same user, null product, same ts.
  const orderItems: FilterableEvent[] = [
  ev({ productId: null, eventType: "order_item", tsMs: s(0), email: "buyer@gmail.com" }),
  ev({ productId: null, eventType: "order_item", tsMs: s(0), email: "buyer@gmail.com" }),
  ];
  const withBurst = partitionEvents(orderItems, { config: CONFIG });
- assert.equal(withBurst.kept.length, 1); // burst collapses them — wrong for orders
+ assert.equal(withBurst.kept.length, 1); // burst collapses them: wrong for orders
  const skipped = partitionEvents(orderItems, { config: CONFIG, skipBurst: true });
  assert.equal(skipped.kept.length, 2); // both kept
  assert.equal(skipped.stats.burst, 0);

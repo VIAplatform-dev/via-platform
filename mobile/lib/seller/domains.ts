@@ -22,7 +22,7 @@ export const REGISTRANT_FIELDS: { key: keyof Registrant; label: string; hint?: s
   { key: "city", label: "City" },
   { key: "state", label: "State / county" },
   { key: "zip", label: "Postcode" },
-  { key: "country", label: "Country", hint: "Two letters — US, GB, FR." },
+  { key: "country", label: "Country", hint: "Two letters. US, GB, FR." },
 ];
 
 /**
@@ -35,7 +35,7 @@ export function missingRegistrantFields(r: Registrant): string[] {
   return REGISTRANT_FIELDS.filter((f) => !String(r[f.key] ?? "").trim()).map((f) => f.label);
 }
 
-/** "Add your first name and postcode." — or null when nothing is missing. */
+/** "Add your first name and postcode.", or null when nothing is missing. */
 export function describeMissing(r: Registrant): string | null {
   const missing = missingRegistrantFields(r);
   if (!missing.length) return null;
@@ -50,7 +50,7 @@ export function describeMissing(r: Registrant): string | null {
 /**
  * What she types, turned into something worth searching.
  *
- * A registrar wants a bare label — she may type "My Brand", "mybrand.com", or a whole URL. All three
+ * A registrar wants a bare label. She may type "My Brand", "mybrand.com", or a whole URL. All three
  * mean the same thing, and searching the raw string returns nothing for two of them.
  */
 export function searchTermFrom(v: string | null | undefined): string {
@@ -68,7 +68,7 @@ export function searchTermFrom(v: string | null | undefined): string {
 
 const SYMBOLS: Record<string, string> = { USD: "$", GBP: "£", EUR: "€" };
 
-/** "$12/year", or "Taken" — never a bare number with no unit, which reads as a one-off price. */
+/** "$12/year", or "Taken", never a bare number with no unit, which reads as a one-off price. */
 export function priceLine(o: DomainOption, currency = "USD"): string {
   if (!o.available) return "Taken";
   if (o.priceCents == null) return "Price unavailable";

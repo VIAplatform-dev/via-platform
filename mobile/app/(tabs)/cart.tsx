@@ -12,7 +12,7 @@ import { colors, eyebrow, fonts, spacing } from "../../lib/theme";
 
 // Your Bag.
 //
-// VYA never takes the money — every piece belongs to a store that is its own merchant with its own
+// VYA never takes the money. Every piece belongs to a store that is its own merchant with its own
 // checkout. So a bag spanning three stores is three payments, and the screen has to be honest about
 // that BEFORE anyone starts: each store gets its own subtotal and its own Checkout button, and the
 // total across all of them is stated at the bottom so nobody is surprised by the sum.

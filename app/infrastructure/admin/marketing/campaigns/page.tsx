@@ -31,7 +31,7 @@ export default function CampaignsPage() {
  const r = await fetch("/api/store/campaign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, body: msg, link, test }) });
  const d = await r.json();
  if (!r.ok) setCampMsg({ text: d.error || "Couldn’t send.", tone: "err" });
- else if (test) setCampMsg({ text: `Test sent to ${d.sentTo} — check your inbox.`, tone: "ok" });
+ else if (test) setCampMsg({ text: `Test sent to ${d.sentTo}: check your inbox.`, tone: "ok" });
  else setCampMsg({ text: `Sent to ${d.sent} customer${d.sent === 1 ? "" : "s"}${d.failed ? ` (${d.failed} failed)` : ""}.`, tone: "ok" });
  } catch { setCampMsg({ text: "Couldn’t send.", tone: "err" }); }
  setSending(false);
@@ -42,7 +42,7 @@ export default function CampaignsPage() {
  <AdminHeader eyebrow="Store · Marketing" title="Campaigns" subtitle="Write an email, see how it will look, and send it to your customers from your store’s address." />
 
  <TechCard className="overflow-hidden">
- {/* Who it's from / who it's going to — the context you want before you write a word. */}
+ {/* Who it's from / who it's going to. The context you want before you write a word. */}
  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 bg-stone-50/60 px-5 py-3">
  <div className="min-w-0">
  <p className="text-[13px] font-semibold text-stone-900">New email</p>
@@ -79,7 +79,7 @@ export default function CampaignsPage() {
  </Field>
  </div>
 
- {/* Send bar — a distinct final step, not buttons floating in the compose area. */}
+ {/* Send bar: a distinct final step, not buttons floating in the compose area. */}
  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-100 bg-stone-50/60 px-5 py-3.5">
  <div className="flex items-center gap-2 text-[12px]">
  {campMsg ? (
@@ -88,7 +88,7 @@ export default function CampaignsPage() {
  </span>
  ) : (
  <span className="text-stone-400">
- {camp?.allowance?.label || "Send a test to yourself first — links are tagged so opens & clicks show up in Analytics."}
+ {camp?.allowance?.label || "Send a test to yourself first. Links are tagged so opens & clicks show up in Analytics."}
 </span>
  )}
  </div>

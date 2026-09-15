@@ -44,7 +44,7 @@ test("a message falls back gracefully when the buyer or the piece is unknown", (
  assert.equal(messagePush({ buyerName: null, itemTitle: null, message: "hi", conversationId: 1, source: "marketplace" }).title, "A buyer messaged you");
 });
 
-test("the body is the first 140 characters — a lock screen is not an inbox", () => {
+test("the body is the first 140 characters. A lock screen is not an inbox", () => {
  const long = "x".repeat(300);
  const p = messagePush({ buyerName: "A", itemTitle: "B", message: long, conversationId: 1, source: "storefront" });
  assert.equal(p.body.length, 141);

@@ -19,7 +19,7 @@ export default function ConsignorsPage() {
  const [err, setErr] = useState<string | null>(null);
  const [copiedId, setCopiedId] = useState<number | null>(null);
 
- // Migrate from another consignment platform (ConsignCloud/SimpleConsign/etc.) — paste or upload
+ // Migrate from another consignment platform (ConsignCloud/SimpleConsign/etc.): paste or upload
  // their consignor export; balances come over as a stated opening figure, never a replay of sales.
  const [imp, setImp] = useState({ csv: "", source: "" });
  const [importing, setImporting] = useState(false);
@@ -48,7 +48,7 @@ export default function ConsignorsPage() {
  reload();
  }
 
- // Consignors connect their own bank in the consignor portal (Stripe Express, /api/consignor/connect) —
+ // Consignors connect their own bank in the consignor portal (Stripe Express, /api/consignor/connect),
  // the store never touches bank details. This copies the portal link so the store can nudge someone
  // who hasn't set up direct deposit yet.
  function copySetupLink(id: number) {
@@ -125,7 +125,7 @@ export default function ConsignorsPage() {
 
  <TechCard id="import" className="mt-4 scroll-mt-6 p-4">
  <SectionLabel className="mb-1">Switching from another consignment tool?</SectionLabel>
- <p className="mb-3 text-[12px] text-stone-500">Move your consignor book over from <strong>ConsignCloud, SimpleConsign, Ricochet</strong>, or a spreadsheet — export your consignors there and drop the CSV here. (This is just your consignor list + balances, not your store or products.) We map the columns automatically. Balances come over as a stated opening figure — we never replay old sales, so nothing gets double-counted or double-paid.</p>
+ <p className="mb-3 text-[12px] text-stone-500">Move your consignor book over from <strong>ConsignCloud, SimpleConsign, Ricochet</strong>, or a spreadsheet. Export your consignors there and drop the CSV here. (This is just your consignor list + balances, not your store or products.) We map the columns automatically. Balances come over as a stated opening figure. We never replay old sales, so nothing gets double-counted or double-paid.</p>
  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
  <div>
  <label className={label}>Upload CSV</label>
@@ -166,7 +166,7 @@ export default function ConsignorsPage() {
  <div className="flex items-start justify-between gap-3">
  <div className="min-w-0">
  <p className="font-medium text-stone-900">{c.name}</p>
- <p className="text-[12px] text-stone-400 [overflow-wrap:anywhere]">{[c.email, c.phone].filter(Boolean).join(" · ") || "—"}</p>
+ <p className="text-[12px] text-stone-400 [overflow-wrap:anywhere]">{[c.email, c.phone].filter(Boolean).join(" · ") || "-"}</p>
  </div>
  <div className="shrink-0 text-right">
  <p className="font-medium tabular-nums text-stone-900">{money(c.balanceCents)}</p>
@@ -211,7 +211,7 @@ export default function ConsignorsPage() {
  <tr key={c.id} className="transition hover:bg-stone-50/70">
  <TD className="px-4">
  <div className="font-medium text-stone-900">{c.name}</div>
- <div className="text-[12px] text-stone-400">{[c.email, c.phone].filter(Boolean).join(" · ") || "—"}</div>
+ <div className="text-[12px] text-stone-400">{[c.email, c.phone].filter(Boolean).join(" · ") || "-"}</div>
  </TD>
  <TD className="px-4">
  <input

@@ -4,16 +4,16 @@ import type { CartLine, Product } from "./types";
 
 // The bag.
 //
-// IT LIVES ON THE DEVICE, and that is not a shortcut. VYA does not sell anything itself — each
+// IT LIVES ON THE DEVICE, and that is not a shortcut. VYA does not sell anything itself. Each
 // store is its own merchant with its own checkout. There is no server-side cart to sync to, because
 // there is no single basket to pay for: a bag holding pieces from three stores becomes three
 // checkouts. The app's job is to hold the list until the person is ready, then walk them through
 // paying each store in turn.
 //
 // That is what the shipped app told people, in as many words:
-//   "Each store is a separate seller, so you'll pay store-by-store — we'll walk you through them."
+//   "Each store is a separate seller, so you'll pay store-by-store. We'll walk you through them."
 //
-// Persisted so closing the app doesn't empty the bag — the single most annoying thing a shopping
+// Persisted so closing the app doesn't empty the bag. The single most annoying thing a shopping
 // app can do.
 
 const KEY = "vya.cart.v1";
@@ -42,7 +42,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const raw = await AsyncStorage.getItem(KEY);
         if (raw) setLines(JSON.parse(raw) as CartLine[]);
       } catch {
-        /* allow-swallow: a corrupt bag is not worth an error screen — start empty and move on. */
+        /* allow-swallow: a corrupt bag is not worth an error screen. Start empty and move on. */
       } finally {
         setHydrated(true);
       }
@@ -59,7 +59,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const has = useCallback((productId: number) => lines.some((l) => l.productId === productId), [lines]);
 
   const add = useCallback((p: Product) => {
-    // Every piece is one-of-one vintage — there are no quantities, and adding twice is a mistake
+    // Every piece is one-of-one vintage. There are no quantities, and adding twice is a mistake
     // rather than an order for two. The screen says "This piece is already in your bag."
     let added = false;
     setLines((prev) => {

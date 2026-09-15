@@ -27,7 +27,7 @@ const ICONS: Record<string, React.ComponentType<{ size?: number; className?: str
  */
 function useSettingsGroups() {
  const [isVyaOwner, setIsVyaOwner] = useState(false);
- // Who this is. The same call already ran for the owner check — it simply threw the identity away.
+ // Who this is. The same call already ran for the owner check. It simply threw the identity away.
  const [me, setMe] = useState<{ email?: string | null; slug?: string | null } | null>(null);
  useEffect(() => {
   /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
@@ -50,8 +50,8 @@ export default function SettingsIndex() {
 
    {/* WHICH ACCOUNT THIS IS.
        
-       Nowhere in the workspace said which address you were signed in with. With two accounts — a
-       personal one and the shop's — that is the first thing you need when a screen is missing
+       Nowhere in the workspace said which address you were signed in with. With two accounts. A
+       personal one and the shop's. That is the first thing you need when a screen is missing
        something, and the only way to check was to sign out and watch which address the link went to. */}
    {me?.email && (
     <TechCard className="mb-6 flex items-center gap-3.5 px-5 py-4">

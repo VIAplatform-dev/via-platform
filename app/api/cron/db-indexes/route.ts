@@ -8,7 +8,7 @@ import { neon } from "@neondatabase/serverless";
 //   curl -H "authorization: Bearer $CRON_SECRET" https://vyaplatform.com/api/cron/db-indexes
 // CREATE INDEX IF NOT EXISTS is safe to re-run. Each index runs independently so one failure
 // (e.g. a column that doesn't exist on this DB) is reported without blocking the rest.
-// Run it while the tables are still small — plain CREATE INDEX briefly locks writes on big tables.
+// Run it while the tables are still small. Plain CREATE INDEX briefly locks writes on big tables.
 export const maxDuration = 300;
 
 function db() {
@@ -35,17 +35,17 @@ export async function GET(request: Request) {
  }
  };
 
- // clicks — the hottest append table; product_id/store_slug are filtered on every browse
+ // clicks. The hottest append table; product_id/store_slug are filtered on every browse
  // and dashboard load, and getNewArrivals GROUPs the whole table by (store_slug, product_name).
  await add("clicks_product_id", () => sql`CREATE INDEX IF NOT EXISTS idx_clicks_product_id ON clicks(product_id)`);
  await add("clicks_store_slug", () => sql`CREATE INDEX IF NOT EXISTS idx_clicks_store_slug ON clicks(store_slug)`);
  await add("clicks_store_product_name", () => sql`CREATE INDEX IF NOT EXISTS idx_clicks_store_product_name ON clicks(store_slug, product_name)`);
 
- // products — brand GROUP BY (brand pages) and product_type LIKE (search) seq-scan today.
+ // products. Brand GROUP BY (brand pages) and product_type LIKE (search) seq-scan today.
  await add("products_brand", () => sql`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`);
  await add("products_product_type_lower", () => sql`CREATE INDEX IF NOT EXISTS idx_products_product_type_lower ON products(LOWER(product_type))`);
 
- // events — the ETL aggregate() and per-seller market-insights scan by these composites.
+ // events. The ETL aggregate() and per-seller market-insights scan by these composites.
  await add("events_store_ts", () => sql`CREATE INDEX IF NOT EXISTS idx_events_store_ts ON events(store_slug, ts)`);
  await add("events_type_ts", () => sql`CREATE INDEX IF NOT EXISTS idx_events_type_ts ON events(event_type, ts)`);
 
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
  // conversions.items JSONB is unnested in ~8 aggregations with no GIN index.
  await add("conversions_items_gin", () => sql`CREATE INDEX IF NOT EXISTS idx_conversions_items_gin ON conversions USING GIN (items)`);
 
- // item_collections — "items in a collection" filters collection_id alone (PK is (item_id, collection_id)).
+ // item_collections. "items in a collection" filters collection_id alone (PK is (item_id, collection_id)).
  await add("item_collections_collection", () => sql`CREATE INDEX IF NOT EXISTS idx_item_collections_collection ON item_collections(collection_id)`);
 
  const created = results.filter((r) => r.ok).length;

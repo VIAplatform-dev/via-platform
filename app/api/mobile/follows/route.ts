@@ -3,7 +3,7 @@ import { setFollows, getFollows } from "@/app/lib/store-follows-db";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/mobile/follows?deviceId=... — the device's followed store slugs. */
+/** GET /api/mobile/follows?deviceId=... the device's followed store slugs. */
 export async function GET(request: Request) {
  const { searchParams } = new URL(request.url);
  const deviceId = searchParams.get("deviceId");
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
  }
 }
 
-/** POST /api/mobile/follows — replace a device's followed stores.
+/** POST /api/mobile/follows. Replace a device's followed stores.
  * Body: { deviceId, pushToken?, stores: string[] }. The push token lets the
  * notify-follows cron alert this device when a followed store drops new arrivals. */
 export async function POST(request: Request) {

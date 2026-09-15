@@ -3,6 +3,7 @@ import { stores, convertCurrencyToUSD } from "@/app/lib/stores";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { neon } from "@neondatabase/serverless";
 import { getDisplayNameOverride } from "@/app/lib/store-profile-db";
+import { storeCurrency } from "@/app/lib/store-currency-db";
 
 function getDatabaseUrl() {
  const url = process.env.DATABASE_URL;
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ error: "Not a registered store partner" }, { status: 403 });
  }
 
- // Admin test account — return synthetic store data
+ // Admin test account: return synthetic store data
  if (storeSlug === "via-admin") {
  return NextResponse.json({
  storeSlug: "via-admin",
@@ -35,26 +36,32 @@ export async function GET(request: NextRequest) {
  });
  }
 
+ // Her currency, from her own choice or her ship-from country. NOT the hardcoded "USD" that both
+ // branches below used to return: `stores` is the original partner array and every store that
+ // signed up since falls through it, so every one of them printed dollars whatever address it had
+ // saved. See store-currency.ts.
+ const currency = await storeCurrency(storeSlug);
+
  const store = stores.find((s) => s.slug === storeSlug);
  if (!store) {
- // Store is in storeContactEmails but not yet fully onboarded — return a minimal portal.
+ // Store is in storeContactEmails but not yet fully onboarded. Return a minimal portal.
  //
  // The name comes from the sellers row, not from the slug. `stores` is a hardcoded array of the
  // original partner shops; every store that signed up since is absent from it and fell through to
  // this branch, where the name WAS the slug. So a seller who set her name in Settings was greeted
- // by her URL — "Good afternoon, gianna-marie-raucher" — and nothing she typed ever changed it.
+ // by her URL, "Good afternoon, gianna-marie-raucher", and nothing she typed ever changed it.
  const named = await neon(getDatabaseUrl())`SELECT name FROM sellers WHERE slug = ${storeSlug} LIMIT 1`
   .then((r) => (r[0]?.name as string | undefined) || null)
   .catch(() => null);
  // What she renamed the shop to, if she did. Settings → Store details writes this override and
  // this route never read it, so a rename showed on her storefront and nowhere in her own
- // workspace — the greeting kept using the name from before.
+ // workspace: the greeting kept using the name from before.
  const renamed = await getDisplayNameOverride(storeSlug).catch(() => null);
  return NextResponse.json({
  storeSlug,
  storeName: renamed || named || storeSlug,
  location: "",
- currency: "USD",
+ currency,
  website: "",
  logo: "",
  logoBg: "#FFFDF8",
@@ -106,7 +113,7 @@ export async function GET(request: NextRequest) {
  `,
  ]);
 
- // Every figure a store sees is in USD — non-US stores' prices are converted from
+ // Every figure a store sees is in USD. Non-US stores' prices are converted from
  // their own stored currency (a no-op for the USD prices we sync). Mirrors the way
  // conversions are always stored/shown in USD.
  const toUsd = (r: Record<string, unknown>) =>
@@ -121,10 +128,10 @@ export async function GET(request: NextRequest) {
  favoriteCount: Number(r.favorite_count),
  }));
  } catch {
- // Non-fatal — dashboard still loads without these figures
+ // Non-fatal: dashboard still loads without these figures
  }
 
- // Her own name for her shop beats the one VYA typed at onboarding — the same order
+ // Her own name for her shop beats the one VYA typed at onboarding. The same order
  // getStoreProfile resolves (override → static → slug), so the workspace, the app and the
  // storefront finally agree on what this shop is called.
  const renamedStore = await getDisplayNameOverride(storeSlug).catch(() => null);
@@ -132,7 +139,7 @@ export async function GET(request: NextRequest) {
  storeSlug: store.slug,
  storeName: renamedStore || store.name,
  location: store.location,
- currency: store.currency,
+ currency,
  website: store.website,
  logo: store.logo,
  logoBg: store.logoBg,

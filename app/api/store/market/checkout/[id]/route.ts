@@ -9,7 +9,7 @@ import { reconcileCheckout } from "@/app/lib/market/reconcile";
 
 export const dynamic = "force-dynamic";
 
-// GET — the checkout's server state (the Checkout screen polls this). After 10 s of waiting it asks
+// GET: the checkout's server state (the Checkout screen polls this). After 10 s of waiting it asks
 // Stripe directly, so a delayed webhook never stalls the seller; expires it lazily if overdue.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
  if (!c || c.sellerId !== acting.seller.id) return NextResponse.json({ error: "Not found" }, { status: 404 });
  if (c.status === "awaiting_payment") {
  // Self-heal: a QR checkout that somehow has no Session (a crash between reserve and create) gets one
- // now — idempotent on the checkout id, so a racing poll can't mint two.
+ // now: idempotent on the checkout id, so a racing poll can't mint two.
  if (c.tender === "qr" && !c.payUrl) {
  const acct = await sellerAccount(acting.slug);
  if (acct?.chargesEnabled) {

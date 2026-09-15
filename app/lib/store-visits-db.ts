@@ -31,7 +31,7 @@ async function ensureTable() {
  await sql`CREATE INDEX IF NOT EXISTS idx_store_visits_store_ts ON store_visits (store_slug, timestamp)`;
  // Self-healing columns, added after the table shipped. Device comes from the
  // user-agent; the geo fields come from Vercel's edge headers, which are present
- // in production and absent locally — hence all four are nullable and every read
+ // in production and absent locally. Hence all four are nullable and every read
  // treats NULL as "unknown" rather than dropping the visit.
  await sql`ALTER TABLE store_visits ADD COLUMN IF NOT EXISTS device_type TEXT`;
  await sql`ALTER TABLE store_visits ADD COLUMN IF NOT EXISTS country TEXT`;
@@ -41,7 +41,7 @@ async function ensureTable() {
 }
 
 /**
- * Coarse device class from a user-agent. Three buckets is all a seller acts on —
+ * Coarse device class from a user-agent. Three buckets is all a seller acts on,
  * "most of my traffic is phones" changes how you shoot and crop, nothing finer does.
  * Tablet is checked before mobile because iPads advertise both.
  */
@@ -55,7 +55,7 @@ export function classifyDevice(ua: string | null | undefined): "mobile" | "table
 
 export type GeoHint = { country: string | null; region: string | null; city: string | null };
 
-/** Vercel's edge geo headers. Empty everywhere else, which is fine — the fields are nullable. */
+/** Vercel's edge geo headers. Empty everywhere else, which is fine. The fields are nullable. */
 export function geoFromHeaders(h: Headers): GeoHint {
  const get = (k: string) => {
   const v = h.get(k);
@@ -86,7 +86,7 @@ export async function recordStoreVisit(v: {
 }
 
 const SESSION_COOKIE = "via_sess";
-const SESSION_TTL_SECONDS = 1800; // 30 min — a returning visitor after this counts as a new session
+const SESSION_TTL_SECONDS = 1800; // 30 min: a returning visitor after this counts as a new session
 
 /**
  * Record the entry source for a storefront request, once per session. Returns a
@@ -123,7 +123,7 @@ export async function captureStorefrontEntry(req: NextRequest, slug: string): Pr
 
 /**
  * Client-beacon variant of the above. The block-builder storefront is server-rendered, so a small
- * client tracker POSTs the REAL external referrer (document.referrer) — a client beacon's own Referer
+ * client tracker POSTs the REAL external referrer (document.referrer): a client beacon's own Referer
  * would just be the storefront page. Records the entry source once per session; returns a fresh
  * sessionId for the caller to set as `via_sess`, or null if the session already exists.
  */
@@ -147,7 +147,7 @@ export async function captureStorefrontEntryClient(input: {
 }
 
 // ── Page-level analytics: every page view per store (NOT session-gated), so a store can see what
-// pages/products shoppers actually browse — clean, per-store data across marketplace + storefront.
+// pages/products shoppers actually browse. Clean, per-store data across marketplace + storefront.
 let pvEnsured = false;
 async function ensurePageviews() {
  if (pvEnsured) return;

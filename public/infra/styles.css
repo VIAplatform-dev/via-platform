@@ -65,7 +65,7 @@
   .btn-glass{background:rgba(255,255,255,0.14);color:#fff;backdrop-filter:blur(6px)}
   .btn-glass:hover{background:rgba(255,255,255,0.24)}
   .btn-lg{padding:13px 22px;font-size:15px}
-  /* The ☰ is a text glyph, so with no box of its own it was a ~19x27px tap target — and it is the
+  /* The ☰ is a text glyph, so with no box of its own it was a ~19x27px tap target, and it is the
      ONLY way into the menu on a phone, across all nine getvya.ai marketing pages. Sized to 44 so it
      can actually be hit; `display:none` still hides it above the breakpoint (see the media query
      further down, which flips it to `flex`). */
@@ -532,7 +532,7 @@
     .nav.theme-dark .nav-links a{border-bottom:1px solid var(--line-d2)}
     .nav.theme-light .nav-links a{border-bottom:1px solid var(--line-2)}
     .nav-links a:last-child{border-bottom:0}
-    /* Footer links were a 22px line box with a 13px margin below — a 35px pitch made of mostly
+    /* Footer links were a 22px line box with a 13px margin below. A 35px pitch made of mostly
        dead space. Turning the margin into padding grows each target to 44px while the column
        barely gets taller, and leaves the desktop footer exactly as it was. */
     .foot-col a{padding:12px 0;margin-bottom:0}
@@ -1293,7 +1293,7 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 .feat-row.in .mk-ltable>.mk-lt-row:nth-child(6){animation-delay:.49s}
 @keyframes ltRow{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.feat-row.in .mk-ltable>.mk-lt-row{animation:none}}
-/* Mobile: Recently Listed table — tighten columns so badges don't overflow */
+/* Mobile: Recently Listed table: tighten columns so badges don't overflow */
 @media(max-width:480px){
  .mk-lt-head,.mk-lt-row{grid-template-columns:minmax(0,1fr) 46px minmax(0,auto) minmax(0,auto);gap:8px}
  .mk-lt-chips{flex-wrap:wrap}
@@ -1361,8 +1361,8 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 @keyframes psFill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @media (prefers-reduced-motion:reduce){.feat-row.in .ps-card,.feat-row.in .ps-card .mk-pill,.feat-row.in .ps-pay .mk-tick,.feat-row.in .ps-step.done,.feat-row.in .ps-line.done{animation:none}}
 
-/* Storefront import "takeover" — the demo box becomes her ACTUAL site, cloned live into a sandboxed
-   iframe (/api/public/clone-homepage — the same raw-HTML mirror the backend produces at /site/{slug}). */
+/* Storefront import "takeover": the demo box becomes her ACTUAL site, cloned live into a sandboxed
+   iframe (/api/public/clone-homepage: the same raw-HTML mirror the backend produces at /site/{slug}). */
 #vsTakeover{position:absolute;inset:0;z-index:6;display:none;flex-direction:column;background:#0b0c0f;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,0.09);box-shadow:0 20px 60px rgba(0,0,0,0.45)}
 #vsTakeover.on{display:flex}
 .vs-tk-bar{position:relative;z-index:3;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:rgba(10,11,14,0.96);border-bottom:1px solid rgba(255,255,255,0.08)}
@@ -1379,7 +1379,7 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 .vs-way{display:flex;align-items:center;gap:10px;font:400 12px var(--g);color:rgba(255,255,255,0.72)}
 .vs-way b{color:#f2f3f5;font-weight:600}
 .vs-way-i{width:26px;height:26px;flex:none;border-radius:8px;background:rgba(255,255,255,0.06);display:grid;place-items:center;color:#33d18f;font-size:13px}
-/* Storefront demo — two labeled mini-devices side by side: her store + the Canva builder (1:1). */
+/* Storefront demo: two labeled mini-devices side by side: her store + the Canva builder (1:1). */
 .vs-duo{align-self:stretch;width:100%;height:100%;min-height:470px;display:flex;gap:20px;align-items:stretch;justify-content:center}
 .vs-duo-col{flex:1;min-width:0;display:flex;flex-direction:column;gap:11px}
 .vs-duo-label{display:flex;align-items:center;gap:8px;font:600 12.5px var(--g);color:#f2f3f5;padding-left:2px}
@@ -1421,7 +1421,7 @@ a.sf-card:hover{transform:translateY(-6px);box-shadow:0 34px 66px rgba(0,0,0,0.6
 .vb-fc.on{border-color:#5D0F17}
 .vb-fc b{display:block;font-size:13px;color:#2a2620}
 .vb-fc span{font:500 8.5px var(--g);color:#a19a90}
-/* Storefront builder duo — stack vertically on narrow screens so each mockup is readable */
+/* Storefront builder duo: stack vertically on narrow screens so each mockup is readable */
 @media(max-width:560px){
  .vs-duo{flex-direction:column;gap:14px;min-height:auto;height:auto}
  .vs-duo-col{flex:none}

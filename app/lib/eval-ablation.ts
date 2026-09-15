@@ -7,16 +7,16 @@ import { getCrossStoreSimilar, resolveSpecificPiece } from "./intake-memory-db";
 import { gate } from "./concurrency";
 
 // ───────────────────────────────────────────────────────────────────────────
-// The ablation — does the learning loop actually DO anything?
+// The ablation: does the learning loop actually DO anything?
 //
 // Runs the SAME items through the model TWICE: once BLIND (no memory) and once WITH
 // the cross-store memory (visually-similar confirmed pieces + the specific-piece
 // reference index) fed in as hints. If memory works, the "with memory" arm scores
-// higher — a real number, not a hope. Neither arm is given the brand (so brand lift
+// higher: a real number, not a hope. Neither arm is given the brand (so brand lift
 // is measurable) and reverse-image is held out of BOTH (so the delta is memory ALONE).
 //
 // Leak guard: retrieval drops a near-identical self-match (an item can't learn from a
-// copy of itself). And we report how often memory even PRODUCED a hint — because at
+// copy of itself). And we report how often memory even PRODUCED a hint, because at
 // pilot volume the corpus is near-empty and the honest result is "no lift yet, nothing
 // to retrieve". It becomes meaningful once the reference index is built + real listings flow.
 // ───────────────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ export async function runAblation(opts: { sample: number; goldenOnly?: boolean }
  rows = (await sql`SELECT image_urls, brand, era, title FROM training_examples WHERE brand IS NOT NULL AND brand <> '' AND jsonb_array_length(image_urls) > 0 ORDER BY random() LIMIT ${sample}`.catch(() => [])) as any[];
  }
 
- const g = gate("ablation", 2); // two drafts per item — keep concurrency low
+ const g = gate("ablation", 2); // two drafts per item. Keep concurrency low
  let memoryHits = 0;
  const scored = await Promise.all(rows.map((r) => g.run(async () => {
  const imageUrl = Array.isArray(r.image_urls) ? r.image_urls[0] : null;
@@ -80,7 +80,7 @@ export async function runAblation(opts: { sample: number; goldenOnly?: boolean }
  resolveSpecificPiece(embedding, null, { excludeNearIdentical: true }).catch(() => null),
  ]);
  const specificHint = specific
- ? `\n\nLIKELY THE SAME PIECE — a confirmed VYA/catalog reference matches this photo very closely (${Math.round(specific.similarity * 100)}% visual match): "${specific.model}"${specific.era ? ` (${specific.era})` : ""}. Treat this as a strong identification of the specific model/line. Never mention this reference in the copy.`
+ ? `\n\nLIKELY THE SAME PIECE. A confirmed VYA/catalog reference matches this photo very closely (${Math.round(specific.similarity * 100)}% visual match): "${specific.model}"${specific.era ? ` (${specific.era})` : ""}. Treat this as a strong identification of the specific model/line. Never mention this reference in the copy.`
  : "";
  hints = cross + specificHint;
  }
@@ -106,7 +106,7 @@ export async function runAblation(opts: { sample: number; goldenOnly?: boolean }
  const d = (a: number | null, b: number | null) => (a == null || b == null ? null : b - a);
  const memoryHitRate = valid.length ? Math.round((memoryHits / valid.length) * 100) : 0;
  const note = memoryHitRate === 0
- ? "Memory produced NO hints on any item — the corpus is empty, so it can't help yet. Build the reference index + get real listings flowing, then re-run."
+ ? "Memory produced NO hints on any item. The corpus is empty, so it can't help yet. Build the reference index + get real listings flowing, then re-run."
  : `Memory produced a hint on ${memoryHitRate}% of items. A positive delta = the learning loop is really adding accuracy.`;
 
  return {

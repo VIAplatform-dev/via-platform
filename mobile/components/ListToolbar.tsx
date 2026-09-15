@@ -4,7 +4,7 @@ import { colors, spacing } from "../lib/theme";
 
 // The Save / Filter row that sits above a listing.
 //
-// SAVE IS NOT A BOOKMARK — it saves the SEARCH. On a marketplace where every piece is one-of-one,
+// SAVE IS NOT A BOOKMARK. It saves the SEARCH. On a marketplace where every piece is one-of-one,
 // "shoes, size 38, under $300" is a standing request: nothing matching it may exist today and three
 // things may exist next week. That is why it writes to /api/mobile/saved-searches and turns up in
 // Obsessions › Searches with a count of what has landed since.

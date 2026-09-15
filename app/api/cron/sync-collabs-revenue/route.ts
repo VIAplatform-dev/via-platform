@@ -27,7 +27,7 @@ const collabsHandleOverrides: Record<string, string> = {
  "source 24": "source-twenty-four",
  "chill boutique consignment": "chill-boutique",
  "chillboutiqueconsignment": "chill-boutique",
- // Collabs display names that drift from the VYA store name (extra/missing word) — without these the
+ // Collabs display names that drift from the VYA store name (extra/missing word), without these the
  // order records under an orphan slug no store owns, so it never shows in that store's analytics.
  "sablier": "sablier-vintage",
  "lamash store": "lamash",
@@ -45,7 +45,7 @@ function resolveStoreSlug(brandName: string): string {
  // 2. Explicit overrides for known mismatches
  if (collabsHandleOverrides[key]) return collabsHandleOverrides[key];
 
- // 3. Normalized match — handles camelCase handles like "PortersPreloved" → "porters-preloved"
+ // 3. Normalized match: handles camelCase handles like "PortersPreloved" → "porters-preloved"
  const normalized = key.replace(/[^a-z0-9]/g, "");
  if (slugByNormalized.has(normalized)) return slugByNormalized.get(normalized)!;
 
@@ -71,11 +71,11 @@ function calculateOrderTotal(commissionUsd: number, rules: CommissionRule[]): nu
 
  // Unique rates sorted high → low (highest rate applies to lowest price tier)
  const rates = [...new Set(rules.map((r) => r.value / 100))].sort((a, b) => b - a);
- if (rates.length === 1) return commissionUsd / rates[0]; // Flat rate — exact
+ if (rates.length === 1) return commissionUsd / rates[0]; // Flat rate: exact
 
  // Tiered: check every rate for self-consistency (implied price fits within that
- // tier's [floor, ceiling) range). When multiple tiers are valid — e.g. $52.50
- // commission is consistent with both $750@7% and $1050@5% — prefer the LAST
+ // tier's [floor, ceiling) range). When multiple tiers are valid. E.g. $52.50
+ // commission is consistent with both $750@7% and $1050@5% prefer the LAST
  // valid tier (lower rate, higher implied price). This avoids underreporting
  // order value when a commission falls right at a tier boundary.
  const tierCeilings = [1000, 5000]; // upper bound for each tier index
@@ -137,7 +137,7 @@ async function fetchIndividualCommissions(
  };
 
  // Three query tiers, tried in order until one works:
- // 1. Full: order total + all line items (ideal — exact amount, all items)
+ // 1. Full: order total + all line items (ideal: exact amount, all items)
  // 2. Partial: line item title/price + order name (what we had before)
  // 3. Minimal: commission amount + earnedAt only (fallback)
  type QueryTier = "full" | "partial" | "minimal";
@@ -192,7 +192,7 @@ async function fetchIndividualCommissions(
  if (nodes.length === 0) continue;
 
  const cutoff = lastSyncedAt ? new Date(lastSyncedAt) : null;
- // Held orders often have earnedAt predating lastSyncedAt — use a 45-day window
+ // Held orders often have earnedAt predating lastSyncedAt. Use a 45-day window
  // so we find the record even when the holding period started before our last sync.
  const effectiveCutoff = group === "IN_HOLDING_PERIOD"
  ? new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
@@ -247,7 +247,7 @@ async function saveCollabsConversions(
  if (!dbUrl) return { inserted: 0, attempted: 0 };
  const sql = neon(dbUrl);
  // Counts rows this call ACTUALLY wrote. `ON CONFLICT DO NOTHING` writes nothing when the order
- // is already recorded, and the old code returned an unconditional `true` regardless — so the
+ // is already recorded, and the old code returned an unconditional `true` regardless, so the
  // sync reported "1 new conversion recorded" having saved none, and, because it had reported
  // success, advanced the snapshot past that order. The next run then saw deltaOrders = 0 and the
  // sale was gone for good. A save must report what it wrote, not that it ran.
@@ -306,7 +306,7 @@ async function saveCollabsConversions(
  const ts = [...items.map(c => c.earnedAt)].sort().reverse()[0] || now;
  const totalCommission = items.reduce((sum, c) => sum + c.commissionUsdAmount, 0);
 
- // Build the items array — prefer full order line items from API, else per-commission nodes
+ // Build the items array. Prefer full order line items from API, else per-commission nodes
  let lineItems: { productName: string; quantity: number; price: number }[];
  let orderTotal: number;
 
@@ -321,7 +321,7 @@ async function saveCollabsConversions(
  }));
  } else {
  // Fallback: Collabs gave us only the commission, not the order total. Prefer the
- // price of the product the buyer actually CLICKED (looked up from our catalog) —
+ // price of the product the buyer actually CLICKED (looked up from our catalog),
  // it's the real listed price and avoids the ambiguous commission→total back-calc
  // that can land on the wrong rate tier (e.g. a $729 order reported as $1,020.60).
  // Order of preference: API line-item price → clicked product's price → estimate.
@@ -359,7 +359,7 @@ async function saveCollabsConversions(
  }
 
  // The individual commission node hasn't resolved an amount yet (holding period). Don't hold the whole
- // sale back — recover the REAL order total from the Shopify order-webhook cache (matched by order name),
+ // sale back: recover the REAL order total from the Shopify order-webhook cache (matched by order name),
  // else back-calculate it from the known partnership commission delta. Only give up if there's no signal
  // at all. This keeps the conversion in the table immediately instead of waiting for Collabs to finalize.
  if (orderTotal <= 0) {
@@ -383,7 +383,7 @@ async function saveCollabsConversions(
 
  // Enrich with the REAL line items from the Shopify order-webhook cache. Collabs
  // frequently returns no itemized data, so without this the conversion is labeled
- // with just the product the buyer clicked — which may not be what they bought.
+ // with just the product the buyer clicked, which may not be what they bought.
  // Collabs stays the source of truth for the total/commission; we only swap in
  // the true cart contents (by order name, else store+total+time). No-op if the
  // store has no webhook or we have no cache hit.
@@ -402,7 +402,7 @@ async function saveCollabsConversions(
 
  const conversionId = `collabs_${partnershipId}_${Date.now()}_${i}`;
 
- // Buyer email: Collabs never includes it, but the Shopify order webhook does —
+ // Buyer email: Collabs never includes it, but the Shopify order webhook does,
  // recover it from the order cache (matched by name, else store+total+time).
  const customerEmail = cached?.email ?? null;
 
@@ -443,7 +443,7 @@ async function saveCollabsConversions(
  return { inserted: insertedRows, attempted: attemptedRows };
  }
 
- // Commission is in holding period and individual records weren't findable — retry next run.
+ // Commission is in holding period and individual records weren't findable. Retry next run.
  if (deltaCommission <= 0) return { inserted: 0, attempted: 0 };
 
  // Fallback: delta-based approach using actual commission rates
@@ -479,7 +479,7 @@ async function saveCollabsConversions(
 
  // Prefer the REAL line items from the order-webhook cache (matched by
  // store + total + time). Else use the click's cart, else the single clicked
- // product. Collabs total/commission is unchanged — this only fixes the items.
+ // product. Collabs total/commission is unchanged. This only fixes the items.
  const cached = await findCachedOrder({
  storeSlug,
  totalUsd: perOrderTotal,
@@ -581,7 +581,7 @@ type ReconcileCommission = { commissionId: string; orderName: string | null; com
 
 /**
  * Fetch a partnership's recent commissions across ALL groups (incl. IN_HOLDING_PERIOD), stepping the
- * query down full → partial → minimal on GraphQL error — same as the delta path, but windowed by date
+ * query down full → partial → minimal on GraphQL error. Same as the delta path, but windowed by date
  * for the reconcile safety net (not by deltaOrders). Used to find orders the delta sync never recorded.
  */
 async function fetchCommissionsForReconcile(partnershipId: string, cookie: string, csrfToken: string, sinceIso: string): Promise<ReconcileCommission[]> {
@@ -628,7 +628,7 @@ async function fetchCommissionsForReconcile(partnershipId: string, cookie: strin
  * Safety net that runs after the delta sync: for any partnership where Collabs shows MORE orders than
  * we've recorded, deep-fetch its commissions and insert the ones missing from conversions. Cheap up front
  * (one grouped count; only gap>0 partnerships get a live fetch). Dedups by order_id AND by rounded order
- * total within ±14 days of the commission date — so an order already recorded under a name-based id can't
+ * total within ±14 days of the commission date, so an order already recorded under a name-based id can't
  * be re-inserted under a commission-based id at minimal tier (the West Village dupe). Never touches
  * partnerships whose name doesn't resolve to a real VYA store (those need a slug override, not a synthetic row).
  */
@@ -649,21 +649,21 @@ async function reconcileMissingOrders(
  for (const p of partnerships) {
   const slug = resolveStoreSlug(p.name);
   const gap = (p.totalOrders ?? 0) - (countBySlug.get(slug) ?? 0);
-  if (gap <= 0) continue;                                   // we have >= Collabs — nothing missing
-  if (!stores.find((s) => s.slug === slug)) continue;       // unmatched partnership — needs a slug override, skip
+  if (gap <= 0) continue;                                   // we have >= Collabs. Nothing missing
+  if (!stores.find((s) => s.slug === slug)) continue;       // unmatched partnership: needs a slug override, skip
   storesSwept++;
 
   const commissions = await fetchCommissionsForReconcile(p.id, cookie, csrfToken, sinceIso);
   const byOrder = new Map<string, ReconcileCommission[]>();
   for (const c of commissions) { const key = c.orderName || `commission-${c.commissionId}`; const g = byOrder.get(key) ?? []; g.push(c); byOrder.set(key, g); }
-  const rate = Number(p.commissionRules?.[0]?.value) || null; // % — back-calc a total when Collabs gives none
+  const rate = Number(p.commissionRules?.[0]?.value) || null; // percent, to back-calc a total when Collabs gives none
 
   for (const [, items] of byOrder) {
    const orderName = items[0].orderName;
    const orderId = orderName ? `collabs-${slug}-${orderName.replace(/^#/, "")}` : `collabs-commission-${items[0].commissionId}`;
    const commissionUsd = Math.round(items.reduce((s, i) => s + i.commissionUsd, 0) * 100) / 100;
    const orderTotalUsd = items.find((i) => i.orderTotalUsd)?.orderTotalUsd ?? (rate ? Math.round((commissionUsd / (rate / 100)) * 100) / 100 : null);
-   if (!orderTotalUsd || orderTotalUsd <= 0) continue;      // no resolvable total — leave for a future run
+   if (!orderTotalUsd || orderTotalUsd <= 0) continue;      // no resolvable total: leave for a future run
 
    const earnedMs = new Date(items[0].earnedAt).getTime();
    const loIso = new Date(earnedMs - 14 * 24 * 60 * 60 * 1000).toISOString();
@@ -676,7 +676,7 @@ async function reconcileMissingOrders(
         OR (round(order_total::numeric) = ${dollars} AND timestamp BETWEEN ${loIso} AND ${hiIso}))
     LIMIT 1
    `) as unknown[]).length > 0;
-   if (dupe) continue;                                      // already recorded under any id — never double-count
+   if (dupe) continue;                                      // already recorded under any id, never double-count
 
    const convId = `collabs_reconcile_${slug}_${earnedMs}`;
    await sql`
@@ -742,7 +742,7 @@ export async function GET(request: Request) {
  ]);
 
  if (!cookie || !csrfToken) {
- console.log("[Sync Collabs Revenue] No credentials stored — skipping");
+ console.log("[Sync Collabs Revenue] No credentials stored. Skipping");
  return NextResponse.json({ skipped: true, reason: "No credentials" });
  }
 
@@ -778,7 +778,7 @@ export async function GET(request: Request) {
  break;
  }
  if (!res.ok) {
- if (page === 0) { console.error(`[Sync Collabs Revenue] Shopify returned ${res.status} — credentials may have expired`); return NextResponse.json({ error: `Shopify returned ${res.status}` }, { status: res.status }); }
+ if (page === 0) { console.error(`[Sync Collabs Revenue] Shopify returned ${res.status}: credentials may have expired`); return NextResponse.json({ error: `Shopify returned ${res.status}` }, { status: res.status }); }
  break;
  }
  const rotated = res.headers.get("x-csrf-token");
@@ -830,7 +830,7 @@ export async function GET(request: Request) {
  let newOrdersRecorded = 0;
  let dbWriteFailed = false;
 
- // Track partnerships whose commission is in holding period — we'll hold back their
+ // Track partnerships whose commission is in holding period. We'll hold back their
  // order count in the snapshot so the next cron run sees deltaOrders > 0 and retries.
  const holdbackIds = new Set<string>();
 
@@ -845,12 +845,12 @@ export async function GET(request: Request) {
  const deltaCommission = currCommission - prevCommission;
 
  // First time we've ever seen this partnership (newly added to the config, or newly
- // surfaced by the pagination fix): BASELINE it at its current count — do not backfill its
+ // surfaced by the pagination fix): BASELINE it at its current count. Do not backfill its
  // whole prior order history as synthetic conversions. Those orders predate our tracking and
  // are already recorded via the Shopify order webhook, so fabricating them here duplicates.
  // Genuinely NEW orders after this baseline record normally on subsequent runs.
  if (deltaOrders > 0 && !prev) {
- console.log(`[Sync Collabs Revenue] ${p.name}: first seen — baselining at ${currOrders} orders (not backfilling history)`);
+ console.log(`[Sync Collabs Revenue] ${p.name}: first seen: baselining at ${currOrders} orders (not backfilling history)`);
  continue;
  }
 
@@ -863,14 +863,14 @@ export async function GET(request: Request) {
  newOrdersRecorded += recorded.inserted;
  console.log(`[Sync Collabs Revenue] ${p.name}: +${recorded.inserted} conversions written (delta was ${deltaOrders}), +${deltaCommission.toFixed(2)} ${p.currency ?? "USD"} commission, rates: [${(p.commissionRules ?? []).map((r: CommissionRule) => r.value + "%").join(", ")}]`);
  } else if (recorded.attempted > 0) {
- // Tried and every row already existed. Nothing new, but nothing lost either — so the
+ // Tried and every row already existed. Nothing new, but nothing lost either, so the
  // snapshot may advance. Do NOT count these: they are not new conversions.
- console.log(`[Sync Collabs Revenue] ${p.name}: ${recorded.attempted} order(s) already recorded — nothing new`);
+ console.log(`[Sync Collabs Revenue] ${p.name}: ${recorded.attempted} order(s) already recorded. Nothing new`);
  } else {
  // Never got as far as an insert (holding period, no amount yet). HOLD THE SNAPSHOT so the
- // next run sees the delta again — otherwise the order is lost for good.
+ // next run sees the delta again. Otherwise the order is lost for good.
  holdbackIds.add(p.id);
- console.log(`[Sync Collabs Revenue] ${p.name}: +${deltaOrders} orders in holding period — no amount yet, will retry next run`);
+ console.log(`[Sync Collabs Revenue] ${p.name}: +${deltaOrders} orders in holding period, no amount yet, will retry next run`);
  }
  } catch (err) {
  dbWriteFailed = true;
@@ -897,13 +897,13 @@ export async function GET(request: Request) {
  await saveSetting("collabs_last_synced_at", now);
  await saveSetting("collabs_data", JSON.stringify(snapshotToSave));
  } else {
- console.warn("[Sync Collabs Revenue] Snapshot NOT advanced due to DB write failures — will retry on next run");
+ console.warn("[Sync Collabs Revenue] Snapshot NOT advanced due to DB write failures. Will retry on next run");
  }
 
  // A SYNC THAT STOPS FINDING ANYTHING LOOKS EXACTLY LIKE A QUIET MARKETPLACE.
  //
  // Collabs is reached with a session cookie, not an API key, and that cookie expires. When it
- // does, every run still returns 200 and records nothing — so conversions simply stop, and the
+ // does, every run still returns 200 and records nothing, so conversions simply stop, and the
  // first anyone knows is a store asking where its sale went. Alert once the gap is longer than
  // any believable quiet spell, so the cookie gets refreshed before a month of sales is lost.
  try {
@@ -914,7 +914,7 @@ export async function GET(request: Request) {
  if (daysQuiet > STALE_CONVERSION_DAYS) {
   await sendOpsAlert(
   "Collabs conversions have gone quiet",
-  `No conversion has been recorded for ${Number.isFinite(daysQuiet) ? Math.floor(daysQuiet) : "any"} days (last: ${latest ?? "never"}). The sync is still running, so this is usually the Collabs SESSION COOKIE having expired — refresh collabs_cookie / collabs_csrf_token from the admin. Partnerships seen this run: ${partnerships.length}.`,
+  `No conversion has been recorded for ${Number.isFinite(daysQuiet) ? Math.floor(daysQuiet) : "any"} days (last: ${latest ?? "never"}). The sync is still running, so this is usually the Collabs SESSION COOKIE having expired. Refresh collabs_cookie / collabs_csrf_token from the admin. Partnerships seen this run: ${partnerships.length}.`,
   ).catch(() => {});
  }
  } catch {
@@ -939,6 +939,6 @@ export async function GET(request: Request) {
  }
 
  const heldBack = holdbackIds.size;
- console.log(`[Sync Collabs Revenue] Synced ${partnerships.length} partnerships, recorded ${newOrdersRecorded} new orders, ${heldBack} held back (holding period), retro-matched ${retroMatched} existing orders, reconciled ${reconciled} missing${dbWriteFailed ? " (snapshot NOT advanced — DB errors)" : ""}`);
+ console.log(`[Sync Collabs Revenue] Synced ${partnerships.length} partnerships, recorded ${newOrdersRecorded} new orders, ${heldBack} held back (holding period), retro-matched ${retroMatched} existing orders, reconciled ${reconciled} missing${dbWriteFailed ? " (snapshot NOT advanced. DB errors)" : ""}`);
  return NextResponse.json({ ok: !dbWriteFailed, partnerships: partnerships.length, newOrdersRecorded, heldBack, retroMatched, reconciled, reconcileStores, syncedAt: now, snapshotAdvanced: !dbWriteFailed });
 }

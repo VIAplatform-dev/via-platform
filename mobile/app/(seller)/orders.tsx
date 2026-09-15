@@ -10,18 +10,18 @@ import { groupIntoParcels, parcelsToCollect, type Parcel } from "../../lib/selle
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { labelQuoteLine, type LabelQuote } from "../../lib/seller/labels";
 
-// Orders — the most time-critical thing a seller does, often standing in a post office queue.
+// Orders: the most time-critical thing a seller does, often standing in a post office queue.
 //
-// BUYING THE LABEL HAPPENS HERE NOW. It used to say "Label not bought yet — do it on the desktop",
+// BUYING THE LABEL HAPPENS HERE NOW. It used to say "Label not bought yet. Do it on the desktop",
 // which is the worst place in the app to be sent away from: she is holding the parcel. It is two
-// taps rather than one on purpose — a quote, then the purchase — because the quote is where she
+// taps rather than one on purpose, a quote, then the purchase, because the quote is where she
 // finds out what it costs and, more to the point, WHETHER SHE IS PAYING. On a free-shipping order
 // the label comes off her card, and a one-tap button would spend her money before she saw a number.
 //
 // Once bought, her job is print, post, confirm. Orders are per piece, but
 // she posts PARCELS: three things bought together are one row here, one label, one "Mark as
 // posted" that flips every piece on the server (lib/seller/parcels.ts). A collection order says so
-// instead, because there is no label to look for — the API tells us via deliveryMethod.
+// instead, because there is no label to look for. The API tells us via deliveryMethod.
 
 type Order = {
   id: string;
@@ -40,7 +40,7 @@ type Order = {
 
 type Tab = "post" | "pickup" | "transit" | "done";
 
-// Collections are paid orders the buyer picks up at the counter — no label, nothing to post.
+// Collections are paid orders the buyer picks up at the counter, no label, nothing to post.
 // Their own tab, so "To post" is only what goes in the bag and Home's "collections waiting" row
 // lands on exactly them (?filter=pickup).
 const CHIPS: { key: Tab; label: string }[] = [
@@ -74,7 +74,7 @@ export default function OrdersScreen() {
   const [labelBusy, setLabelBusy] = useState<string | null>(null);
   const [labelError, setLabelError] = useState<string | null>(null);
 
-  // A parcel is several orders but ONE label, bought against the first — the same order the
+  // A parcel is several orders but ONE label, bought against the first. The same order the
   // server files the label on, which is why parcels.ts reads labelUrl off the first that has one.
   async function getQuote(p: Parcel<Order>) {
     setLabelError(null);
@@ -104,7 +104,7 @@ export default function OrdersScreen() {
     }
   }
 
-  // One call for the whole bag — every piece flips together, and the buyer gets one email.
+  // One call for the whole bag. Every piece flips together, and the buyer gets one email.
   const act = useMutation({
     mutationFn: (v: { parcel: Parcel<Order>; action: "posted" | "collected" | "delivered" }) =>
       apiPost("/api/store/orders/parcel", { orderIds: v.parcel.orders.map((o) => o.id), action: v.action }),
@@ -160,7 +160,7 @@ export default function OrdersScreen() {
                     {p.buyerEmail ? ` · ${p.buyerEmail}` : ""}
                   </Text>
                   <Text style={{ fontSize: 13, color: pickup ? colors.textMuted : colors.positive, marginTop: 3 }}>
-                    {pickup ? "Collection — no label needed" : p.labelUrl ? "Label bought — emailed to you" : "No label yet"}
+                    {pickup ? "Collection, no label needed" : p.labelUrl ? "Label bought: emailed to you" : "No label yet"}
                   </Text>
                 </View>
               </View>
@@ -179,11 +179,11 @@ export default function OrdersScreen() {
                   {!pickup && p.labelUrl ? (
                     // THE SHARE SHEET, NOT A BROWSER. openURL drops a PDF into Safari, where the
                     // only way to a printer is a two-tap detour most people never find. The share
-                    // sheet puts AirPrint, Files and Mail on the first screen — which is the whole
+                    // sheet puts AirPrint, Files and Mail on the first screen, which is the whole
                     // difference between "the label is on my phone" and "the label is on the box".
                     // Long-press still opens it, for anyone who wants to look at it first.
                     <Pressable
-                      onPress={() => void Share.share({ url: p.labelUrl!, message: `Shipping label — ${first.itemTitle ?? "order"}` })}
+                      onPress={() => void Share.share({ url: p.labelUrl!, message: `Shipping label: ${first.itemTitle ?? "order"}` })}
                       onLongPress={() => void Linking.openURL(p.labelUrl!)}
                       style={{ paddingHorizontal: spacing.xl, justifyContent: "center", borderRadius: radius, backgroundColor: colors.bgAlt }}
                     >

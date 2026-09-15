@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, radius } from "../../lib/portal-theme";
 import { useDraft } from "../../lib/seller/draft";
 
-// Capture — the first screen of the one flow that makes her money.
+// Capture: the first screen of the one flow that makes her money.
 //
 // A REAL VIEWFINDER, not a grey panel with a button under it. Dark ground so the garment is the
 // only lit thing, corner brackets to frame against, and one line of guidance. Shots collect in a
@@ -40,7 +40,7 @@ export default function CaptureScreen() {
   async function pick() {
     // 20, because that is what the routes store (items PATCH and intake/publish both cap there).
     // Six was a number this screen invented, and it meant a piece could carry more photos on the
-    // web than the phone would let her pick — on the one device she actually shoots them with.
+    // web than the phone would let her pick, on the one device she actually shoots them with.
     const r = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsMultipleSelection: true,
@@ -60,7 +60,7 @@ export default function CaptureScreen() {
         <Pressable onPress={() => void requestPermission()} style={{ marginTop: spacing.lg, backgroundColor: colors.accent, borderRadius: radius, paddingHorizontal: spacing.xxl, paddingVertical: spacing.md }}>
           <Text style={{ color: colors.accentText, fontWeight: "600" }}>Allow camera</Text>
         </Pressable>
-        {/* The library still works without the camera — never a dead end. */}
+        {/* The library still works without the camera, never a dead end. */}
         <Pressable onPress={() => void pick()} style={{ marginTop: spacing.md }}>
           <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>Choose from library instead</Text>
         </Pressable>
@@ -79,19 +79,29 @@ export default function CaptureScreen() {
         <Text style={{ flex: 1, textAlign: "center", color: "#fff", fontSize: 15 }}>
           {photos.length === 0 ? "New piece" : `${photos.length} ${photos.length === 1 ? "photo" : "photos"}`}
         </Text>
-        <Pressable hitSlop={12} onPress={() => void pick()} style={{ marginRight: spacing.lg }}>
+        <Pressable hitSlop={12} onPress={() => void pick()}>
           <Feather name="image" size={22} color="#fff" />
         </Pressable>
-        {/* A rail's worth at once. Starts in the library, because that is where forty photos are. */}
-        <Pressable hitSlop={12} onPress={() => router.push("/(seller)/new/bulk")}>
-          <Feather name="layers" size={22} color="#fff" />
-        </Pressable>
       </View>
+
+      {/* A rail's worth at once. Starts in the library, because that is where forty photos are.
+          IT SAYS WHAT IT IS. This was a bare `layers` glyph. White on black, no label, wedged
+          between the library icon and the edge, and listing a rail in one pass was a screen the
+          app had built and nobody could find: the only door to it was an icon nothing named.
+          Its own row under the header, because the words don't fit beside a centred title. */}
+      <Pressable
+        accessibilityLabel="List multiple items"
+        onPress={() => router.push("/(seller)/new/bulk")}
+        style={{ alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6, marginBottom: spacing.md, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.35)", paddingHorizontal: spacing.lg, paddingVertical: 6 }}
+      >
+        <Feather name="layers" size={15} color="#fff" />
+        <Text style={{ color: "#fff", fontSize: 13, fontWeight: "600" }} numberOfLines={1}>List multiple items</Text>
+      </Pressable>
 
       {/* The frame */}
       <View style={{ flex: 1, marginHorizontal: spacing.lg, borderRadius: radius, overflow: "hidden" }}>
         <CameraView ref={camera} style={{ flex: 1 }} facing="back" />
-        {/* Corner brackets — something to fill, rather than a bare rectangle. */}
+        {/* Corner brackets. Something to fill, rather than a bare rectangle. */}
         {([["top", "left"], ["top", "right"], ["bottom", "left"], ["bottom", "right"]] as const).map(([v, h]) => (
           <View
             key={`${v}${h}`}
@@ -109,7 +119,7 @@ export default function CaptureScreen() {
           pointerEvents="none"
           style={{ position: "absolute", bottom: 16, left: 0, right: 0, textAlign: "center", color: "rgba(255,255,255,0.8)", fontSize: 13 }}
         >
-          Fill the frame — label and tag help
+          Fill the frame: label and tag help
         </Text>
       </View>
 

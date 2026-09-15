@@ -7,15 +7,15 @@ import { indexItems } from "@/app/lib/market/embeddings-db";
 
 export const dynamic = "force-dynamic";
 
-// Owner (admin password / via-admin) — or anyone on a LOCAL dev server, where a store login is
+// Owner (admin password / via-admin), or anyone on a LOCAL dev server, where a store login is
 // usually the owner testing their own build.
 const allowed = (request: NextRequest, slug: string) => isOwner(request, slug) || process.env.NODE_ENV === "development";
 
-// POST — OWNER ONLY (or local dev). Seeds a dozen realistic vintage items into the acting store so Market Mode can
+// POST: OWNER ONLY (or local dev). Seeds a dozen realistic vintage items into the acting store so Market Mode can
 // be exercised end to end (search, confirm, cash/QR checkout, refund, bring list). Photos are borrowed
 // from live marketplace listings so photo matching (Phase 3) has something real to embed.
 const SEED = [
- { title: "Vintage Levi's 501 Jeans — Made in USA", brand: "Levi's", category: "Jeans", size: "32", price: 85, era: "1990s", condition: "Good" },
+ { title: "Vintage Levi's 501 Jeans. Made in USA", brand: "Levi's", category: "Jeans", size: "32", price: 85, era: "1990s", condition: "Good" },
  { title: "1980s Nike Windbreaker Jacket", brand: "Nike", category: "Coats & Jackets", size: "L", price: 120, era: "1980s", condition: "Very good" },
  { title: "Carhartt Detroit Jacket, Blanket Lined", brand: "Carhartt", category: "Coats & Jackets", size: "XL", price: 145, era: "1990s", condition: "Good" },
  { title: "Y2K Blumarine Slip Dress, Floral", brand: "Blumarine", category: "Dresses", size: "S", price: 220, era: "2000s", condition: "Excellent" },
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, count: created.length, created, indexed });
 }
 
-// DELETE — remove every seeded "(test)" item of the acting store (owner only).
+// DELETE: remove every seeded "(test)" item of the acting store (owner only).
 export async function DELETE(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

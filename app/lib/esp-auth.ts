@@ -31,7 +31,7 @@ async function fresh(storeSlug: string, c: EspConnection): Promise<string | null
  * Headers and API host for this store's connection.
  *
  * `host` is null for Klaviyo (one host for everyone) and the datacentre host for Mailchimp, which
- * differs per account — hence the metadata call when they first connect.
+ * differs per account: hence the metadata call when they first connect.
  */
 export async function espAuth(storeSlug: string): Promise<{ conn: EspConnection; auth: EspAuth } | null> {
  const c = await getEspConnection(storeSlug);

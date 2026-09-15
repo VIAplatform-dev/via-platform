@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 
 // Who at VYA can sign in to this workspace.
 //
-// The invite API and a page for it already existed at vyaplatform.com/admin/users — the LEGACY
+// The invite API and a page for it already existed at vyaplatform.com/admin/users. The LEGACY
 // panel, on the other host. This workspace is where the owner actually works, and getvya.ai rewrites
 // /admin/* here, so that page was simply unreachable from the place it was needed and admin could
 // only be granted by curl.
 //
-// TWO LISTS, DELIBERATELY SEPARATE. "Should have access" is app/lib/admin-emails.ts — a code
+// TWO LISTS, DELIBERATELY SEPARATE. "Should have access" is app/lib/admin-emails.ts. A code
 // constant, reviewable in a diff, naming VYA's own people. "Accounts" is the database: who has
 // actually accepted an invite and set a password. Being named in the first grants nothing; the
 // gap between them is the actionable thing this page exists to close.
@@ -26,7 +26,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
 
   // The first read lives inside the effect, guarded by `active`, rather than in a callback the
-  // effect then calls — the lint rule that objects to the latter is right that a setState reached
+  // effect then calls. The lint rule that objects to the latter is right that a setState reached
   // synchronously from an effect body cascades renders.
   useEffect(() => {
     let active = true;
@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
       {err ? <p className="mt-5 rounded-lg bg-red-50 px-3.5 py-3 text-[13px] text-red-800">{err}</p> : null}
       {msg ? <p className="mt-5 rounded-lg bg-stone-100 px-3.5 py-3 text-[13px] text-stone-700">{msg}</p> : null}
 
-      {/* Named in code, no account yet — the one actionable gap. */}
+      {/* Named in code, no account yet. The one actionable gap. */}
       {missing.length > 0 && (
         <div className="mt-7 rounded-xl border border-stone-200 bg-white p-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">Should have access</p>
@@ -147,7 +147,7 @@ export default function AdminUsersPage() {
                 <div className="min-w-0">
                   <p className="truncate text-[14px] text-stone-900">{a.email}</p>
                   <p className="text-[12px] text-stone-400">
-                    {a.active ? "Active" : a.hasPassword ? "Set up" : "Invited — waiting on their password"}
+                    {a.active ? "Active" : a.hasPassword ? "Set up" : "Invited. Waiting on their password"}
                   </p>
                 </div>
                 <button
@@ -170,7 +170,7 @@ export default function AdminUsersPage() {
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">Testing the signup flow</p>
         <p className="mt-2 text-[13px] leading-relaxed text-stone-500">
           Anyone above can walk seller signup again, as many times as they like, even with a store
-          already — just go to <span className="font-mono text-[12px]">/onboarding</span>. Each run
+          already, just go to <span className="font-mono text-[12px]">/onboarding</span>. Each run
           builds a separate test store and switches you into it; your real store is untouched, and the
           shop name at the top of the sidebar switches you back.
         </p>
@@ -182,7 +182,7 @@ export default function AdminUsersPage() {
         </a>
       </div>
 
-      {/* Anyone not on the code list — a contractor, a temporary hand. */}
+      {/* Anyone not on the code list. A contractor, a temporary hand. */}
       <div className="mt-7 rounded-xl border border-stone-200 bg-white p-4">
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-stone-400">Invite someone else</p>
         <div className="mt-2.5 flex gap-2">

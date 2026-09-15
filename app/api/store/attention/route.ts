@@ -4,7 +4,7 @@ import { attentionForStore } from "@/app/lib/attention-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — what needs the seller today: counts, the rows Home shows (only the non-zero ones, in the
+// GET: what needs the seller today: counts, the rows Home shows (only the non-zero ones, in the
 // order attention-core.ts fixes), and the ids of live pieces whose AI price wants a look (so
 // Inventory's ?missing=confidence filter can pick them out). Web session or the phone's JWT.
 export async function GET(request: NextRequest) {

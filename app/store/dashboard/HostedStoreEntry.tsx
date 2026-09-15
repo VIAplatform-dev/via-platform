@@ -8,7 +8,7 @@ import { describeHostedStore, type CaptureStatus, type HostedStoreView } from "@
 //
 // A store finished importing and there was nothing anywhere in the portal that said "this is your
 // hosted copy, here is how you change it". The click-to-edit view has existed all along at
-// ?edit=1 — this is the block that finds it for her, in her words, and it never offers the button
+// ?edit=1: this is the block that finds it for her, in her words, and it never offers the button
 // for a store that has nothing captured (see app/lib/hosted-store-entry.ts).
 
 type Undoable = { path: string; savedAt: string | null };
@@ -34,7 +34,7 @@ export default function HostedStoreEntry({ previewStore }: { previewStore: strin
    fetch(withStore("/api/store/hosted-review")).then((r) => (r.ok ? r.json() : null)).catch(() => null),
   ]).then(([cap, rev]: [CaptureStatus | null, { health?: { screens?: { page: string }[] } | null; reviews?: { page: string }[] } | null]) => {
    if (!alive) return;
-   // health === null means no check has ever run for this store — "nothing to review", which is
+   // health === null means no check has ever run for this store. "nothing to review", which is
    // NOT the same as "not reviewed". reviewGate keeps those apart; `screens: null` carries it.
    const review = { screens: rev?.health ? (rev.health.screens ?? []).map((s) => s.page) : null, answered: (rev?.reviews ?? []).map((r) => r.page) };
    setView(describeHostedStore(cap, review));
@@ -81,7 +81,7 @@ export default function HostedStoreEntry({ previewStore }: { previewStore: strin
     </a>
    )}
 
-   {/* NOT REVIEWED YET. She still sees her hosted store and every page in it — what she doesn't get
+   {/* NOT REVIEWED YET. She still sees her hosted store and every page in it. What she doesn't get
        is the Edit button, and instead of a disabled control with no explanation she gets the step,
        named, with the way to do it. */}
    {view.state === "review-first" && (
@@ -116,9 +116,9 @@ export default function HostedStoreEntry({ previewStore }: { previewStore: strin
     <>
      {/* What she is looking at, in her words. Nothing here promises more than the editor does. */}
      <div className="space-y-1.5 rounded-xl bg-[#5D0F17]/[0.04] px-4 py-3 text-sm leading-relaxed text-[#5D0F17]/80">
-      <p><span className="font-medium text-[#5D0F17]">How editing works.</span> Open a page below and click any words or photo to change them. You can also add sections, and remove ones you don’t want.</p>
-      <p>Your changes are <span className="font-medium text-[#5D0F17]">live the moment you press Save</span> — there is no separate publish step, and shoppers see the new version on your hosted store straight away.</p>
-      <p><span className="font-medium text-[#5D0F17]">Undo goes back one save.</span> We keep the version of a page from immediately before your last save, and nothing older. Once you undo, that step is used up.</p>
+      <p><span className="font-medium text-[#5D0F17]">How editing works.</span> Open a page and click any words or photo to change them. Add and remove sections as you like.</p>
+      <p>Your changes are <span className="font-medium text-[#5D0F17]">live the moment you press Save</span>. There is no separate publish step, and shoppers see the new version on your hosted store straight away.</p>
+      <p><span className="font-medium text-[#5D0F17]">Undo goes back one save.</span> Undo goes back one save, and only one. There is no older version to return to.</p>
       {view.productPages > 0 && (
        <p>Your {view.productPages} product page{view.productPages === 1 ? "" : "s"} {view.productPages === 1 ? "isn’t" : "aren’t"} in this list: they’re built from your live inventory, so titles, photos and prices are edited in <span className="font-medium text-[#5D0F17]">Listings</span>.</p>
       )}

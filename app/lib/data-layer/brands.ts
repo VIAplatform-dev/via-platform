@@ -1,11 +1,11 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — canonical brand resolution (pure + tested).
+// Data Layer: canonical brand resolution (pure + tested).
 //
 // We sell brand-level demand data TO brands, so brand attribution is our top
 // trust risk. Brand is resolved from a CANONICAL reference (label) via an
 // alias/synonym map ("YSL" → "Saint Laurent"), loaded from the brand_aliases
 // table (seeded like era_buckets, so an alias can be added to fix coverage with
-// no code deploy). This module is the pure matcher — the reference is injected
+// no code deploy). This module is the pure matcher. The reference is injected
 // (see brands-db.ts) so it stays node-testable.
 //
 // Rule (enrich.ts): NEVER guess. If no alias matches, the brand is null.
@@ -21,8 +21,8 @@ function escapeRe(s: string): string {
  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Does `text` (already lowercased) contain `alias`? Whole-word aliases — and any
-// alias ≤3 chars (lv/cd/ck) — must be bounded by non-letters so they never match
+// Does `text` (already lowercased) contain `alias`? Whole-word aliases, and any
+// alias ≤3 chars (lv/cd/ck): must be bounded by non-letters so they never match
 // INSIDE a word ("etro" must not hit "retro", "boss" must not hit "embossed").
 // Every other alias matches as a substring, so plurals/possessives still resolve
 // ("guccis", "gucci's", "gucci-style" → Gucci). Shared by all brand matchers so

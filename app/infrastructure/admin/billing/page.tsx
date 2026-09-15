@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill, SegmentedControl } from "../ui";
-import { Check } from "lucide-react";
+import { Check, CreditCard } from "lucide-react";
 
 type Price = { amount: number; currency: string } | null;
 type TierCard = {
@@ -11,6 +11,8 @@ type TierCard = {
 };
 type Billing = {
  configured: boolean; trialDays: number; annualDiscountPct: number;
+ /** Whether VYA holds a card it can bill. Shipping's absorb-the-postage modes are gated on it. */
+ hasCard?: boolean;
  current: { tier: string | null; interval: string | null; status: string | null; plan: string; currentPeriodEnd: string | null };
  tiers: TierCard[];
 };
@@ -29,15 +31,23 @@ export default function BillingPage() {
  const [interval, setIntervalState] = useState<"month" | "year">("month");
  const [busy, setBusy] = useState("");
  const [notice, setNotice] = useState("");
+ // Arrived from shipping's "Add a card"? Then a card is what she came for, not the plan tiers.
+ const [wantedCard, setWantedCard] = useState(false);
+ const cardRef = useRef<HTMLDivElement>(null);
 
  useEffect(() => {
  (async () => {
  const r = await fetch("/api/store/billing").then((x) => (x.ok ? x.json() : null)).catch(() => null);
  if (r) setD(r);
- const q = new URLSearchParams(window.location.search).get("sub");
- if (q === "success") setNotice("You're on your free trial — welcome to VYA. No charge for 30 days.");
- else if (q === "cancelled") setNotice("Checkout cancelled — you weren't charged.");
- if (q) window.history.replaceState({}, "", window.location.pathname);
+ const params = new URLSearchParams(window.location.search);
+ const q = params.get("sub");
+ if (q === "success") setNotice("You're on your free trial. Welcome to VYA. No charge for 30 days.");
+ else if (q === "cancelled") setNotice("Checkout cancelled. You weren't charged.");
+ if (params.get("add") === "card") {
+ setWantedCard(true);
+ requestAnimationFrame(() => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+ }
+ if (q || params.get("add")) window.history.replaceState({}, "", window.location.pathname);
  })();
  }, []);
 
@@ -50,12 +60,16 @@ export default function BillingPage() {
  const j = await r.json().catch(() => ({}));
  setBusy("");
  if (j.url) window.location.href = j.url;
- else setNotice(j.error || "Couldn't start checkout — try again.");
+ else setNotice(j.error || "Couldn't start checkout: try again.");
  }
 
- async function manage() {
- setBusy("portal"); setNotice("");
- const r = await fetch("/api/store/billing/portal", { method: "POST" });
+ async function manage(intent?: "card") {
+ setBusy(intent === "card" ? "card" : "portal"); setNotice("");
+ const r = await fetch("/api/store/billing/portal", {
+ method: "POST",
+ headers: { "Content-Type": "application/json" },
+ body: JSON.stringify(intent ? { intent } : {}),
+ });
  const j = await r.json().catch(() => ({}));
  setBusy("");
  if (j.url) window.location.href = j.url;
@@ -73,7 +87,7 @@ export default function BillingPage() {
  eyebrow="Business · Billing"
  title="Plans & billing"
  subtitle="Your VYA subscription. Free for 30 days, and you can cancel at any time."
- actions={entitled ? <TechButton variant="secondary" onClick={manage} disabled={busy === "portal"}>Manage subscription</TechButton> : undefined}
+ actions={entitled ? <TechButton variant="secondary" onClick={() => manage()} disabled={busy === "portal"}>Manage subscription</TechButton> : undefined}
  />
 
  {notice && <div className="mb-4 rounded-lg bg-[var(--accent-soft,#eafaf3)] px-4 py-2.5 text-[13px] font-medium text-[var(--accent-ink,#0b7a5c)]">{notice}</div>}
@@ -85,6 +99,42 @@ export default function BillingPage() {
  {cur?.currentPeriodEnd && <span className="text-[12px] text-stone-400">Renews {new Date(cur.currentPeriodEnd).toLocaleDateString()}</span>}
  </div>
  )}
+
+ {/* THE CARD ON FILE, AND WHY IT IS ON THIS PAGE.
+   
+   Shipping's "You pay, free for the buyer" and "Free over an amount" are locked until VYA holds
+   a card it can bill, and that link sent her here, to a page about subscription tiers with no
+   mention of a card anywhere on it. The only control was "Manage subscription", which appeared
+   only if she already had one, and the portal behind it refused outright without a subscription.
+   So the answer to "where do I add a card" was: nowhere.
+   
+   It is the right page: this is the card VYA CHARGES. Payments is the opposite direction, the
+   account VYA pays her into, and putting it there would be filing the bill under the income. */}
+ <TechCard ref={cardRef} className={`mb-5 p-5 ${wantedCard && !d?.hasCard ? "ring-2 ring-[var(--accent,#0e9f76)]" : ""}`}>
+ <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+ <div className="min-w-0 max-w-[60ch]">
+  <div className="flex flex-wrap items-center gap-2">
+  <CreditCard size={15} className="text-stone-400" />
+  <h2 className="text-[13.5px] font-semibold text-stone-900">Card on file</h2>
+  {d && (d.hasCard
+   ? <StatusPill tone="live" dot>Added</StatusPill>
+   : <StatusPill tone="pending">Not added</StatusPill>)}
+  </div>
+  <p className="mt-1.5 text-[12.5px] leading-relaxed text-stone-500">
+  {d?.hasCard
+   ? "Your subscription bills to this, and so does any postage you cover for a buyer. Nothing comes out of your payout."
+   : "Needed before you can offer free or discounted postage. The label is charged to it the moment you print one, so nothing comes out of your payout."}
+  </p>
+ </div>
+ <TechButton
+  variant={d?.hasCard ? "secondary" : undefined}
+  onClick={() => manage("card")}
+  disabled={busy === "card"}
+ >
+  {busy === "card" ? "Opening…" : d?.hasCard ? "Change card" : "Add a card"}
+ </TechButton>
+ </div>
+ </TechCard>
 
  {/* Monthly / Annual toggle */}
  <div className="mb-5 flex items-center gap-3">
@@ -119,14 +169,14 @@ export default function BillingPage() {
  <span className="text-[13px] text-stone-400">/{interval === "year" ? "yr" : "mo"}</span>
  </>
  ) : (
- <span className="text-[15px] font-medium text-stone-400">{t.priced ? "—" : "Price set in Stripe"}</span>
+ <span className="text-[15px] font-medium text-stone-400">{t.priced ? "-" : "Price set in Stripe"}</span>
  )}
  </div>
  {p && interval === "year" && <p className="mt-0.5 text-[11.5px] text-stone-400">≈ {money(Math.round(p.amount / 12), p.currency)}/mo, billed annually</p>}
 
  {/* What this tier ADDS over the one below is bold; everything it inherits stays quiet. The plans
      are cumulative, so without this the cards are the same list three times and the only way to
-     find the difference is to read all three in parallel. The entry plan marks nothing — it has no
+     find the difference is to read all three in parallel. The entry plan marks nothing. It has no
      tier below it, and bolding all of it would emphasise everything and distinguish nothing. */}
  <div className="mt-4 flex-1 space-y-2">
  {t.features.map((f) => {
@@ -155,11 +205,11 @@ export default function BillingPage() {
 
  {d && !d.configured && (
  <div className="mt-5 rounded-xl border border-amber-200/70 bg-amber-50/60 px-4 py-3 text-[12.5px] leading-relaxed text-amber-800">
- <b>Prices aren't set yet.</b> Create the Products + Prices in Stripe (a monthly and an annual per tier), then set the <code className="font-mono text-[11.5px]">STRIPE_PRICE_&lt;TIER&gt;_MONTHLY</code> / <code className="font-mono text-[11.5px]">…_ANNUAL</code> env vars. The trial, tiers, and gating already work — this page fills in the live numbers automatically.
+ <b>Prices aren't set yet.</b> Create the Products + Prices in Stripe (a monthly and an annual per tier), then set the <code className="font-mono text-[11.5px]">STRIPE_PRICE_&lt;TIER&gt;_MONTHLY</code> / <code className="font-mono text-[11.5px]">…_ANNUAL</code> env vars. The trial, tiers, and gating already work. This page fills in the live numbers automatically.
  </div>
  )}
 
- <p className="mt-4 text-[12px] leading-relaxed text-stone-400">Billing covers your VYA operating system (getvya.ai). Every plan includes the full 30-day trial; you can switch or cancel anytime from Manage subscription.</p>
+ <p className="mt-4 text-[12px] leading-relaxed text-stone-400">Your VYA subscription. Every plan starts with 30 days free, and you can switch or cancel any time.</p>
  </AdminPage>
  );
 }

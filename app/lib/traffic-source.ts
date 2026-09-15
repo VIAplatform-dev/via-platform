@@ -8,7 +8,7 @@ export type ClassifiedSource = { type: SourceType; source: string; referrerHost:
 // ── In-app browsers ────────────────────────────────────────────────────────
 // The reason "Direct" swallows most social traffic. A tap from an Instagram bio
 // or a TikTok profile opens inside that app's own webview, which sends NO
-// referrer at all — so referrer-only classification files the visit as Direct
+// referrer at all, so referrer-only classification files the visit as Direct
 // and the seller never learns Instagram sent it. The app is, however, plainly
 // identifiable in the user-agent, so we read it there when the referrer is
 // silent. TikTok in particular has never once appeared in our data by referrer.
@@ -95,7 +95,7 @@ export function classifySource(input: { referrer?: string | null; utmSource?: st
  if (med.includes("email") || src.includes("email") || src.includes("newsletter") || src.includes("klaviyo")) return { type: "Email", source: "Email", referrerHost };
  if (med === "cpc" || med === "ppc" || med === "paid" || med === "ads" || med.includes("paid")) return { type: "Paid", source: titleCase(src) || "Paid", referrerHost };
 
- // 2. A named utm_source — match it to a platform, else treat it as a referral source.
+ // 2. A named utm_source: match it to a platform, else treat it as a referral source.
  if (src) {
  const known = matchKnown(src.includes(".") ? src : `${src}.com`);
  if (known) return { ...known, referrerHost };
@@ -107,7 +107,7 @@ export function classifySource(input: { referrer?: string | null; utmSource?: st
  const self = (input.selfHost || "").replace(/^www\./, "").toLowerCase().split(":")[0];
  const selfReferred = Boolean(self) && referrerHost === self;
 
- // No referrer, our own pages, or an auth bounce — none of those say where the
+ // No referrer, our own pages, or an auth bounce. None of those say where the
  // shopper came from, so the in-app browser is the better answer when we have one.
  if (!referrerHost || selfReferred || AUTH_BOUNCE.has(referrerHost)) {
  if (inApp) return { ...inApp, referrerHost };
@@ -127,13 +127,13 @@ export function classifySource(input: { referrer?: string | null; utmSource?: st
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Stored-source normalization — ONE definition, shared by every reader.
+// Stored-source normalization: ONE definition, shared by every reader.
 //
 // Historically four different places each had their own alias map and their own
 // hardcoded list of junk values to ignore (the marketplace tracker, /api/track-utm,
 // the admin customers query, and the customers response mapper). They drifted, which
 // is why the Source Attribution panel showed "Chrome / Safari / Edge" as traffic
-// sources while the customer list — which filtered those out — disagreed with it.
+// sources while the customer list, which filtered those out. Disagreed with it.
 //
 // Browser names are in the data because the page tracker used to label untagged
 // traffic by user-agent. That's fixed at the write side, but ~months of rows still
@@ -149,7 +149,7 @@ export const SOURCE_ALIASES: Record<string, string> = {
 /**
  * Values that are NOT a traffic source, and must never be shown as one.
  * Browser names (the old user-agent fallback), plus placeholders and the names of
- * the capture surfaces themselves ("register", "giveaway_modal" — those say WHERE the
+ * the capture surfaces themselves ("register", "giveaway_modal": those say WHERE the
  * row was written, not where the person came from).
  */
 export const LEGACY_NON_SOURCES = [
@@ -172,8 +172,8 @@ export function isRealSource(raw: string | null | undefined): boolean {
 }
 
 /**
- * The display label for a stored source. Anything that isn't a real source — a browser
- * name, a placeholder, an empty cell — becomes "Direct", because that is what it
+ * The display label for a stored source. Anything that isn't a real source. A browser
+ * name, a placeholder, an empty cell. Becomes "Direct", because that is what it
  * actually means: we never learned where they came from.
  */
 export function normalizeStoredSource(raw: string | null | undefined): string {
@@ -186,10 +186,10 @@ export function normalizeStoredSource(raw: string | null | undefined): string {
 }
 
 // Email service providers, so a source of "mailchimp" channels as Email rather than
-// falling through to Referral. The LABEL still says Mailchimp — only the grouping changes.
+// falling through to Referral. The LABEL still says Mailchimp, only the grouping changes.
 const EMAIL_SENDERS = ["email", "newsletter", "klaviyo", "mailchimp", "sendgrid", "resend", "mailerlite", "beehiiv", "substack_email"];
 
-/** The channel a source belongs to — what the filter chips in the admin group by. */
+/** The channel a source belongs to. What the filter chips in the admin group by. */
 export function sourceChannel(raw: string | null | undefined): SourceType {
  const s = canonicalSource(raw);
  if (!isRealSource(s)) return "Direct";

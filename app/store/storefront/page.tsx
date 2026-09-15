@@ -22,7 +22,7 @@ import { orderFieldsForPanel, splitFocusedFields } from "@/app/lib/panel-field-o
 import { Eye, EyeOff, Files } from "lucide-react";
 import GridPanel, { type GridCollection } from "./GridPanel";
 import { parseGridConfig, type GridConfig } from "@/app/lib/site-builder/grid-config";
-// Step 3: the Pages rail — menu order, rename, hide, add.
+// Step 3: the Pages rail: menu order, rename, hide, add.
 import PagesPanel, { type PageEntryView } from "./PagesPanel";
 
 type Template = { id: string; name: string; description: string; colors: { bg: string; text: string; accent: string }; fonts: { heading: string; body: string }; heroStyle: string };
@@ -57,7 +57,7 @@ export default function StorefrontEditor() {
  const [loading, setLoading] = useState(true);
  const [tab, setTab] = useState<"design" | "sections" | "assets" | "details" | "domain">("sections");
  const [storeName, setStoreName] = useState("Your Store");
- const [capTab, setCapTab] = useState<"design" | "sections" | "pages" | "elements" | "text" | "uploads" | "assist">("design"); // captured-mode left rail — 1:1 with the from-scratch studio
+ const [capTab, setCapTab] = useState<"design" | "sections" | "pages" | "elements" | "text" | "uploads" | "assist">("design"); // captured-mode left rail: 1:1 with the from-scratch studio
  const [capPanelOpen, setCapPanelOpen] = useState(true); // collapse the side panel (Canva-style), keeping the icon rail
  const [showControls, setShowControls] = useState(true); // block-mode: the Customize slide-over
  const [copiedUrl, setCopiedUrl] = useState(false);
@@ -76,10 +76,10 @@ export default function StorefrontEditor() {
  const [headingFonts, setHeadingFonts] = useState<string[]>([]);
  const [bodyFonts, setBodyFonts] = useState<string[]>([]);
  // The faces her OWN imported site is set in (app/lib/plan-b/font-detect.ts). The picker used to
- // offer a curated Google list and nothing else, so the one font she certainly wanted — the one her
- // shop is already in — was the one it did not have.
+ // offer a curated Google list and nothing else, so the one font she certainly wanted. The one her
+ // shop is already in. Was the one it did not have.
  const [siteFonts, setSiteFonts] = useState<{ family: string; face: boolean }[]>([]);
- // WHAT EACH PIECE'S PAGE SAYS. The same theme.productPage the block builder edits — one setting, and
+ // WHAT EACH PIECE'S PAGE SAYS. The same theme.productPage the block builder edits. One setting, and
  // until now only reachable from an editor a seller with her own site never opens. It governs the
  // pages VYA renders for pieces she adds here (a piece with no Shopify handle of its own); her
  // imported products keep their captured page, whose design is the Product page in the page list.
@@ -147,7 +147,7 @@ export default function StorefrontEditor() {
  // Captured site (a seller who brought their own site over): they edit THAT, not blocks.
  const [captured, setCaptured] = useState<{ count: number; url: string | null; slug: string | null; origin: string | null; pages: string[]; unlinked: string[]; productTemplate: string | null; productCount: number } | null>(null);
  // The pages strip opens as one scrolling row (fine for a five-page site, useless for eighty-two).
- // Expanded, it becomes a wrapping grid — the same "see everything at once" the block Studio has.
+ // Expanded, it becomes a wrapping grid. The same "see everything at once" the block Studio has.
  const [pagesOpen, setPagesOpen] = useState(false);
  // Zoom on the preview, also matching the Studio. A captured page is a real site at real width, so
  // zooming out is the only way to see a whole long homepage while editing it.
@@ -155,10 +155,10 @@ export default function StorefrontEditor() {
  const surfaceRef = useRef<HTMLDivElement | null>(null);
  const [secQ, setSecQ] = useState(""); // Layout rail search, matching the Studio
  // The selected piece of text, reported by the page. Its controls live in the SAME floating bar as
- // the section's — there used to be a second bar drawn inside the page, sitting on top of the very
+ // the section's. There used to be a second bar drawn inside the page, sitting on top of the very
  // words you were editing.
  // `btn`: the fill of the button this text is the label of ("" for an outline button), or null when it
- // isn't a button's label — which is what decides whether Button colour is offered.
+ // isn't a button's label, which is what decides whether Button colour is offered.
  const [txtSel, setTxtSel] = useState<{ eid: number; color: string; align: string; top: number; btn: string | null } | null>(null);
  // The element last clicked ON THE PAGE. It does two jobs: the panel opens on that element's
  // fields rather than the whole section, and the field is scrolled to and focused once.
@@ -167,10 +167,10 @@ export default function StorefrontEditor() {
  // box where it landed on the page. Null = unknown, which puts it at the end, never at the front.
  const focusCaret = useRef<number | null>(null);
  const [scrollEid, setScrollEid] = useState<number | null>(null);
- // Everything in this section, not just the clicked element — opened on demand.
+ // Everything in this section, not just the clicked element. Opened on demand.
  const [showAllFields, setShowAllFields] = useState(false);
  // A text box / image / button she added INSIDE a section. While one is selected the section panel's
- // Duplicate and Delete act on it, not on the whole band — deleting a text box used to take the
+ // Duplicate and Delete act on it, not on the whole band. Deleting a text box used to take the
  // section it sat in with it.
  const [inlineKind, setInlineKind] = useState<string | null>(null);
  // Which PICTURE she clicked. A collection tile is a photograph, so without this the panel answered
@@ -178,7 +178,7 @@ export default function StorefrontEditor() {
  const [focusImg, setFocusImg] = useState<number | null>(null);
  // The inventory piece the clicked text belongs to, when it belongs to one. A product card
  // regenerates its name, price and photo from Inventory on every page load, so a text box over them
- // is a box that lies — she gets the piece instead. See plan-b/product-card-identity.ts.
+ // is a box that lies. She gets the piece instead. See plan-b/product-card-identity.ts.
  const [focusItem, setFocusItem] = useState<{ id: string; title: string } | null>(null);
  // What the selected section IS, reported by the builder's script: a block she added, or one of her
  // captured sections (which Hide rather than delete), and whether it is hidden. `gridSel` is the product
@@ -187,7 +187,7 @@ export default function StorefrontEditor() {
  const [gridSel, setGridSel] = useState<{ id: string; config: GridConfig; kit: "theme" | "simple" | null; empty: boolean } | null>(null);
  const [gridCollections, setGridCollections] = useState<GridCollection[] | null>(null);
  const [gridRefresh, setGridRefresh] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
- // ── HER PAGES (Step 3) — the Pages rail and the ✕ on each thumbnail ───────────────────────────
+ // ── HER PAGES (Step 3): the Pages rail and the ✕ on each thumbnail ───────────────────────────
  const [pagesList, setPagesList] = useState<PageEntryView[]>([]);
  const [pagesMenu, setPagesMenu] = useState<{ items: { id: string; label: string; href: string; hidden?: boolean }[]; signature: string } | null>(null);
  const [pagesReady, setPagesReady] = useState(true); // false until the owner has run the migration
@@ -202,8 +202,8 @@ export default function StorefrontEditor() {
  // A short word next to Undo after it stepped back through a SAVED version (the page's own undo stack is
  // gone once a save reloads it).
  const [undoNote, setUndoNote] = useState<string | null>(null);
- // Her own arrangement of the strip. Housekeeping — it moves thumbnails in HER editor and nothing
- // on her site — so it saves immediately with no draft or publish step attached.
+ // Her own arrangement of the strip. Housekeeping: it moves thumbnails in HER editor and nothing
+ // on her site, so it saves immediately with no draft or publish step attached.
  const [pageOrder, setPageOrder] = useState<string[] | null>(null);
  const dragFrom = useRef<string | null>(null);
  const [isAdmin, setIsAdmin] = useState(false); // owner-only: the reset/wipe action
@@ -240,7 +240,7 @@ export default function StorefrontEditor() {
  // What the store's custom-CSS row holds, as this editor last read or wrote it: the only base a design save
  // may replace (the server refuses any other). null = it never loaded, so nothing here may be saved.
  const designBase = useRef<string | null>(null);
- const designTouched = useRef(false); // she changed something here — opening the editor alone never writes
+ const designTouched = useRef(false); // she changed something here. Opening the editor alone never writes
  const designCss = useRef<string | null>(null); // what the preview shows; re-sent whenever the frame reloads
  const designQueue = useRef<Promise<void>>(Promise.resolve());
  const [capTheme, setCapTheme] = useState<ThemeModel | null>(null); // how the captured theme sets its colours
@@ -294,7 +294,7 @@ export default function StorefrontEditor() {
 
  // Pinch-to-zoom on the trackpad.
  //
- // macOS reports a two-finger pinch as a wheel event with ctrlKey set — that is how every canvas
+ // macOS reports a two-finger pinch as a wheel event with ctrlKey set. That is how every canvas
  // app detects it, and it is the same event a mouse produces with Ctrl (or Cmd) held. Without
  // preventDefault the browser zooms the whole application instead, which is what "the zoom doesn't
  // work" actually looked like: the gesture was being handled, just by Chrome rather than by us.
@@ -325,7 +325,7 @@ export default function StorefrontEditor() {
     inner?.removeEventListener("wheel", onWheel);
     doc.addEventListener("wheel", onWheel, { passive: false });
     inner = doc;
-   } catch { /* a cross-origin frame simply doesn't get the gesture — the surface still does */ }
+   } catch { /* a cross-origin frame simply doesn't get the gesture. The surface still does */ }
   };
   attachInner();
   const poll = window.setInterval(attachInner, 600);
@@ -338,7 +338,7 @@ export default function StorefrontEditor() {
  }, []);
 
  // On a phone the 1280px canvas opened at 100%, which is a quarter of the page and a sideways scroll.
- // Start it zoomed to the width of the surface instead. Presentation only, once, and only under 768 —
+ // Start it zoomed to the width of the surface instead. Presentation only, once, and only under 768,
  // the slider and pinch still reach anywhere from 20% to 130%.
  const phoneFitted = useRef(false);
  useEffect(() => {
@@ -349,7 +349,7 @@ export default function StorefrontEditor() {
   return () => cancelAnimationFrame(id);
  });
 
- // The Sidekick can change the design — refresh the editor + preview when it does.
+ // The Sidekick can change the design. Refresh the editor + preview when it does.
  useEffect(() => {
  function onUpdate() {
  setPreviewKey((k) => k + 1); // reload the captured-site preview after a VYA edit
@@ -358,7 +358,7 @@ export default function StorefrontEditor() {
  const [sfR, dsR] = await Promise.all([fetch(withStore("/api/store/storefront")), fetch(withStore("/api/store/storefront/design"))]);
  if (sfR.ok) { const d = await sfR.json(); setTagline(d.settings.tagline || ""); setHeroImage(d.settings.heroImage || ""); }
  if (dsR.ok) { const d = await dsR.json(); setTemplate(d.template); setColors(d.colors); setFonts(d.fonts); setBlocks(d.blocks || []); setShopBlocks(d.shopBlocks || []); setExtraPages(d.extraPages || []); setCustomCss(d.customCss || ""); }
- // VYA may have restyled the captured site. Take its CSS unless she has unsaved design changes — then
+ // VYA may have restyled the captured site. Take its CSS unless she has unsaved design changes, then
  // her save is refused as a conflict and loads it instead of erasing it.
  if (!designTouched.current) { const cR = await fetch(withStore("/api/store/capture/css")); const c = cR.ok ? await cR.json() : null; if (c && typeof c.css === "string" && !designTouched.current) loadDesignCss(c.css); }
  } catch { /* ignore */ }
@@ -376,23 +376,23 @@ export default function StorefrontEditor() {
  try {
  const r = await fetch(withStore("/api/store/storefront/generate"), { method: "POST" });
  const d = await r.json();
- if (!r.ok) { setGenErr(d.error || "Couldn’t generate — try again."); setGenBusy(false); return; }
+ if (!r.ok) { setGenErr(d.error || "Couldn’t generate: try again."); setGenBusy(false); return; }
  const dsR = await fetch(withStore("/api/store/storefront/design"));
  if (dsR.ok) { const ds = await dsR.json(); setTemplate(ds.template); setColors(ds.colors); setFonts(ds.fonts); setBlocks(ds.blocks || []); setExtraPages(ds.extraPages || []); setActiveSlug("home"); }
  setSaved(false);
- } catch { setGenErr("Couldn’t generate — try again."); }
+ } catch { setGenErr("Couldn’t generate: try again."); }
  setGenBusy(false);
  }
 
  // Re-pull the seller's live site so the hosted copy reflects their latest changes.
  async function reSync() {
- if (!captured?.origin) { setSyncMsg("We don't have your original site URL — bring it over again from “Bring your site.”"); return; }
+ if (!captured?.origin) { setSyncMsg("We don't have your original site URL. Bring it over again from “Bring your site.”"); return; }
  setSyncBusy(true); setSyncMsg(null);
  try {
  const r = await fetch(withStore("/api/store/capture"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: captured.origin }) });
  const d = await r.json();
  if (!r.ok) setSyncMsg(d.error || "Re-sync failed.");
- else { setCaptured((c) => (c ? { ...c, count: d.pages ?? c.count } : c)); setSyncMsg(`✓ Synced — ${d.pages} pages now up to date.`); setPreviewKey((k) => k + 1); }
+ else { setCaptured((c) => (c ? { ...c, count: d.pages ?? c.count } : c)); setSyncMsg(`✓ Synced. ${d.pages} pages now up to date.`); setPreviewKey((k) => k + 1); }
  } catch { setSyncMsg("Re-sync failed."); }
  setSyncBusy(false);
  }
@@ -400,7 +400,7 @@ export default function StorefrontEditor() {
  // Apply the global design (accent + fonts) to the captured site's custom-CSS layer,
  // preserving any other custom CSS, then reload the preview to show it.
  // Live design like the studio: the moment a colour/font/corner changes, inject it into the preview
- // instantly (postMessage → a <style> in the iframe) AND auto-save (debounced) — no Apply button, no reload.
+ // instantly (postMessage → a <style> in the iframe) AND auto-save (debounced), no Apply button, no reload.
  //
  // Only what SHE changes is saved. This used to post the loaded design straight back on every open, so a
  // load that came back empty wrote "" over the store's CSS; now nothing is written until a control moves.
@@ -455,11 +455,11 @@ export default function StorefrontEditor() {
    if (!doc || doc === sentTo || designCss.current === null || !doc.getElementById("vya-save")) return;
    sentTo = doc;
    postToPreview({ vya: "css", css: designCss.current });
-  } catch { /* allow-swallow: frame mid-navigation — the next tick tries again */ }
+  } catch { /* allow-swallow: frame mid-navigation: the next tick tries again */ }
  }, 300);
  return () => window.clearInterval(id);
  }, []);
- // Undo/redo shortcuts for the captured editor — forwarded into the preview iframe. (When you're typing
+ // Undo/redo shortcuts for the captured editor. Forwarded into the preview iframe. (When you're typing
  // in the iframe the browser handles ⌘Z natively; this covers the rest + the top-bar buttons.)
  useEffect(() => {
  if (!captured) return;
@@ -487,7 +487,7 @@ export default function StorefrontEditor() {
  if (!d || !d.vya) return;
  if (d.vya === "section") { setPanel({ index: d.index ?? -1, fields: d.fields || [] }); setSelImg(null); setSecStyle(d.style || {}); setSecRect(d.rect || null); setPanelDirty(false); setPanelSaving(false); setSecInfo(null); setGridSel(null); }
  else if (d.vya === "secrect") setSecRect({ top: (d as { top: number }).top, cx: (d as { cx: number }).cx });
- // Escape inside the page backs out of everything — the panel here has to follow, or the rail goes
+ // Escape inside the page backs out of everything. The panel here has to follow, or the rail goes
  // on editing a section the page no longer thinks is selected.
  else if (d.vya === "deselect") { setPanel(null); setSelImg(null); setSecRect(null); setTxtSel(null); setSecInfo(null); setGridSel(null); }
  else if (d.vya === "textsel") {
@@ -497,7 +497,7 @@ export default function StorefrontEditor() {
   // …and take the panel to that field. The canvas has always reported which element was clicked;
   // the panel just never used it, so finding the words you'd tapped meant scrolling a list where
   // every link is labelled the same. Clicking "Make an appointment here." on the page now puts
-  // the cursor in its box — and its address is the next box down (panel-field-order.ts).
+  // the cursor in its box, and its address is the next box down (panel-field-order.ts).
   if (t.eid >= 0) { setFocusEid(t.eid); setScrollEid(t.eid); setShowAllFields(false); setFocusImg(null); }
   else setFocusEid(null);
   const it = d as { item?: unknown; itemTitle?: unknown };
@@ -555,7 +555,7 @@ export default function StorefrontEditor() {
  }
  // "More layouts…" from the + between sections: the Layout rail's next pick lands in that seam.
  else if (d.vya === "openlayout") { setPanel(null); setSelImg(null); setCapTab("sections"); setCapPanelOpen(true); }
- // The bar on a hidden page's own editor — "Show" puts it back for shoppers. Written straight from
+ // The bar on a hidden page's own editor. "Show" puts it back for shoppers. Written straight from
  // here rather than through the Pages panel, because she is standing on the page she means.
  else if (d.vya === "showpage") {
   const p = (d as { path?: unknown }).path;
@@ -575,7 +575,7 @@ export default function StorefrontEditor() {
  // THE PIECE BEHIND A PRODUCT CARD.
  //
  // A card in the editor is captured markup, but a shopper's page rebuilds it from Inventory every
- // time it loads — so the name and price shown here are a photograph of something that has moved on,
+ // time it loads, so the name and price shown here are a photograph of something that has moved on,
  // and typing over them would be thrown away. The panel asks Inventory what the piece says now and
  // writes her changes back there, which is the only place an edit to a product can actually live.
  const [itemDraft, setItemDraft] = useState<{ id: string; title: string; price: string; images: string[] } | null>(null);
@@ -618,7 +618,7 @@ export default function StorefrontEditor() {
   const up = await fetch(withStore("/api/store/assets"), { method: "POST", body: fd }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (!up?.url) { setItemState("idle"); return; }
   // The first photo is the one every card shows, so a replacement takes that place and the rest
-  // stay behind it — she is changing the piece's cover, not deleting its other angles.
+  // stay behind it: she is changing the piece's cover, not deleting its other angles.
   const images = [up.url, ...itemDraft.images.slice(1)];
   setItemDraft({ ...itemDraft, images });
   await saveItem({ images });
@@ -627,7 +627,7 @@ export default function StorefrontEditor() {
  const goToPage = (path: string) => { setSelPath(path); setPanel(null); setSelImg(null); setFocusEid(null); setPreviewKey((k) => k + 1); };
 
  const postToPreview = (msg: unknown) => editIframe.current?.contentWindow?.postMessage(msg, "*");
- // Her collections, for the Grid panel's picker — read once, the first time she opens a grid.
+ // Her collections, for the Grid panel's picker. Read once, the first time she opens a grid.
  useEffect(() => {
   if (!gridSel || gridCollections !== null) return;
   fetch(withStore("/api/store/collections?all=1"))
@@ -645,11 +645,11 @@ export default function StorefrontEditor() {
  };
  // ── HER PAGES ──────────────────────────────────────────────────────────────────────────────────
  // One read: her pages, her menu order, what nothing links to, and how many links point at each.
- // Read-only — opening the editor never writes a page row.
+ // Read-only: opening the editor never writes a page row.
  const loadPages = useCallback(async () => {
   // `no-store`: this is re-read straight after a rename or a hide, to the same URL. Left to the
   // browser's own judgement it can answer from its cache and hand back the page list as it was
-  // before her change — which reads as the change not having happened.
+  // before her change, which reads as the change not having happened.
   const r = await fetch(withStore("/api/store/capture/pages"), { cache: "no-store" }).catch(() => null);
   const j = r && r.ok ? await r.json().catch(() => null) : null; /* allow-swallow: reported below */
   if (!j) { setPagesNote("Couldn’t load your pages just now."); return; }
@@ -665,7 +665,7 @@ export default function StorefrontEditor() {
  const patchPage = async (path: string, patch: Record<string, unknown>): Promise<boolean> => {
   setPagesBusy(true); setPagesNote(null);
   // The rail changes the moment she acts, the same way reordering already does. Waiting for the round
-  // trip reads as nothing having happened — she renamed a page, saw the old name, and refreshed.
+  // trip reads as nothing having happened. She renamed a page, saw the old name, and refreshed.
   const before = pagesList;
   setPagesList((list) => list.map((e) => {
    if (e.path !== path) return e;
@@ -687,17 +687,17 @@ export default function StorefrontEditor() {
   if (!r || !r.ok) { setPagesList(before); setPagesNote(typeof j.error === "string" ? j.error : "Couldn’t save that just now."); return false; }
   setPagesStale((n) => n + 1);
   // ALWAYS, not just when she is looking at the page she changed. Renaming or hiding a page changes
-  // the MENU, and the menu is on every page — so the canvas is out of date whichever one is open.
+  // the MENU, and the menu is on every page, so the canvas is out of date whichever one is open.
   setPreviewKey((k) => k + 1);
   return true;
  };
 
- /** Rename: what the page is called, in her menu and in the browser tab. Never its address — so no
+ /** Rename: what the page is called, in her menu and in the browser tab. Never its address, so no
   *  link anyone is holding, and nothing Google has indexed, breaks. */
  const renamePage = async (p: PageEntryView) => {
   const name = await dialog.prompt({
    title: `Rename “${p.label}”`,
-   body: `Changes what this page is called — in your menu and in the browser tab. Its web address stays ${p.path}, so every link to it still works.`,
+   body: `Changes what this page is called, in your menu and in the browser tab. Its web address stays ${p.path}, so every link to it still works.`,
    defaultValue: p.navLabel || p.title || p.label,
    confirmLabel: "Rename", maxLength: 60,
   });
@@ -731,7 +731,7 @@ export default function StorefrontEditor() {
   await saveMenu(items);
  };
 
- /** Her order, dragged in the rail. This is the order shoppers see — on desktop AND on a phone. */
+ /** Her order, dragged in the rail. This is the order shoppers see, on desktop AND on a phone. */
  const reorderMenu = async (from: string, to: string) => {
   if (!pagesMenu) return;
   const items = [...pagesMenu.items];
@@ -782,7 +782,7 @@ export default function StorefrontEditor() {
   if (secInfo && !secInfo.block) { postToPreview({ vya: secInfo.hidden ? "showsec" : "hidesec" }); setSecInfo({ ...secInfo, hidden: !secInfo.hidden }); return; }
   postToPreview({ vya: "delsec" }); setPanel(null); setSecRect(null); setGridSel(null);
  };
- // Asset library (Canva-style uploads) — the store's own photos, reusable across the whole site.
+ // Asset library (Canva-style uploads). The store's own photos, reusable across the whole site.
  async function loadAssets() {
  setAssetsBusy(true);
  const r = await fetch(withStore("/api/store/assets")).then((x) => (x.ok ? x.json() : null)).catch(() => null);
@@ -804,7 +804,7 @@ export default function StorefrontEditor() {
  setSelImg((s) => (s ? { ...s, src } : s));
  setPanelDirty(true);
  }
- // Style the selected captured section (background / text colour / alignment) — live + tracked for save.
+ // Style the selected captured section (background / text colour / alignment). Live + tracked for save.
  function setSec(prop: "bg" | "color" | "align", value: string) {
  const css = prop === "bg" ? "background-color" : prop === "color" ? "color" : "text-align";
  postToPreview({ vya: "secstyle", prop: css, value });
@@ -873,7 +873,7 @@ export default function StorefrontEditor() {
  };
 
  // Floating format toolbar: when the owner selects text inside an editable element on the canvas,
- // pop a small bar (bold / italic / underline / colour) above the selection — Canva-style.
+ // pop a small bar (bold / italic / underline / colour) above the selection. Canva-style.
  useEffect(() => {
  const onSel = () => {
  const s = window.getSelection();
@@ -926,7 +926,7 @@ export default function StorefrontEditor() {
  setBusy(false);
  }
 
- // Live on/off — persists immediately (used by the top-bar toggle in both editor modes).
+ // Live on/off: persists immediately (used by the top-bar toggle in both editor modes).
  async function toggleLive() {
  const next = !enabled;
  setEnabled(next);
@@ -935,7 +935,7 @@ export default function StorefrontEditor() {
 
  // Admin-only: wipe this storefront entirely (settings, design, pages, public URL) and reopen blank.
  async function removeStorefront() {
- if (!(await dialog.confirm({ title: "Delete this storefront?", body: "Wipes the entire imported site — settings, design, captured pages, public URL, and all imported inventory. This can’t be undone.", confirmLabel: "Delete everything" }))) return;
+ if (!(await dialog.confirm({ title: "Delete this storefront?", body: "Wipes the entire imported site. Settings, design, captured pages, public URL, and all imported inventory. This can’t be undone.", confirmLabel: "Delete everything" }))) return;
  setDelBusy(true);
  const r = await fetch(withStore("/api/store/storefront"), { method: "DELETE" }).catch(() => null);
  if (r && r.ok) { window.location.reload(); return; }
@@ -1018,7 +1018,7 @@ export default function StorefrontEditor() {
  if (captured) {
  const pageLabel = (p: string) => {
  // Her own name for the page wins. This picker is built from the captured PATHS, so without this it
- // keeps calling a page by the name its address implies — "Faq" for a page she renamed.
+ // keeps calling a page by the name its address implies. "Faq" for a page she renamed.
  const named = (pagesList.find((x) => x.path === p)?.label || "").trim();
  if (named) return named;
  if (p === "/") return "Home";
@@ -1026,13 +1026,13 @@ export default function StorefrontEditor() {
  return seg.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
  };
  // Edit preview must be SAME-ORIGIN so it loads the captured pages on whatever host the editor is on
- // (localhost, getvya.ai). captured.url is an absolute public URL (prod / custom domain) — wrong for the
+ // (localhost, getvya.ai). captured.url is an absolute public URL (prod / custom domain). Wrong for the
  // iframe. Build a relative /site/{slug} path from the slug (falling back to the url's pathname).
  // One editor for "the piece behind what I clicked", shown whether she clicked its photo, its name
  // or its price. Everything here writes to Inventory, because that is where a product's name, price
- // and photos actually live — the card on the page is rebuilt from them on every load.
+ // and photos actually live. The card on the page is rebuilt from them on every load.
  // Where a link goes, said in words, with the way there. Built once because a link is a link whether
- // she reached it by clicking its text or by clicking the picture it wraps — a collection tile is the
+ // she reached it by clicking its text or by clicking the picture it wraps. A collection tile is the
  // second kind, and used to offer neither.
  const linkDestination = (href: string, label: string) => {
   const t = resolveLinkTarget(href, label, captured.pages, { slug: captured.slug, origin: captured.origin });
@@ -1046,7 +1046,7 @@ export default function StorefrontEditor() {
     {t.matched === "name" ? `Open your “${t.label}” page` : `Go to ${t.label}`} →
    </button>
   );
-  if (t.kind === "external") return <p className="mt-1.5 text-[11.5px] text-stone-400">Leaves your site — {t.host}</p>;
+  if (t.kind === "external") return <p className="mt-1.5 text-[11.5px] text-stone-400">Leaves your site. {t.host}</p>;
   if (t.kind === "missing") return <p className="mt-1.5 text-[11.5px] text-stone-400">Points at {t.path}, which isn’t one of your pages.</p>;
   return <p className="mt-1.5 text-[11.5px] text-stone-400">Doesn’t go anywhere yet.</p>;
  };
@@ -1084,7 +1084,7 @@ export default function StorefrontEditor() {
     </div>
    </div>
    <p className="mt-2 text-[11.5px] leading-relaxed text-stone-500">
-    Changing it here changes the piece itself, everywhere it appears — your site, the marketplace, your inventory.
+    Changing it here changes the piece itself, everywhere it appears. Your site, the marketplace, your inventory.
    </p>
    <a href={withStore(`/admin/inventory?item=${encodeURIComponent(itemDraft.id)}`)} className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-medium text-[#5D0F17] underline underline-offset-2 hover:opacity-70">
     Everything else about this piece →
@@ -1094,19 +1094,19 @@ export default function StorefrontEditor() {
 
  const sitePath = captured.slug ? `/site/${captured.slug}` : (() => { try { return new URL(captured.url || "").pathname; } catch { return ""; } })();
  const editSrc = `${sitePath}${selPath === "/" ? "" : selPath}?edit=1`;
- // The address her hosted store is ACTUALLY served on — the same one /api/store/capture hands
+ // The address her hosted store is ACTUALLY served on. The same one /api/store/capture hands
  // back (her connected domain, else {slug}.vyasites.com). Deriving it from that one answer is how
  // this stays true: it used to print a .getvya.ai host while the store was served somewhere else,
  // so a seller was shown an address her own site does not answer on.
  // Host AND path. Showing only the host turned the fallback "vyaplatform.com/site/{slug}" into
- // "vyaplatform.com/collections" in the address bar — a URL that serves the marketplace, not her
+ // "vyaplatform.com/collections" in the address bar. A URL that serves the marketplace, not her
  // shop. With Plan B configured this reads tesselizabethvintage.vyasites.com; without it, the real
  // fallback path rather than a tidier-looking address that goes nowhere.
  const siteHost = (() => {
   try { const u = new URL(captured.url || ""); return (u.host + u.pathname).replace(/\/+$/, ""); }
   catch { return handle || captured.slug || "your-store"; }
  })();
- // A FIXED canvas width per device, in real pixels — never "100%".
+ // A FIXED canvas width per device, in real pixels, never "100%".
  //
  // Desktop used to be 100%, so the page rendered at whatever the surface happened to be: narrower
  // laptop, narrower page, and a theme with a 1200px breakpoint quietly served its tablet layout.
@@ -1133,11 +1133,11 @@ export default function StorefrontEditor() {
    <div className="w-full max-w-[420px] rounded-2xl border border-black/10 bg-white p-5 shadow-[0_30px_80px_-20px_rgba(43,36,29,0.6)]">
     <p className="text-[15px] font-semibold text-stone-900">Remove &ldquo;{removeAsk.label}&rdquo;?</p>
     <p className="mt-2 text-[12.5px] leading-relaxed text-stone-600">
-     Hiding it is the reversible one: shoppers get &ldquo;Page not found&rdquo;, it disappears from your menu, and it stays here so you can bring it back whenever you like.
+     Hiding takes it off your menu and out of search. It stays here, so you can bring it back.
     </p>
     {!!removeAsk.linkedFrom && (
      <p className="mt-2.5 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-800">
-      {removeAsk.linkedFrom === 1 ? "One link on your site still points here" : `${removeAsk.linkedFrom} links on your site still point here`} — anyone following one will get &ldquo;Page not found&rdquo;.
+      {removeAsk.linkedFrom === 1 ? "One link on your site still points here" : `${removeAsk.linkedFrom} links on your site still point here`}. Anyone following one will get &ldquo;Page not found&rdquo;.
      </p>
     )}
     <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1162,7 +1162,7 @@ export default function StorefrontEditor() {
   </div>
  )}
  <HideGlobalChat />
- {/* Top bar — matches the studio */}
+ {/* Top bar: matches the studio */}
  <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-black/10 bg-[#fbf9f5] px-3">
  <div className="flex min-w-0 items-center gap-2.5">
  <a href={`${base}/home`} title="Back to admin" className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-black/10 text-stone-500 transition hover:bg-stone-100"><ChevronDown size={16} className="rotate-90" /></a>
@@ -1183,7 +1183,7 @@ export default function StorefrontEditor() {
  {capStatus === "unsaved"
  ? <button type="button" onClick={() => postToPreview({ vya: "save" })} className="rounded-lg bg-[#5D0F17] px-3.5 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">Save</button>
  : <span className="hidden text-[11px] text-stone-400 sm:inline">{capStatus === "saving" ? "Saving…" : "All changes saved"}</span>}
- <button type="button" onClick={toggleLive} className="flex items-center gap-2 rounded-lg border border-black/15 px-3 py-1.5 transition hover:bg-stone-100" aria-pressed={enabled} title={enabled ? "Your store is live — click to unpublish" : "Your store is off — click to publish"}>
+ <button type="button" onClick={toggleLive} className="flex items-center gap-2 rounded-lg border border-black/15 px-3 py-1.5 transition hover:bg-stone-100" aria-pressed={enabled} title={enabled ? "Your store is live. Click to unpublish" : "Your store is off. Click to publish"}>
  <span className="text-[12px] font-medium text-stone-600">{enabled ? "Live" : "Off"}</span>
  <span className="relative h-4 w-7 rounded-full transition" style={{ background: enabled ? "#10b981" : "#d6d3d1" }}><span className="absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-all" style={{ left: enabled ? "14px" : "2px" }} /></span>
  </button>
@@ -1192,7 +1192,7 @@ export default function StorefrontEditor() {
  </div>
 
  <div className="relative flex min-h-0 flex-1">
- {/* Canva-style shell: a vertical icon rail (always visible) + a collapsible content panel — 1:1 with the from-scratch studio */}
+ {/* Canva-style shell: a vertical icon rail (always visible) + a collapsible content panel. 1:1 with the from-scratch studio */}
  {/* Below 768 the open panel floats OVER the preview instead of pushing it: a 430px column on a 390px
      phone pushed itself off the screen and crushed the preview to nothing. Collapse it to see the page. */}
  <div className={`relative flex shrink-0 overflow-visible border-r border-black/10 bg-white transition-[width] duration-200 ${capPanelOpen ? "w-[430px] max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:w-[calc(100vw-2.5rem)] max-md:shadow-[8px_0_24px_-12px_rgba(0,0,0,0.25)]" : "w-[70px]"}`}>
@@ -1205,11 +1205,11 @@ export default function StorefrontEditor() {
  </button>
  ))}
  </div>
- {/* Active panel — hidden when the side bar is collapsed */}
+ {/* Active panel: hidden when the side bar is collapsed */}
  {capPanelOpen && (
  <div className="flex min-h-0 min-w-0 flex-1 flex-col border-l border-black/10 bg-white">
  {(selImg || panel) ? (
- /* ── Contextual editor — selecting an image/section replaces the rail (like the studio) ── */
+ /* ── Contextual editor: selecting an image/section replaces the rail (like the studio) ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  {selImg ? (
  <>
@@ -1219,11 +1219,11 @@ export default function StorefrontEditor() {
  </div>
  {piecePanel}
  {/* WHERE THIS PICTURE GOES. A collection tile is a photo wrapped in a link, so clicking it used to
-     offer "replace this image" and nothing else — no address, no way through to the collection. A
+     offer "replace this image" and nothing else, no address, no way through to the collection. A
      link made of words always showed both; this is the same link, reached by its picture. */}
  {selImg.linkId !== null && (
  <div className="mb-4">
-  <label className="mb-1 block text-[12px] font-medium text-stone-600">Link{selImg.linkLabel ? ` — “${selImg.linkLabel}”` : ""}</label>
+  <label className="mb-1 block text-[12px] font-medium text-stone-600">Link{selImg.linkLabel ? `: “${selImg.linkLabel}”` : ""}</label>
   <input
    value={selImg.href}
    onChange={(e) => { const href = e.target.value; setSelImg({ ...selImg, href }); postToPreview({ vya: "set", kind: "link", id: selImg.linkId, href }); }}
@@ -1233,7 +1233,7 @@ export default function StorefrontEditor() {
   {linkDestination(selImg.href, selImg.linkLabel)}
  </div>
  )}
- {/* Taking one collection off a page. Not "delete the collection" — it stays in your Collections and
+ {/* Taking one collection off a page. Not "delete the collection". It stays in your Collections and
      on every other page that shows it; this is the box, off this page. */}
  {selImg.tile && (
  <button
@@ -1244,7 +1244,7 @@ export default function StorefrontEditor() {
   <Trash2 size={13} /> Remove this from the page
  </button>
  )}
- {/* A product photo belongs to the piece, and the grid is rebuilt from Inventory on every load — so
+ {/* A product photo belongs to the piece, and the grid is rebuilt from Inventory on every load, so
      swapping the captured <img> here would be undone the moment a shopper opened the page. Above is
      the control that actually changes it. */}
  {!piecePanel && <>
@@ -1256,7 +1256,7 @@ export default function StorefrontEditor() {
  </label>
  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Your uploads</p>
  {assets.length === 0 ? (
- <p className="text-[12px] leading-relaxed text-stone-400">{assetsBusy ? "Loading…" : "No uploads yet — add photos and they'll live here, reusable across your whole site."}</p>
+ <p className="text-[12px] leading-relaxed text-stone-400">{assetsBusy ? "Loading…" : "No uploads yet: add photos and they'll live here, reusable across your whole site."}</p>
  ) : (
  <div className="grid grid-cols-3 gap-1.5">
  {assets.map(({ url }) => (
@@ -1288,13 +1288,13 @@ export default function StorefrontEditor() {
  <div className="mb-3 flex items-center justify-between">
  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Edit section</p>
  {/* Done closes the rail AND releases the page. Closing only the rail left the section still
-     outlined and its text still editable, with no way back out — which is what "I can't unclick
+     outlined and its text still editable, with no way back out, which is what "I can't unclick
      it" was. */}
  <button onClick={() => { postToPreview({ vya: "deselect" }); setPanel(null); setSecRect(null); }} className="rounded-md px-2 py-1 text-[12px] font-semibold text-[#5D0F17] hover:bg-[#5D0F17]/[0.06]">Done</button>
  </div>
  {/* What "Delete" means depends on what she has hold of. With a box selected it is the box; the
      whole band is still one click away, by clicking the band. */}
- {inlineKind && <p className="mb-1.5 text-[11px] text-stone-400">This {inlineKind === "image" ? "image" : inlineKind === "button" ? "button" : "text box"} is selected — use the arrows on it to move it.</p>}
+ {inlineKind && <p className="mb-1.5 text-[11px] text-stone-400">This {inlineKind === "image" ? "image" : inlineKind === "button" ? "button" : "text box"} is selected. Use the arrows on it to move it.</p>}
  <div className="mb-4 flex gap-2">
  <button onClick={() => postToPreview({ vya: inlineKind ? "dupinline" : "dupsec" })} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-2 text-[12px] font-medium text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]"><Copy size={13} /> Duplicate{inlineKind ? " this" : ""}</button>
  {!inlineKind && secInfo && !secInfo.block ? (
@@ -1306,12 +1306,12 @@ export default function StorefrontEditor() {
  </div>
  {!inlineKind && secInfo && !secInfo.block && (
  <p className="-mt-2 mb-4 text-[11.5px] leading-snug text-stone-400">
-  {secInfo.hidden ? "Hidden from shoppers — it stays here so you can bring it back." : "Hiding keeps it on your page for later."}{" "}
+  {secInfo.hidden ? "Hidden from shoppers. It stays here so you can bring it back." : "Hiding keeps it on your page for later."}{" "}
   <button type="button" onClick={async () => { if (!(await dialog.confirm({ title: "Delete this section for good?", body: "It comes off this page. Hide it instead if you might want it back.", confirmLabel: "Delete section" }))) return; postToPreview({ vya: "delsec" }); setPanel(null); setSecRect(null); setSecInfo(null); }} className="underline underline-offset-2 hover:text-red-600">Delete permanently</button>
  </p>
  )}
  {/* Adding INTO the section she has open. The left rail's Text tab can only add a new band, because
-     reaching that tab means dismissing this panel — and dismissing it deselects the section, so by
+     reaching that tab means dismissing this panel, and dismissing it deselects the section, so by
      the time she clicks "Paragraph" there is no "here" left to put anything in. Here there is. */}
  <div className="mb-4">
  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add to this section</p>
@@ -1323,19 +1323,19 @@ export default function StorefrontEditor() {
  ))}
  </div>
  </div>
- {panel.fields.length === 0 && <p className="text-[12px] leading-relaxed text-stone-400">This section has no editable text or images — move, duplicate, or delete it, or ask VYA.</p>}
+ {panel.fields.length === 0 && <p className="text-[12px] leading-relaxed text-stone-400">This section has no editable text or images. Move, duplicate, or delete it, or ask VYA.</p>}
  <div className="space-y-4">
  {/* A link's WORDS and where it GOES, together.
      The panel listed every text field first and every href far below it, so checking where "Make
      an appointment here." pointed meant scrolling past twenty boxes all labelled "Link text" and
      matching them up by eye. The link field already knows the text it belongs to (`label`), so
-     each destination is rendered directly beneath the words that carry it. Order is display-only —
+     each destination is rendered directly beneath the words that carry it. Order is display-only,
      the underlying indices are untouched, because they address the real element in the page. */}
  {(() => {
  const ordered = orderFieldsForPanel(panel.fields);
  const { focused, rest } = splitFocusedFields(ordered, focusEid, focusImg);
  const shown = focused.length && !showAllFields ? focused : ordered;
- // She clicked something belonging to a piece in her inventory — a product's name, its price, its
+ // She clicked something belonging to a piece in her inventory. A product's name, its price, its
  // photo. Those are not editable here in any meaningful sense: every shopper's page rebuilds them
  // from Inventory, so whatever she types is gone on the next load. Give her the piece.
  const inInventory = focusItem && !showAllFields ? focusItem : null;
@@ -1358,7 +1358,7 @@ export default function StorefrontEditor() {
  {shown.map(({ f, i }) => (
  /* Touching a field scrolls the preview to the section it belongs to.
     The captured page is one long document and the panel is a separate column, so after any
-    scrolling — or a jump to a new page — you end up typing into a box with no idea which part of
+    scrolling, or a jump to a new page. You end up typing into a box with no idea which part of
     the site is changing. The injected script has always answered "scrollto"; nothing had ever
     asked. onFocusCapture so it fires for the textarea, the image picker and the link box alike,
     without repeating the call on each of them. */
@@ -1371,7 +1371,7 @@ export default function StorefrontEditor() {
  <label className="mb-1 block text-[12px] font-medium text-stone-600">
  {fieldLabel(f.tag)}
  {/* Twenty fields all called "Link text" are twenty fields you have to open to tell apart. */}
- {f.tag === "a" && f.value.trim() ? <span className="font-normal text-stone-400"> — “{f.value.trim().slice(0, 40)}”</span> : null}
+ {f.tag === "a" && f.value.trim() ? <span className="font-normal text-stone-400"> · “{f.value.trim().slice(0, 40)}”</span> : null}
  </label>
  <textarea
  ref={(el) => {
@@ -1381,8 +1381,8 @@ export default function StorefrontEditor() {
   el.scrollIntoView({ block: "center", behavior: "smooth" });
   el.focus();
   // Where she clicked, not the front. A focused box starts with its cursor at 0, so clicking at the
-  // END of "Out In Nature" on the page and typing wrote at the START of the box — measured: typing
-  // "Z" gave "ZOur Story", Delete ate its first letter — and a header/footer edit then carried that
+  // END of "Out In Nature" on the page and typing wrote at the START of the box. Measured: typing
+  // "Z" gave "ZOur Story", Delete ate its first letter, and a header/footer edit then carried that
   // damage to every page.
   const at = focusCaret.current === null ? el.value.length : Math.min(focusCaret.current, el.value.length);
   try { el.setSelectionRange(at, at); } catch { /* allow-swallow: a box that can't take a selection keeps the browser's */ }
@@ -1406,9 +1406,9 @@ export default function StorefrontEditor() {
  )}
  {f.kind === "link" && (
  <>
- <label className="mb-1 block text-[12px] font-medium text-stone-600">Link{f.label ? ` — “${f.label}”` : ""}</label>
+ <label className="mb-1 block text-[12px] font-medium text-stone-600">Link{f.label ? `: “${f.label}”` : ""}</label>
  <input value={f.href} onChange={(e) => { updatePanelField(i, { href: e.target.value }); postToPreview({ vya: "set", kind: "link", id: f.id, href: e.target.value }); }} placeholder="https://…  or  /page" className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-[13px] outline-none focus:border-[#5D0F17]/50" />
- {/* A URL is the one thing a seller can't read. Say where this link goes — and when it goes to
+ {/* A URL is the one thing a seller can't read. Say where this link goes, and when it goes to
   a page of hers, hand her the way there, instead of eighty thumbnails to hunt through. */}
  {(() => {
   return linkDestination(f.href, f.label || "");
@@ -1441,7 +1441,7 @@ export default function StorefrontEditor() {
  <ColorSwatch value={secStyle.color || "#1a1a1a"} onChange={(v) => setSec("color", v)} />
  </div>
  {/* The section's buttons. Background and Text recolour the section and its words, but every button
-     keeps its own fill — so from here, no button that came with the site could change colour. */}
+     keeps its own fill, so from here, no button that came with the site could change colour. */}
  {typeof secStyle.btn === "string" && (
  <div className="flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2">
  <span className="flex-1 text-[13px] text-stone-700">Buttons</span>
@@ -1468,7 +1468,7 @@ export default function StorefrontEditor() {
  {capTab === "assist" ? (
  <div className="min-h-0 flex-1"><Sidekick docked /></div>
  ) : capTab === "pages" ? (
- /* ── Pages — her menu order, renaming, hiding, and adding a page ── */
+ /* ── Pages. Her menu order, renaming, hiding, and adding a page ── */
  <PagesPanel
   pages={pagesList}
   ready={pagesReady}
@@ -1485,18 +1485,18 @@ export default function StorefrontEditor() {
   dragRef={pageDrag}
  />
  ) : capTab === "sections" ? (
- /* ── Layout — the same word, grouping and names as the Studio's Layout rail.
+ /* ── Layout: the same word, grouping and names as the Studio's Layout rail.
     It read "Sections" here and "Layout" there for the same job, which is how one product starts
-    feeling like two. Categories and copy now come from app/lib/storefront-variants.ts — the
-    catalogue the Studio renders — so the two lists cannot drift apart again.
+    feeling like two. Categories and copy now come from app/lib/storefront-variants.ts. The
+    catalogue the Studio renders, so the two lists cannot drift apart again.
     What is deliberately NOT here is the variant picker (Full bleed / Slideshow / Split / Stacked).
     Those exist only as React blocks; this editor injects HTML into the seller's own theme, and
     there is no block-to-HTML renderer. Five variants that all dropped identical markup would be a
     worse lie than one honest layout. ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Add a layout</p>
- <p className="mb-3 text-[12px] leading-snug text-stone-400">Drops it after the section you have selected (or the one in the middle of your screen). To put it exactly somewhere, hover between two sections on the page and press +.</p>
- {/* Product grid — live pieces in her theme's own card. First, because it is the one layout that sells. */}
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Adds it after the selected section. To place it exactly, hover between two sections and press +.</p>
+ {/* Product grid: live pieces in her theme's own card. First, because it is the one layout that sells. */}
  <button type="button" onClick={() => postToPreview({ vya: "addgrid" })} className="group mb-4 flex w-full items-center gap-3 rounded-xl border border-[#5D0F17]/25 bg-[#5D0F17]/[0.03] p-3 text-left transition hover:-translate-y-px hover:border-[#5D0F17]/50 hover:shadow-[0_10px_26px_-14px_rgba(43,36,29,0.5)]">
   <span className="grid h-10 w-10 shrink-0 grid-cols-2 gap-0.5 rounded-md border border-black/5 bg-white p-1.5" aria-hidden>{[0, 1, 2, 3].map((i) => <span key={i} className="rounded-[2px] bg-[#5D0F17]/25" />)}</span>
   <span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold text-stone-800">Product grid</span><span className="block text-[11.5px] leading-snug text-stone-500">Live pieces, in your site&rsquo;s own product card</span></span>
@@ -1529,10 +1529,10 @@ export default function StorefrontEditor() {
  })()}
  </div>
  ) : capTab === "elements" ? (
- /* ── Elements — small building blocks dropped onto the page ── */
+ /* ── Elements. Small building blocks dropped onto the page ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Elements</p>
- <p className="mb-3 text-[12px] leading-snug text-stone-400">Goes inside the section you have selected. With nothing selected it becomes a new band of its own, near the middle of the screen.</p>
+ <p className="mb-3 text-[12px] leading-snug text-stone-400">Goes inside the selected section. With nothing selected it becomes a band of its own.</p>
  <div className="grid grid-cols-3 gap-2">
  {([["image", "Image", ImageIcon], ["button", "Button", MousePointerClick], ["divider", "Line", Minus]] as const).map(([type, label, Icon]) => (
  <button key={type} type="button" onClick={() => postToPreview({ vya: "addblock", type })} className="flex flex-col items-center gap-1.5 rounded-lg border border-black/10 bg-white py-3.5 text-stone-600 transition hover:border-[#5D0F17]/40 hover:text-[#5D0F17]">
@@ -1543,7 +1543,7 @@ export default function StorefrontEditor() {
  </div>
  </div>
  ) : capTab === "text" ? (
- /* ── Text — drop a text block onto the page ── */
+ /* ── Text: drop a text block onto the page ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Text</p>
  <p className="mb-3 text-[12px] leading-snug text-stone-400">Select a section first and the text lands inside it. Click it to edit; the floating toolbar sizes, colours and aligns it.</p>
@@ -1556,13 +1556,13 @@ export default function StorefrontEditor() {
  </div>
  </div>
  ) : capTab === "uploads" ? (
- /* ── Uploads — the media library; click a photo to drop it onto the page ── */
+ /* ── Uploads. The media library; click a photo to drop it onto the page ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
  <label className="mb-4 flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#5D0F17] px-3 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#4a0c12]">{assetsBusy ? "Uploading…" : (<><UploadIcon size={14} /> Upload a photo</>)}<input type="file" accept="image/*" className="hidden" disabled={assetsBusy} onChange={async (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) await uploadAsset(f); }} /></label>
  <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Your uploads</p>
  <p className="mb-3 text-[12px] leading-snug text-stone-400">Click a photo to drop it onto your page as an image, reusable across your whole site.</p>
  {assets.length === 0 ? (
- <p className="text-[12px] leading-relaxed text-stone-400">{assetsBusy ? "Loading…" : "No uploads yet — add photos and they'll live here."}</p>
+ <p className="text-[12px] leading-relaxed text-stone-400">{assetsBusy ? "Loading…" : "No uploads yet: add photos and they'll live here."}</p>
  ) : (
  <div className="grid grid-cols-3 gap-1.5">
  {assets.map(({ url }) => (
@@ -1573,9 +1573,9 @@ export default function StorefrontEditor() {
  )}
  </div>
  ) : (
- /* ── Design tab — 1:1 with the studio: palettes / colours / corners / fonts ── */
+ /* ── Design tab: 1:1 with the studio: palettes / colours / corners / fonts ── */
  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
- <p className="mb-2 rounded-lg bg-[#5D0F17]/[0.05] px-3 py-2 text-[11px] leading-relaxed text-[#5D0F17]">Your imported site keeps its own layout — these set its palette and fonts on top. Changes show in the preview straight away and save on their own.</p>
+ <p className="mb-2 rounded-lg bg-[#5D0F17]/[0.05] px-3 py-2 text-[11px] leading-relaxed text-[#5D0F17]">Set the palette and fonts over your imported layout. Changes show in the preview and save themselves.</p>
  {designNote && <p className="mb-2 rounded-lg border border-[#5D0F17]/25 bg-white px-3 py-2 text-[11px] leading-relaxed text-[#5D0F17]">{designNote}</p>}
  {designOutdated && (
  <p className="mb-2 rounded-lg border border-[#5D0F17]/25 bg-white px-3 py-2 text-[11px] leading-relaxed text-stone-600">
@@ -1621,11 +1621,11 @@ export default function StorefrontEditor() {
  </div>
  {(design.heading || design.body) && <button onClick={() => setDesignField({ heading: null, body: null })} className="mt-2 text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Keep original fonts</button>}
 
- {/* Pick the two ends separately — and pick from HER faces, not only ours. A font read off her own
+ {/* Pick the two ends separately, and pick from HER faces, not only ours. A font read off her own
      stylesheet renders in the real thing on her own pages, because the @font-face that defines it
      came over with the capture. */}
  <p className="mb-1.5 mt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Or choose each</p>
- {siteFonts.length > 0 && <p className="mb-2 text-[11px] leading-snug text-stone-400">Your site&rsquo;s own fonts came over with it — they&rsquo;re at the top of each list.</p>}
+ {siteFonts.length > 0 && <p className="mb-2 text-[11px] leading-snug text-stone-400">Your site&rsquo;s own fonts came over with it. They&rsquo;re at the top of each list.</p>}
  <div className="space-y-1.5">
  {([["heading", "Headings"], ["body", "Body text"]] as const).map(([key, label]) => (
  <div key={key} className="flex items-center gap-3 rounded-lg border border-black/10 bg-white px-3 py-2">
@@ -1652,7 +1652,7 @@ export default function StorefrontEditor() {
  {/* ── What a product page says ────────────────────────────────────────────────────────────────
      One template for every piece, and the same setting the block builder edits. Which products it
      governs is worth saying plainly: a piece you add in VYA gets a page VYA renders, so this is its
-     design. A product you imported keeps the page that came over with it — that one's design is the
+     design. A product you imported keeps the page that came over with it. That one's design is the
      "Product page" entry in the page list above the preview, where an edit reaches all of them. */}
  <div className="mb-1.5 mt-6 flex items-center justify-between">
  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">What a product page says</p>
@@ -1672,25 +1672,25 @@ export default function StorefrontEditor() {
  </span>
  </label>
 
- <p className="mt-4 text-[11px] text-stone-400">{designSaved ? "All changes saved ✓ — live on your site" : "Changes apply live as you edit."}</p>
+ <p className="mt-4 text-[11px] text-stone-400">{designSaved ? "All changes saved ✓, live on your site" : "Changes apply live as you edit."}</p>
 
  <details className="mt-4">
  <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Custom CSS</summary>
- <p className="mb-1.5 mt-2 text-[12px] leading-snug text-stone-400">Advanced — layered over your site. Or just ask VYA.</p>
+ <p className="mb-1.5 mt-2 text-[12px] leading-snug text-stone-400">Advanced. Layered over your site. Or just ask VYA.</p>
  <textarea value={designRest} onChange={(e) => { designTouched.current = true; setDesignRest(e.target.value); setDesignSaved(false); }} spellCheck={false} placeholder=".site-header { background: #111; }" className="min-h-[100px] w-full resize-y rounded-lg border border-black/10 bg-white px-2.5 py-2 font-mono text-[11px] leading-relaxed outline-none focus:border-[#5D0F17]/50" />
  </details>
 
  {isAdmin && (
  <div className="mt-5 space-y-2 border-t border-black/10 pt-4">
  <button onClick={reSync} disabled={syncBusy} className="w-full rounded-lg border border-black/15 px-3 py-1.5 text-[12px] font-medium text-stone-600 hover:border-[#5D0F17] disabled:opacity-50">{syncBusy ? "Syncing…" : "Re-sync from live site (admin)"}</button>
- {(syncBusy || syncMsg) && <p className={`text-[11px] ${syncBusy ? "text-stone-400" : syncMsg!.startsWith("✓") ? "text-green-700" : "text-amber-700"}`}>{syncBusy ? "Re-crawling — a minute or two…" : syncMsg}</p>}
- <button onClick={async () => { if (!(await dialog.confirm({ title: "Reset this store?", body: "discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone.", confirmLabel: "Reset" }))) return; const r = await fetch(withStore("/api/store/capture"), { method: "DELETE" }).catch(() => null); if (r && r.ok) { window.location.reload(); } else { const msg = r ? ((await r.json().catch(() => ({}))).error || `Reset failed (${r.status}).`) : "Reset failed — network error."; alert(msg + " The captured site was NOT removed."); } }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
+ {(syncBusy || syncMsg) && <p className={`text-[11px] ${syncBusy ? "text-stone-400" : syncMsg!.startsWith("✓") ? "text-green-700" : "text-amber-700"}`}>{syncBusy ? "Re-crawling. A minute or two…" : syncMsg}</p>}
+ <button onClick={async () => { if (!(await dialog.confirm({ title: "Reset this store?", body: "discards the captured site AND deletes all (non-sold) inventory, then switches to the simple design. This can’t be undone.", confirmLabel: "Reset" }))) return; const r = await fetch(withStore("/api/store/capture"), { method: "DELETE" }).catch(() => null); if (r && r.ok) { window.location.reload(); } else { const msg = r ? ((await r.json().catch(() => ({}))).error || `Reset failed (${r.status}).`) : "Reset failed. Network error."; alert(msg + " The captured site was NOT removed."); } }} className="block text-[11px] text-stone-400 underline hover:text-[#5D0F17]">Use the simple design instead (owner)</button>
  </div>
  )}
  {isPlatformAdmin && (
  <div className="mt-4 space-y-1.5 border-t border-black/10 pt-4">
  <button onClick={removeStorefront} disabled={delBusy} className="w-full rounded-lg border border-red-200 px-3 py-1.5 text-[12px] font-medium text-red-600 hover:bg-red-50 disabled:opacity-50">{delBusy ? "Deleting…" : "Delete storefront"}</button>
- <p className="text-[10px] leading-tight text-stone-400">Platform admin only — wipes this storefront entirely.</p>
+ <p className="text-[10px] leading-tight text-stone-400">Platform admin only. Wipes this storefront entirely.</p>
  </div>
  )}
  </div>
@@ -1730,14 +1730,14 @@ export default function StorefrontEditor() {
  </div>
  </div>
 
- {/* Preview surface — the pixel-perfect captured site */}
- {/* The canvas is often wider than this surface — at ANY window width, not just below 1280: a 1440
+ {/* Preview surface: the pixel-perfect captured site */}
+ {/* The canvas is often wider than this surface, at ANY window width, not just below 1280: a 1440
      laptop minus the 430px panel leaves ~1000px for a 1280px canvas. Plain centring pushed its left
      edge out where no scrollbar reaches; safe centring starts it at the left instead, and still
      centres it when it fits. */}
  <div ref={surfaceRef} className="relative flex min-h-0 flex-1 justify-center-safe overflow-auto bg-[#eeece7] p-4">
  {/* Zooming out means seeing MORE PAGE, not a narrower page.
-     The frame stays exactly canvasW wide at every zoom — so the theme never reflows — and grows
+     The frame stays exactly canvasW wide at every zoom, so the theme never reflows, and grows
      TALLER by 100/scale, which is what puts more of the page on screen. The outer box reserves the
      SCALED size, because a CSS transform doesn't change the space an element occupies: without it
      the surface has nothing to scroll and zooming in traps you with no way to reach the edges. */}
@@ -1746,14 +1746,14 @@ export default function StorefrontEditor() {
  <iframe ref={editIframe} key={`${selPath}-${previewKey}-${device}`} src={editSrc} onLoad={() => { setPanel(null); setSelImg(null); setSecRect(null); }} className="h-full w-full rounded-lg border border-black/10 bg-white shadow-sm" title="Page editor" />
  </div>
  </div>
- {/* Floating section bar — the SAME bar as the from-scratch builder, positioned over the selected section */}
+ {/* Floating section bar: the SAME bar as the from-scratch builder, positioned over the selected section */}
  {panel && secRect && editIframe.current && !gridSel && (() => {
  const ir = editIframe.current.getBoundingClientRect();
  // secRect is measured INSIDE the frame, so it is in the page's own pixels. The frame is scaled,
  // so those have to be scaled too or the bar drifts further from its section the further you zoom.
  const z = zoom / 100;
  // ABOVE the section, not inside it. Anchored at the top edge it covered the first thing in the
- // section — which is usually the heading you clicked to get here. Falls back to just inside only
+ // section, which is usually the heading you clicked to get here. Falls back to just inside only
  // when the section starts at the very top of the frame and there is genuinely no room above.
  const anchorTop = txtSel ? Math.min(secRect.top, txtSel.top) : secRect.top;
  const top = Math.max(ir.top + 6, Math.min(ir.top + anchorTop * z - 46, ir.bottom - 54));
@@ -1823,14 +1823,14 @@ export default function StorefrontEditor() {
  );
  })()}
  </div>
- {/* Pages strip — the captured site's pages as thumbnails (click to switch).
+ {/* Pages strip: the captured site's pages as thumbnails (click to switch).
      Collapsed it is one scrolling row, which is fine for a five-page site and useless for
      eighty-two: the seller has no idea how many there are or what is down the far end. Expanded
      it wraps into a grid, which is the "zoom out and see everything" the block Studio already has.
-     Pages nothing on her site links to sort last and are greyed — see app/lib/capture-links.ts. */}
+     Pages nothing on her site links to sort last and are greyed. See app/lib/capture-links.ts. */}
  {captured.pages.length > 1 && (() => {
   const unlinked = new Set(captured.unlinked || []);
-  // Default: not-live pages last. Once she has dragged anything, HER order wins outright — the
+  // Default: not-live pages last. Once she has dragged anything, HER order wins outright. The
   // whole point is that the four pages she actually opens sit at the front.
   // Product pages are one design with a copy per piece; the strip shows the design once, at the end.
  const listable = captured.pages.filter((p) => !/^\/products\//.test(p));
@@ -1842,7 +1842,7 @@ export default function StorefrontEditor() {
    setPageOrder(next); // the strip moves now; the save is a formality behind it
    fetch(withStore("/api/store/storefront/page-order"), {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order: next }),
-   }).catch(() => { /* the arrangement is a preference — a failed save must not interrupt her */ });
+   }).catch(() => { /* the arrangement is a preference. A failed save must not interrupt her */ });
   };
   const onDrop = (target: string) => {
    const from = dragFrom.current;
@@ -1853,7 +1853,7 @@ export default function StorefrontEditor() {
   const Thumb = ({ p }: { p: string }) => {
    const off = unlinked.has(p);
    // What she has said about this page: hidden from shoppers, renamed, or one of the few that can
-   // never be removed at all (home, the cart, the product template) — see site-builder/pages.ts.
+   // never be removed at all (home, the cart, the product template). See site-builder/pages.ts.
    const meta = pagesList.find((x) => x.path === p) ?? null;
    const isHidden = !!meta?.hidden;
    const name = meta?.label || pageLabel(p);
@@ -1872,7 +1872,7 @@ export default function StorefrontEditor() {
       <button
        type="button"
        onClick={() => { setSelPath(p); setPanel(null); setSelImg(null); setPreviewKey((k) => k + 1); }}
-       title={isHidden ? `${name} — hidden from shoppers` : off ? `${name} — came over fine, but nothing on your site links to it` : name}
+       title={isHidden ? `${name}: hidden from shoppers` : off ? `${name}: came over fine, but nothing on your site links to it` : name}
        className={`relative grid h-[68px] w-[52px] place-items-center overflow-hidden rounded-md border bg-white shadow-sm transition ${selPath === p ? "border-[#5D0F17] ring-2 ring-[#5D0F17]/25" : "border-black/10 hover:border-black/25"} ${off || isHidden ? "opacity-45" : ""}`}
       >
        <div className="absolute inset-0 flex flex-col gap-1 p-1.5">
@@ -1909,14 +1909,14 @@ export default function StorefrontEditor() {
      <button type="button" onClick={() => setPagesOpen((o) => !o)} className="rounded-md px-2 py-1 font-semibold text-stone-600 transition hover:bg-stone-100">
       {pagesOpen ? "Collapse" : `All ${byDefault.length} pages`}
      </button>
-     <span className="hidden text-stone-400 sm:inline">Drag to reorder — just for you, your site doesn’t change</span>
+     <span className="hidden text-stone-400 sm:inline">Drag to reorder, just for you, your site doesn’t change</span>
      {pageOrder && pageOrder.length > 0 && (
       <button type="button" onClick={() => saveOrder([])} className="rounded-md px-2 py-1 text-stone-500 transition hover:bg-stone-100" title="Put the strip back to its default order">
        Reset order
       </button>
      )}
      {hiddenCount > 0 && (
-      <span title="These pages imported fine — nothing on your site links to them, so nobody browsing will find them. They still open for anyone with the direct link.">
+      <span title="These pages imported fine, but nothing on your site links to them. Add them to your menu, or leave them for direct links only.">
        {hiddenCount} not live on your site
       </span>
      )}
@@ -1948,7 +1948,7 @@ export default function StorefrontEditor() {
  }
 
  // No captured site: the canonical from-scratch builder is the Studio, rendered by the
- // /admin/storefront wrapper. Never fall through to the legacy in-file blocks builder — that was the
+ // /admin/storefront wrapper. Never fall through to the legacy in-file blocks builder. That was the
  // "old builder vs new builder" inconsistency (pressing reset dropped you into this UI instead of the
  // Studio). While the capture check is in flight, show a loader; once resolved with no capture, hand
  // off to the wrapper so it routes to the Studio.

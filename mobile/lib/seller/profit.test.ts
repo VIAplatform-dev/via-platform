@@ -12,7 +12,7 @@ const margin = {
       { label: "Shipping labels", cents: -33_300 },
       { label: "Net profit", cents: -12_000, total: true },
     ],
-    missingCostNote: "Cost missing on 2 sold pieces — not counted above.",
+    missingCostNote: "Cost missing on 2 sold pieces, not counted above.",
   },
 };
 
@@ -32,8 +32,8 @@ test("a negative net profit is a number, never hidden or clamped", () => {
   assert.equal(netProfitLine({ netProfitCents: 34_000 }, "USD"), "$340");
 });
 
-test("with no cost on record there are no rows and no net line — only the prompt, with the caveat", () => {
-  const unknown = { netProfitCents: null, profit: { lines: [], missingCostNote: "Cost missing on 3 sold pieces — not counted above." } };
+test("with no cost on record there are no rows and no net line, only the prompt, with the caveat", () => {
+  const unknown = { netProfitCents: null, profit: { lines: [], missingCostNote: "Cost missing on 3 sold pieces, not counted above." } };
   assert.deepEqual(profitRows(unknown, "GBP"), []);
   assert.equal(netProfitLine(unknown, "GBP"), null);
   assert.match(noProfitPrompt(unknown), /No cost on record/);

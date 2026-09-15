@@ -67,7 +67,7 @@ test("none of the template's own product survives", () => {
  assert.ok(!out.includes("https://cdn/109.jpg"));
 });
 
-// The same renderer, a completely different theme — no branch, no second code path.
+// The same renderer, a completely different theme, no branch, no second code path.
 test("works identically on a theme with different names for everything", () => {
  const $ = cheerio.load(`<table><tbody>${renderCartRows(horizon(), LINES)}</tbody></table>`);
  assert.equal($("tr").length, 2);
@@ -127,7 +127,7 @@ test("prices in each line's own currency", () => {
  assert.match($.root().text(), /£1,499\.00/);
 });
 
-// Caught on a real Horizon store: the row rendered "£600.00 … £155.00" — the derived price slot was
+// Caught on a real Horizon store: the row rendered "£600.00 … £155.00". The derived price slot was
 // filled, but the theme's SECOND money element (unit price vs line total) kept the template's own
 // price. One-of-one stock means both are always the same number, so every money string in the row
 // belongs to this line.
@@ -166,7 +166,7 @@ test("drops per-product fields rather than showing the template's", () => {
  assert.match(out, /Rick Owens Jacket/);
 });
 
-// The theme's own remove control is often an icon button with no text — Horizon uses a trash glyph.
+// The theme's own remove control is often an icon button with no text. Horizon uses a trash glyph.
 // Unrecognised, we appended our OWN "Remove" button beside it, so every line had two.
 test("uses the theme's own remove control instead of adding a second one", () => {
  const withTrash = `<html><body><table><tbody>

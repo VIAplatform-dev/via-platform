@@ -54,7 +54,7 @@ export async function listActivity(opts: { storeSlug?: string | null; email?: st
  }));
 }
 
-/** Everyone who's done anything, most recent first — the list to pick from. */
+/** Everyone who's done anything, most recent first. The list to pick from. */
 export async function listActiveStores(): Promise<{ storeSlug: string | null; email: string | null; last: string; events: number }[]> {
  await ensure();
  const rows = await db()`SELECT store_slug, max(email) AS email, max(created_at) AS last, count(*)::int AS events

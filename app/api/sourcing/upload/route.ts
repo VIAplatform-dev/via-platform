@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ error: "No file provided" }, { status: 400 });
  }
 
- // Validate type. SVG is excluded even though it matches "image/*" — it's XML that can carry
+ // Validate type. SVG is excluded even though it matches "image/*". It's XML that can carry
  // embedded <script>, and this check is client-asserted MIME with no magic-byte verification, so
  // a renamed file would sail through otherwise. Uploaded to a public blob URL, so an SVG here
  // would be a stored-XSS vector.

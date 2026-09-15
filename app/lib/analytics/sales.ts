@@ -3,11 +3,11 @@ import { ensureAnalyticsViews } from "./views";
 import { deltaPct, type Granularity, type ResolvedPeriod, type Window } from "./period";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — sales & revenue.
+// Analytics: sales & revenue.
 //
 // GMV, order count and AOV for the period, each carrying its own direction:
 // against the prior comparable period AND against the same period a year ago.
-// Plus the trend behind the headline, and the store's best day / best week —
+// Plus the trend behind the headline, and the store's best day / best week,
 // the number sellers actually plan around ("Saturdays are my day").
 //
 // Reads `vya_store_sales`, so a piece marked sold in the admin counts exactly
@@ -38,12 +38,12 @@ export type SalesMetrics = {
  bestDay: { day: string; cents: number; orders: number } | null;
  bestWeek: { weekStart: string; cents: number; orders: number } | null;
  recentSales: { title: string; amountCents: number; at: string | null; buyerEmail: string | null; origin: string }[];
- /** Sold pieces with no sale date on record — real revenue, but not placeable in time. */
+ /** Sold pieces with no sale date on record. Real revenue, but not placeable in time. */
  undatedSales: { count: number; valueCents: number };
  /** Money that came back. Refunded orders never count toward GMV, so this stands apart from it. */
  returns: { orders: number; valueCents: number; ratePct: number };
  /**
-  * Sales tax collected from buyers. NOT revenue — it's held on behalf of the
+  * Sales tax collected from buyers. NOT revenue: it's held on behalf of the
   * state until the seller files, so it's reported separately and never added to
   * GMV. Null-safe: orders from before tax was switched on simply contribute 0.
   */
@@ -135,7 +135,7 @@ export async function getSalesMetrics(sellerId: string, period: ResolvedPeriod):
     WHERE seller_id = ${sellerId}::uuid AND status = ANY(${SOLD_STATUSES})
      AND paid_at >= ${current.startISO} AND paid_at < ${current.endISO}
    `.catch(() => []),
-   // Refunds live on orders alone — a hand-marked sale has no concept of coming back.
+   // Refunds live on orders alone. A hand-marked sale has no concept of coming back.
    sql`
     SELECT COUNT(*)::int AS n, COALESCE(SUM(amount_cents), 0)::bigint AS value_cents
     FROM orders

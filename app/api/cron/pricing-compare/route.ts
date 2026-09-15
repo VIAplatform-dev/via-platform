@@ -8,7 +8,7 @@ import { inferBrandFromTitle } from "@/app/lib/loadStoreProducts";
 // lean path (reverse-image + eBay-sold, Google Shopping only if thin) and the legacy full
 // basket (reverse-image + eBay + Shopping + RealReal), and report how far the two prices
 // diverge + the SerpApi calls each used. Lets us confirm the lean path is as accurate before
-// trusting it. NOTE: makes live SerpApi + Claude calls for each item — keep the sample small.
+// trusting it. NOTE: makes live SerpApi + Claude calls for each item. Keep the sample small.
 //   /api/cron/pricing-compare?slug=lamash&limit=4
 export const maxDuration = 300;
 
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
  const photoUrl = p.image as string;
  const brand = (p.brand as string) || inferBrandFromTitle(title) || null;
 
- // Reverse-image matches — shared by both paths (one Google Lens call).
+ // Reverse-image matches. Shared by both paths (one Google Lens call).
  const reverse = matchesToComps(await reverseImageMatches(photoUrl).catch(() => []));
 
  // NEW lean path: reverse-image + eBay-sold, Google Shopping only if thin.

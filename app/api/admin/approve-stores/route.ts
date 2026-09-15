@@ -16,7 +16,7 @@ function isAuthorized(request: NextRequest): boolean {
  return false;
 }
 
-/** POST /api/admin/approve-stores — approves all store owner emails in pilot_access */
+/** POST /api/admin/approve-stores. Approves all store owner emails in pilot_access */
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

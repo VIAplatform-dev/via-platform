@@ -25,7 +25,7 @@ test("photos and prices are counted over live and draft pieces; sold ones are no
  assert.equal(c.unpriced, 1);
 });
 
-test("a missing cost only matters on a piece that is live — a draft is still being written", () => {
+test("a missing cost only matters on a piece that is live. A draft is still being written", () => {
  const c = itemCounts([item({ id: "a", costCents: null }), item({ id: "b", status: "draft", costCents: null }), item({ id: "c", costCents: 0 })], new Set(), NOW);
  assert.equal(c.costMissing, 1);
 });

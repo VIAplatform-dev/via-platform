@@ -49,7 +49,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
  setStoreSlugs(new Set(data.storeSlugs));
  }
  } catch {
- // Silently fail — favorites just won't show
+ // Silently fail: favorites just won't show
  } finally {
  setLoaded(true);
  }
@@ -66,7 +66,7 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
  fetchFavorites();
  }, [session?.user, fetchFavorites]);
 
- // Re-sync when the tab regains focus — keeps state fresh across tabs/sessions
+ // Re-sync when the tab regains focus. Keeps state fresh across tabs/sessions
  useEffect(() => {
  const handleFocus = () => { if (session?.user) fetchFavorites(); };
  document.addEventListener("visibilitychange", handleFocus);

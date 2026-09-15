@@ -5,7 +5,7 @@ import { refreshGridKit } from "@/app/lib/site-builder/grid-kit-store";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// POST { refresh: true } — "Refresh card look": derive the store's grid kit again from her captured
+// POST { refresh: true }: "Refresh card look": derive the store's grid kit again from her captured
 // collection pages and store it (a reserved capture row, see grid-kit-store.ts). A seller action,
 // scoped to her own store; every grid she has added takes the new card on its next render.
 export async function POST(request: NextRequest) {

@@ -4,7 +4,7 @@ import { resolveBrand, brandSlug, aliasMatches, type BrandRef } from "./brands.t
 import { brands as BRAND_DEFS, WHOLE_WORD_ALIASES } from "../brandData.ts";
 
 // Build the reference straight from the real brand data (import-free file, so it
-// loads under raw node) — this exercises the SHIPPING alias map.
+// loads under raw node). This exercises the SHIPPING alias map.
 const REF: BrandRef[] = BRAND_DEFS.map((b) => ({ slug: b.slug, label: b.label, aliases: b.keywords }));
 // Helper bound to the shipping whole-word set, mirroring the ETL call.
 const resolve = (t: string) => resolveBrand(t, REF, WHOLE_WORD_ALIASES);
@@ -17,7 +17,7 @@ const MINI: BrandRef[] = [
 ];
 
 // ── alias → canonical ────────────────────────────────────────────────────────
-test("resolveBrand — synonyms collapse to the canonical label", () => {
+test("resolveBrand: synonyms collapse to the canonical label", () => {
  assert.equal(resolveBrand("Vintage YSL Tribute heels", REF), "Saint Laurent");
  assert.equal(resolveBrand("Yves Saint Laurent silk blouse", REF), "Saint Laurent");
  assert.equal(resolveBrand("Saint Laurent Kate bag", REF), "Saint Laurent");
@@ -25,13 +25,13 @@ test("resolveBrand — synonyms collapse to the canonical label", () => {
  assert.equal(resolveBrand("Christian Dior saddle bag", REF), "Dior");
 });
 
-test("resolveBrand — case-insensitive", () => {
+test("resolveBrand: case-insensitive", () => {
  assert.equal(resolveBrand("vintage ysl bag", MINI), "Saint Laurent");
  assert.equal(resolveBrand("GUCCI loafers", REF), "Gucci");
 });
 
 // ── never guess → null ───────────────────────────────────────────────────────
-test("resolveBrand — unknown title resolves to null (never guesses)", () => {
+test("resolveBrand: unknown title resolves to null (never guesses)", () => {
  assert.equal(resolveBrand("Beautiful vintage silk slip dress", REF), null);
  assert.equal(resolveBrand("Hand-knit wool cardigan, size M", REF), null);
  assert.equal(resolveBrand("", REF), null);
@@ -40,7 +40,7 @@ test("resolveBrand — unknown title resolves to null (never guesses)", () => {
 });
 
 // ── short-alias word boundaries (no false positives inside words) ────────────
-test("resolveBrand — short aliases need word boundaries", () => {
+test("resolveBrand: short aliases need word boundaries", () => {
  // "lv" must NOT match inside "solving" / "lvmh", "cd" not inside "scdream".
  assert.equal(resolveBrand("Problem-solving toolkit", MINI), null);
  assert.equal(resolveBrand("LVMH holding company", MINI), null);
@@ -51,7 +51,7 @@ test("resolveBrand — short aliases need word boundaries", () => {
 });
 
 // ── priority: first matching brand in ref order wins ─────────────────────────
-test("resolveBrand — first matching brand (ref order) wins", () => {
+test("resolveBrand: first matching brand (ref order) wins", () => {
  const ref: BrandRef[] = [
  { slug: "a", label: "Brand A", aliases: ["alpha"] },
  { slug: "b", label: "Brand B", aliases: ["beta"] },
@@ -61,7 +61,7 @@ test("resolveBrand — first matching brand (ref order) wins", () => {
 });
 
 // ── brandSlug helper ─────────────────────────────────────────────────────────
-test("brandSlug — maps a resolved label back to its canonical slug", () => {
+test("brandSlug: maps a resolved label back to its canonical slug", () => {
  assert.equal(brandSlug("Saint Laurent", REF), "saint-laurent");
  assert.equal(brandSlug("Louis Vuitton", REF), "louis-vuitton");
  assert.equal(brandSlug(null, REF), null);
@@ -69,7 +69,7 @@ test("brandSlug — maps a resolved label back to its canonical slug", () => {
 });
 
 // ── substring-of-common-word false positives (the bug) ──────────────────────
-test("resolveBrand — whole-word aliases don't match inside common words", () => {
+test("resolveBrand: whole-word aliases don't match inside common words", () => {
  // etro → retro/metro, boss → embossed, coach → stagecoach/coaching,
  // pucci → cappuccino, marni → marnier, "the row" → "the rowing".
  assert.equal(resolve("Retro floral dress"), null);
@@ -82,7 +82,7 @@ test("resolveBrand — whole-word aliases don't match inside common words", () =
  assert.equal(resolve("The rowing club crewneck"), null);
 });
 
-test("resolveBrand — whole-word aliases STILL match as standalone words", () => {
+test("resolveBrand: whole-word aliases STILL match as standalone words", () => {
  assert.equal(resolve("Etro paisley silk scarf"), "Etro");
  assert.equal(resolve("Coach leather shoulder bag"), "Coach");
  assert.equal(resolve("Hugo Boss wool blazer"), "Hugo Boss");
@@ -92,7 +92,7 @@ test("resolveBrand — whole-word aliases STILL match as standalone words", () =
  assert.equal(resolve("The Row Margaux bag"), "The Row");
 });
 
-test("resolveBrand — normal aliases still match plurals & possessives", () => {
+test("resolveBrand: normal aliases still match plurals & possessives", () => {
  assert.equal(resolve("Guccis bag"), "Gucci");
  assert.equal(resolve("Gucci's vintage loafers"), "Gucci");
  assert.equal(resolve("Gucci-style monogram belt"), "Gucci");
@@ -100,7 +100,7 @@ test("resolveBrand — normal aliases still match plurals & possessives", () => 
 });
 
 // ── aliasMatches unit (shared by all matchers) ───────────────────────────────
-test("aliasMatches — whole-word vs substring", () => {
+test("aliasMatches. Whole-word vs substring", () => {
  assert.equal(aliasMatches("retro dress", "etro", true), false);
  assert.equal(aliasMatches("etro scarf", "etro", true), true);
  assert.equal(aliasMatches("guccis bag", "gucci", false), true); // substring keeps plurals
@@ -109,7 +109,7 @@ test("aliasMatches — whole-word vs substring", () => {
 });
 
 // ── every seeded alias resolves to its own brand (self-consistency) ──────────
-test("resolveBrand — every shipped alias resolves to its canonical brand", () => {
+test("resolveBrand: every shipped alias resolves to its canonical brand", () => {
  for (const b of REF) {
  for (const alias of b.aliases) {
   const got = resolveBrand(`prefix ${alias} suffix`, REF);

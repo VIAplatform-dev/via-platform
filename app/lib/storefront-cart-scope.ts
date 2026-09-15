@@ -18,9 +18,9 @@ import { cartSellerId } from "./storefront-cart-db.ts";
  *
  * Null is not a failure: every reader treats it as "the whole bag", which is exactly how these
  * routes behaved before bags were per-store. So a page that hasn't been taught to name its store
- * keeps working — it just doesn't get the filtering.
+ * keeps working. It just doesn't get the filtering.
  *
- * The last resort — the bag's OWN store — is what keeps a shopper's single-store bag working on a
+ * The last resort, the bag's OWN store. Is what keeps a shopper's single-store bag working on a
  * VYA page that forgot the `?store=`: with one store in the bag there is no ambiguity to resolve.
  */
 export async function requestBagSellerId(request: NextRequest, cartToken: string | null | undefined): Promise<string | null> {

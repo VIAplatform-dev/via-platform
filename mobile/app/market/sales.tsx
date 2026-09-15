@@ -9,12 +9,12 @@ import { useAuth } from "../../lib/auth";
 import { colors, spacing, fonts } from "../../lib/theme";
 import { formatMoney } from "../../lib/seller/home";
 
-// Sales today — what has gone out the door at this market, and how it was paid.
+// Sales today: what has gone out the door at this market, and how it was paid.
 // GET /api/store/market/sales answers the open session's orders plus a summary; same numbers as
 // the band on the market screen, itemised.
 //
-// VOID: the customer changed their mind while still at the stall. Two taps — Void, then confirm on
-// the row itself — and POST .../sales/[id]/void does the rest server-side: cash comes off the tin,
+// VOID: the customer changed their mind while still at the stall. Two taps. Void, then confirm on
+// the row itself, and POST .../sales/[id]/void does the rest server-side: cash comes off the tin,
 // a card payment is refunded through the same code Orders uses, the piece goes back on the rack.
 
 type Sale = { id: string; itemTitle?: string | null; amountCents: number; tender?: string | null; status: string; createdAt?: string | null; paidAt?: string | null };
@@ -44,7 +44,7 @@ export default function SalesToday() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* The market screen sets the bar light for its wine band; this screen is cream, so it
-          must set it back — the bar is per-screen, and a light bar on cream is invisible. */}
+          must set it back. The bar is per-screen, and a light bar on cream is invisible. */}
       <StatusBar style="dark" />
       <View style={{ flexDirection: "row", alignItems: "center", paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
         <Pressable hitSlop={12} onPress={() => router.back()}><Text style={{ fontSize: 15, color: colors.accent, fontWeight: "600" }}>Back</Text></Pressable>

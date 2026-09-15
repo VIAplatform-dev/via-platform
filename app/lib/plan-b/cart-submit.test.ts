@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cartSubmitAction } from "./cart-submit.ts";
 
-// Shopify's cart form is ONE form with TWO submit buttons — `checkout` and `update`. Which one the
+// Shopify's cart form is ONE form with TWO submit buttons. `checkout` and `update`. Which one the
 // shopper pressed is carried only by which name appears in the body, so this decision is the whole
 // difference between "take my money" and "recalculate my bag".
 test("the checkout button starts a checkout", () => {
@@ -14,7 +14,7 @@ test("the update button does not", () => {
  assert.equal(cartSubmitAction({ update: "Update" }).kind, "update");
 });
 
-// A bare POST /cart with neither name is Shopify's own "just recalculate" — never a checkout.
+// A bare POST /cart with neither name is Shopify's own "just recalculate", never a checkout.
 // Guessing checkout here would charge a shopper who only changed a quantity.
 test("a body with neither button is an update, never a checkout", () => {
  assert.equal(cartSubmitAction({}).kind, "update");
@@ -26,7 +26,7 @@ test("checkout wins when a theme sends both", () => {
 });
 
 test("reads quantity-zero lines out of the positional updates[] form", () => {
- // updates[]=1&updates[]=0&updates[]=1 — the second line was zeroed.
+ // updates[]=1&updates[]=0&updates[]=1: the second line was zeroed.
  const a = cartSubmitAction({ update: "", "updates[]": ["1", "0", "1"] });
  assert.deepEqual(a, { kind: "update", removeLines: [2] });
 });
@@ -45,7 +45,7 @@ test("an update that removes nothing removes nothing", () => {
 });
 
 // One-of-one stock: a theme optimistically asking for 2 must not be read as "remove", and must not
-// throw either — it is simply not a removal.
+// throw either: it is simply not a removal.
 test("quantities above one are not removals", () => {
  assert.deepEqual(cartSubmitAction({ "updates[]": ["2", "5"] }), { kind: "update", removeLines: [] });
 });

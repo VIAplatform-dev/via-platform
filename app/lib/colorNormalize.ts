@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Normalize a free-text colour (from the vision model, e.g. "navy blue",
 // "charcoal grey", "black with white pinstripes") to ONE keyword from the site's
-// colour-filter vocabulary — so image-derived colours merge cleanly with the
+// colour-filter vocabulary, so image-derived colours merge cleanly with the
 // title-derived ones. Pure + tested. Returns null when nothing maps (never guess).
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ export function normalizeColor(raw: string | null | undefined): string | null {
  const s = raw.toLowerCase().trim();
  if (!s) return null;
 
- // Whole-string synonym (e.g. "gray", "off white") — cheap fast path.
+ // Whole-string synonym (e.g. "gray", "off white"): cheap fast path.
  if (SYNONYM[s]) return SYNONYM[s];
 
  // Otherwise pick the earliest-mentioned colour across palette words AND

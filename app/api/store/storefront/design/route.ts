@@ -24,19 +24,19 @@ import type { StorefrontTheme } from "@/app/lib/store-import";
 export const dynamic = "force-dynamic";
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
-// GET — current design (template + colors + fonts), the options, and a few of the
+// GET: current design (template + colors + fonts), the options, and a few of the
 // store's real products so the editor can show a true-to-life live preview.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  // A ?version= means "edit this draft, not the live site". Without it the editor works on the live
- // storefront exactly as before — which is why a two-week project used to have to go live first.
+ // storefront exactly as before, which is why a two-week project used to have to go live first.
  const versionId = new URL(request.url).searchParams.get("version");
  if (versionId) {
   const v = await getVersionTheme(slug, versionId);
   if (!v) return NextResponse.json({ error: "That design isn’t yours." }, { status: 404 });
   if (v.kind === "imported") {
-   return NextResponse.json({ error: "Imported sites are edited on the live site — publish this one first.", importedDraft: true }, { status: 409 });
+   return NextResponse.json({ error: "Imported sites are edited on the live site. Publish this one first.", importedDraft: true }, { status: 409 });
   }
   return NextResponse.json({ theme: v.theme ?? {}, version: versionId });
  }
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
  const sf = await getStorefrontBySlug(slug);
  let theme: StorefrontTheme = sf?.theme ?? {};
  // First time the builder opens with no sections yet, seed it. A store that IMPORTED from a URL
- // should see THEIR site pulled one-for-one — so if we captured their site, replicate its homepage
+ // should see THEIR site pulled one-for-one, so if we captured their site, replicate its homepage
  // sections; only a build-from-scratch store (no capture) gets the polished starter template. This
  // also closes a race where the capture's block import and this seeding could otherwise collide.
  if (!theme.blocks?.length) {
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
  const seller = await getSellerBySlug(slug).catch(() => null);
  // Inventory for the builder's product sections. This has to match what the LIVE storefront renders
  // or the seller designs against a different shop than the one shoppers see:
- //  • Same source and same fallback as app/s/StorefrontView.tsx — VYA listings first, synced external
+ //  • Same source and same fallback as app/s/StorefrontView.tsx. VYA listings first, synced external
  //    products when a store has none. Without the fallback a synced store's builder looks empty
  //    while its live page is full.
  //  • No image filter. The live grid shows an imageless listing as a blank tile; hiding it here
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
    .map((p) => ({ title: p.name, price: p.price, image: p.image || p.images?.[0] || "" }));
  // ONE real listing, with the facts a product page can print. The Product preview used to fill these
  // with invented copy ("Alexander Wang", "2000s"), which made the builder promise a page the store's
- // own listings couldn't produce — the seller then went to the live site and found it unchanged. A
+ // own listings couldn't produce. The seller then went to the live site and found it unchanged. A
  // preview of a product page has to be a preview of a PRODUCT.
  const sampleItem = seller ? (await listStorefrontItems(seller.id).catch(() => []))[0] ?? null : null;
  const sampleProduct = sampleItem
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
   }
   : null;
 
- // Collections for the "Products shown" picker — ALL of them, so a seller can point a section at any
+ // Collections for the "Products shown" picker. ALL of them, so a seller can point a section at any
  // collection they have. Only the ones a section actually names get their items fetched: that's one
  // query per USED collection rather than per existing one, and a store with forty collections would
  // otherwise pay forty queries to render a page that references one.
@@ -159,7 +159,7 @@ export async function GET(request: NextRequest) {
  // Resolved the SAME way the live storefront resolves it (app/s/StorefrontView.tsx), so the
  // editor's header and the published page can't show two different names. The old chain fell
  // through to the tagline and then the slug, while the live page reached for the store's real
- // name — which is why the studio said "via-admin" and the storefront said "VYA Test Store".
+ // name, which is why the studio said "via-admin" and the storefront said "VYA Test Store".
  storeName: sf?.theme?.storeName || stores.find((s) => s.slug === slug)?.name || seller?.name || sf?.tagline || null,
  tagline: sf?.tagline || null,
  templates: STOREFRONT_TEMPLATES,
@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
  bodyFonts: BODY_FONTS,
  // The faces her OWN site is set in, read back out of the CSS we captured. The picker's curated
  // Google list never contained the one font she actually wanted. `face: true` means the stylesheet
- // ships the file too, so choosing it renders in the real thing rather than a fallback — which is
+ // ships the file too, so choosing it renders in the real thing rather than a fallback, which is
  // why these are offered to the store they came from and not pooled across stores (a webfont
  // licence is per-domain). Empty for a store that never imported a site.
  siteFonts: await getSiteCss(slug).then((css) => detectSiteFonts(css || "")).catch(() => []),
@@ -177,7 +177,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-// POST { template?, colors?, fonts? } — apply a template and/or save customizations.
+// POST { template?, colors?, fonts? }: apply a template and/or save customizations.
 // A template seeds colors + fonts; explicit colors/fonts override on top (so a store
 // can start from a template and tweak from there). All write the storefront theme.
 export async function POST(request: NextRequest) {
@@ -197,9 +197,9 @@ export async function POST(request: NextRequest) {
  //
  // Two things are deliberately NOT destructive:
  //   • The seller's existing pages survive. A template page is added only where the store has no
- //     page at that slug — so switching template to try a look never deletes an About page someone
+ //     page at that slug, so switching template to try a look never deletes an About page someone
  //     wrote. (Home and Shop ARE replaced; that is what choosing a layout means.)
- //   • `applyContent: false` restyles only — palette, type, corners, header — leaving every section
+ //   • `applyContent: false` restyles only, palette, type, corners, header. Leaving every section
  //     where it is. That's the path the Design panel uses for a seller who has already built a page.
  if (body?.template) {
  const t = getTemplate(String(body.template));
@@ -242,12 +242,12 @@ export async function POST(request: NextRequest) {
  }
 
  if (body?.radius === "sharp" || body?.radius === "soft" || body?.radius === "round") theme.radius = body.radius;
- // Store logo. "" clears it (back to the store name in type). Only an uploaded asset URL is stored —
+ // Store logo. "" clears it (back to the store name in type). Only an uploaded asset URL is stored,
  // safeSrc keeps this from becoming a way to point the header at an arbitrary remote URL.
  if (["inline", "center", "split", "stacked"].includes(String(body?.headerLayout))) theme.headerLayout = body.headerLayout;
  if (typeof body?.logo === "string") { const u = body.logo.trim(); theme.logo = u ? (safeSrc(u) ?? theme.logo ?? null) : null; }
  // Store name (the storefront wordmark). The GET has always READ theme.storeName, but nothing
- // ever wrote it — so the name field in the build wizard was preview-only and the seller's
+ // ever wrote it, so the name field in the build wizard was preview-only and the seller's
  // typed name was discarded the moment the wizard closed. Blank is ignored rather than stored,
  // so a client that omits it can't wipe the name off a live store.
  if (typeof body?.storeName === "string") { const n = body.storeName.trim().slice(0, 80); if (n.length >= 2) theme.storeName = n; }
@@ -305,7 +305,7 @@ export async function POST(request: NextRequest) {
  if (typeof body?.footerAbout === "string") theme.footerAbout = body.footerAbout.slice(0, 300);
  if (typeof body?.footerNewsletterHeading === "string") theme.footerNewsletterHeading = body.footerNewsletterHeading.slice(0, 120);
  if (typeof body?.footerNewsletterText === "string") theme.footerNewsletterText = body.footerNewsletterText.slice(0, 300);
- // The shop's own labels. Only the four known keys, each a short string — anything else is dropped.
+ // The shop's own labels. Only the four known keys, each a short string. Anything else is dropped.
  if (body?.words && typeof body.words === "object") {
   const w: Record<string, string> = {};
   for (const k of ["sold", "shopAll", "viewAll", "empty"]) {
@@ -325,7 +325,7 @@ export async function POST(request: NextRequest) {
  }).filter(Boolean).slice(0, 12) as { label: string; href: string; place: "header" | "footer" | "both" }[];
  }
 
- // Writing to a draft leaves the live storefront completely alone — that is the whole point of
+ // Writing to a draft leaves the live storefront completely alone. That is the whole point of
  // being able to edit one without publishing it.
  const targetVersion = typeof body?.version === "string" && body.version ? body.version : null;
  if (targetVersion) {

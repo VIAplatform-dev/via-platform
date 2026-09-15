@@ -25,7 +25,7 @@ export function formatPriceCents(cents: number, currency?: string | null): strin
  return new Intl.NumberFormat("en-US", { style: "currency", currency: code, minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 }).format(cents / 100);
 }
 
-/** The symbol alone — "£", "$", "€", "A$" — for an input's prefix. Falls back to the code. */
+/** The symbol alone, "£", "$", "€", "A$", for an input's prefix. Falls back to the code. */
 export function currencySymbol(currency?: string | null): string {
  const code = currency?.trim().toUpperCase() || "USD";
  try {

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ appointments, slots, settings });
 }
 
-// POST — the store writing someone in itself: a phone call, a walk-in. Confirmed on the spot, since
+// POST: the store writing someone in itself: a phone call, a walk-in. Confirmed on the spot, since
 // the shop was already there when it agreed to the time, and never charged a deposit.
 export async function POST(request: NextRequest) {
  const acting = await seller(request);

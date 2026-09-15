@@ -34,7 +34,7 @@ function resolveStoreSlug(brandName: string): string | null {
  if (collabsHandleOverrides[key]) return collabsHandleOverrides[key];
  const normalized = key.replace(/[^a-z0-9]/g, "");
  if (slugByNormalized.has(normalized)) return slugByNormalized.get(normalized)!;
- return null; // Can't resolve — don't touch it
+ return null; // Can't resolve: don't touch it
 }
 
 /**

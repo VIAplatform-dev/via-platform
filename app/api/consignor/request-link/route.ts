@@ -5,7 +5,7 @@ import { createMagicLinkToken } from "@/app/lib/mobileAuth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Consignor requests a sign-in link. We only send one if the email is on file as a consignor —
+// Consignor requests a sign-in link. We only send one if the email is on file as a consignor,
 // but always respond the same way, so the form never reveals who is or isn't a consignor.
 export async function POST(request: Request) {
  const body = await request.json().catch(() => null);

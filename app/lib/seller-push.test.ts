@@ -5,7 +5,7 @@ import { DEFAULT_PREFS, mergePrefs } from "./notification-prefs-core.ts";
 import type { PushPayload } from "./push.ts";
 
 // Delivery of a seller push, with every outside dependency faked: nothing here touches a
-// database or Expo. What is tested is the GATE — her preferences, her tokens — and that a failure
+// database or Expo. What is tested is the GATE, her preferences, her tokens, and that a failure
 // anywhere in the chain is swallowed, because a push must never break the sale that caused it.
 
 function fakes(o: { prefs?: unknown; tokens?: string[]; getPrefs?: SellerPushDeps["getPrefs"]; getTokens?: SellerPushDeps["getTokens"]; send?: SellerPushDeps["send"] } = {}) {
@@ -55,7 +55,7 @@ test("no phone registered → nothing to send, and that is not an error", async 
  assert.equal(sent.length, 0);
 });
 
-test("a failure anywhere is swallowed — the sale already happened", async () => {
+test("a failure anywhere is swallowed. The sale already happened", async () => {
  const prefsDown = fakes({ getPrefs: async () => { throw new Error("db down"); } });
  assert.deepEqual(await pushSellerSale("blummier", SALE, prefsDown.deps), { sent: false, reason: "error" });
  const sendDown = fakes({ send: async () => { throw new Error("expo down"); } });
@@ -98,12 +98,12 @@ test("a payout pushes when she asked to hear about it", async () => {
  assert.equal(sent[0].payload.data?.type, "payout");
 });
 
-test("payout is off by default — money moving is not urgent enough to buzz unasked", async () => {
+test("payout is off by default. Money moving is not urgent enough to buzz unasked", async () => {
  const { deps } = fakes();
  assert.deepEqual(await pushSellerPayout("s", { amountCents: 1, currency: "usd", payoutId: "po" }, deps), { sent: false, reason: "off" });
 });
 
-test("a push failure never escapes — the payout already happened", async () => {
+test("a push failure never escapes. The payout already happened", async () => {
  const { deps } = fakes({ prefs: mergePrefs(DEFAULT_PREFS, { push: { payout: true } }), send: async () => { throw new Error("expo down"); } });
  assert.deepEqual(await pushSellerPayout("s", { amountCents: 1, currency: "usd", payoutId: "po" }, deps), { sent: false, reason: "error" });
 });

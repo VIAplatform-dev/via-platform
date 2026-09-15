@@ -6,7 +6,7 @@ import { importCustomers } from "@/app/lib/store-customers-db";
 
 export const dynamic = "force-dynamic";
 
-// POST { csv, source? } — bring over a seller's existing customer list. Any TEXT export
+// POST { csv, source? }: bring over a seller's existing customer list. Any TEXT export
 // (Shopify/Square/Mailchimp/plain list) parses flexibly; a spreadsheet's bytes are refused by
 // name so the seller hears "save it as CSV" rather than "no email addresses found".
 export async function POST(request: NextRequest) {

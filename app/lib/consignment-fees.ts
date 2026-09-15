@@ -4,12 +4,12 @@
 //
 //  1. THE MONEY DOESN'T COME THROUGH US. eBay and Depop pay the seller's own account directly.
 //     VYA never holds that cash, so it cannot transfer the consignor's share out of a balance it
-//     was never given — see settledThroughVya below.
+//     was never given: see settledThroughVya below.
 //
 //  2. THE MARKETPLACE TOOK A CUT FIRST. eBay is around 13%. Splitting the GROSS means the store
 //     pays the whole fee out of its own half: on a $100 sale at 50/50 the consignor gets $50, eBay
 //     gets $13, and the store keeps $37 rather than $50. That may be exactly what a store's
-//     agreement says — but it has to be a decision, not an accident, so it is a per-store setting.
+//     agreement says, but it has to be a decision, not an accident, so it is a per-store setting.
 
 /** Who absorbs the marketplace's cut on an off-platform sale. */
 export type FeePolicy =
@@ -27,8 +27,8 @@ const ROUTED_CHANNELS = new Set(["vya", "storefront", "market"]);
  * Did this sale's money actually reach VYA?
  *
  * The auto-payout transfers from VYA's own Stripe balance. For a VYA sale that balance holds the
- * consignor's cut, routed at checkout. For an eBay sale it holds nothing — the seller was paid
- * directly — so paying out against it would send VYA's own money for a sale it never processed.
+ * consignor's cut, routed at checkout. For an eBay sale it holds nothing. The seller was paid
+ * directly, so paying out against it would send VYA's own money for a sale it never processed.
  */
 export function settledThroughVya(channel: string | null | undefined): boolean {
  return ROUTED_CHANNELS.has((channel || "vya").toLowerCase());

@@ -6,10 +6,10 @@
 import type { PushPayload } from "./push";
 
 /** Currencies VYA's pilot stores actually price in. Anything else falls back to its code, which is
- *  honest — inventing the wrong symbol misstates the amount. */
+ *  honest: inventing the wrong symbol misstates the amount. */
 const SYMBOLS: Record<string, string> = { GBP: "£", USD: "$", EUR: "€" };
 
-/** Thousands separators by hand, not `toLocaleString` — copied from mobile/lib/seller/home.ts so a
+/** Thousands separators by hand, not `toLocaleString`. Copied from mobile/lib/seller/home.ts so a
  *  push reads exactly the way the same amount reads on the phone's Home. */
 function group(n: number): string {
  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");

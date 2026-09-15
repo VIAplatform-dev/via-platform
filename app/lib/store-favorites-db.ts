@@ -4,7 +4,7 @@ import { neon } from "@neondatabase/serverless";
 // VYA marketplace.
 //
 // TWO DIFFERENT IDENTITIES, ON PURPOSE.
-//   • VIEWS are anonymous — an unnamed cookie. Counting how many people looked at a piece needs no
+//   • VIEWS are anonymous. An unnamed cookie. Counting how many people looked at a piece needs no
 //     name, and asking for one to browse would be an imposition with nothing behind it.
 //   • SAVES are signed in. `shopper_id` here is the email on the store session (shopper-session.ts),
 //     which is what lets a list follow somebody from a laptop to a phone, and what turns "eleven
@@ -27,7 +27,7 @@ export async function ensureStoreEngagementTables() {
 async function ensureTables() {
  if (ensured) return;
  const sql = db();
- // NOT `store_favorites`. That name was already taken by app/lib/favorites-db.ts — the MARKETPLACE's
+ // NOT `store_favorites`. That name was already taken by app/lib/favorites-db.ts. The MARKETPLACE's
  // table of shoppers following a whole store (user_id, store_slug), which feeds notifications and
  // has real rows in it. This is a different thing entirely: one shopper saving one PIECE on one
  // seller's storefront.
@@ -35,7 +35,7 @@ async function ensureTables() {
  // The collision was silent and total. `CREATE TABLE IF NOT EXISTS` saw a table by that name and
  // did nothing, so every read and write here ran against a table with no item_id column, failed,
  // and was swallowed by the .catch on each query. Saving a piece on a storefront has therefore
- // never once worked — it returned ok, and stored nothing.
+ // never once worked. It returned ok, and stored nothing.
  await sql`CREATE TABLE IF NOT EXISTS store_item_favorites (
   id SERIAL PRIMARY KEY, store_slug TEXT NOT NULL, item_id TEXT NOT NULL, shopper_id TEXT NOT NULL,
   email TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -80,7 +80,7 @@ export type ShopperFavorite = {
  currency: string;
  image: string | null;
  status: string;
- /** How this store addresses the piece — the imported handle where there is one, else the id. It is
+ /** How this store addresses the piece. The imported handle where there is one, else the id. It is
   *  what goes in /products/…, and the two are not interchangeable. See wishlist-core.ts. */
  ref: string;
 };
@@ -101,7 +101,7 @@ export async function getShopperFavorites(storeSlug: string, shopperId: string):
   currency: String(r.currency || "USD").toUpperCase(),
   image: Array.isArray(r.images) ? (r.images[0] ?? null) : null,
   status: String(r.status || "active"),
-  // Sold pieces stay in the list rather than vanishing — on one-of-one vintage, "this one went" is
+  // Sold pieces stay in the list rather than vanishing, on one-of-one vintage, "this one went" is
   // information a shopper wants, and silently dropping it looks like the list lost her piece.
   ref: String(r.source_id || r.item_id),
  }));
@@ -112,7 +112,7 @@ export async function getShopperFavorites(storeSlug: string, shopperId: string):
  *
  * A storefront addresses a piece by whichever name it arrived with: an imported store links to the
  * handle it had on Shopify, a piece added on VYA links to its own id. Saving has to work from both,
- * and only ever within the store doing the asking — a handle from one shop must not be able to
+ * and only ever within the store doing the asking. A handle from one shop must not be able to
  * attach a save to another shop's piece, and handles are not unique across stores.
  *
  * Returns null when the reference matches nothing live in that store, so a stale link in a
@@ -125,7 +125,7 @@ export async function resolveStoreItemId(storeSlug: string, ref: string): Promis
  const seller = (await sql`SELECT id FROM sellers WHERE slug = ${storeSlug} LIMIT 1`.catch(() => [])) as { id: string }[];
  const sellerId = seller[0]?.id;
  if (!sellerId) return null;
- // An id, if it looks like one — matched against this store, never taken on trust.
+ // An id, if it looks like one. Matched against this store, never taken on trust.
  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r)) {
   const byId = (await sql`SELECT id FROM items WHERE id = ${r}::uuid AND seller_id = ${sellerId} LIMIT 1`.catch(() => [])) as { id: string }[];
   if (byId[0]) return String(byId[0].id);
@@ -156,8 +156,8 @@ export async function favoriteCount(storeSlug: string, itemId: string): Promise<
 /**
  * How much attention one piece has had: views and saves, together.
  *
- * These two numbers were already being COLLECTED — store_product_views has had a row per storefront
- * visit for months — and read by nothing. The phone's piece editor drew "{item.views ?? 0} views ·
+ * These two numbers were already being COLLECTED. Store_product_views has had a row per storefront
+ * visit for months, and read by nothing. The phone's piece editor drew "{item.views ?? 0} views ·
  * {item.favorites ?? 0} saves" from fields no endpoint had ever returned, so every piece in the app
  * reported 0 · 0, including one of ange-archive's with 98 real views. A seller deciding whether to
  * reprice something was being shown a flat zero and no way to tell it apart from a true zero.

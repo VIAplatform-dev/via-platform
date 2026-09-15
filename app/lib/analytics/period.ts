@@ -1,17 +1,17 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — the period resolver (pure, no I/O, unit-tested).
+// Analytics: the period resolver (pure, no I/O, unit-tested).
 //
 // Every metric in the store analytics suite is a function of ONE resolved
 // period, so this is the single place that decides what "Q3", "last 30 days" or
-// a custom range actually mean — and what they get compared against. Two
+// a custom range actually mean, and what they get compared against. Two
 // comparison windows are always produced alongside the current one:
-//   • prior — the previous comparable window (Q3 → Q2, August → July)
-//   • yoy   — the same window one year earlier (Q3 2026 → Q3 2025)
+//   • prior: the previous comparable window (Q3 → Q2, August → July)
+//   • yoy: the same window one year earlier (Q3 2026 → Q3 2025)
 // so every headline number can carry direction, not just a value.
 //
 // Calendar boundaries resolve in the STORE's timezone (default UTC) so "best
 // day" is the day the seller actually lived through, not a UTC slice of two.
-// Windows are half-open [start, end) — the end instant belongs to the next one.
+// Windows are half-open [start, end): the end instant belongs to the next one.
 // ───────────────────────────────────────────────────────────────────────────
 
 export type Granularity = "day" | "week" | "month";
@@ -65,7 +65,7 @@ function dtf(tz: string): Intl.DateTimeFormat {
  return f;
 }
 
-/** True when the runtime recognises the zone — guards a user-supplied ?tz=. */
+/** True when the runtime recognises the zone. Guards a user-supplied ?tz=. */
 export function isValidTimeZone(tz: string): boolean {
  try { dtf(tz); return true; } catch { return false; }
 }
@@ -138,7 +138,7 @@ function parseSpec(input: PeriodInput, now: Date, tz: string): Spec {
  if (raw === "custom" || (!raw && input.from && input.to)) {
   const from = String(input.from || "");
   const to = String(input.to || "");
-  // A malformed custom range is a client bug, not a reason to 500 — fall back to
+  // A malformed custom range is a client bug, not a reason to 500. Fall back to
   // the default window so the dashboard still renders something truthful.
   if (ISO_DATE.test(from) && ISO_DATE.test(to) && from <= to) return { kind: "custom", from, to };
  }
@@ -212,7 +212,7 @@ function windowFor(spec: Spec, now: Date, tz: string, earliest?: string | null):
 
 // Calendar periods (and only those) have real calendar neighbours: the month
 // before August is July, not "31 days earlier". Rolling / custom / to-date
-// windows get slid instead — see resolvePeriod.
+// windows get slid instead. See resolvePeriod.
 type CalendarSpec = Extract<Spec, { kind: "month" | "quarter" | "year" }>;
 
 function priorSpec(spec: CalendarSpec): CalendarSpec {
@@ -227,7 +227,7 @@ function yoySpec(spec: CalendarSpec): CalendarSpec {
  return { kind: "year", year: spec.year - 1 };
 }
 
-/** A window of `ms` length starting at `start` — used for to-date comparisons. */
+/** A window of `ms` length starting at `start`. Used for to-date comparisons. */
 function spanFrom(start: Date, ms: number, label: string): Window {
  return {
   startISO: start.toISOString(),
@@ -237,7 +237,7 @@ function spanFrom(start: Date, ms: number, label: string): Window {
  };
 }
 
-/** Shift a window back by `ms`, keeping its length — used for rolling/custom comparisons. */
+/** Shift a window back by `ms`, keeping its length. Used for rolling/custom comparisons. */
 function shiftBack(w: Window, ms: number, label: string): Window {
  return {
   startISO: new Date(Date.parse(w.startISO) - ms).toISOString(),
@@ -288,7 +288,7 @@ export function resolvePeriod(input: PeriodInput = {}): ResolvedPeriod {
   yoy = windowFor(yoySpec(spec), now, tz);
  } else if (spec.kind === "toDate") {
   // "Quarter to date" is only honest against the SAME elapsed span of the previous
-  // quarter — 29 days in vs 29 days in, never 29 days vs a finished 92.
+  // quarter: 29 days in vs 29 days in, never 29 days vs a finished 92.
   const m = toDateStartMonth(spec);
   const prevYear = spec.unit === "year" ? spec.year - 1 : spec.year;
   const prevStart = spec.unit === "month"
@@ -299,7 +299,7 @@ export function resolvePeriod(input: PeriodInput = {}): ResolvedPeriod {
   prior = spanFrom(prevStart, lengthMs, spec.unit === "year" ? "Same span last year" : `Same span, prior ${spec.unit}`);
   yoy = spanFrom(zonedStart(spec.year - 1, m, 1, tz), lengthMs, "Same period last year");
  } else {
-  // Rolling and custom windows have no calendar predecessor — slide them.
+  // Rolling and custom windows have no calendar predecessor. Slide them.
   prior = shiftBack(current, lengthMs, "Prior period");
   yoy = shiftBack(current, 365 * DAY_MS, "Same period last year");
  }

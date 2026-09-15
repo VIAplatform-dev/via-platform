@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { adaptForEbay, recoverSize, missingSizeMessage } from "./ebay-adapt.ts";
 
 // The decision order is the product here: what she wrote, then what she wrote elsewhere, then a
-// fact about the piece, then — and only then — a question. Every one of these is a listing a buyer
+// fact about the piece, then, and only then. A question. Every one of these is a listing a buyer
 // sees, so the tests care as much about what it REFUSES to invent as what it fills in.
 
 // A stand-in for eBay's own list. Anything not on it is rejected, exactly as eBay does.

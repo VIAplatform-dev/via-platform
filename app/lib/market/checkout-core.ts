@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Market Mode checkout — pure rules (no DB), so the state machine is unit-testable
+// Market Mode checkout: pure rules (no DB), so the state machine is unit-testable
 // in isolation. checkout-db.ts enforces these atomically with status-guarded UPDATEs.
 //
 // A market checkout is the seller's intent to sell ONE item to the customer in
@@ -36,7 +36,7 @@ export function canCheckoutTransition(from: MarketCheckoutStatus, to: MarketChec
  return CHECKOUT_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-/** The statuses a verified payment may arrive from — the WHERE clause of the paid claim. */
+/** The statuses a verified payment may arrive from. The WHERE clause of the paid claim. */
 export function allowedFromForPaid(): MarketCheckoutStatus[] {
  return (Object.keys(CHECKOUT_TRANSITIONS) as MarketCheckoutStatus[]).filter((s) => canCheckoutTransition(s, "paid"));
 }

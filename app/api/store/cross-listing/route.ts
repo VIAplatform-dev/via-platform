@@ -14,7 +14,7 @@ import { clearEtsyTokens } from "@/app/lib/etsy-tokens-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — connected platforms + the cross-listing board (items × platform status).
+// GET: connected platforms + the cross-listing board (items × platform status).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-// POST — connect/update a platform account. { platform, handle, autoList? }
+// POST: connect/update a platform account. { platform, handle, autoList? }
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, accounts: await getPlatformAccounts(slug) });
 }
 
-// DELETE ?platform= — disconnect a platform.
+// DELETE ?platform= disconnect a platform.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -59,7 +59,7 @@ export async function DELETE(request: NextRequest) {
  return NextResponse.json({ ok: true, accounts: await getPlatformAccounts(slug) });
 }
 
-// PATCH — it sold somewhere; pull it everywhere. { itemId, platform } (platform = where
+// PATCH: it sold somewhere; pull it everywhere. { itemId, platform } (platform = where
 // it sold: "vya" or a marketplace key). Marks the item sold on VYA + delists the rest.
 export async function PATCH(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

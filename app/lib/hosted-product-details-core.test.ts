@@ -5,7 +5,7 @@ import { hostedProductDetails, renderHostedDetailsHtml } from "./hosted-product-
 import { conditionDefinition } from "./condition-core.ts";
 
 // The words a shopper reads on a hosted product page must be the words the classic product page
-// prints (app/s/[handle]/p/[id]/page.tsx) — same cores, same order of reading: the size line and
+// prints (app/s/[handle]/p/[id]/page.tsx): same cores, same order of reading: the size line and
 // the measurements under it, the grade with its meaning and the seller's note, the flaws, and where
 // it ships.
 

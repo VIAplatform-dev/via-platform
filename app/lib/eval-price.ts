@@ -7,16 +7,16 @@ import { normalizeCategory } from "./market-data-db";
 import { gate } from "./concurrency";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Price accuracy — graded against REAL money.
+// Price accuracy: graded against REAL money.
 //
 // The only unimpeachable answer key for price is what an item ACTUALLY sold for.
 // This runs the pricer BLIND on items VYA has already sold (photo + known brand)
-// and compares the prediction to the real sold price. No manual labeling — reality
+// and compares the prediction to the real sold price. No manual labeling. Reality
 // is the truth. Leak-safe: the pricer never sees the sold price, and the dominant
 // signal (reverse-image + external comps) is independent of our own sale record.
 //
 // Results are PERSISTED per item so the graded sample (and thus the confidence in
-// the number) grows every run — the path to a trustworthy "% within ±10%".
+// the number) grows every run. The path to a trustworthy "% within ±10%".
 // ───────────────────────────────────────────────────────────────────────────
 
 function db() {
@@ -26,7 +26,7 @@ function db() {
 }
 
 // The prediction we grade is the engine's MARKET VALUE read (marketCents), not the
-// store-adjusted suggestion — a store's own markup is a per-store pricing choice, not
+// store-adjusted suggestion: a store's own markup is a per-store pricing choice, not
 // a question of whether the AI read the market right. That's the accuracy we care about.
 
 let ensured = false;
@@ -53,7 +53,7 @@ async function ensureTable() {
  // real seller upload. specific_resolved records whether the reference index matched a piece at all.
  await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'title'`.catch(() => {});
  await db()`ALTER TABLE price_eval_items ADD COLUMN IF NOT EXISTS specific_resolved BOOLEAN`.catch(() => {});
- // Confirmed-sale flag lives on sold_items — ensure it exists so a `confirmedOnly` eval can filter on it.
+ // Confirmed-sale flag lives on sold_items. Ensure it exists so a `confirmedOnly` eval can filter on it.
  await db()`ALTER TABLE sold_items ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT false`.catch(() => {});
  // A sold item can be graded once PER MODE (title + photo coexist). Replace the old sold-only index.
  await db()`DROP INDEX IF EXISTS uq_price_eval_sold`.catch(() => {});
@@ -74,8 +74,8 @@ export type PriceEvalRun = { requested: number; graded: number; skipped: number;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Grade a fresh sample of real sales against the real sold price. Two modes:
- *  • default (title) — the pricer is handed the item's real title (easy mode: identification is free).
- *  • photoOnly — the query is derived from the PHOTO alone via the reference index, no human title;
+ *  • default (title): the pricer is handed the item's real title (easy mode: identification is free).
+ *  • photoOnly: the query is derived from the PHOTO alone via the reference index, no human title;
  *    this mirrors a real seller upload and is the honest test of "can VYA price from a photo?".
  * Costs SerpApi (reverse-image + comps) per item; keep the sample small. Accumulates per (sale, mode).
  */
@@ -86,7 +86,7 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  const sql = db();
 
  // Prefer sales not yet graded IN THIS MODE (grow coverage), newest first. `confirmedOnly` grades
- // against ONLY real confirmed order prices (the receipts) — the truest answer key, once we have them.
+ // against ONLY real confirmed order prices (the receipts). The truest answer key, once we have them.
  const rows = (await (opts.confirmedOnly
  ? sql`
   SELECT s.id, s.title, s.designer, s.final_price, s.image, s.embedding
@@ -118,7 +118,7 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  let query: string;
  let specificResolved: boolean | null = null;
  if (mode === "photo") {
- // Photo-only: identify the piece from the photo via the reference index — NO human title.
+ // Photo-only: identify the piece from the photo via the reference index, NO human title.
  // excludeNearIdentical stops the item matching a copy of itself in the index (cheating).
  let emb: number[] = [];
  try { emb = Array.isArray(r.embedding) ? r.embedding : JSON.parse(r.embedding || "[]"); } catch { emb = []; }
@@ -163,7 +163,7 @@ export async function runPriceEval(opts: { sample: number; photoOnly?: boolean; 
  };
 }
 
-// ── Wilson score interval — an honest 95% CI on a pass-rate, so a small sample reads as
+// ── Wilson score interval. An honest 95% CI on a pass-rate, so a small sample reads as
 // "88% (95% CI 74–95%, n=40)" and can't be mistaken for a settled number. ──
 export function wilson95(successes: number, n: number): [number, number] | null {
  if (n <= 0) return null;
@@ -184,7 +184,7 @@ export type PriceScore = {
  verdict: "pass" | "close" | "fail" | "insufficient"; // vs the 95%-within-10% bar
 };
 
-const MIN_N = 30; // below this, a segment is "insufficient data" — never a verdict on noise
+const MIN_N = 30; // below this, a segment is "insufficient data", never a verdict on noise
 const GATE = 0.95; // beta bar: 95% of items within ±10%
 
 function scoreOf(segment: string, items: { within10: boolean | null; within20: boolean | null; errorPct: number | null }[]): PriceScore {
@@ -195,11 +195,11 @@ function scoreOf(segment: string, items: { within10: boolean | null; within20: b
  const errs = graded.map((i) => i.errorPct as number).sort((a, b) => a - b);
  const ci = wilson95(w10, n);
  const rate = n ? w10 / n : null;
- // Verdict uses the LOWER CI bound vs the gate — we only "pass" when we're statistically confident
+ // Verdict uses the LOWER CI bound vs the gate. We only "pass" when we're statistically confident
  // the true rate clears 95%, not just the point estimate. Honest, and it demands real sample size.
  const verdict: PriceScore["verdict"] = n < MIN_N ? "insufficient"
  : ci && ci[0] >= GATE ? "pass"
- : rate != null && rate >= GATE ? "close" // point estimate clears it but the CI doesn't yet — need more data
+ : rate != null && rate >= GATE ? "close" // point estimate clears it but the CI doesn't yet. Need more data
  : "fail";
  return {
  segment, n, within10: w10, within20: w20,
@@ -210,7 +210,7 @@ function scoreOf(segment: string, items: { within10: boolean | null; within20: b
  };
 }
 
-// The individual worst misses — joined back to the sold item so you can SEE the piece, what it
+// The individual worst misses. Joined back to the sold item so you can SEE the piece, what it
 // really sold for, and what the AI predicted. This is where you diagnose WHY it's off (a category,
 // a price tier, a kind of piece the comps don't cover).
 export type PriceMiss = {
@@ -229,7 +229,7 @@ export async function getPriceMisses(limit = 20, windowDays = 120, mode = "title
  `.catch(() => [])) as { sold_id: number; brand: string | null; category: string | null; tier: string | null; sold_cents: number; pred_cents: number | null; error_pct: number | null; title: string | null; image: string | null }[];
  return rows.map((r) => ({
  soldId: Number(r.sold_id), brand: r.brand ?? null, title: r.title ?? null,
- category: r.category || "uncategorized", tier: r.tier || "—",
+ category: r.category || "uncategorized", tier: r.tier || "-",
  soldUsd: Math.round(Number(r.sold_cents) / 100), predUsd: r.pred_cents != null ? Math.round(Number(r.pred_cents) / 100) : null,
  errorPct: r.error_pct != null ? Number(r.error_pct) : null, image: r.image ?? null,
  }));
@@ -237,7 +237,7 @@ export async function getPriceMisses(limit = 20, windowDays = 120, mode = "title
 
 export type PriceAccuracy = { overall: PriceScore; byCategory: PriceScore[]; byTier: PriceScore[]; totalGraded: number; windowDays: number };
 
-/** The accumulated price-accuracy picture across ALL graded sales in the window — overall + by
+/** The accumulated price-accuracy picture across ALL graded sales in the window. Overall + by
  *  category + by price tier, each with a 95% CI and a pass/fail verdict vs the ±10% beta bar. */
 export async function getPriceAccuracy(windowDays = 120, mode = "title"): Promise<PriceAccuracy> {
  await ensureTable();
@@ -246,7 +246,7 @@ export async function getPriceAccuracy(windowDays = 120, mode = "title"): Promis
   SELECT category, tier, within10, within20, error_pct
   FROM price_eval_items WHERE ran_at >= ${cutoff} AND error_pct IS NOT NULL AND mode = ${mode}
  `.catch(() => [])) as { category: string | null; tier: string | null; within10: boolean | null; within20: boolean | null; error_pct: number | null }[];
- const items = rows.map((r) => ({ category: r.category || "uncategorized", tier: r.tier || "—", within10: r.within10, within20: r.within20, errorPct: r.error_pct }));
+ const items = rows.map((r) => ({ category: r.category || "uncategorized", tier: r.tier || "-", within10: r.within10, within20: r.within20, errorPct: r.error_pct }));
 
  const group = (key: "category" | "tier") => {
  const m = new Map<string, typeof items>();

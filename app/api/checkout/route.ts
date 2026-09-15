@@ -23,7 +23,7 @@ function baseUrl(request: NextRequest) {
 // Buyer-facing checkout. We collect the address ourselves (so we can quote a live
 // shipping rate first), then open a Stripe Checkout Session as a DIRECT charge on
 // the seller's account. VYA's application fee = 1% of the item PLUS any shipping the
-// buyer paid (VYA holds the shipping to fund the label later — see the fulfillment
+// buyer paid (VYA holds the shipping to fund the label later. See the fulfillment
 // view). The one-of-one is held for the duration of checkout.
 export async function POST(request: NextRequest) {
  if (!stripeConfigured()) return NextResponse.json({ error: "Checkout isn’t available yet." }, { status: 503 });
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
  const acctId = payableAccountId(pay);
  if (!acctId) return NextResponse.json({ error: "This store can’t take payments yet." }, { status: 400 });
 
- // Per-store discount code — applied to the native charge. validateDiscount is scoped by
+ // Per-store discount code: applied to the native charge. validateDiscount is scoped by
  // seller.slug, so ONLY this store's codes ever apply (a code from another store won't match).
  // Skipped on binding offers, where the agreed price is already final.
  let salePriceCents = effPriceCents;
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
  }
  }
 
- // A piece live on eBay or Depop may have sold there minutes ago and not reached us yet — the
+ // A piece live on eBay or Depop may have sold there minutes ago and not reached us yet. The
  // marketplace sync polls hourly. Ask now, before charging, so a one-of-one can't sell twice.
  // Costs nothing for a VYA-only piece; a flaky feed never blocks the sale (see market-sync).
  const soldElsewhere = await settleCrossListedBeforeCharge(seller.slug, [itemId]);
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
  },
  acctId, // direct charge on the seller's account
  );
- // Log the checkout attempt — if they don't complete, abandoned-cart nudges them.
+ // Log the checkout attempt, if they don't complete, abandoned-cart nudges them.
  recordCheckoutAttempt({ storeSlug: seller.slug, email: buyerEmail, name: String(buyer.name || "") || null, itemId, itemTitle: item.title, itemImage: item.images?.[0] || null }).catch(() => {});
  return NextResponse.json({ ok: true, url: session.url });
  } catch (e) {

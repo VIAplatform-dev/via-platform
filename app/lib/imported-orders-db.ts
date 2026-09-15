@@ -1,11 +1,11 @@
 import { neon } from "@neondatabase/serverless";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Historical order import — a store's PAST orders from Shopify/Square/etc., brought
+// Historical order import: a store's PAST orders from Shopify/Square/etc., brought
 // over for accounting, LTV, and repeat-customer signal. Kept in its OWN table, apart
 // from the live transactional `orders` (which requires a live `item_id` and drives
 // checkout/payouts). A historical order references a product that already sold and no
-// longer exists as a VYA item, so it's stored as free text — never touching the money
+// longer exists as a VYA item, so it's stored as free text, never touching the money
 // engine. Self-healing table (CREATE IF NOT EXISTS), so no migration step is needed.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ export async function getImportedOrderTitleSet(storeSlug: string): Promise<Set<s
 
 /** Reconcile scraped sold-out items against the uploaded order history: a store that keeps
  *  sold pieces on its page (then removes them ~30 days later) imports them as phantom `sold`
- *  items — but the SAME sale also arrives, authoritatively (real date/buyer/amount), in the
+ *  items, but the SAME sale also arrives, authoritatively (real date/buyer/amount), in the
  *  order-list upload. Keeping both double-counts the sale, so we drop the redundant scraped
  *  copies (matched by store + normalized title). The order rows are the source of truth.
  *  Returns how many sold items were reconciled away. Idempotent. */

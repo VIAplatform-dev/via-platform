@@ -11,7 +11,7 @@ import { useState } from "react";
 // On success it follows a sign-in link the server mints on the spot. That hop is not optional:
 // proxy.ts gates PAGES on an Auth.js session first and the approval cookie second, so the cookie
 // alone would open the API and still bounce them to /login on their first tap. One redirect, no
-// email, no password — and they come out the other side signed in and approved.
+// email, no password, and they come out the other side signed in and approved.
 
 export default function FlyerGate({ slug, headline, subhead }: { slug: string; headline: string; subhead: string }) {
   const [email, setEmail] = useState("");

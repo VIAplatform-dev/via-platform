@@ -1,12 +1,12 @@
 // HER PAGES, AS THE PANEL SHOWS THEM AND THE SERVE PATH TREATS THEM.
 //
 // Three things she can do to a captured page, and what each one means:
-//  · RENAME — the page's title and its label in the menu. Never its address: a URL that changes is a
+//  · RENAME: the page's title and its label in the menu. Never its address: a URL that changes is a
 //    URL that 404s for everyone holding it, which is why there is no redirects table anywhere here.
-//  · HIDE — shoppers get a plain "Page not found" and every menu link to it disappears. The page
+//  · HIDE: shoppers get a plain "Page not found" and every menu link to it disappears. The page
 //    itself is untouched, so Show puts it back exactly as it was. The same choice Step 2 made for
 //    sections: hide is reversible, delete is a second, deliberate action.
-//  · ADD — a new page in her own header and footer, with a starter text block in the middle.
+//  · ADD: a new page in her own header and footer, with a starter text block in the middle.
 //
 // Sparse: no row means "as captured". A store nobody has touched has no rows at all, and everything
 // below returns the page list the capture already implies.
@@ -24,7 +24,7 @@ export type PageRow = { path: string; title: string | null; navLabel: string | n
 export const PAGE_LIMITS = { title: 120, navLabel: 60, path: 300 } as const;
 
 /**
- * Pages that may never be hidden or deleted, and why — said in her words, because a control that
+ * Pages that may never be hidden or deleted, and why, said in her words, because a control that
  * silently does nothing is worse than one that explains itself.
  *
  * The cart is here for a blunt reason: hiding it takes out checkout. Home is the address her domain
@@ -32,8 +32,8 @@ export const PAGE_LIMITS = { title: 120, navLabel: 60, path: 300 } as const;
  */
 export function removalRefusal(path: string, opts: { productTemplate?: string | null } = {}): string | null {
  const p = normalizePath(path) ?? path;
- if (p === "/" || p === "") return "Your home page is the first thing shoppers see — it can’t be hidden.";
- if (/^\/cart$/.test(p)) return "Your cart page is how shoppers check out — hiding it would stop them buying.";
+ if (p === "/" || p === "") return "Your home page is the first thing shoppers see. It can’t be hidden.";
+ if (/^\/cart$/.test(p)) return "Your cart page is how shoppers check out. Hiding it would stop them buying.";
  if (/^\/search$/.test(p)) return "Your search page answers your shop’s own search box.";
  if (opts.productTemplate && path === opts.productTemplate) return "This is the design every product page uses, not a page of its own.";
  if (/^\/products\//.test(p)) return "This is the design every product page uses, not a page of its own.";
@@ -55,7 +55,7 @@ export function labelFromPath(path: string): string {
  * What the panel calls this page: her own name for it, else what her MENU calls it, else its address.
  *
  * The menu matters here. Her shop's own words for these pages are "Our Shoes" and "Shoe Blog"; the
- * addresses behind them are /collections/all and /blogs/news, which derive to "All" and "News" — so a
+ * addresses behind them are /collections/all and /blogs/news, which derive to "All" and "News", so a
  * list built from addresses alone names her pages things she has never called them.
  */
 export function pageLabel(path: string, row?: Pick<PageRow, "title" | "navLabel"> | null, fromMenu?: string): string {
@@ -71,7 +71,7 @@ export type PageEntry = {
 /**
  * The page list the panel renders: her menu first, in menu order, then the rest.
  *
- * Product pages are hundreds of copies of one design, so they are represented by the template alone —
+ * Product pages are hundreds of copies of one design, so they are represented by the template alone,
  * the same rule the page strip has always followed.
  */
 export function mergePageList(input: {
@@ -104,7 +104,7 @@ export function mergePageList(input: {
 
  const out: PageEntry[] = [];
  const placed = new Set<string>();
- // In her menu, in her order — the whole point of the panel.
+ // In her menu, in her order. The whole point of the panel.
  for (const [href] of [...menuOrder.entries()].sort((a, b) => a[1] - b[1])) {
   const match = listable.find((p) => (normalizeMenuHref(p) ?? p) === href);
   if (match && !placed.has(match)) { out.push(entry(match, "menu")); placed.add(match); }
@@ -122,14 +122,14 @@ export function mergePageList(input: {
  * How many links on the pages we checked still point at this one.
  *
  * Hiding a page that her footer, a banner or a collection tile links to leaves those links pointing
- * at a "Page not found" — so the confirmation says how many there are first. Shoppers still get a
+ * at a "Page not found", so the confirmation says how many there are first. Shoppers still get a
  * clean 404 rather than a broken layout; this is so she is not surprised by it.
  */
 export function countLinksTo(htmls: readonly string[], path: string, origin?: string | null): number {
  return countLinksByPath(htmls, origin).get(normalizeMenuHref(path) ?? path) ?? 0;
 }
 
-/** The same count for every page at once — the page list needs all of them, and this reads each
+/** The same count for every page at once. The page list needs all of them, and this reads each
  *  source page once rather than once per page in the list. */
 export function countLinksByPath(htmls: readonly string[], origin?: string | null): Map<string, number> {
  const out = new Map<string, number>();
@@ -151,7 +151,7 @@ function slugify(title: string): string {
 }
 
 /**
- * Where a page she adds lives, in the shape her own platform uses — so it sits among her other pages
+ * Where a page she adds lives, in the shape her own platform uses, so it sits among her other pages
  * rather than announcing itself as ours. A collision with anything already captured takes a suffix,
  * because two rows cannot share an address and overwriting one of her pages is unthinkable.
  */
@@ -167,7 +167,7 @@ export function addedPagePath(title: string, platform: Platform, taken: readonly
 /**
  * The page to borrow her chrome from: the simplest page of hers we hold.
  *
- * The shortest ordinary page, because a long one is a long one for a reason — a homepage full of
+ * The shortest ordinary page, because a long one is a long one for a reason. A homepage full of
  * carousels, or a collection page whose markup is mostly grid. Anything with commerce in it is
  * skipped outright. The home page is the last resort, never the first choice.
  */

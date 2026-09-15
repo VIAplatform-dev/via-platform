@@ -8,7 +8,7 @@ const page = `<html><body><form action="/cart/add"><div class="product-form__but
 </div></form></body></html>`;
 
 test("the buttons in a buy group are made to match each other", () => {
- // blummier's Enquire button renders at 25.6px beside an Add to cart at 13px — same classes, same
+ // blummier's Enquire button renders at 25.6px beside an Add to cart at 13px. Same classes, same
  // parent, on her site the same size. Something in her stylesheet reaches the <button> on her copy
  // and not on ours. Rather than hardcode a size per store, the group agrees on the smallest.
  const out = normaliseBuyButtons(page);
@@ -32,7 +32,7 @@ test("running twice does not stack two scripts", () => {
 });
 
 test("it only touches a group whose sizes actually disagree", () => {
- // A theme that already agrees with itself must be left alone — the whole point is matching HER
+ // A theme that already agrees with itself must be left alone. The whole point is matching HER
  // design, and overriding a deliberate size difference would be the same mistake in reverse.
  assert.match(normaliseBuyButtons(page), /RATIO/);
 });

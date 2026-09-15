@@ -17,7 +17,7 @@ test("a link for one store cannot sign anyone into another", () => {
  assert.equal(readSignInLink(t, "sourcedbyscottie", SECRET), null);
 });
 
-test("a link expires quickly — it travels through email", () => {
+test("a link expires quickly. It travels through email", () => {
  const stale = signInLinkToken({ email: "buyer@example.com", storeSlug: "blummier" }, SECRET, { issuedAt: now - 31 * 60 * 1000 });
  assert.equal(readSignInLink(stale, "blummier", SECRET), null, "half an hour is long enough");
  const fresh = signInLinkToken({ email: "buyer@example.com", storeSlug: "blummier" }, SECRET, { issuedAt: now - 5 * 60 * 1000 });

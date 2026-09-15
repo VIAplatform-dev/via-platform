@@ -1,20 +1,20 @@
-// Which Stripe world a connected account belongs to — test or live — and the rule that keeps the
+// Which Stripe world a connected account belongs to, test or live, and the rule that keeps the
 // two from ever being mixed.
 //
 // WHY THIS EXISTS. A Stripe connected account id is `acct_1Abc…` in BOTH test and live mode: the
-// string carries no hint of which world made it. Nothing else does either — the account lives in
+// string carries no hint of which world made it. Nothing else does either. The account lives in
 // one Stripe mode, and the key the server happens to be holding decides which mode it is asking
 // about. Point a server with test keys at the production database, onboard one store, and
 // `seller_payments.stripe_account_id` now holds a TEST account id for a real seller. Production,
 // running live keys, then tries to charge an account that does not exist in live mode: that store's
-// checkout is dead, its Market Mode POS is dead, and refunds on it fail — with a Stripe error that
+// checkout is dead, its Market Mode POS is dead, and refunds on it fail, with a Stripe error that
 // reads like a transient outage rather than the data problem it is.
 //
 // Nothing in the app noticed which mode it was in before this file. `stripeConfigured()` only ever
 // asked whether a key was present.
 //
 // THE RULE. Stamp the mode when an account is saved, and treat an account from the other mode as if
-// the store had never connected at all — the seller-facing message is the one that already exists
+// the store had never connected at all. The seller-facing message is the one that already exists
 // ("this store can't take payments yet"), and no charge, refund or transfer is attempted against an
 // id the current key cannot see. A sandbox then cannot corrupt live data even when it is pointed at
 // the live database, which is the one mistake worth engineering against.
@@ -52,7 +52,7 @@ export function accountUsableHere(accountMode: StripeMode | null | undefined, en
 }
 
 /** The connected account to charge, or null when there is nothing safe to charge. Every money path
- *  — storefront checkout, cart, Market Mode, refunds — resolves its account through this. */
+ * storefront checkout, cart, Market Mode, refunds. Resolves its account through this. */
 export function payableAccountId(
  pay: { stripeAccountId?: string | null; chargesEnabled?: boolean; stripeMode?: StripeMode | null } | null | undefined,
  env: NodeJS.ProcessEnv = process.env,
@@ -64,7 +64,7 @@ export function payableAccountId(
 /**
  * Why an onboarding attempt is being refused, or null when it may go ahead.
  *
- * Creating a second account would overwrite the store's real one — the row holds a single id — so a
+ * Creating a second account would overwrite the store's real one, the row holds a single id, so a
  * store already connected in the other mode is refused rather than reconnected. This is the check
  * that makes a sandbox pointed at the live database annoying instead of destructive.
  */

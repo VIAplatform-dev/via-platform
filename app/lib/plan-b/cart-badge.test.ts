@@ -96,7 +96,7 @@ test("dawnBubbleHtml is the markup the section API sends back", () => {
 });
 
 // Both of these were found by running applyCartBadge against all 16 captured storefronts, not by
-// reading the code — each one drew a real, visible second badge in the wrong place.
+// reading the code: each one drew a real, visible second badge in the wrong place.
 
 test("a cart drawer INSIDE the header does not get a badge on its close button", () => {
  // We Thieves: the sidebar cart lives inside <header>, so a header-ancestor test alone let its
@@ -116,7 +116,7 @@ test("dawn's 'Item added' popup does not get a second badge on its View cart lin
 });
 
 test("an alpine cart button is found by the count it binds, not by a label it doesn't have", () => {
- // hachi archive's button has no href, no aria-label — only an @click handler.
+ // hachi archive's button has no href, no aria-label, only an @click handler.
  const html = `<html><body><header><button class="relative" @click.prevent="$store.modals.open('cart')"><span class="sr-only">Cart</span><span x-text="$store.cart_count.count">0</span></button></header></body></html>`;
  const out = applyCartBadge(html, 3);
  assert.match(out, /x-text="\$store\.cart_count\.count">3</);

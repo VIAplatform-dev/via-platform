@@ -4,14 +4,14 @@ import { getAutomations, setBuiltinEnabled, setCustomEnabled, addCustomAutomatio
 
 export const dynamic = "force-dynamic";
 
-// GET — built-in flows (with on/off state) + the store's custom automations.
+// GET: built-in flows (with on/off state) + the store's custom automations.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  return NextResponse.json({ ok: true, ...(await getAutomations(slug)), triggers: CUSTOM_TRIGGERS });
 }
 
-// PATCH { kind, key|id, enabled } — toggle a built-in flow or a custom automation.
+// PATCH { kind, key|id, enabled }: toggle a built-in flow or a custom automation.
 export async function PATCH(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest) {
  return NextResponse.json({ ok: true, ...(await getAutomations(slug)) });
 }
 
-// POST { name, trigger, subject, body } — create a custom automation.
+// POST { name, trigger, subject, body }. Create a custom automation.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, ...(await getAutomations(slug)) });
 }
 
-// DELETE { id } — remove a custom automation.
+// DELETE { id }: remove a custom automation.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

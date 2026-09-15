@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   if (!dbUrl) return NextResponse.json({ error: "No database" }, { status: 500 });
   const sql = neon(dbUrl);
 
-  // 1. The conversion row for this order. (Branch the whole query — the Neon HTTP driver
+  // 1. The conversion row for this order. (Branch the whole query. The Neon HTTP driver
   //    doesn't compose partial sql`` fragments.)
   const convRows = store
     ? await sql`
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     click = clickRows[0] ?? null;
   }
 
-  // 3. Real removals for this store around the order time — the piece that sold dropped off the
+  // 3. Real removals for this store around the order time. The piece that sold dropped off the
   //    feed on the next resync and was captured here with its true LISTED price.
   const removals = removalsStore
     ? await sql`

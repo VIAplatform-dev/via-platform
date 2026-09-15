@@ -4,7 +4,7 @@ import { snapshotAccuracy } from "@/app/lib/accuracy-snapshot-db";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Daily listing-accuracy snapshot — stores a rolling-30d + all-time reading so the accuracy trend
+// Daily listing-accuracy snapshot: stores a rolling-30d + all-time reading so the accuracy trend
 // (progress toward the 95% onboarding bar) is charted over time. Cheap (pure SQL, no API cost).
 //   Scheduled in vercel.json; also runnable manually via /api/admin/accuracy-trend?snapshot=1.
 export async function GET(request: NextRequest) {

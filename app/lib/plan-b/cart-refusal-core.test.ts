@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { hostedCartRefusal, SELLABLE_STATUSES } from "./cart-refusal-core.ts";
 
 // The seller's own Add-to-cart button, driving VYA's bag, used to say "has sold" for every piece it
-// refused — including one the seller was keeping back for a named customer. A hold is not a sale.
+// refused, including one the seller was keeping back for a named customer. A hold is not a sale.
 
 test("a held piece is refused as on hold, never as sold", () => {
  assert.equal(hostedCartRefusal({ title: "Silk skirt", status: "reserved", unavailableReason: null }), "Silk skirt is on hold.");

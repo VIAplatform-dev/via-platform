@@ -1,4 +1,4 @@
-// Which page a captured store keeps each of its products on — read off the store's own catalogue.
+// Which page a captured store keeps each of its products on. Read off the store's own catalogue.
 //
 // WHY THIS EXISTS. captured-product-path.ts finds a product's page by its handle, and failing that
 // by slugifying its title, because that is how these platforms build handles. It gets most of them.
@@ -7,7 +7,7 @@
 // and no amount of slugifying will produce that. Those pieces stayed on the error page.
 //
 // The store already told us the answer. Every captured collection page is a list of the store's
-// products — a link to each one, labelled with its name (an `aria-label`, an image `alt`, or the
+// products. A link to each one, labelled with its name (an `aria-label`, an image `alt`, or the
 // link's own text; the three conventions between them cover every storefront we capture). Read those
 // pairs out ONCE per store and the mapping from a product's NAME to its own page is exact, whatever
 // the platform chose to call the URL.
@@ -17,7 +17,7 @@
 // throw it away with the pages it was read from.
 //
 // NEVER GUESSES BETWEEN TWO PIECES. One-of-one vintage stores really do list two garments under one
-// name — this store has two products both called "Christian Louboutin So Kate". An index that
+// name: this store has two products both called "Christian Louboutin So Kate". An index that
 // resolved that name to whichever it saw first would send half of those shoppers to the other shoe.
 // An ambiguous name resolves to nothing and the caller falls back, which is the same rule the rest
 // of the import pipeline follows about matching on titles.
@@ -28,7 +28,7 @@ import { isProductPagePath } from "./captured-product-path.ts";
 export const PRODUCT_INDEX_PATH = "/__vya/product-index";
 
 /** `version` is the EXTRACTOR's version, not the shape's. A stored index is only as good as the
- *  reader that built it — the first one matched a few short anchors and missed 189 of this store's
+ *  reader that built it. The first one matched a few short anchors and missed 189 of this store's
  *  192 products, and a row like that is indistinguishable from a small catalogue once it is written.
  *  Bump this whenever extractProductLinks() learns to see more, and every store rebuilds. */
 export type ProductIndex = { version: 2; entries: { title: string; path: string }[] };
@@ -59,7 +59,7 @@ export function extractProductLinks(html: string, sitePrefix?: string): { title:
   const path = normalizePath(attr(m[1], "href"), sitePrefix);
   if (!path || !isProductPagePath(path)) continue;
   const start = (m.index ?? 0) + m[0].length;
-  // The card's markup up to its closing tag — or as much of it as the window holds, which is all
+  // The card's markup up to its closing tag, or as much of it as the window holds, which is all
   // the name has ever needed.
   const content = page.slice(start, start + CONTENT_WINDOW).split(/<\/a>/i)[0];
   const title = decode(
@@ -80,7 +80,7 @@ export function extractProductLinks(html: string, sitePrefix?: string): { title:
  * The page for a product NAME, or null when the store's catalogue can't say for certain.
  *
  * Null covers both "nothing by that name" and "more than one thing by that name, on different
- * pages" — see the note at the top about why the second must never be resolved by picking one.
+ * pages". See the note at the top about why the second must never be resolved by picking one.
  */
 export function pickIndexedPath(index: ProductIndex | null, title: string): string | null {
  const want = norm(title);
@@ -113,7 +113,7 @@ export async function loadProductIndex(slug: string): Promise<ProductIndex | nul
 /**
  * Read the catalogue off the store's own listing pages.
  *
- * Product pages are skipped — they list a couple of "you may also like" neighbours at most, and
+ * Product pages are skipped. They list a couple of "you may also like" neighbours at most, and
  * there are hundreds of them. What's left (the home page, the shop, each category) is where a store
  * lists what it sells.
  */

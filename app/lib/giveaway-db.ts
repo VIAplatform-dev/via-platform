@@ -96,7 +96,7 @@ export async function createGiveawayEntry(
  return { referralCode, isExisting: false };
  } catch (err: unknown) {
  const error = err as { code?: string };
- // Unique violation on referral_code — retry with new code
+ // Unique violation on referral_code. Retry with new code
  if (error.code === "23505") {
  referralCode = generateReferralCode();
  attempts++;

@@ -17,7 +17,7 @@ import ProductGrid from "../../components/ProductGrid";
 import type { Product } from "../../lib/types";
 import { colors, eyebrow, fonts, spacing } from "../../lib/theme";
 
-// A store's own page. Stores are the unit VYA is built on — people follow a shop, not a brand — so
+// A store's own page. Stores are the unit VYA is built on, people follow a shop, not a brand, so
 // Follow sits directly under the name, above even the description.
 
 type StoreResponse = {

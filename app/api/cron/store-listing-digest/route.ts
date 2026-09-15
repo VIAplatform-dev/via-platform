@@ -7,7 +7,7 @@ import { getNotificationPrefs } from "@/app/lib/notification-prefs-db";
 import { emailEnabled } from "@/app/lib/notification-prefs-core";
 
 // Weekly listing-quality email to each store partner. Each flagged listing is
-// emailed ONCE — we only send newly-flagged listings (those not yet alerted),
+// emailed ONCE: we only send newly-flagged listings (those not yet alerted),
 // then mark them so stores aren't reminded about the same listing again.
 export const maxDuration = 300;
 const BASE_URL = getBaseUrl();
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
  // stores don't get listing alerts before we're ready. Flip on by setting the
  // env var STORE_LISTING_DIGEST_ENABLED=1 in Vercel (no redeploy needed).
  if (process.env.STORE_LISTING_DIGEST_ENABLED !== "1") {
- return NextResponse.json({ skipped: true, reason: "STORE_LISTING_DIGEST_ENABLED not set — digest disabled" });
+ return NextResponse.json({ skipped: true, reason: "STORE_LISTING_DIGEST_ENABLED not set: digest disabled" });
  }
 
  let sent = 0;
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
  const [slug, email] = entries[i];
  if (!email) { skipped++; continue; }
  // Her own answer about being emailed. "Something needs you" is a switch on the Notifications
- // screen that nothing read — every store on the list got this digest whether it wanted it or not.
+ // screen that nothing read. Every store on the list got this digest whether it wanted it or not.
  const wants = await getNotificationPrefs(slug).then((p) => emailEnabled(p, "needs")).catch(() => true);
  if (!wants) { skipped++; continue; }
  try {

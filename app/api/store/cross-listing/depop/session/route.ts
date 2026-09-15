@@ -5,11 +5,11 @@ import { saveDepopTokens, getDepopTokens, clearDepopTokens } from "@/app/lib/dep
 export const dynamic = "force-dynamic";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Depop session hand-off — the VYA side of the on-device connect.
+// Depop session hand-off: the VYA side of the on-device connect.
 //
 // The VYA mobile app (via-app) redeems the seller's Depop magic link ON THE PHONE, where the login
-// looks genuine to Depop and never trips the SMS gate. Whatever credential that login yields — a
-// session cookie string, a bearer token, or both — the app POSTs here, and VYA stores it in the
+// looks genuine to Depop and never trips the SMS gate. Whatever credential that login yields. A
+// session cookie string, a bearer token, or both. The app POSTs here, and VYA stores it in the
 // existing depop_tokens drawer. From then on the server-side poster and the sold-sync use it.
 //
 // WHY THE SHAPE IS FLEXIBLE: we haven't yet measured a completed Depop login (the web capture died
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 // `session` string (stored as the access credential) plus optional `refresh` and expiry, and the
 // app sends whatever it captured. Once we see a real login we can tighten this.
 //
-// AUTH: the seller must be signed into VYA (resolveStoreSlugAny) — same gate as every other
+// AUTH: the seller must be signed into VYA (resolveStoreSlugAny): same gate as every other
 // /api/store route. The Depop credential is bound to THAT store, never passed in the body as a
 // slug, so one seller can't attach a session to another's account.
 // ───────────────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
  const body = await request.json().catch(() => null);
 
  // The credential the on-device login produced. Named `session` because for Depop it's most likely
- // a cookie string, not an OAuth token — but the store treats it opaquely either way.
+ // a cookie string, not an OAuth token, but the store treats it opaquely either way.
  const session = typeof body?.session === "string" ? body.session.trim() : "";
  if (!session || session.length < 8) {
   return NextResponse.json({ error: "No Depop session in the request." }, { status: 400 });
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
  await saveDepopTokens(slug, { accessToken: session, refreshToken: refresh, expiresInSec, depopUser: handle });
 
  // Report back what we stored (never the value) so the app can show "Connected as @handle" and,
- // crucially, surface the session lifetime — the number that tells us how often a seller reconnects.
+ // crucially, surface the session lifetime. The number that tells us how often a seller reconnects.
  return NextResponse.json({
   ok: true,
   connected: true,
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
  });
 }
 
-// GET — is this store's Depop connected, and how much life is left on the session? Powers the
+// GET: is this store's Depop connected, and how much life is left on the session? Powers the
 // app's "Connected / Reconnect" state without ever handing the credential back to the client.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-// DELETE — disconnect. Mirrors the existing per-platform disconnect on the cross-listing board.
+// DELETE: disconnect. Mirrors the existing per-platform disconnect on the cross-listing board.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Sign into VYA first." }, { status: 401 });

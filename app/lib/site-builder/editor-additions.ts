@@ -2,7 +2,7 @@
 //
 // Injected by prepareEditMode right AFTER the editor's own script (EDITOR_JS in site-capture.ts) and
 // kept apart from it on purpose: that script is the most contended code in the repo. It reaches the
-// editor only through `window.__vyaEd` — a small bridge at the end of EDITOR_JS — and through the
+// editor only through `window.__vyaEd`, a small bridge at the end of EDITOR_JS, and through the
 // page's own messages. Step 2 adds:
 //
 //  · PRODUCT GRIDS. A grid is an empty marker ([data-vya-grid]); its cards are fetched from
@@ -37,7 +37,7 @@ css.textContent='#vya-plus{position:fixed;z-index:2147483646;display:none;place-
 +'#vya-hidbar button{background:#fff;color:#5D0F17;border:0;border-radius:6px;padding:5px 10px;font:600 12px -apple-system,system-ui,sans-serif;cursor:pointer}';
 document.head.appendChild(css);
 
-/* Sections, as the save counts them — top-level only. */
+/* Sections, as the save counts them. Top-level only. */
 function secList(){return [].slice.call(document.querySelectorAll("[data-vya-sec],[data-vya-block]")).filter(function(n){return !n.classList.contains("vya-del")&&!(n.parentNode&&n.parentNode.closest&&n.parentNode.closest("[data-vya-sec],[data-vya-block]"))})}
 function gridCfg(el){try{return JSON.parse(el.getAttribute("data-vya-grid")||"{}")}catch(e){return{}}}
 function infoOf(s,pc){var g=s.hasAttribute("data-vya-grid");return{vya:"secinfo",block:s.hasAttribute("data-vya-block"),hidden:s.hasAttribute("data-vya-hidden"),grid:g?{id:s.getAttribute("data-vya-grid-id"),config:gridCfg(s)}:null,item:pc?pc.getAttribute("data-vya-item"):null,itemTitle:pc?pc.getAttribute("data-vya-item-title"):null}}
@@ -107,7 +107,7 @@ else if(d.vya==="undo"||d.vya==="redo"){setTimeout(refillEmpty,0)}
 else if(d.vya==="dupsec"){var s2=E.sel(),c2=s2&&s2.nextElementSibling;if(c2&&s2.hasAttribute("data-vya-grid")&&c2.getAttribute("data-vya-grid-id")===s2.getAttribute("data-vya-grid-id")){c2.removeAttribute("data-vya-sec");c2.classList.remove("vya-sel");c2.setAttribute("data-vya-grid-id",newId());c2.innerHTML="";fillGrid(c2)}}
 });
 /* ── a page she has hidden ──
-   She can still open and edit it — hiding is about shoppers, not about her. One bar says so, and
+   She can still open and edit it. Hiding is about shoppers, not about her. One bar says so, and
    offers the way back; the panel does the write and reloads this frame. */
 if(EDIT.hidden){var hb=document.createElement("div");hb.id="vya-hidbar";
 hb.appendChild(document.createTextNode("This page is hidden from shoppers"));

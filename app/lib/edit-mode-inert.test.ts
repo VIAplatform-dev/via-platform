@@ -58,7 +58,7 @@ test("editing is untouched: text, images and links are still addressable", () =>
 
 // ── undo ───────────────────────────────────────────────────────────────────────────────────────
 // Deleting a section and pressing undo brought nothing back. Undo restores an innerHTML snapshot of
-// "the sections' parent", which was read as the parent of the FIRST tagged section — true only when
+// "the sections' parent", which was read as the parent of the FIRST tagged section. True only when
 // every section shares one parent. Real themes put header sections in <header> and the page's in
 // <main>, so the snapshot covered one branch and a delete in another was outside it entirely.
 test("undo snapshots the subtree that holds ALL the sections, not the first one's parent", () => {

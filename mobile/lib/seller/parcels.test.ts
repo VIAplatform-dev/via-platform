@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { groupIntoParcels, parcelsToPost, parcelsToCollect, parcelStatus, parcelsToPostLabel } from "./parcels.ts";
 
-// Mirror of app/lib/parcels-core.ts — the same cases, so the phone and the web count the same bags.
+// Mirror of app/lib/parcels-core.ts. The same cases, so the phone and the web count the same bags.
 
 const o = (id: string, p: Partial<{ status: string; paymentIntent: string | null; buyerEmail: string | null; paidAt: string | null; deliveryMethod: "ship" | "pickup"; amountCents: number; trackingNumber: string | null; labelUrl: string | null }> = {}) => ({
   id, status: p.status ?? "paid", paymentIntent: p.paymentIntent === undefined ? `pi_${id}` : p.paymentIntent, buyerEmail: p.buyerEmail ?? "ana@example.com",
@@ -48,7 +48,7 @@ test("a parcel carries whichever piece's label and tracking", () => {
   assert.equal(parcels[0].labelUrl, "https://l");
 });
 
-test("collections are the paid pickups — the bags waiting at the counter, not in the post", () => {
+test("collections are the paid pickups. The bags waiting at the counter, not in the post", () => {
   const parcels = groupIntoParcels([o("a", { paymentIntent: "pi_1" }), o("d", { paymentIntent: "pi_3", deliveryMethod: "pickup" }), o("f", { paymentIntent: "pi_5", deliveryMethod: "pickup", status: "fulfilled" })]);
   assert.deepEqual(parcelsToCollect(parcels).map((p) => p.orders[0].id), ["d"]);
 });

@@ -8,7 +8,7 @@ test("a percentage comes off the subtotal", () => {
  assert.deepEqual(computeDiscount({ kind: "percent", value: 10 }, 20_000), { offCents: 2_000, freeShipping: false });
 });
 
-test("a code with no amount set takes nothing off — it does not throw, and it does not take 100%", () => {
+test("a code with no amount set takes nothing off. It does not throw, and it does not take 100%", () => {
  // The reported bug was a WELCOME10 saved before the "10" was typed. It must be harmless until fixed.
  assert.deepEqual(computeDiscount({ kind: "percent", value: null }, 20_000), { offCents: 0, freeShipping: false });
  assert.deepEqual(computeDiscount({ kind: "fixed", value: null }, 20_000), { offCents: 0, freeShipping: false });

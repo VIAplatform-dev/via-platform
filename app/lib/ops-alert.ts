@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-// Standalone ops-alert sender — deliberately a LEAF module: it imports only `resend`, nothing that
+// Standalone ops-alert sender: deliberately a LEAF module: it imports only `resend`, nothing that
 // reaches the server-only storefront sanitizer. error-log.ts imports it (and error-log is pulled in by
 // the foundational db.ts), so keeping this dependency-light is what lets db.ts stay client-bundle-safe.
 // The full email.ts re-exports sendOpsAlert from here for its other server-side callers.
@@ -16,7 +16,7 @@ const FROM_EMAIL = "VYA <hana@vyaplatform.com>";
 const OPS_ALERT_EMAIL = process.env.OPS_ALERT_EMAIL || "helster@me.com";
 
 /**
- * Send an operational alert to the founder — used when a nightly ETL cron throws or produces a
+ * Send an operational alert to the founder. Used when a nightly ETL cron throws or produces a
  * suspiciously empty result, or a shipping label eats its margin, so silent failures surface instead
  * of looking like "no data". Best-effort: never throws, so an alert failure can't mask the original.
  */

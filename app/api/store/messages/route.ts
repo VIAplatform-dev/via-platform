@@ -12,7 +12,7 @@ import { sendExpoPush } from "@/app/lib/push";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/store/messages — conversations for the acting store + unread total. */
+/** GET /api/store/messages. Conversations for the acting store + unread total. */
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/store/messages — store replies in a conversation it owns.
+ * POST /api/store/messages. Store replies in a conversation it owns.
  * Body: { conversationId, body }. Push-notifies the customer.
  */
 export async function POST(request: NextRequest) {

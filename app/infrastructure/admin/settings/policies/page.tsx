@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { ScrollText, Check } from "lucide-react";
 import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
+import { Sparkles } from "lucide-react";
 
 // What the store promises its buyers.
 //
 // Every hosted storefront already links to Returns, Shipping, Privacy and Terms. Until now only
-// returns existed, buried in a settings tab — the other three linked to pages with nothing behind
+// returns existed, buried in a settings tab. The other three linked to pages with nothing behind
 // them. Marketplaces and Stripe both ask for these too, so the blanks weren't only a storefront
 // problem.
 //
@@ -46,12 +47,35 @@ export default function PoliciesPage() {
  const [busy, setBusy] = useState(false);
  const [saved, setSaved] = useState<Key | null>(null);
  const [err, setErr] = useState<string | null>(null);
+ // Which tabs are currently showing words WE wrote rather than hers. A tab leaves this set the
+ // moment she types in it, so the "we drafted this" note never sits over her own writing.
+ const [drafted, setDrafted] = useState<Set<Key>>(new Set());
 
  useEffect(() => {
   let active = true;
   (async () => {
    const d = await fetch("/api/store/profile").then((r) => (r.ok ? r.json() : null)).catch(() => null);
    if (active) setP(d?.profile?.policies ?? { returns: "", shipping: "", privacy: "", terms: "" });
+   const w = await fetch("/api/store/policies/draft").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+   if (!active || !w?.ok) return;
+   // WRITTEN ALREADY, not offered behind a button.
+   //
+   // Four empty boxes is why most stores have no policies at all: writing a returns policy from
+   // nothing is an afternoon nobody has. She has already answered every part of it in the settings
+   // screens, so the box arrives full and her job is editing rather than starting.
+   //
+   // ONLY THE EMPTY ONES. Anything she has written is hers and is never touched, and nothing is
+   // saved until she presses Save, so a draft she disagrees with dies when she closes the tab.
+   setP((cur) => {
+    if (!cur) return cur;
+    const next = { ...cur };
+    const filled = new Set<Key>();
+    for (const k of (w.available ?? []) as Key[]) {
+     if (!next[k]?.trim() && w.drafts?.[k]) { next[k] = w.drafts[k]; filled.add(k); }
+    }
+    setDrafted(filled);
+    return next;
+   });
   })();
   return () => { active = false; };
  }, []);
@@ -74,7 +98,7 @@ export default function PoliciesPage() {
 
  return (
   <>
-   <AdminHeader eyebrow="Settings" title="Policies" subtitle="What you write here is what buyers are shown and what they agree to at checkout. Linked from every page of your storefront." />
+   <AdminHeader eyebrow="Settings" title="Policies" subtitle="Buyers read this at checkout and agree to it. Linked from every page of your storefront." />
    {err && <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] text-rose-700" role="alert">{err}</div>}
 
    {!p ? (
@@ -105,14 +129,26 @@ export default function PoliciesPage() {
       </div>
       {tab === "returns" && (
        <p className="mb-3 rounded-lg bg-stone-50 px-3 py-2.5 text-[12px] leading-relaxed text-stone-500">
-        This is the page buyers read, and the same text as the returns box under General → Returns —
+        This is the page buyers read, and the same text as the returns box under General → Returns,
         edit it in either place. The <span className="font-medium text-stone-700">rules</span> a refund
-        actually follows — how many days, any restocking fee, who pays return postage — are set there too.
+        actually follows, how many days, any restocking fee, who pays return postage. Are set there too.
        </p>
+      )}
+      {/* OUR WORDS, SAID SO. The box is already full, so she has to know whose sentences these are
+          before she publishes them under her shop's name. It disappears the moment she edits. */}
+      {drafted.has(tab) && (
+       <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3.5 py-2.5">
+        <Sparkles size={14} className="mt-0.5 shrink-0 text-amber-700" />
+        <p className="text-[12.5px] leading-relaxed text-stone-700">
+         <span className="font-medium text-stone-900">This is a draft we wrote from your settings.</span>{" "}
+         Read it, change anything that isn&rsquo;t how your shop works, then save it. Nothing is live
+         until you do.
+        </p>
+       </div>
       )}
       <textarea
        value={p[tab]}
-       onChange={(e) => { setP({ ...p, [tab]: e.target.value }); setSaved(null); }}
+       onChange={(e) => { setP({ ...p, [tab]: e.target.value }); setSaved(null); setDrafted((d) => { const n = new Set(d); n.delete(tab); return n; }); }}
        placeholder={current.placeholder}
        rows={16}
        className="w-full resize-y rounded-lg border border-stone-300 px-3 py-2.5 text-[13px] leading-relaxed outline-none focus:border-stone-500"
@@ -122,8 +158,9 @@ export default function PoliciesPage() {
      <div className="flex flex-wrap items-center gap-3 border-t border-stone-100 px-5 py-3.5">
       <TechButton onClick={save} disabled={busy}>{busy ? "Saving…" : `Save ${current.label.toLowerCase()}`}</TechButton>
       {saved === tab && <StatusPill tone="live">Saved</StatusPill>}
+      {drafted.has(tab) && saved !== tab && <StatusPill tone="pending">Not saved yet</StatusPill>}
       <span className="ml-auto text-[11.5px] text-stone-400">
-       {written(tab) ? "Live on your storefront — on VYA pages. A site you imported keeps its own policy pages." : "Not written yet — your storefront won’t link to it."}
+       {written(tab) ? "Live on your storefront, on VYA pages. A site you imported keeps its own policy pages." : "Not written yet: your storefront won’t link to it."}
       </span>
      </div>
     </TechCard>

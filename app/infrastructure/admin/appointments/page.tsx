@@ -5,11 +5,11 @@ import { CalendarRange, ChevronLeft, ChevronRight, X, Clock, Settings2 } from "l
 import VisitPanel from "./VisitPanel";
 import { AdminPage, AdminHeader, TechCard, TechButton, StatusPill, cn } from "../ui";
 
-// The store's schedule — its own page, because a shop that only sells still takes appointments.
+// The store's schedule: its own page, because a shop that only sells still takes appointments.
 //
 // Opens on the MONTH. A seller arriving here is usually asking a month-shaped question: how busy is
 // next week, does anything clash with the market on the 14th, when could I fit someone in. The week
-// view is for working a day, and it's one click away — but landing there meant scrolling forward
+// view is for working a day, and it's one click away, but landing there meant scrolling forward
 // week by week to answer anything about the month.
 //
 // Empty open days still draw their slots, so an open Thursday with nobody in it reads as available
@@ -31,7 +31,7 @@ function withStore(path: string): string {
 
 const MS = 86_400_000;
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T00:00:00Z`) + n * MS).toISOString().slice(0, 10);
-/** The Monday on or before a date — the week a shop thinks in. */
+/** The Monday on or before a date. The week a shop thinks in. */
 function weekStart(d: string): string {
  const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
  return addDays(d, -((wd + 6) % 7));
@@ -40,7 +40,7 @@ const dayLabel = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("e
 const monthLabel = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = (d: string) => weekStart(`${d.slice(0, 7)}-01`);
-/** Same day-of-month, n months away — clamped by the Date itself, so 31 Jan + 1 lands in February. */
+/** Same day-of-month, n months away. Clamped by the Date itself, so 31 Jan + 1 lands in February. */
 function monthShift(d: string, n: number): string {
  const t = new Date(`${d}T00:00:00Z`);
  t.setUTCMonth(t.getUTCMonth() + n, 1);
@@ -51,8 +51,8 @@ const longDay = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en
 const clock = (t: string) => { const [h, m] = t.split(":").map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
 
 export default function RentalCalendarPage() {
- // The month, not the week. A shop wants to see the shape of the whole month when it opens this —
- // whether next week is full, whether anything clashes with a market — and can drop to a week when
+ // The month, not the week. A shop wants to see the shape of the whole month when it opens this,
+ // whether next week is full, whether anything clashes with a market, and can drop to a week when
  // it's actually working a day.
  const [span, setSpan] = useState<"week" | "month">("month");
  const [from, setFrom] = useState(() => monthStart(today()));
@@ -65,7 +65,7 @@ export default function RentalCalendarPage() {
  const [form, setForm] = useState({ name: "", email: "", phone: "", kind: "", note: "" });
  const [busy, setBusy] = useState(false);
  // Everything waiting on an answer, WHATEVER week it falls in. The diary only ever showed the week
- // on screen, so a request for a fortnight away was invisible — a store clicked "approve" in its
+ // on screen, so a request for a fortnight away was invisible. A store clicked "approve" in its
  // email, landed here, and found nothing to approve.
  const [pending, setPending] = useState<Appointment[]>([]);
  const [open, setOpen] = useState<Appointment | null>(null);
@@ -137,7 +137,7 @@ export default function RentalCalendarPage() {
       <TechButton variant="secondary" className="max-sm:px-4 max-sm:py-2.5" onClick={() => setFrom(step(-1))} aria-label={`Previous ${span}`}><ChevronLeft size={15} /></TechButton>
       <TechButton variant="secondary" className="max-sm:px-4 max-sm:py-2.5" onClick={() => setFrom(step(1))} aria-label={`Next ${span}`}><ChevronRight size={15} /></TechButton>
       {/* The hours, deposits and approval rule that govern everything on this page live in
-          settings — reachable from the thing they govern, not only from the settings index. */}
+          settings. Reachable from the thing they govern, not only from the settings index. */}
       <a href={withStore("/admin/settings/appointments")}
        className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-1.5 text-[12.5px] font-medium text-stone-600 transition hover:bg-stone-50 max-sm:py-2.5">
        <Settings2 size={14} /> Settings
@@ -202,9 +202,9 @@ export default function RentalCalendarPage() {
    {loading ? (
     <TechCard className="px-5 py-10 text-center text-[13px] text-stone-400">Loading…</TechCard>
    ) : span === "month" ? (
-    /* A month answers "how busy is September", not "what's at 2pm" — so a day is a count and a
+    /* A month answers "how busy is September", not "what's at 2pm", so a day is a count and a
        date, and clicking one drops into that week where the times actually fit. On a phone the
-       whole month fits the screen: each day shows its date and a count, not the names — a month
+       whole month fits the screen: each day shows its date and a count, not the names. A month
        you have to scroll sideways can't answer "how busy is September" at a glance. */
     <div className="overflow-x-auto">
      <div className="grid grid-cols-7 gap-px rounded-xl bg-stone-200 p-px md:min-w-[42rem]">
@@ -317,7 +317,7 @@ export default function RentalCalendarPage() {
         {dayLabel(adding.day)} at {adding.start}
        </h2>
       </div>
-      <p className="mt-1 text-[12.5px] text-stone-500">Writing someone into the book yourself — a phone call, or a walk-in.</p>
+      <p className="mt-1 text-[12.5px] text-stone-500">Writing someone into the book yourself. A phone call, or a walk-in.</p>
       <div className="mt-4 flex flex-col gap-2">
        {cfg && cfg.types.length > 1 && (
         <div className="flex flex-wrap gap-1.5">

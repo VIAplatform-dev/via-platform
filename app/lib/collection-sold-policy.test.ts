@@ -8,7 +8,7 @@ test("a seller who lists sold pieces in her own collection keeps them", () => {
 });
 
 test("a seller whose collection has no sold pieces, where we hold plenty, drops them", () => {
- // ascensio-demo's Dresses returns 21 products, none unavailable — while we hold 10 sold pieces
+ // ascensio-demo's Dresses returns 21 products, none unavailable, while we hold 10 sold pieces
  // filed in it. She clears sold stock out of her collections; we were putting it back, which is
  // the whole of the "31 here, 21 on hers" discrepancy.
  assert.equal(soldPolicy({ feedUnavailable: 0, feedTotal: 21, weHoldSold: 10 }), "drops");
@@ -16,7 +16,7 @@ test("a seller whose collection has no sold pieces, where we hold plenty, drops 
 
 test("no sold pieces on EITHER side proves nothing", () => {
  // THE TRAP. A collection where nothing has sold yet looks identical to one she clears out. Calling
- // that "drops" would start hiding an archive she never asked us to hide — the same "couldn't tell
+ // that "drops" would start hiding an archive she never asked us to hide. The same "couldn't tell
  // two situations apart" mistake as every other bug this week.
  assert.equal(soldPolicy({ feedUnavailable: 0, feedTotal: 21, weHoldSold: 0 }), "unknown");
 });
@@ -29,7 +29,7 @@ test("a collection we could not read is unknown, never 'drops'", () => {
 });
 
 test("one sold piece is enough to prove she keeps them", () => {
- // feathers has just 7 sold across four collections. Sparse evidence is still evidence — she has
+ // feathers has just 7 sold across four collections. Sparse evidence is still evidence. She has
  // not cleared them out.
  assert.equal(soldPolicy({ feedUnavailable: 1, feedTotal: 97, weHoldSold: 26 }), "keeps");
 });

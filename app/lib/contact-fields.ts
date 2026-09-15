@@ -1,6 +1,6 @@
 // The questions a store's contact form asks.
 //
-// The form used to be three hardcoded inputs — Name, Email, Message — with no way to change them.
+// The form used to be three hardcoded inputs, Name, Email, Message, with no way to change them.
 // That is fine for "get in touch" and wrong for everything else a vintage store actually collects:
 // a sourcing request needs a size, a wholesale enquiry needs a company, a repair needs a photo
 // reference. So the fields are content now, edited in the section like any other list.
@@ -8,7 +8,7 @@
 // Stored the way every other repeated list is stored (see storefront-items.ts): one string in the
 // block's props. Nothing here knows about the delimiter.
 
-import { readItems, type Item, type ItemSchema } from "./storefront-items";
+import { readItems, type Item, type ItemSchema } from "./storefront-items.ts";
 
 export const CONTACT_FIELD_SCHEMA: ItemSchema = { key: "fields", fields: ["label", "type", "required", "options"] };
 
@@ -18,7 +18,7 @@ export type ContactField = {
  label: string;
  type: ContactFieldType;
  required: boolean;
- /** Only used by "choice" — the options a visitor picks between. */
+ /** Only used by "choice". The options a visitor picks between. */
  options: string[];
 };
 
@@ -32,7 +32,7 @@ export const CONTACT_FIELD_TYPES: { value: ContactFieldType; label: string }[] =
 ];
 
 /**
- * What a form asks when the seller hasn't changed anything — including every storefront saved before
+ * What a form asks when the seller hasn't changed anything, including every storefront saved before
  * this existed, which has no `fields` prop at all. Identical to the three inputs the form has always
  * rendered, so nothing already published changes shape.
  */
@@ -70,7 +70,7 @@ export const answerKey = (i: number) => `f${i}`;
 /**
  * Turn a set of answers into the three things a conversation is made of.
  *
- * The inbox stores a name, an email and a message — that's the shape of a thread, and it shouldn't
+ * The inbox stores a name, an email and a message. That's the shape of a thread, and it shouldn't
  * change because a seller added a question. So: the first email field is the email, the first field
  * that reads like a name is the name, the first long answer is the message, and every other answer
  * is written into the message as a labelled line. The seller reads one note with everything in it
@@ -104,7 +104,7 @@ export function canSubmit(fields: ContactField[], values: Record<string, string>
 }
 
 /**
- * Copy a template left for the seller to replace — "[YOUR EMAIL]", "[@YOURHANDLE]". Fine as a prompt
+ * Copy a template left for the seller to replace. "[YOUR EMAIL]", "[@YOURHANDLE]". Fine as a prompt
  * in the editor, broken as a `mailto:` on a published page, so the live site leaves it out.
  */
 export const isPlaceholderCopy = (v: string | undefined) => !!v && /^\s*\[.*\]\s*$/.test(v);

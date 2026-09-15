@@ -19,14 +19,23 @@ export type StoreProfile = {
  location: string | null;
  bio: string | null;
  // Business facts nothing collected before, yet customs declarations want a real legal name and
- // Stripe asks for a support contact — both were quietly falling back to the display name.
+ // Stripe asks for a support contact. Both were quietly falling back to the display name.
  supportEmail: string | null;
  supportPhone: string | null;
- /** Companies House number, EIN, ABN — whatever the store's country calls it. */
+ /** Companies House number, EIN, ABN. Whatever the store's country calls it. */
  companyNumber: string | null;
  /** VAT/GST number as it appears on invoices. Not the same thing as a Stripe Tax registration,
   *  which is about collecting; this is about identifying the business. */
  vatNumber: string | null;
+ /**
+  * What her prices are in, when she has said. Null means nobody has chosen and the ship-from
+  * country decides (store-currency.ts).
+  *
+  * Stored rather than derived because a store may legitimately trade in something other than its
+  * own country's money, and because the derivation must never silently re-answer a question she
+  * has already answered.
+  */
+ currency: string | null;
  policies: StorePolicies;
 };
 
@@ -51,7 +60,7 @@ function coercePolicies(raw: any): StorePolicies {
  };
 }
 
-/** Which policies a store has actually written — the storefront shouldn't link to a blank page. */
+/** Which policies a store has actually written. The storefront shouldn't link to a blank page. */
 export function publishedPolicies(p: StorePolicies): (keyof StorePolicies)[] {
  return (Object.keys(p) as (keyof StorePolicies)[]).filter((k) => (p[k] || "").trim().length > 0);
 }
@@ -67,12 +76,13 @@ async function ensureTable() {
  bio TEXT,
  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
- // Additive, lazily — same convention as the other store_* tables, so a deploy never lands code
+ // Additive, lazily: same convention as the other store_* tables, so a deploy never lands code
  // that reads a column the database hasn't got yet.
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS support_email TEXT`.catch(() => {});
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS support_phone TEXT`.catch(() => {});
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS company_number TEXT`.catch(() => {});
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS vat_number TEXT`.catch(() => {});
+ await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS currency TEXT`.catch(() => {});
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS policies JSONB`.catch(() => {});
  // Optional "Set up your store" steps she chose to skip (["domain"]). See setup-core.ts.
  await db()`ALTER TABLE store_profiles ADD COLUMN IF NOT EXISTS setup_skipped JSONB`.catch(() => {});
@@ -101,7 +111,7 @@ export async function setSetupSkipped(storeSlug: string, ids: string[]): Promise
 
 export async function getStoreProfile(storeSlug: string): Promise<StoreProfile> {
  await ensureTable();
- const rows = (await db()`SELECT display_name, legal_name, location, bio, support_email, support_phone, company_number, vat_number, policies FROM store_profiles WHERE store_slug = ${storeSlug} LIMIT 1`.catch(() => [])) as any[];
+ const rows = (await db()`SELECT display_name, legal_name, location, bio, support_email, support_phone, company_number, vat_number, currency, policies FROM store_profiles WHERE store_slug = ${storeSlug} LIMIT 1`.catch(() => [])) as any[];
  const o = rows[0] || {};
  const staticStore = stores.find((s) => s.slug === storeSlug);
  return {
@@ -114,6 +124,7 @@ export async function getStoreProfile(storeSlug: string): Promise<StoreProfile> 
  supportPhone: o.support_phone ?? null,
  companyNumber: o.company_number ?? null,
  vatNumber: o.vat_number ?? null,
+ currency: o.currency ?? null,
  policies: coercePolicies(typeof o.policies === "string" ? JSON.parse(o.policies) : o.policies),
  };
 }
@@ -125,9 +136,9 @@ export async function getDisplayNameOverride(storeSlug: string): Promise<string 
  return rows[0]?.display_name ?? null;
 }
 
-export async function updateStoreProfile(storeSlug: string, patch: { displayName?: string; legalName?: string; location?: string; bio?: string; supportEmail?: string; supportPhone?: string; companyNumber?: string; vatNumber?: string; policies?: Partial<StorePolicies> }): Promise<StoreProfile> {
+export async function updateStoreProfile(storeSlug: string, patch: { displayName?: string; legalName?: string; location?: string; bio?: string; supportEmail?: string; supportPhone?: string; companyNumber?: string; vatNumber?: string; currency?: string | null; policies?: Partial<StorePolicies> }): Promise<StoreProfile> {
  await ensureTable();
- const cur = (await db()`SELECT display_name, legal_name, location, bio, support_email, support_phone, company_number, vat_number, policies FROM store_profiles WHERE store_slug = ${storeSlug} LIMIT 1`.catch(() => [])) as any[];
+ const cur = (await db()`SELECT display_name, legal_name, location, bio, support_email, support_phone, company_number, vat_number, currency, policies FROM store_profiles WHERE store_slug = ${storeSlug} LIMIT 1`.catch(() => [])) as any[];
  const o = cur[0] || {};
  const next = {
  display_name: patch.displayName != null ? String(patch.displayName).trim().slice(0, 120) || null : (o.display_name ?? null),
@@ -138,6 +149,11 @@ export async function updateStoreProfile(storeSlug: string, patch: { displayName
  support_phone: patch.supportPhone != null ? String(patch.supportPhone).trim().slice(0, 40) || null : (o.support_phone ?? null),
  company_number: patch.companyNumber != null ? String(patch.companyNumber).trim().slice(0, 60) || null : (o.company_number ?? null),
  vat_number: patch.vatNumber != null ? String(patch.vatNumber).trim().slice(0, 60) || null : (o.vat_number ?? null),
+ // An explicit null CLEARS the choice, which puts the store back on "follow my address". Three
+ // letters or nothing: a "$" typed into the box would format every price as the string "$".
+ currency: patch.currency !== undefined
+  ? (/^[A-Za-z]{3}$/.test(String(patch.currency ?? "")) ? String(patch.currency).toUpperCase() : null)
+  : (o.currency ?? null),
  // Merged per key: the policies page saves one at a time, and a full replace would blank the rest.
  policies: JSON.stringify(coercePolicies({
   ...coercePolicies(typeof o.policies === "string" ? JSON.parse(o.policies) : o.policies),
@@ -145,9 +161,9 @@ export async function updateStoreProfile(storeSlug: string, patch: { displayName
  })),
  };
  await db()`
- INSERT INTO store_profiles (store_slug, display_name, legal_name, location, bio, support_email, support_phone, company_number, vat_number, policies, updated_at)
- VALUES (${storeSlug}, ${next.display_name}, ${next.legal_name}, ${next.location}, ${next.bio}, ${next.support_email}, ${next.support_phone}, ${next.company_number}, ${next.vat_number}, ${next.policies}::jsonb, now())
- ON CONFLICT (store_slug) DO UPDATE SET display_name = ${next.display_name}, legal_name = ${next.legal_name}, location = ${next.location}, bio = ${next.bio}, support_email = ${next.support_email}, support_phone = ${next.support_phone}, company_number = ${next.company_number}, vat_number = ${next.vat_number}, policies = ${next.policies}::jsonb, updated_at = now()
+ INSERT INTO store_profiles (store_slug, display_name, legal_name, location, bio, support_email, support_phone, company_number, vat_number, currency, policies, updated_at)
+ VALUES (${storeSlug}, ${next.display_name}, ${next.legal_name}, ${next.location}, ${next.bio}, ${next.support_email}, ${next.support_phone}, ${next.company_number}, ${next.vat_number}, ${next.currency}, ${next.policies}::jsonb, now())
+ ON CONFLICT (store_slug) DO UPDATE SET display_name = ${next.display_name}, legal_name = ${next.legal_name}, location = ${next.location}, bio = ${next.bio}, support_email = ${next.support_email}, support_phone = ${next.support_phone}, company_number = ${next.company_number}, vat_number = ${next.vat_number}, currency = ${next.currency}, policies = ${next.policies}::jsonb, updated_at = now()
  `;
  return getStoreProfile(storeSlug);
 }

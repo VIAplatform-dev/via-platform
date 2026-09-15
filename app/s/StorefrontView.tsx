@@ -20,6 +20,8 @@ import { sanitizeBlocks, sanitizePages } from "@/app/lib/storefront-blocks";
 import { stripThemeBackgroundOverrides } from "@/app/lib/theme-css";
 import { StoreFooter } from "@/app/s/StoreChrome";
 import { resolveWords } from "@/app/lib/storefront-words";
+import { policyLinks } from "@/app/lib/policy-pages";
+import { getStoreProfile } from "@/app/lib/store-profile-db";
 
 /** Render the raw price string sensibly (loadStoreProducts may or may not prefix a symbol). */
 function fmtPrice(price: string): string {
@@ -38,13 +40,13 @@ function googleFontsHref(families: string[]): string | null {
  return `https://fonts.googleapis.com/css2?${q}&display=swap`;
 }
 
-// Shared storefront render — used by /s/[handle] and the custom-domain route.
+// Shared storefront render: used by /s/[handle] and the custom-domain route.
 // Applies the store's extracted theme (fonts, colour palette, logo).
 export default async function StorefrontView({ settings, view = "home", preview = false, category, query, pageSlug, collectionSlug }: { settings: StorefrontSettings; view?: "home" | "shop"; preview?: boolean; category?: string; query?: string; pageSlug?: string; collectionSlug?: string }) {
  const sf = settings;
  const onOwnOrigin = isStoreHost((await headers()).get("host"));
  // Store metadata: prefer hardcoded stores.ts, fall back to the sellers table,
- // then the handle — so DB-based sellers (not in stores.ts) still render.
+ // then the handle, so DB-based sellers (not in stores.ts) still render.
  const store = stores.find((s) => s.slug === sf.storeSlug);
  const seller = await getSellerBySlug(sf.storeSlug).catch(() => null);
  const storeName = sf.theme?.storeName || store?.name || seller?.name || sf.handle.replace(/-/g, " ");
@@ -77,7 +79,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const toSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
  const catFields = (l: Listing) => [...(l.tags || []), l.category || ""].filter(Boolean);
  // A family slug ("clothing") stands for every bucket underneath it, so the Shop menu's group
- // heading is a real destination and not just a label. Checked first and exactly — the loose word
+ // heading is a real destination and not just a label. Checked first and exactly. The loose word
  // matching below would never connect "clothing" to a listing categorised "Skirts".
  // Only a family that actually groups SEVERAL buckets takes this path. "bags" is a family of one, and
  // routing it here would quietly retire the tag matching that imported stores' own menus depend on.
@@ -109,7 +111,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  .filter((l) => (collectionIds ? collectionIds.has(l.id) : true))
  .filter((l) => (catFilters ? matchesCat(l) : true))
  .filter((l) => (q ? l.title.toLowerCase().includes(q) || catFields(l).some((t) => t.toLowerCase().includes(q)) : true));
- // A held piece keeps its link — the product page says "On hold" and refuses to sell it — so the
+ // A held piece keeps its link, the product page says "On hold" and refuses to sell it, so the
  // customer it is held for can still look at it.
  const toTile = (l: Listing): Tile => ({ key: `l${l.id}`, title: l.title, price: formatPrice(l.price, l.currency), image: l.images[0] || "", size: l.size, href: null, itemId: l.status !== "sold" ? l.id : undefined, sold: l.status === "sold", held: l.held });
  const items: Tile[] = listings.length
@@ -121,14 +123,14 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  // ── Theme ──
  const theme = sf.theme || {};
- // The shop's own labels — "Sold", "View all". Overridable per store; see storefront-words.ts.
+ // The shop's own labels. "Sold", "View all". Overridable per store; see storefront-words.ts.
  const words = resolveWords(theme.words);
- // Headings/buttons/prices take the accent — but only when we can trust it.
+ // Headings/buttons/prices take the accent, but only when we can trust it.
  //   • A palette SCRAPED from an imported site: the extracted "accent" is often a spurious CSS
  //     colour (a sale-tag red, a link blue), so the site's own ink is the reliable match.
  //   • A palette CHOSEN in the studio: the seller clicked that colour and watched the preview use
  //     it. Overriding it here is how the live page stops matching the editor. Honour it exactly.
- // No marker means a theme saved before this distinction existed — treated as chosen, since the
+ // No marker means a theme saved before this distinction existed. Treated as chosen, since the
  // studio is where the overwhelming majority of these palettes came from.
  const scraped = theme.colorsFrom === "imported";
  const accent = (scraped
@@ -143,11 +145,20 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const logo = theme.logo || null;
  const headerLayout = theme.headerLayout || "inline";
 
+ // VYA'S OWN TYPE IS THE DEFAULT, and the fallback behind whatever she picks.
+ //
+ // A storefront with no fonts chosen used to land on Georgia for some headings and the browser's
+ // default for everything else. Two typefaces nobody selected, and neither of them VYA's. A shop
+ // built here should look like it was, until she decides otherwise.
+ //
+ // Newsreader and Hanken Grotesk are the admin's faces and are already loaded on every page by the
+ // app shell, so this costs no request. A store that HAS chosen fonts still gets them; VYA's are
+ // now what sits behind them when a family fails to load, instead of Georgia.
  const vars: Record<string, string> = { "--accent": accent, "--bg": bg, "--text": text };
- if (headingFont) vars["--font-heading"] = `'${headingFont}', Georgia, serif`;
- if (bodyFont) vars["--font-body"] = `'${bodyFont}', system-ui, sans-serif`;
- const rootStyle = { ...vars, background: bg, color: text, ...(bodyFont ? { fontFamily: "var(--font-body)" } : {}) } as CSSProperties;
- const headingStyle: CSSProperties = headingFont ? { fontFamily: "var(--font-heading)", color: accent } : { color: accent };
+ vars["--font-heading"] = headingFont ? `'${headingFont}', 'Newsreader', Georgia, serif` : `'Newsreader', Georgia, serif`;
+ vars["--font-body"] = bodyFont ? `'${bodyFont}', 'Hanken Grotesk', system-ui, sans-serif` : `'Hanken Grotesk', system-ui, sans-serif`;
+ const rootStyle = { ...vars, background: bg, color: text, fontFamily: "var(--font-body)" } as CSSProperties;
+ const headingStyle: CSSProperties = { fontFamily: "var(--font-heading)", color: accent };
  // Per-section heading-font overrides (deep style inspector) must be loaded too, or they'd fall back.
  const blockHeadingFonts = [
  ...(theme.blocks ?? []),
@@ -160,7 +171,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const sections = theme.sections ?? [];
  const categories = theme.categories ?? [];
  // The Shop dropdown. An imported site arrives with its own nav categories (theme.categories) and
- // those win — they're the seller's real menu. A store built in the studio has none, so derive them
+ // those win: they're the seller's real menu. A store built in the studio has none, so derive them
  // from what's actually IN STOCK, bucketed by the platform's canonical normalizeCategory: "skirt",
  // "Skirts" and "MINI SKIRT" all collapse to one entry, and the labels match the numbers everywhere
  // else on VYA. Only buckets holding a live item appear, so the menu can never open an empty aisle.
@@ -171,7 +182,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
   : (() => {
    // ONLY the item's category field. Not tags, not the title: normalizeCategory checks Tops before
    // Bags, so a "top handle" tag on a Chanel flap lands the store an entire Tops aisle holding one
-   // handbag. An uncategorised item simply doesn't vote — a missing aisle is recoverable, a lying
+   // handbag. An uncategorised item simply doesn't vote. A missing aisle is recoverable, a lying
    // one sends the shopper to a page that doesn't hold what it promised.
    const tally = new Map<string, number>();
    for (const l of sortedListings) {
@@ -179,7 +190,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
     if (bucket) tally.set(bucket, (tally.get(bucket) || 0) + 1);
    }
    // Grouped a tier up (Clothing → Tops · Skirts), because nobody scans thirteen flat buckets.
-   // Family order is fixed rather than by count — a menu that reshuffles itself as stock turns over
+   // Family order is fixed rather than by count. A menu that reshuffles itself as stock turns over
    // is a menu returning shoppers can't learn. Within a family, the fullest aisle leads.
    const out: MenuEntry[] = [];
    for (const fam of CATEGORY_FAMILIES) {
@@ -187,7 +198,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
      .filter((m) => tally.has(m))
      .sort((a, b) => tally.get(b)! - tally.get(a)! || a.localeCompare(b));
     if (!present.length) continue;
-    // A heading that expands to a single child just says the same thing twice — so a family
+    // A heading that expands to a single child just says the same thing twice, so a family
     // holding one bucket (or holding only one in THIS store) becomes a plain link.
     if (present.length === 1) {
      const only = fam.members.length === 1 ? fam.label : present[0];
@@ -200,7 +211,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
   })();
  const menuFlat = shopMenu.flatMap((c) => [c, ...c.children]);
  const categoryLabel = category ? menuFlat.find((c) => c.slug === category)?.label || category.replace(/-/g, " ") : null;
- // Only render content sections that actually have content — skip stray image-only
+ // Only render content sections that actually have content. Skip stray image-only
  // sections (a lone full-bleed photo with no headline/text reads as a random "double image").
  const contentSections = sections.filter(
  (s) => ["text", "feature", "gallery"].includes(s.type) && (s.headline || s.text || (s.ctas && s.ctas.length)),
@@ -208,7 +219,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const newsletter = sections.find((s) => s.type === "newsletter");
  // Preserve the ?preview flag across internal links (so previewing an off
  // storefront doesn't 404 when you click into Shop / a page).
- // On the store's OWN origin its pages ARE the site root — /shop, /philosophy, /p/{id}. The
+ // On the store's OWN origin its pages ARE the site root. /shop, /philosophy, /p/{id}. The
  // /s/{handle} prefix is how VYA reaches the same storefront internally, and hardcoding it meant
  // every link on a seller's own domain read via-admin.vyasites.com/s/via-admin/shop.
  const base = onOwnOrigin ? "" : `/s/${sf.handle}`;
@@ -227,9 +238,9 @@ export default async function StorefrontView({ settings, view = "home", preview 
  // The homepage shows a small "New Arrivals"-style highlight (a few items + a
  // "View all" link); the full catalogue lives on the Shop page.
  //
- // This cap applies ONLY to the legacy grid below — the one a captured/blockless storefront renders.
+ // This cap applies ONLY to the legacy grid below. The one a captured/blockless storefront renders.
  // A block-built page must not be truncated here: each featured layout declares how many pieces it
- // shows (grid 8, carousel 12, archive 26 — see app/s/blocks/featured.tsx), and clamping every one of
+ // shows (grid 8, carousel 12, archive 26. See app/s/blocks/featured.tsx), and clamping every one of
  // them to 3 meant a seller chose a layout in the builder and shoppers got a different page. Blocks
  // receive the full list and slice it themselves.
  const HOME_HIGHLIGHT = 3;
@@ -264,7 +275,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const cardRatioCls = SHOP_RATIO[(isShop && shopGrid.ratio) || "4/5"];
 
  // VYA-built section layout. When present it replaces the default cloned
- // hero/sections/grid — the seller (or VYA) composes the page from blocks. A
+ // hero/sections/grid: the seller (or VYA) composes the page from blocks. A
  // pageSlug renders one of the store's extra pages; otherwise the home page.
  const homeBlocks = sanitizeBlocks(theme.blocks ?? []);
  const shopIntro = isShop ? sanitizeBlocks(theme.shopBlocks ?? []) : [];
@@ -272,14 +283,14 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const activePage = pageSlug ? extraPages.find((p) => p.slug === pageSlug) : null;
  const blocks = pageSlug ? activePage?.blocks ?? [] : homeBlocks;
  // The store's collections, each with its items, so a product section can show a curated set. Built
- // from the same listings already loaded above — no extra product queries, just membership lookups.
+ // from the same listings already loaded above, no extra product queries, just membership lookups.
  // Capped because this is one query per collection and a nav menu of forty is not a real design.
  const usedCollectionSlugs = new Set(
   [...blocks, ...shopIntro].map((b) => b.props?.collection).filter((v): v is string => !!v),
  );
  const byId = new Map(items.map((t) => [t.key.replace(/^l/, ""), t]));
  const blockCollections = (await Promise.all(
-  // Only the collections a section on this page actually names — one query per USED collection,
+  // Only the collections a section on this page actually names. One query per USED collection,
   // not per existing one. A store with forty collections shouldn't pay forty queries per page view.
   storeCollections.filter((c) => c.itemCount > 0 && usedCollectionSlugs.has(c.slug)).map(async (c) => ({
    slug: c.slug,
@@ -308,7 +319,20 @@ export default async function StorefrontView({ settings, view = "home", preview 
  const linkHref = (h: string) => (h.startsWith("/") ? withPreview(h) : h);
  const customLinks = (theme.navLinks ?? []).filter((l) => l.label && l.href);
  const headerNav = [...finalNav, ...customLinks.filter((l) => l.place !== "footer").map((l) => ({ label: l.label, href: linkHref(l.href) }))];
- const footerNav = [...finalNav, ...customLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: linkHref(l.href) }))];
+ // HER POLICIES, IN THE FOOTER, WHERE A SHOPPER LOOKS FOR THEM. Only the ones she has actually
+ // written: a link to a blank page is worse than no link, because a shopper clicks it to find out
+ // where she stands and learns nothing. Appended last so her own nav and her own custom links keep
+ // their order. Served by /s/{handle}/{slug}. See app/lib/policy-pages.ts.
+ const policyNav = policyLinks(
+ (await getStoreProfile(sf.storeSlug).catch(() => null))?.policies,
+ base,
+ preview,
+ );
+ const footerNav = [
+ ...finalNav,
+ ...customLinks.filter((l) => l.place !== "header").map((l) => ({ label: l.label, href: linkHref(l.href) })),
+ ...policyNav,
+ ];
  const gridHeading = isShop ? collectionTitle || categoryLabel || (query ? `Search: ${query}` : "Shop") : productsSection?.headline || "New Arrivals";
  const heroHeadline = theme.hero?.headline ?? null;
  const heroSub = theme.hero?.subheadline ?? null;
@@ -353,7 +377,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  return (
  <main style={rootStyle} className="min-h-screen">
  {fontsHref && <link rel="stylesheet" href={fontsHref} />}
- {/* Store's own custom CSS — layered over the theme (targets .vya-* classes). Trusted: only the owner/AI set it. */}
+ {/* Store's own custom CSS. Layered over the theme (targets .vya-* classes). Trusted: only the owner/AI set it. */}
  {theme.customCss && <style dangerouslySetInnerHTML={{ __html: stripThemeBackgroundOverrides(theme.customCss) }} />}
 
  {/* The store's own code. Only ever on the store's own origin. */}
@@ -376,11 +400,11 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {logo ? (
  <img src={logo} alt={storeName} className="h-7 w-auto object-contain" />
  ) : (
- <span className="text-lg tracking-[0.12em]" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>{storeName}</span>
+ <span className="text-lg tracking-[0.12em]" style={{ fontFamily: "var(--font-heading)" }}>{storeName}</span>
  )}
  </a>
  );
- // `items`, not `headerNav` — the split layout passes each HALF of the menu in, and mapping the whole
+ // `items`, not `headerNav`: the split layout passes each HALF of the menu in, and mapping the whole
  // menu here rendered the entire nav on BOTH sides of the brand. A seller with seven pages saw
  // fourteen links in preview and five in the editor, which is what "what I edit and what I preview
  // look completely different" meant.
@@ -402,11 +426,11 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </a>
  <div className="invisible absolute left-1/2 top-full z-50 -translate-x-1/2 pt-3 opacity-0 transition group-hover:visible group-hover:opacity-100">
  <div className="grid min-w-[210px] gap-0.5 border border-black/10 p-3 shadow-xl" style={{ background: bg }}>
- {/* "Shop all" first — the way back to the full catalogue once you've narrowed it. */}
+ {/* "Shop all" first: the way back to the full catalogue once you've narrowed it. */}
  <a href={n.href} className="px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100" style={{ letterSpacing: "normal" }}>{words.shopAll}</a>
  {shopMenu.map((c, j) => (
  <div key={j} className="contents">
- {/* The family heading is itself a destination — "Clothing" shows every bucket beneath it. */}
+ {/* The family heading is itself a destination. "Clothing" shows every bucket beneath it. */}
  <a href={withPreview(`${base}/shop?category=${c.slug}`)} className={`px-2 py-1.5 text-[11px] normal-case tracking-normal hover:opacity-100${c.children.length ? " font-medium" : ""}`} style={{ letterSpacing: "normal" }}>{c.label}</a>
  {c.children.map((s, k) => (
  <a key={k} href={withPreview(`${base}/shop?category=${s.slug}`)} className="px-2 py-1 pl-5 text-[11px] normal-case tracking-normal opacity-70 hover:opacity-100" style={{ letterSpacing: "normal" }}>{s.label}</a>
@@ -441,7 +465,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  );
  if (headerLayout === "split") return (
  <nav className={`${bar} flex items-center gap-6 py-5`} style={{ background: bg }}>
- {/* The menu halves sit at the OUTER edges, not tucked against the brand — bunched in the middle
+ {/* The menu halves sit at the OUTER edges, not tucked against the brand. Bunched in the middle
      they read as one crowded list with empty gutters either side, which is the opposite of what a
      split header is for. The spacer mirrors the search icon so the brand stays truly centred. */}
  <span className="w-8 shrink-0" />
@@ -463,7 +487,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </nav>
  );
  })()}
- {/* Mobile nav row — WRAPS, it does not scroll, and for the reasons StoreChrome.tsx sets out at
+ {/* Mobile nav row: WRAPS, it does not scroll, and for the reasons StoreChrome.tsx sets out at
      length: a horizontally-scrollable strip slices the last label mid-word against the screen edge
      with nothing to say the row can be swiped, so a store with seven pages looks like a store whose
      header is cut off. The editor's chrome was changed to wrap; this, the renderer a shopper actually
@@ -484,12 +508,12 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {!hasBlocks && !isShop && (
  <>
  {heroImg && heroHeadline ? (
- /* Cloned hero — headline + buttons over the real photo, honouring its alignment */
+ /* Cloned hero: headline + buttons over the real photo, honouring its alignment */
  <header className="relative flex min-h-[68vh] w-full overflow-hidden">
  <img src={heroImg} alt="" className="absolute inset-0 h-full w-full object-cover" />
  <div className="absolute inset-0 bg-black/30" />
  <div className={"relative z-10 mx-auto flex w-full max-w-6xl flex-col justify-center px-8 py-24 text-white " + alignClass(heroAlign)}>
- <h1 className="max-w-2xl text-4xl leading-tight sm:text-6xl" style={headingFont ? { fontFamily: "var(--font-heading)" } : { fontFamily: "Georgia, serif" }}>{heroHeadline}</h1>
+ <h1 className="max-w-2xl text-4xl leading-tight sm:text-6xl" style={{ fontFamily: "var(--font-heading)" }}>{heroHeadline}</h1>
  {heroSub && <p className="mt-4 max-w-xl text-sm opacity-90 sm:text-base">{heroSub}</p>}
  {renderCtas(heroCtas, true, heroAlign)}
  </div>
@@ -502,7 +526,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  {logo ? (
  <img src={logo} alt={storeName} className="max-h-16 w-auto object-contain" />
  ) : (
- <h1 className="text-4xl sm:text-5xl" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>{storeName}</h1>
+ <h1 className="text-4xl sm:text-5xl" style={{ fontFamily: "var(--font-heading)" }}>{storeName}</h1>
  )}
  {sf.tagline && <p className="mt-3 max-w-xl text-sm sm:text-base opacity-90">{sf.tagline}</p>}
  </div>
@@ -518,7 +542,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </header>
  )}
 
- {/* Cloned content sections — each rendered in its real layout/background/alignment */}
+ {/* Cloned content sections. Each rendered in its real layout/background/alignment */}
  {contentSections.map((s, i) => {
  const onDark = s.background === "dark";
  const sectionStyle: CSSProperties | undefined = onDark
@@ -526,7 +550,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  : s.background === "accent"
  ? { background: accent, color: "#ffffff" }
  : undefined;
- const headStyle: CSSProperties = { ...(headingFont ? { fontFamily: "var(--font-heading)" } : {}), color: onDark || s.background === "accent" ? "#ffffff" : accent };
+ const headStyle: CSSProperties = { fontFamily: "var(--font-heading)", color: onDark || s.background === "accent" ? "#ffffff" : accent };
  const textAlign = s.align === "left" ? "text-left" : s.align === "right" ? "text-right" : "text-center";
 
  // Side-by-side image + text
@@ -554,7 +578,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <img src={s.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
  <div className="absolute inset-0 bg-black/45" />
  <div className={"relative z-10 mx-auto flex w-full max-w-5xl flex-col text-white " + alignClass(s.align)}>
- {s.headline && <h2 className="text-3xl sm:text-5xl" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>{s.headline}</h2>}
+ {s.headline && <h2 className="text-3xl sm:text-5xl" style={{ fontFamily: "var(--font-heading)" }}>{s.headline}</h2>}
  {s.text && <p className="mt-4 max-w-xl text-sm opacity-90 sm:text-base">{s.text}</p>}
  {renderCtas(s.ctas, true, s.align)}
  </div>
@@ -562,7 +586,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  );
  }
 
- // Centered / band / text — optional stacked image
+ // Centered / band / text. Optional stacked image
  return (
  <section key={i} className="px-6 py-16" style={sectionStyle}>
  <div className={"mx-auto max-w-3xl " + textAlign}>
@@ -577,7 +601,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  </>
  )}
 
- {/* Editable Shop intro — content the store adds above its catalogue. */}
+ {/* Editable Shop intro: content the store adds above its catalogue. */}
  {shopIntro.length > 0 && (
  <Blocks blocks={shopIntro} colors={{ bg, text, accent }} fonts={{ heading: headingFont, body: bodyFont }} products={blockItems.map((it) => ({ key: it.key, title: it.title, price: it.price, image: it.image, href: it.itemId ? withPreview(`${base}/p/${it.itemId}`) : it.href || undefined, sold: it.sold, held: it.held }))} shopHref={shopHref} radius={radius} skin={skin} collections={blockCollections} storeSlug={sf.handle} words={words} collectionHrefs={collectionHrefs} />
  )}
@@ -586,7 +610,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  <section id="products" className="mx-auto max-w-6xl px-5 sm:px-8 py-20 sm:py-24 scroll-mt-4">
  <div className={"mb-12 " + (isShop ? "text-center" : "")}>
  <span className="mb-3 block text-[10px] uppercase tracking-[0.3em] opacity-40">{isShop ? "Catalogue" : "New In"}</span>
- <h2 className="text-3xl capitalize sm:text-[2.6rem] leading-tight" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>{gridHeading}</h2>
+ <h2 className="text-3xl capitalize sm:text-[2.6rem] leading-tight" style={{ fontFamily: "var(--font-heading)" }}>{gridHeading}</h2>
  {sf.about && <p className="mt-4 mx-auto max-w-2xl text-sm leading-relaxed opacity-60">{sf.about}</p>}
  </div>
 
@@ -640,7 +664,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
 
  {!hasBlocks && !isShop && newsletter && (
  <section className="border-t border-black/10 px-6 py-16 text-center">
- <h2 className="text-2xl sm:text-3xl" style={headingFont ? { fontFamily: "var(--font-heading)" } : undefined}>{newsletter.headline || "Join our mailing list"}</h2>
+ <h2 className="text-2xl sm:text-3xl" style={{ fontFamily: "var(--font-heading)" }}>{newsletter.headline || "Join our mailing list"}</h2>
  {newsletter.text && <p className="mt-2 text-sm opacity-70">{newsletter.text}</p>}
  <NewsletterForm accent={accent} />
  </section>
@@ -651,7 +675,7 @@ export default async function StorefrontView({ settings, view = "home", preview 
  logo={logo}
  nav={footerNav.map((n) => ({ label: n.label, href: n.href }))}
  colors={{ bg, text, accent }}
- headingFontFamily={headingFont ? `'${headingFont}', Georgia, serif` : undefined}
+ headingFontFamily={vars["--font-heading"]}
  year={new Date().getFullYear()}
  tagline={[sf.tagline, location].filter(Boolean).join(" · ") || undefined}
  footerAbout={theme.footerAbout || undefined}

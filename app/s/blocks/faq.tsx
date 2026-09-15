@@ -1,4 +1,4 @@
-// FAQ — six arrangements of the same question-and-answer pairs.
+// FAQ: six arrangements of the same question-and-answer pairs.
 //
 // This is the section with the most machinery behind it: rows drag to reorder (within a section AND
 // between two FAQ sections), rows add and remove, and on the live site each row is a native
@@ -7,7 +7,7 @@
 //
 // The drag targeting hit-tests the pointer against `[data-faq-row]` and reads that row's own
 // `data-faq-index` (see onGripDown in the studio), so it works in a grid or a two-column split as
-// readily as in a single stack — provided every row carries those attributes. `EditRow` is the only
+// readily as in a single stack. Provided every row carries those attributes. `EditRow` is the only
 // thing that renders them, which is why every layout below goes through it.
 import { FreeField, type EditKit } from "./kit";
 import { GripVertical } from "lucide-react";
@@ -34,7 +34,7 @@ const Chev = () => (
  <svg className="vya-faq-chev ml-3 shrink-0 opacity-50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
 );
 
-// The editor's row: grip, editable question, editable answer, remove. Always shows the answer —
+// The editor's row: grip, editable question, editable answer, remove. Always shows the answer,
 // hiding it behind a disclosure you'd have to open before typing would make editing a chore.
 function EditRow({ kit, pair, children }: { kit: EditKit; pair: Pair; children?: React.ReactNode }) {
  const { b, ctx, txt, txtPlain } = kit;
@@ -81,7 +81,7 @@ function LiveRow({ kit, pair }: { kit: EditKit; pair: Pair }) {
  );
 }
 
-// A question and answer both always visible — for the layouts that don't hide anything (cards,
+// A question and answer both always visible, for the layouts that don't hide anything (cards,
 // index). Editable in place in the editor, plain on the live site.
 function OpenPair({ kit, pair, qClass = "text-[15px] font-medium leading-snug", aClass = "mt-2 text-[14px] leading-relaxed opacity-70" }: { kit: EditKit; pair: Pair; qClass?: string; aClass?: string }) {
  const { ctx, txt, txtPlain } = kit;
@@ -122,7 +122,7 @@ function Head({ kit, align = "text-center" }: { kit: EditKit; align?: string }) 
 }
 
 // The rows container. `data-faq-container` is what a drag falling outside any row targets, so it
-// belongs on every layout's row wrapper — that's how you drop a row at the end of the list.
+// belongs on every layout's row wrapper. That's how you drop a row at the end of the list.
 function Rows({ kit, pairs, className = "" }: { kit: EditKit; pairs: Pair[]; className?: string }) {
  const { b, ctx } = kit;
  return (
@@ -188,8 +188,8 @@ function FaqSided({ kit }: { kit: EditKit }) {
 }
 
 // ── cards ───────────────────────────────────────────────────────────────────────────────────────
-// Each pair in its own bordered panel, in a grid. Nothing is hidden here — a disclosure inside a
-// card reads as a box that does nothing until you poke it — so answers are always visible. Best
+// Each pair in its own bordered panel, in a grid. Nothing is hidden here. A disclosure inside a
+// card reads as a box that does nothing until you poke it, so answers are always visible. Best
 // when they're short.
 function FaqCards({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
@@ -227,7 +227,7 @@ function FaqCards({ kit }: { kit: EditKit }) {
 
 // ── numbered ────────────────────────────────────────────────────────────────────────────────────
 // Display numerals beside each question. The numeral comes from POSITION, so reordering renumbers
-// automatically — it's a graphic element, not stored data, and nothing has to be kept in sync.
+// automatically: it's a graphic element, not stored data, and nothing has to be kept in sync.
 function FaqNumbered({ kit }: { kit: EditKit }) {
  const { b, ctx } = kit;
  const pairs = readPairs(kit.p);
@@ -260,7 +260,7 @@ function FaqNumbered({ kit }: { kit: EditKit }) {
 // down one side, everything readable on the other. Earns its place past roughly fifteen questions.
 //
 // The anchors are real ids on the live site, scoped by block id so two FAQ sections on one page
-// can't collide. In the editor they're inert text — clicking a contents entry there should not jump
+// can't collide. In the editor they're inert text. Clicking a contents entry there should not jump
 // the canvas out from under you.
 function FaqIndex({ kit }: { kit: EditKit }) {
  const { b, ctx } = kit;

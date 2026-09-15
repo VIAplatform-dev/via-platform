@@ -37,7 +37,7 @@ test("a step id the phone has never heard of falls back rather than guessing", (
   assert.equal(phoneRouteFor({ id: "something_new" as never }), null);
 });
 
-test("a server that predates setup steps answers with no list — the phone must neither crash nor show the block", () => {
+test("a server that predates setup steps answers with no list. The phone must neither crash nor show the block", () => {
   // Seen live: the phone pointed at a deploy without Tier 3, Home rendered, and `steps.filter`
   // threw on undefined. An unknown checklist is "nothing to show", never a red screen.
   const sum = setupSummary(undefined);

@@ -84,7 +84,7 @@ test("COMEBACK50: refused when they bought last month, and says why", () => {
  assert.match(r.refusal || "", /6 months/);
 });
 
-test("someone who never bought counts as lapsed — that's what a shop means by it", () => {
+test("someone who never bought counts as lapsed. That's what a shop means by it", () => {
  const rule = { kind: "percent" as const, value: 50, audience: "lapsed" as const, lapsedDays: 180 };
  assert.equal(audienceAllows(rule, anyone).ok, true);
 });
@@ -97,7 +97,7 @@ test("an audience-gated code asks for an email rather than guessing", () => {
 
 // ── the two rules together ─────────────────────────────────────────────────────────────────────
 
-test("who fails, nothing comes off — the scope never gets a look in", () => {
+test("who fails, nothing comes off. The scope never gets a look in", () => {
  const r = applyDiscountToOrder(
   { kind: "percent", value: 50, audience: "new", itemIds: ["d1"] },
   bothInBag,

@@ -4,7 +4,7 @@ import { getOrOpenSession, renameSession, listSessions } from "@/app/lib/market/
 
 export const dynamic = "force-dynamic";
 
-// GET — the open session (opened on demand) + recent history. POST { name } — rename the open session.
+// GET: the open session (opened on demand) + recent history. POST { name }: rename the open session.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

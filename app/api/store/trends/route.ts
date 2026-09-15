@@ -35,11 +35,11 @@ function buildPlaybook(
  const g = gMap.get(key);
  const r = rMap.get(key);
  const igMom = bMap.get(key)?.momentumPct ?? null;
- const buzzing = igMom != null && igMom >= 25; // social surging — a LEADING signal
+ const buzzing = igMom != null && igMom >= 25; // social surging. A LEADING signal
  const buzzNote = buzzing ? ` 🔥 Gaining fast on Instagram (${pct(igMom!)}).` : "";
  // VYA demand + eBay resale volume are the HARD signals (your buyers, real transactions). Google
  // is supplementary: it CONFIRMS a rise, but a quiet brand-name search never downgrades a brand
- // that's hot on VYA with a real resale market — search lags resale for niche/archival labels.
+ // that's hot on VYA with a real resale market. Search lags resale for niche/archival labels.
  const vya = b.momentumPct;
  const gi = g?.avgInterest ?? null;
  const gMom = g?.momentumPct ?? null;
@@ -57,28 +57,28 @@ function buildPlaybook(
  let action: Play["action"]; let reason: string;
  if (vyaCool && (thinMarket || (gMom != null && gMom < 0))) {
  action = "cool";
- reason = `Cooling — demand is sliding on VYA (${pct(vya!)})${gMom != null && gMom < 0 ? ` and in search (${pct(gMom)})` : ""}. Don't over-source${price ? `; move what you hold at or below ${price}` : ""}.`;
+ reason = `Cooling. Demand is sliding on VYA (${pct(vya!)})${gMom != null && gMom < 0 ? ` and in search (${pct(gMom)})` : ""}. Don't over-source${price ? `; move what you hold at or below ${price}` : ""}.`;
  } else if (vyaHot && (deep || realMarket)) {
  action = "source";
- const conf = gConfirms ? " Google search confirms it's climbing off-platform too." : gQuiet ? " (Brand-name search is quiet — normal for niche/archival labels — but your demand and real eBay sales say it's moving.)" : "";
- reason = `Source now — surging on VYA (${pct(vya!)}) with a ${deep ? "deep" : "real"} resale market (${fmtK(sold!)} sold${price ? ` ~${price}` : ""}).${conf}${buzzNote} Stock it${price ? `; list near ${price}` : ""}.`;
+ const conf = gConfirms ? " Google search confirms it's climbing off-platform too." : gQuiet ? " (Brand-name search is quiet, normal for niche/archival labels, but your demand and real eBay sales say it's moving.)" : "";
+ reason = `Source now. Surging on VYA (${pct(vya!)}) with a ${deep ? "deep" : "real"} resale market (${fmtK(sold!)} sold${price ? ` ~${price}` : ""}).${conf}${buzzNote} Stock it${price ? `; list near ${price}` : ""}.`;
  } else if (vyaHot && thinMarket && buzzing) {
  // Leading indicator: hot with your shoppers AND surging on Instagram before eBay volume catches
- // up. This is the "get ahead of it" call — exactly the surge price/search signals miss early.
+ // up. This is the "get ahead of it" call. Exactly the surge price/search signals miss early.
  action = "source";
- reason = `Emerging — hot on VYA (${pct(vya!)}) and surging on Instagram (${pct(igMom!)}) while resale volume's still thin. Social leads resale — get ahead of it: source a few and list early${price ? ` around ${price}` : ""}.`;
+ reason = `Emerging. Hot on VYA (${pct(vya!)}) and surging on Instagram (${pct(igMom!)}) while resale volume's still thin. Social leads resale: get ahead of it: source a few and list early${price ? ` around ${price}` : ""}.`;
  } else if (vyaHot && thinMarket) {
  action = "watch";
- reason = `Hot on VYA only — spiking with your shoppers (${pct(vya!)}) but almost nothing's selling on eBay (${fmtK(sold!)}). Sell here now; don't source deep for outside resale.`;
+ reason = `Hot on VYA only. Spiking with your shoppers (${pct(vya!)}) but almost nothing's selling on eBay (${fmtK(sold!)}). Sell here now; don't source deep for outside resale.`;
  } else if (deep && price) {
  action = "price";
- reason = `Reliable mover — ${fmtK(sold!)} sold, clearing ~${price}. Safe to stock; anchor your price at ${price}${vyaHot ? ", and test a touch above since VYA demand's rising" : gMom != null && gMom < -10 ? " (search softening — don't overpay to source)" : ""}.${buzzNote}`;
+ reason = `Reliable mover. ${fmtK(sold!)} sold, clearing ~${price}. Safe to stock; anchor your price at ${price}${vyaHot ? ", and test a touch above since VYA demand's rising" : gMom != null && gMom < -10 ? " (search softening. Don't overpay to source)" : ""}.${buzzNote}`;
  } else if (buzzing) {
  action = "watch";
- reason = `One to watch — gaining fast on Instagram (${pct(igMom!)})${vya != null ? `, VYA ${pct(vya)}` : ""}. Social's moving before the resale market; keep an eye on it.`;
+ reason = `One to watch. Gaining fast on Instagram (${pct(igMom!)})${vya != null ? `, VYA ${pct(vya)}` : ""}. Social's moving before the resale market; keep an eye on it.`;
  } else {
  action = "watch";
- reason = `Mixed signal${vya != null ? ` — VYA ${pct(vya)}` : ""}${sold != null ? `, ${fmtK(sold)} sold on eBay` : ""}${price ? ` ~${price}` : ""}. No clear move yet.`;
+ reason = `Mixed signal${vya != null ? `: VYA ${pct(vya)}` : ""}${sold != null ? `, ${fmtK(sold)} sold on eBay` : ""}${price ? ` ~${price}` : ""}. No clear move yet.`;
  }
 
  let suggested = median;
@@ -92,7 +92,7 @@ function buildPlaybook(
 }
 
 // Trend intelligence for a store: marketplace-wide demand momentum (the Brand Heat
-// Index) + how the store's OWN inventory brands are trending — to guide sourcing and
+// Index) + how the store's OWN inventory brands are trending, to guide sourcing and
 // pricing. Aggregate/anonymized: it never exposes any individual store's numbers.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
  ...(heat.brands as { brand: string }[]).map((b) => b.brand),
  ...yourBrands.map((b) => b.brand),
  ].filter(Boolean))].slice(0, 20);
- // Read the persisted snapshots (populated daily by the snapshot-market-trends cron) — no live
+ // Read the persisted snapshots (populated daily by the snapshot-market-trends cron), no live
  // SerpApi call on page view.
  const [googleTrends, resaleMarket, igBuzz] = await Promise.all([
  getGoogleTrends(brandNames).catch(() => []),

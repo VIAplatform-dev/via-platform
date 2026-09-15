@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 // Public (landing-page "rebuild your store" demo): return a real screenshot of a store's homepage as
 // a PNG for the marketing preview. Unlike the sandboxed clone iframe (which can't render JS-only
 // themes like Squarespace without an unsafe same-origin grant), this captures the page in a real
-// browser — so SPA themes come through cleanly. First-party on purpose: the frontend stays
+// browser, so SPA themes come through cleanly. First-party on purpose: the frontend stays
 // same-origin and we can swap the underlying provider here without touching the page.
 export const maxDuration = 25;
 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   const res = await fetch(shotUrl, { signal: AbortSignal.timeout(22000) });
   if (!res.ok) return NextResponse.json({ error: "Couldn’t render a preview for that site." }, { status: 502 });
   const buf = await res.arrayBuffer();
-  // A too-small body is the provider's error/placeholder, not a real screenshot — treat as a failure
+  // A too-small body is the provider's error/placeholder, not a real screenshot. Treat as a failure
   // so the demo shows its graceful fallback instead of a broken/blank image.
   if (buf.byteLength < 1024) return NextResponse.json({ error: "Preview not available for this site." }, { status: 502 });
   return new NextResponse(buf, {

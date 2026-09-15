@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 // Per-recipient email link token. Emails embed `?u=<token>` in their links so that a
-// click from an email — even logged out, even ending in a guest checkout — can be tied
+// click from an email, even logged out, even ending in a guest checkout. Can be tied
 // back to the subscriber it was sent to. The token encodes the recipient's email and is
 // HMAC-signed so it can't be forged to mis-attribute a click to someone else.
 //

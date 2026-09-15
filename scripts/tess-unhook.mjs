@@ -6,7 +6,7 @@
 //   1. the store_users row added on 1 Sep (hello@tesselizabeth.com -> tesselizabethvintage)
 //   2. her entry in storeContactEmails (hello@tesselizabeth.com -> tess-elizabeth-vintage)
 //
-// This removes (1). (2) is deliberately LEFT ALONE — she is still selling on the marketplace, and
+// This removes (1). (2) is deliberately LEFT ALONE. She is still selling on the marketplace, and
 // that map is also the address book for her offer/message emails and the roster the sourcing-alert
 // and weekly-digest crons iterate. Removing it to fix a login would quietly change all three.
 //
@@ -30,7 +30,7 @@ async function show(label) {
  const rows = await sql`SELECT id, store_slug, email, role FROM store_users
                         WHERE lower(email) = lower(${EMAIL}) OR store_slug = ${SLUG}
                         ORDER BY id`;
- console.log(`\n${label} — store_users rows: ${rows.length}`);
+ console.log(`\n${label}: store_users rows: ${rows.length}`);
  for (const r of rows) console.log(`   #${r.id}  ${r.store_slug}  ${r.email}  (${r.role})`);
  return rows;
 }
@@ -54,4 +54,4 @@ const [pagesAfter] = await sql`SELECT count(*)::int AS n FROM site_captures WHER
 console.log(`\n${SLUG}: ${pagesAfter.n} captured pages still there`);
 console.log(after.length === 0
  ? "\nUnhooked. A signup with an email that isn't hello@tesselizabeth.com now reaches onboarding."
- : "\nWARNING: rows remain — check them above before testing the flow.");
+ : "\nWARNING: rows remain: check them above before testing the flow.");

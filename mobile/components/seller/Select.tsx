@@ -6,16 +6,16 @@ import { colors as portalColors, spacing, radius } from "../../lib/portal-theme"
 
 // A dropdown: one row that says what is chosen, and a sheet that changes it.
 //
-// WHAT THIS REPLACES. Every list of choices in the seller app was drawn as a wall of chips — all
-// seven packaging presets, all of a store's collections, every consignor — laid out inline and
+// WHAT THIS REPLACES. Every list of choices in the seller app was drawn as a wall of chips. All
+// seven packaging presets, all of a store's collections, every consignor. Laid out inline and
 // wrapped over three or four lines. That shape is right for two or three options and wrong for
 // seven: it pushes everything below it off the screen, it gives a rarely-changed setting the same
 // visual weight as the price, and the thing you actually want to know ("which one is it now?")
 // takes a scan of the whole wall to answer, because it is a colour difference rather than a
-// sentence. A row that says "Ships in — Padded mailer" answers it without being opened.
+// sentence. A row that says "Ships in. Padded mailer" answers it without being opened.
 //
 // It is a Modal rather than an inline expansion for the reason the consignors screen gives for NOT
-// using one: a sheet over a list hides the list. Here that is the point — a picker replaces its
+// using one: a sheet over a list hides the list. Here that is the point. A picker replaces its
 // list rather than adding to it, and a full sheet gives thirty categories room to be grouped.
 //
 // THE PALETTE IS A PROP. The seller portal is getvya.ai burgundy-on-cream (lib/portal-theme) and
@@ -25,7 +25,7 @@ import { colors as portalColors, spacing, radius } from "../../lib/portal-theme"
 export type SelectOption = { key: string; label: string; hint?: string };
 export type SelectGroup = { label?: string; options: SelectOption[] };
 
-/** The colours this control needs — satisfied by lib/theme and lib/portal-theme alike. */
+/** The colours this control needs. Satisfied by lib/theme and lib/portal-theme alike. */
 export type SelectPalette = {
   bg: string; bgAlt: string; text: string; textMuted: string; textDim: string;
   border: string; accent: string; accentText: string; chip: string;
@@ -49,8 +49,8 @@ function Sheet({
           <Pressable onPress={onClose} hitSlop={10}><Feather name="x" size={22} color={palette.text} /></Pressable>
           <Text style={{ flex: 1, textAlign: "center", fontSize: 16, fontWeight: "600", color: palette.text, marginRight: 22 }}>{title}</Text>
         </View>
-        {/* "handled" for the same reason SellerScreen sets it: with a keyboard up — the New
-            collection box below — the first tap would otherwise be spent dismissing it. */}
+        {/* "handled" for the same reason SellerScreen sets it: with a keyboard up. The New
+            collection box below: the first tap would otherwise be spent dismissing it. */}
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
@@ -116,7 +116,7 @@ function Row({
 }
 
 /**
- * Pick one. Choosing closes the sheet — a single choice needs no confirmation.
+ * Pick one. Choosing closes the sheet. A single choice needs no confirmation.
  *
  * `action` is an escape hatch for a list that can be empty or incomplete: "Add someone…" under the
  * consignors, which closes the sheet and goes to the screen that can add one.
@@ -135,7 +135,7 @@ export function SelectRow({
   hint?: string;
   palette?: SelectPalette;
   action?: { label: string; onPress: () => void };
-  /** Open it without a tap — the screen is ASKING, not offering (Market Mode's category). */
+  /** Open it without a tap. The screen is ASKING, not offering (Market Mode's category). */
   autoOpen?: boolean;
   onAutoOpened?: () => void;
 }) {
@@ -144,7 +144,7 @@ export function SelectRow({
   const chosen = all.flatMap((g) => g.options).find((o) => o.key === value);
 
   // An ask, rather than an offer: the parent flips autoOpen and the sheet is already up. In an
-  // effect, not in render — telling the parent it has happened is a setState on someone else.
+  // effect, not in render. Telling the parent it has happened is a setState on someone else.
   useEffect(() => {
     if (!autoOpen) return;
     setOpen(true);
@@ -189,7 +189,7 @@ export function SelectRow({
  * Pick any number. The sheet stays open while she picks and closes on Done, because choosing three
  * collections is one decision made three times, not three decisions.
  *
- * `onCreate` puts a "new one" box at the bottom — for collections, where the route takes titles and
+ * `onCreate` puts a "new one" box at the bottom, for collections, where the route takes titles and
  * creates whatever doesn't exist yet, so picking and creating are the same act.
  */
 export function MultiSelectRow({
@@ -209,7 +209,7 @@ export function MultiSelectRow({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const labelFor = (k: string) => options.find((o) => o.key === k)?.label ?? k;
-  // What is chosen, in the order she chose it, on one line — the row has to answer "which ones?"
+  // What is chosen, in the order she chose it, on one line. The row has to answer "which ones?"
   // without being opened, and a count ("3 selected") answers a different, less useful question.
   const summary = values.map(labelFor).join(", ");
 

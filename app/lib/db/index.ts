@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import * as schema from "./schema";
 
 // Drizzle client over Neon's HTTP driver. Lazy so importing this module never
-// requires the env at build time — the connection is created on first use.
+// requires the env at build time. The connection is created on first use.
 function databaseUrl(): string {
  const u = process.env.DATABASE_URL || process.env.POSTGRES_URL;
  if (!u) throw new Error("DATABASE_URL or POSTGRES_URL is not set.");

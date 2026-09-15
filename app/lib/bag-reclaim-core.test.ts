@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mayReclaimReservation, bagRefusal } from "./bag-reclaim-core.ts";
 
 // The bag re-tries a checkout by releasing the buyer's OWN earlier reservation on each piece.
-// It used to release ANY reservation — including "hold:Ana", the seller keeping a piece back
-// for a named customer — and then sell the piece to whoever pressed Pay. Only the bag's own
+// It used to release ANY reservation, including "hold:Ana", the seller keeping a piece back
+// for a named customer, and then sell the piece to whoever pressed Pay. Only the bag's own
 // token may be reclaimed; everything else is someone else's claim on the piece.
 
 test("a bag may reclaim the reservation it made itself", () => {

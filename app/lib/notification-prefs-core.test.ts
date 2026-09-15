@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PUSH_EVENTS, EMAIL_EVENTS, DEFAULT_PREFS, normalizePrefs, mergePrefs, pushEnabled } from "./notification-prefs-core.ts";
 
-// Which pushes and emails a store wants. The defaults mirror the phone's Notifications screen —
-// a piece sold and a buyer message ON, the rest opt-in — because a phone that buzzes for nothing
+// Which pushes and emails a store wants. The defaults mirror the phone's Notifications screen,
+// a piece sold and a buyer message ON, the rest opt-in, because a phone that buzzes for nothing
 // gets silenced, and then the two that matter are lost with it.
 
 test("the events, and the defaults the phone screen has always shown", () => {
@@ -24,12 +24,12 @@ test("anything stored is read back over the defaults, and junk is ignored", () =
   email: { needs: false },
  });
  assert.deepEqual(normalizePrefs({ push: { sold: "no", bogus: true }, email: "x" }), DEFAULT_PREFS);
- // Never the same object as the defaults — a caller mutating its copy must not change them.
+ // Never the same object as the defaults. A caller mutating its copy must not change them.
  assert.notEqual(normalizePrefs(null), DEFAULT_PREFS);
  assert.notEqual(normalizePrefs(null).push, DEFAULT_PREFS.push);
 });
 
-test("a patch changes only what it names — one toggle is one key", () => {
+test("a patch changes only what it names. One toggle is one key", () => {
  const next = mergePrefs(DEFAULT_PREFS, { push: { payout: true } });
  assert.deepEqual(next, { push: { sold: true, message: true, offer: true, payout: true }, email: { needs: true } });
  assert.deepEqual(mergePrefs(next, { email: { needs: false } }).email, { needs: false });

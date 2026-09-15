@@ -13,6 +13,6 @@ export async function POST(request: NextRequest) {
  const preview = await generateStorePreview(description);
  return NextResponse.json({ ok: true, ...preview });
  } catch {
- return NextResponse.json({ error: "Couldn’t design that just now — try again." }, { status: 502 });
+ return NextResponse.json({ error: "Couldn’t design that just now. Try again." }, { status: 502 });
  }
 }

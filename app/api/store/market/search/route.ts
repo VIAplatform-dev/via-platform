@@ -5,7 +5,7 @@ import { searchMarketItems } from "@/app/lib/market/inventory-db";
 
 export const dynamic = "force-dynamic";
 
-// GET ?q= — fast manual search over the seller's own items (the always-available fallback).
+// GET ?q= fast manual search over the seller's own items (the always-available fallback).
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

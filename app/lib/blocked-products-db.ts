@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 // Admin-managed "permanently removed" products. Deleting a product from the products
-// table isn't enough — the next sync re-imports it. A row here is a tombstone:
+// table isn't enough: the next sync re-imports it. A row here is a tombstone:
 // syncProducts() deletes matching titles and never re-inserts them (see app/lib/db.ts).
 // Keyed by (store_slug, title) to match the products table's UNIQUE(store_slug, title).
 

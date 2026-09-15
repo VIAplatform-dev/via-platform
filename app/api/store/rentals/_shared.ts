@@ -18,7 +18,7 @@ export async function seller(request: NextRequest) {
  return actingSeller(request);
 }
 
-/** Today in the store's own reckoning. UTC for now — a per-store timezone is a later setting. */
+/** Today in the store's own reckoning. UTC for now: a per-store timezone is a later setting. */
 export function today(): string {
  return new Date().toISOString().slice(0, 10);
 }
@@ -34,7 +34,7 @@ export type PublicContext = { sellerId: string; storeSlug: string; settings: Ren
 /**
  * Resolve a rentable item for a storefront caller. Returns null when the piece
  * doesn't exist, the store hasn't switched rentals on, or the piece simply has
- * no rental terms — all of which look the same to a shopper: not for rent.
+ * no rental terms. All of which look the same to a shopper: not for rent.
  */
 export async function rentableItem(itemId: string): Promise<PublicContext | null> {
  const owner = await ownerOfItem(itemId);

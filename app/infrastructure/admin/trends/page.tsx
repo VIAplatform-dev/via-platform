@@ -59,7 +59,7 @@ const TRAJECTORY_PILL: Record<string, { label: string; tone: "live" | "info" | "
 const VERDICT_TONE: Record<DemandResult["verdict"]["rating"], "live" | "info" | "pending" | "neutral"> = {
  source: "live", "buy-sharp": "info", selective: "pending", pass: "neutral",
 };
-const vmoney = (n: number | null) => (n == null ? "—" : `$${Math.round(n).toLocaleString()}`);
+const vmoney = (n: number | null) => (n == null ? "-" : `$${Math.round(n).toLocaleString()}`);
 
 const PLAY_STYLE: Record<Play["action"], { label: string; tone: "live" | "info" | "pending" | "neutral"; rail: string }> = {
  source: { label: "Source", tone: "live", rail: "bg-[var(--accent-bright,#2fd39b)]" },
@@ -83,7 +83,7 @@ function GChip({ pct, breakout }: { pct: number | null; breakout?: boolean }) {
 
 function Momentum({ pct, breakout }: { pct: number | null; breakout?: boolean }) {
  if (breakout) return <StatusPill tone="pending"><Sparkles size={11} /> Breakout</StatusPill>;
- if (pct === null) return <span className="text-[12px] text-stone-400">—</span>;
+ if (pct === null) return <span className="text-[12px] text-stone-400">-</span>;
  const up = pct >= 0;
  return (
  <span className={`inline-flex items-center gap-0.5 text-[12px] font-medium tabular-nums ${up ? "text-[var(--accent-ink,#0b7a5c)]" : "text-stone-400"}`}>
@@ -114,12 +114,12 @@ export default function TrendsPage() {
 
  useEffect(() => {
  fetch("/api/store/trends").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setData(d); setLoading(false); }).catch(() => setLoading(false));
- // Source Now — from VYA's own marketplace data, so it works today (external signals are optional).
+ // Source Now, from VYA's own marketplace data, so it works today (external signals are optional).
  fetch("/api/store/source-now?window=30d").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setSourceNow(d); }).catch(() => {});
  fetch("/api/store/culture-trends").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setCulture(d); }).catch(() => {});
- // Whitespace — rising demand this store doesn't carry yet (personalized sourcing gaps).
+ // Whitespace: rising demand this store doesn't carry yet (personalized sourcing gaps).
  fetch("/api/store/whitespace?window=30d").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setWhitespace(d.picks ?? []); }).catch(() => {});
- // Substack consensus — what fashion writers are collectively calling (leading/editorial signal).
+ // Substack consensus. What fashion writers are collectively calling (leading/editorial signal).
  fetch("/api/store/substack-consensus").then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) { setConsensus(d.picks ?? []); setConsensusScore(d.scorecard ?? null); } }).catch(() => {});
  }, []);
 
@@ -137,17 +137,17 @@ export default function TrendsPage() {
  <AdminHeader
  eyebrow="Platform · Trends"
  title="Trends"
- subtitle="What people are searching for and what it sells for, so you know what to buy and what to charge. Built from searches on VYA, Google Search interest, and real eBay sold prices. The numbers behind each answer are below."
+ subtitle="What people are searching for, and what it sells for. Buy and price against real demand."
  />
 
- {/* Source Now — the headline: what to buy right now, from VYA's own data (works before external signals are on). */}
+ {/* Source Now: the headline: what to buy right now, from VYA's own data (works before external signals are on). */}
  {sourceNowPicks.length > 0 && (
  <TechCard className="mb-6 p-5">
  <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">Source now</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Rising demand · thin supply</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">What to buy right now — where VYA buyers&apos; demand is rising and few stores carry it. The window to source before prices climb.</p>
+ <p className="mb-3 text-[12px] text-stone-400">What to buy now: rising demand, few stores carrying it.</p>
  <div className="space-y-2">
  {sourceNowPicks.map((p) => (
  <div key={`${p.segmentType}:${p.segmentValue}`} className="flex items-start gap-3 rounded-lg border border-stone-100 bg-white px-4 py-3">
@@ -167,27 +167,27 @@ export default function TrendsPage() {
  </TechCard>
  )}
 
- {/* Source Now is Pro — when locked, show the upsell instead of silently rendering nothing. */}
+ {/* Source Now is Pro, when locked, show the upsell instead of silently rendering nothing. */}
  {sourceNow?.locked && (
  <TechCard className="mb-6 p-5">
  <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
  <div>
  <p className="text-[13px] font-semibold text-stone-900">Source now</p>
- <p className="mt-0.5 text-[12px] text-stone-500">What to buy right now — where VYA buyers&apos; demand is rising and few stores carry it. Available on Pro.</p>
+ <p className="mt-0.5 text-[12px] text-stone-500">What to buy right now, where VYA buyers&apos; demand is rising and few stores carry it. Available on Pro.</p>
  </div>
  <Link href="/admin/billing" className="shrink-0 rounded-lg bg-stone-900 px-4 py-2 text-[12px] font-semibold text-white transition hover:bg-stone-800">Upgrade to Pro</Link>
  </div>
  </TechCard>
  )}
 
- {/* Substack consensus — what fashion writers are collectively calling (a leading, editorial signal). */}
+ {/* Substack consensus. What fashion writers are collectively calling (a leading, editorial signal). */}
  {consensus && consensus.length > 0 && (
  <TechCard className="mb-6 p-5">
  <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">What tastemakers are calling</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Fashion Substack · weekly consensus</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">Where independent fashion writers converge this week — a leading signal that moves before secondhand demand. Ranked by how many writers agree, not one loud voice.{consensusScore && consensusScore.hitRate != null && consensusScore.evaluated > 0 ? <span className="font-medium text-[var(--accent-ink)]"> Track record: {consensusScore.hitRate}% of past calls led real VYA demand ({consensusScore.hits}/{consensusScore.evaluated}).</span> : null}</p>
+ <p className="mb-3 text-[12px] text-stone-400">Where independent fashion writers converge this week. A leading signal that moves before secondhand demand. Ranked by how many writers agree, not one loud voice.{consensusScore && consensusScore.hitRate != null && consensusScore.evaluated > 0 ? <span className="font-medium text-[var(--accent-ink)]"> Track record: {consensusScore.hitRate}% of past calls led real VYA demand ({consensusScore.hits}/{consensusScore.evaluated}).</span> : null}</p>
  <div className="space-y-2">
  {consensus.map((c) => {
  const mom = CMOMENTUM[c.momentum];
@@ -207,18 +207,18 @@ export default function TrendsPage() {
  );
  })}
  </div>
- <p className="mt-3 text-[11px] text-stone-400">Leading &amp; editorial — treat as an early watch signal, confirmed against VYA demand before you source deep.</p>
+ <p className="mt-3 text-[11px] text-stone-400">Leading &amp; editorial: treat as an early watch signal, confirmed against VYA demand before you source deep.</p>
  </TechCard>
  )}
 
- {/* Colour of the season — the hottest colours by demand (a cross-market signal: resale tracks retail). */}
+ {/* Colour of the season. The hottest colours by demand (a cross-market signal: resale tracks retail). */}
  {data && data.topColors && data.topColors.length > 0 && (
  <TechCard className="mb-6 p-5">
  <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">Colour of the season</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Hottest colours · demand</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">The colours buyers want most right now. Secondhand tracks retail — when a colour takes over the season, it moves everywhere.</p>
+ <p className="mb-3 text-[12px] text-stone-400">The colours buyers want most right now. Secondhand tracks retail, when a colour takes over the season, it moves everywhere.</p>
  <div className="flex flex-wrap gap-2.5">
  {data.topColors.map((c, i) => {
  const sw = COLOR_SWATCH[c.color.toLowerCase()] || "#c9c2b6";
@@ -241,14 +241,14 @@ export default function TrendsPage() {
  </TechCard>
  )}
 
- {/* Whitespace — rising demand you DON'T carry yet (the personalized sourcing gap). */}
+ {/* Whitespace: rising demand you DON'T carry yet (the personalized sourcing gap). */}
  {whitespace && whitespace.length > 0 && (
  <TechCard className="mb-6 p-5">
  <div className="mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
  <p className="text-[13px] font-semibold text-stone-900">Gaps in your inventory</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Rising demand · you don&apos;t carry it</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">Segments buyers want that aren&apos;t in your inventory yet — the clearest place to expand. Ranked by how far demand outruns supply.</p>
+ <p className="mb-3 text-[12px] text-stone-400">What buyers want that you don&apos;t stock yet, ranked by how far demand outruns supply.</p>
  <div className="space-y-2">
  {whitespace.map((p) => {
  const traj = p.trajectory ? TRAJECTORY_PILL[p.trajectory] : null;
@@ -274,10 +274,10 @@ export default function TrendsPage() {
  </TechCard>
  )}
 
- {/* Should I source this? — quick demand verdict on any brand / item type */}
+ {/* Should I source this? quick demand verdict on any brand / item type */}
  <TechCard className="mb-6 p-5">
  <p className="mb-1 text-[13px] font-semibold text-stone-900">Should I source this?</p>
- <p className="mb-3 text-[12px] text-stone-400">Type a brand or item type — see if it&apos;s worth buying to resell.</p>
+ <p className="mb-3 text-[12px] text-stone-400">Type a brand or item type. See if it&apos;s worth buying to resell.</p>
  <form onSubmit={(e) => { e.preventDefault(); runDemandSearch(buyQ); }} className="flex items-center gap-2">
  <input value={buyQ} onChange={(e) => setBuyQ(e.target.value)} placeholder="e.g. Cavalli, slip dress, Y2K, bags…" className="h-11 min-w-0 flex-1 rounded-lg border border-stone-200 bg-white px-3 py-2 text-[13px] text-stone-900 outline-none focus:border-[var(--accent)] sm:h-auto" />
  <TechButton type="submit" className="h-11 sm:h-auto">Check</TechButton>
@@ -285,18 +285,18 @@ export default function TrendsPage() {
  {buyLoading && <p className="mt-3 text-[12px] text-stone-400">Checking…</p>}
  {!buyLoading && buyVerdict && (
  <div className="mt-3 space-y-2">
- {/* Headline call — blends VYA demand with eBay comps; eBay leads when VYA's own signal is thin. */}
+ {/* Headline call: blends VYA demand with eBay comps; eBay leads when VYA's own signal is thin. */}
  <div className="rounded-lg border border-stone-100 bg-white px-4 py-3">
  <div className="flex flex-wrap items-center gap-2">
  <StatusPill tone={VERDICT_TONE[buyVerdict.rating]}>{buyVerdict.headline}</StatusPill>
  {buyGoogle && buyGoogle.momentumPct != null && <GChip pct={buyGoogle.momentumPct} breakout={buyGoogle.breakout} />}
  </div>
  <p className="mt-1 text-[12px] leading-relaxed text-stone-500">{buyVerdict.detail}</p>
- {/* Hide the single eBay median when we're about to show the honest sub-market split below —
+ {/* Hide the single eBay median when we're about to show the honest sub-market split below,
      one number for a multi-tier brand is exactly what confuses. */}
  {buyEbay && !(buyClusters && buyClusters.length >= 2) && (buyEbay.medianPrice != null || buyEbay.activeCount != null || buyEbay.soldPer30d != null) && (
  <p className="mt-1 text-[12px] text-stone-400">
-  eBay: {buyEbay.medianPrice != null ? `asks ~${vmoney(buyEbay.medianPrice)}` : "—"}
+  eBay: {buyEbay.medianPrice != null ? `asks ~${vmoney(buyEbay.medianPrice)}` : "-"}
   {buyEbay.p25 != null ? ` (${vmoney(buyEbay.p25)}–${vmoney(buyEbay.p75)})` : ""}
   {buyEbay.activeCount != null ? ` · ${buyEbay.activeCount.toLocaleString()} listed` : ""}
   {buyEbay.soldPer30d != null ? ` · ~${buyEbay.soldPer30d}/mo sold` : ""}
@@ -304,17 +304,17 @@ export default function TrendsPage() {
  </p>
  )}
  </div>
- {/* Distinct sub-markets — a wide brand ("Valentino") isn't one price. Pick your tier. */}
+ {/* Distinct sub-markets. A wide brand ("Valentino") isn't one price. Pick your tier. */}
  {buyClusters && buyClusters.length >= 2 && (
  <div className="rounded-lg border border-stone-200 bg-stone-50/60 px-4 py-3">
- <p className="text-[12px] font-semibold text-stone-700">This search spans distinct markets — which is yours?</p>
+ <p className="text-[12px] font-semibold text-stone-700">This search spans distinct markets, which is yours?</p>
  <p className="mb-2 text-[11px] text-stone-400">One median would mislead. Here&apos;s how the live listings actually split, each with its own price.</p>
  <div className="space-y-1">
  {buyClusters.map((c) => (
  <div key={c.label} className="flex items-baseline justify-between gap-3 border-b border-stone-200/70 py-1 last:border-0">
  <span className="text-[12.5px] font-medium capitalize text-stone-800">{c.label}</span>
  <span className="shrink-0 text-[12px] tabular-nums text-stone-500">
- {c.medianPrice != null ? `~${vmoney(c.medianPrice)}` : "—"}
+ {c.medianPrice != null ? `~${vmoney(c.medianPrice)}` : "-"}
  {c.p25 != null && c.p75 != null ? <span className="text-stone-400"> ({vmoney(c.p25)}–{vmoney(c.p75)})</span> : null}
  <span className="text-stone-400"> · {c.count}</span>
  </span>
@@ -332,14 +332,14 @@ export default function TrendsPage() {
  <StatusPill tone={VERDICT_TONE[r.verdict.rating]}>{r.verdict.headline}</StatusPill>
  </div>
  <p className="mt-0.5 text-[12px] text-stone-500">{r.verdict.detail}</p>
- <p className="mt-1 text-[12px] text-stone-400">Demand {Math.round(r.demandIndex)}/100 · Market asking {r.hasPriceData ? `${vmoney(r.priceMedian)} (${vmoney(r.priceP25)}–${vmoney(r.priceP75)})` : "—"}</p>
+ <p className="mt-1 text-[12px] text-stone-400">Demand {Math.round(r.demandIndex)}/100 · Market asking {r.hasPriceData ? `${vmoney(r.priceMedian)} (${vmoney(r.priceP25)}–${vmoney(r.priceP75)})` : "-"}</p>
  </div>
  ))}
  </div>
  )}
  </TechCard>
 
- {/* Rising in culture — Pinterest fashion trends. Hidden until Pinterest is configured, and for
+ {/* Rising in culture: Pinterest fashion trends. Hidden until Pinterest is configured, and for
   any store that isn't Pro (the route answers those with `{ locked: true }` and no trends). */}
  {cultureTrends.length > 0 && (
  <TechCard className="mb-6 p-5">
@@ -347,7 +347,7 @@ export default function TrendsPage() {
  <p className="text-[13px] font-semibold text-stone-900">Rising in culture</p>
  <span className="text-[11px] uppercase tracking-wide text-stone-400">Pinterest · fashion</span>
  </div>
- <p className="mb-3 text-[12px] text-stone-400">Fastest-growing fashion searches on Pinterest — where taste forms before it hits secondhand.</p>
+ <p className="mb-3 text-[12px] text-stone-400">Fastest-growing fashion searches on Pinterest, where taste forms before it hits secondhand.</p>
  <div className="flex flex-wrap gap-2">
  {cultureTrends.map((t) => (
  <span key={t.keyword} className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 py-1.5 text-[12px] capitalize text-stone-700">
@@ -365,11 +365,11 @@ export default function TrendsPage() {
  <div className="flex items-center justify-center py-32 text-sm text-stone-500">Couldn’t load trends.</div>
  ) : (
  <div className="space-y-6">
- {/* The playbook — every signal read together into a call. The actionable layer. */}
+ {/* The playbook: every signal read together into a call. The actionable layer. */}
  {data.playbook && data.playbook.length > 0 && (
  <TechCard className="p-5">
  <p className="mb-1 text-[13px] font-semibold text-stone-900">What to do this week</p>
- <p className="mb-3 text-[12px] text-stone-400">VYA demand, Google search, and eBay secondhand — read together into one call per brand.</p>
+ <p className="mb-3 text-[12px] text-stone-400">VYA demand, Google search, and eBay secondhand. Read together into one call per brand.</p>
  <div className="space-y-2">
  {data.playbook.map((p) => {
  const s = PLAY_STYLE[p.action];
@@ -394,7 +394,7 @@ export default function TrendsPage() {
  </TechCard>
  )}
 
- {/* your brands — the actionable part */}
+ {/* your brands. The actionable part */}
  {data.yourBrands.length > 0 && (
  <TechCard className="p-5">
  <p className="mb-1 text-[13px] font-semibold text-stone-900">Your brands on VYA</p>
@@ -454,12 +454,12 @@ export default function TrendsPage() {
  </TechCard>
  </div>
 
- {/* Across the web — real Google Search interest */}
+ {/* Across the web: real Google Search interest */}
  {data.webConfigured ? (
  data.googleTrends.length > 0 && (
  <TechCard className="p-5">
- <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-sky-100 font-mono text-[9px] font-bold text-sky-700">G</span> Across the web — Google Search</p>
- <p className="mb-3 text-[12px] text-stone-400">Real search interest &amp; 3-month momentum for these brands (Google Trends) — demand beyond VYA.</p>
+ <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-sky-100 font-mono text-[9px] font-bold text-sky-700">G</span> Across the web. Google Search</p>
+ <p className="mb-3 text-[12px] text-stone-400">Real search interest &amp; 3-month momentum for these brands (Google Trends). Demand beyond VYA.</p>
  <div className="divide-y divide-stone-100">
  {[...data.googleTrends].sort((a, b) => (b.breakout ? 1 : 0) - (a.breakout ? 1 : 0) || (b.momentumPct ?? -999) - (a.momentumPct ?? -999)).slice(0, 12).map((g) => (
  <div key={g.brand} className="flex items-center justify-between py-2 text-[13px]">
@@ -475,10 +475,10 @@ export default function TrendsPage() {
  )
  ) : null}
 
- {/* Resale market — real eBay SOLD listings */}
+ {/* Resale market: real eBay SOLD listings */}
  {data.webConfigured && data.resaleMarket.length > 0 && (
  <TechCard className="p-5">
- <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] font-mono text-[9px] font-bold text-[var(--accent-ink,#0b7a5c)]">$</span> Secondhand market — eBay sold + web asking</p>
+ <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--accent-soft,#eafaf3)] font-mono text-[9px] font-bold text-[var(--accent-ink,#0b7a5c)]">$</span> Secondhand market: eBay sold + web asking</p>
  <p className="mb-3 text-[12px] text-stone-400"><span className="font-medium">sold</span> = real eBay completed-sale median · <span className="font-medium">web</span> = median asking across secondhand sites (Google Shopping: Vestiaire, Grailed, RealReal…). Momentum = vs. a week ago.</p>
  <div className="divide-y divide-stone-100">
  {[...data.resaleMarket].sort((a, b) => b.soldCount - a.soldCount).slice(0, 12).map((r) => (
@@ -494,11 +494,11 @@ export default function TrendsPage() {
  </TechCard>
  )}
 
- {/* Social buzz — Instagram (a leading cultural signal) */}
+ {/* Social buzz: Instagram (a leading cultural signal) */}
  {data.socialConfigured && data.igBuzz && data.igBuzz.length > 0 && (
  <TechCard className="p-5">
- <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-fuchsia-100 font-mono text-[9px] font-bold text-fuchsia-700">IG</span> Social buzz — Instagram</p>
- <p className="mb-3 text-[12px] text-stone-400">Engagement on each brand&rsquo;s top hashtag posts — a <span className="font-medium">leading</span> signal (social heat runs ahead of secondhand). Momentum = vs. a week ago.</p>
+ <p className="mb-1 flex items-center gap-1.5 text-[13px] font-semibold text-stone-900"><span className="grid h-4 w-4 place-items-center rounded-full bg-fuchsia-100 font-mono text-[9px] font-bold text-fuchsia-700">IG</span> Social buzz. Instagram</p>
+ <p className="mb-3 text-[12px] text-stone-400">Engagement on each brand&rsquo;s top hashtag posts. A <span className="font-medium">leading</span> signal (social heat runs ahead of secondhand). Momentum = vs. a week ago.</p>
  <div className="divide-y divide-stone-100">
  {[...data.igBuzz].sort((a, b) => (b.momentumPct ?? -999) - (a.momentumPct ?? -999) || b.buzzScore - a.buzzScore).slice(0, 12).map((b) => (
  <div key={b.brand} className="flex items-center justify-between py-2 text-[13px]">
@@ -515,8 +515,8 @@ export default function TrendsPage() {
 
  {!data.webConfigured && !data.socialConfigured && (
  <TechCard className="p-5">
- <p className="text-[13px] font-semibold text-stone-900">Add web signals — Google Search &amp; secondhand sites</p>
- <p className="mt-1 text-[12px] text-stone-500">Blend real Google Search momentum (and secondhand-market comps) into these trends. Turn on SerpApi (<span className="font-mono text-[11px]">SERPAPI_ENABLED=true</span>) to activate — it stays dormant, with no calls or spend, until then.</p>
+ <p className="text-[13px] font-semibold text-stone-900">Add web signals. Google Search &amp; secondhand sites</p>
+ <p className="mt-1 text-[12px] text-stone-500">Blend real Google Search momentum (and secondhand-market comps) into these trends. Turn on SerpApi (<span className="font-mono text-[11px]">SERPAPI_ENABLED=true</span>) to activate: it stays dormant, with no calls or spend, until then.</p>
  </TechCard>
  )}
 

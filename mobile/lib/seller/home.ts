@@ -1,11 +1,11 @@
 // Shaping for the seller Home screen.
 //
-// Pure functions only — no fetching, no React. Home is the screen a seller opens forty times a day
+// Pure functions only, no fetching, no React. Home is the screen a seller opens forty times a day
 // and reads in two seconds, so the numbers on it are worth testing on their own rather than through
 // a rendered tree.
 
 /** Currencies VYA's pilot stores actually price in. Anything else falls back to its code, which is
- *  honest — inventing the wrong symbol misstates the amount. */
+ *  honest: inventing the wrong symbol misstates the amount. */
 const SYMBOLS: Record<string, string> = { GBP: "£", USD: "$", EUR: "€" };
 
 /** Thousands separators by hand rather than `toLocaleString`: Hermes ships a cut-down Intl, and a
@@ -18,7 +18,7 @@ function group(n: number): string {
  * Minor units → what Home displays. Whole units only: the takings line is the largest type on the
  * screen and pennies there cost a character everyone has to read past.
  *
- * `currency` comes from /api/store/me, never a constant — the mockups are one London store.
+ * `currency` comes from /api/store/me, never a constant. The mockups are one London store.
  */
 export function formatMoney(cents: number, currency: string): string {
   const units = Math.round(cents / 100);
@@ -31,7 +31,7 @@ export function formatMoney(cents: number, currency: string): string {
  * Percentage change against the prior period, whole percent, for the `↑ 22%` beside the takings.
  *
  * Null when there is no prior period to compare against. A first day of trading is not "up 100%"
- * — it is a comparison that cannot be made, and the caller should show the takings alone.
+ * it is a comparison that cannot be made, and the caller should show the takings alone.
  */
 export function percentDelta(current: number, prior: number): number | null {
   if (prior === 0) return null;
@@ -40,7 +40,7 @@ export function percentDelta(current: number, prior: number): number | null {
 
 /**
  * The wide tile at the top of Home. Fulfilling an order is the most time-critical thing a seller
- * does — often standing in a post office queue — so this outranks every other number on the screen.
+ * does, often standing in a post office queue, so this outranks every other number on the screen.
  */
 export function ordersToPostLabel(count: number): string {
   if (count === 0) return "Nothing to ship";
@@ -64,7 +64,7 @@ export function toPostOrders<T extends { status: string }>(orders: T[]): T[] {
   return orders.filter((o) => TO_POST.has(o.status));
 }
 
-/** The tile's second line. Two names only — it is one line on a phone, and the count above it
+/** The tile's second line. Two names only: it is one line on a phone, and the count above it
  *  already carries the total. */
 export function toPostSubtitle(orders: { itemTitle: string | null }[]): string {
   return orders
@@ -74,7 +74,7 @@ export function toPostSubtitle(orders: { itemTitle: string | null }[]): string {
     .join(" · ");
 }
 
-/** "Good morning, Blummier." Local hour in, greeting out — passed in rather than read here so the
+/** "Good morning, Blummier." Local hour in, greeting out. Passed in rather than read here so the
  *  screen stays testable and the boundary between clock and copy stays visible. */
 export function greeting(hour: number): string {
   if (hour >= 5 && hour < 12) return "Good morning";

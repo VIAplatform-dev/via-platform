@@ -44,7 +44,7 @@ export async function GET(request: Request) {
  // Popular + recent blend, excluding given product ids. Used as the no-signal
  // feed and as backfill so "Curated for You" is never sparse. When vibePatterns
  // are supplied (from the taste test), results are restricted to titles matching
- // those keywords — this is what makes a brand-new user's feed personalized.
+ // those keywords. This is what makes a brand-new user's feed personalized.
  const popularRecent = async (excludeIds: number[], take: number, vibePatterns: string[] = [], sizeBias: string[] = []) => {
  if (take <= 0) return [] as Array<Record<string, unknown>>;
  // Pull a recent pool, then re-rank by recent engagement (trending) + size fit,
@@ -72,13 +72,13 @@ export async function GET(request: Request) {
  return scored.slice(0, take).map((x) => x.p);
  };
 
- // Taste profile — vibes (keyword bias) + explicit sizes (strong fit signal).
+ // Taste profile: vibes (keyword bias) + explicit sizes (strong fit signal).
  const profile = userId
  ? await getUserTasteProfile(userId).catch(() => ({ vibes: [] as string[], sizes: [] as string[], categories: [] as string[], designers: [] as string[], colors: [] as string[], eras: [] as string[] }))
  : { vibes: queryVibes, sizes: querySizes, categories: [] as string[], designers: [] as string[], colors: [] as string[], eras: [] as string[] };
  const vibes = profile.vibes;
  const savedSizes = profile.sizes; // already uppercased by sanitizeSizes
- // Every taste dimension feeds ONE combined keyword bias — OR-matched and additive,
+ // Every taste dimension feeds ONE combined keyword bias, OR-matched and additive,
  // so a product matching ANY signal (Y2K, orange, a loved designer…) gets surfaced,
  // never filtered out for missing the others.
  const vibePatterns = Array.from(new Set([
@@ -124,7 +124,7 @@ export async function GET(request: Request) {
  try {
  // ============ Build signal profile ============
  // Signed-in: the user's clicks / favorites / views. Logged-out: the favorites
- // the app passes from local storage — so the feed still reflects your likes.
+ // the app passes from local storage, so the feed still reflects your likes.
  let signalRows: Array<{ store_slug: string; size: string | null; score: number }> = [];
  if (userId) {
  signalRows = (await sql`
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
    FROM product_favorites pf WHERE pf.user_id = ${userId}
    UNION ALL
    -- Views are weighted by how long the piece was actually on screen: a scroll-past is 1, a
-   -- lingering look is up to 4. Still below a favourite (8) — dwelling on something is interest,
+   -- lingering look is up to 4. Still below a favourite (8): dwelling on something is interest,
    -- saying so outright is intent.
    SELECT vp.id AS product_id, NULL AS store_slug,
     CASE

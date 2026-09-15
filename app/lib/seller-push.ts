@@ -1,14 +1,14 @@
 // A push to the seller's phone: a sale, a buyer message.
 //
-// Best-effort end to end and never throws — the sale or message that caused it has already
+// Best-effort end to end and never throws. The sale or message that caused it has already
 // happened, and a notification failure must not become a webhook retry. The words come from
 // seller-push-core.ts; the gate is her preferences (notification-prefs-db.ts); the phones are the
 // tokens the app registered (messages-db.ts). Dependencies are injectable so the gating is unit
-// tested with fakes — nothing here is ever exercised against a real phone from a test.
+// tested with fakes. Nothing here is ever exercised against a real phone from a test.
 //
 // Where it is called from: the Stripe Connect webhook after createPaidOrder (a storefront sale)
 // and market-sync after markSold (a sale on eBay/Depop that VYA learned of by polling), plus the
-// two message paths. NOT from finalizeMarketSale — she is standing at the table when a Market
+// two message paths. NOT from finalizeMarketSale: she is standing at the table when a Market
 // Mode sale completes, and a buzz in her pocket for the thing she just did is noise. NOT from the
 // manual cross-listing "mark sold" either, for the same reason: she pressed the button herself.
 

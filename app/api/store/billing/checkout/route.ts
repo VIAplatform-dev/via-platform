@@ -32,7 +32,7 @@ async function stripePost(path: string, params: Record<string, string>) {
  return json;
 }
 
-// POST /api/store/billing/checkout — start a getvya.ai subscription (30-day trial).
+// POST /api/store/billing/checkout: start a getvya.ai subscription (30-day trial).
 // Body: { tier: "starter"|"studio"|"atelier", interval: "month"|"year" }
 export async function POST(request: NextRequest) {
  const session = await auth();

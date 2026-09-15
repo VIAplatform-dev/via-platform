@@ -5,7 +5,7 @@ import { getListingQuality } from "@/app/lib/listing-quality-db";
 import { sendStoreListingDigest } from "@/app/lib/email";
 
 // Admin: send a real listing-quality digest for one store to a chosen email, so
-// we can preview exactly what stores receive. Uses live product data — same logic
+// we can preview exactly what stores receive. Uses live product data. Same logic
 // as the weekly cron, just to an override address.
 //   /api/admin/test-listing-digest?store=to-us-vintage&email=someone@example.com
 

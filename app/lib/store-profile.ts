@@ -89,14 +89,14 @@ export async function buildStoreProfile(input: {
 
  // Signal: every product title+price (the inventory), a sample of real listing
  // copy (the voice), and the store's homepage/about copy (the positioning).
- const lines = products.slice(0, 300).map((p) => `• ${p.name} — ${p.price}${p.size ? ` (size ${p.size})` : ""}`).join("\n");
+ const lines = products.slice(0, 300).map((p) => `• ${p.name}: ${p.price}${p.size ? ` (size ${p.size})` : ""}`).join("\n");
  const descs = products
  .filter((p) => p.description && p.description.length > 20)
  .slice(0, 30)
- .map((p) => `— ${p.name}: "${(p.description || "").slice(0, 240)}"`)
+ .map((p) => `: ${p.name}: "${(p.description || "").slice(0, 240)}"`)
  .join("\n");
 
- const prompt = `You are profiling a vintage / resale fashion store so an AI can later list new items in the store's EXACT voice and pricing. Be specific and concrete — quote their patterns.
+ const prompt = `You are profiling a vintage / resale fashion store so an AI can later list new items in the store's EXACT voice and pricing. Be specific and concrete. Quote their patterns.
 
 STORE: ${input.storeName}
 PRICE STATS: ${stats.min}–${stats.max} ${currency} · median ${stats.median} · average ${stats.average} (from ${prices.length} priced items)
@@ -111,7 +111,7 @@ ${input.copy ? `\nSTORE COPY (homepage / about):\n${input.copy.slice(0, 2500)}` 
 Return ONLY JSON, no prose. Keep it tight so it fits: each text field ≤ 2 sentences; arrays capped at ≤ 10 brands, ≤ 6 categories, ≤ 5 eras, ≤ 8 types.
 {
  "summary": "2-3 sentences: who this store is and how it positions itself",
- "voice": "how they write listings — tone, vocabulary, sentence length, what they lead with and emphasize. Be specific enough to imitate.",
+ "voice": "how they write listings. Tone, vocabulary, sentence length, what they lead with and emphasize. Be specific enough to imitate.",
  "pricingStrategy": "how they price: tiers/ranges, what pushes price up (brand, era, rarity, condition), and typical price points by item type",
  "inventory": {
  "categories": ["broad categories they carry"],

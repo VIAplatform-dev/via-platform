@@ -1,9 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 
-// Store automations — the automated emails VYA sends on a store's behalf. Two kinds:
-//  • builtin  — VYA's own flows (abandoned cart, new arrivals…). A row exists only
+// Store automations. The automated emails VYA sends on a store's behalf. Two kinds:
+//  • builtin: VYA's own flows (abandoned cart, new arrivals…). A row exists only
 //               when the store has OVERRIDDEN the default (on). No row = on.
-//  • custom   — the store's own automation: a trigger + an email to send.
+//  • custom: the store's own automation: a trigger + an email to send.
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -37,19 +37,19 @@ async function ensureTable() {
 // (sendNewListingsDigest + sendAbandonedCartEmail both gate on isAutomationEnabled). Only flows that
 // send AS the store belong here. Saved-search / viewed-item / win-back were removed: those crons are
 // marketplace-level buyer notifications (VYA-branded, keyed on user_id across ALL stores), so a
-// per-store toggle never controlled them — showing it was a dead switch. Re-add only if/when a
+// per-store toggle never controlled them. Showing it was a dead switch. Re-add only if/when a
 // genuinely store-scoped version exists.
 export const BUILTIN_AUTOMATIONS: { key: string; name: string; body: string; cadence: string }[] = [
- { key: "abandoned_cart", name: "Abandoned cart", body: "Nudges a shopper who added to cart but didn’t check out — with the item and a link back.", cadence: "Within a day of drop-off" },
- // New arrivals no longer SENDS on its own — it prepares a draft with the new pieces in it and
+ { key: "abandoned_cart", name: "Abandoned cart", body: "Nudges a shopper who added to cart but didn’t check out, with the item and a link back.", cadence: "Within a day of drop-off" },
+ // New arrivals no longer SENDS on its own. It prepares a draft with the new pieces in it and
  // leaves it on the Emails page for the seller. Which pieces go out, and how it reads, is hers.
- { key: "new_arrivals", name: "New arrivals", body: "Gathers the pieces you've just published into a draft email, ready for you to check and send.", cadence: "Drafted on a new drop — you send it" },
+ { key: "new_arrivals", name: "New arrivals", body: "Gathers the pieces you've just published into a draft email, ready for you to check and send.", cadence: "Drafted on a new drop. You send it" },
 ];
 export const CUSTOM_TRIGGERS: { value: string; label: string }[] = [
  { value: "new_listing", label: "When I publish a new listing" },
  { value: "new_customer", label: "When a new customer is added" },
  { value: "order_placed", label: "After a customer places an order" },
- // Appointments. The reminder is the one stores ask for by name ("email them the day before") —
+ // Appointments. The reminder is the one stores ask for by name ("email them the day before"),
  // when it goes out is the store's own lead time, set in Settings › Appointments.
  { value: "appointment_booked", label: "When someone books an appointment" },
  { value: "appointment_confirmed", label: "When I confirm an appointment" },
@@ -114,7 +114,7 @@ export async function removeCustomAutomation(storeSlug: string, id: number): Pro
  await db()`DELETE FROM store_automations WHERE store_slug = ${storeSlug} AND kind = 'custom' AND id = ${id}`.catch(() => {});
 }
 
-/** Active custom automations for a given trigger — used by the trigger hooks. */
+/** Active custom automations for a given trigger. Used by the trigger hooks. */
 export async function getCustomAutomationsForTrigger(storeSlug: string, trigger: string): Promise<CustomAutomation[]> {
  await ensureTable();
  const rows = (await db()`SELECT id, name, trigger, subject, body, enabled FROM store_automations WHERE store_slug = ${storeSlug} AND kind = 'custom' AND trigger = ${trigger} AND enabled = true`.catch(() => [])) as any[];

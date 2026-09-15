@@ -22,7 +22,7 @@ export const infraMarkup = `<div class="grain"></div>
       <div>
         <div class="eyebrow fade" style="margin-bottom:26px">Economic infrastructure for the one-of-a-kind economy</div>
         <h1 class="serif"><span class="h-line"><span>The infrastructure</span></span><span class="h-line"><span>for <span class="it">recommerce</span>.</span></span></h1>
-        <p class="sub fade">Every other platform is built for inventory that repeats. Yours sells once and never comes back. VYA is the storefront, the listing engine, and the marketplace — built for one-of-one.</p>
+        <p class="sub fade">Every other platform is built for inventory that repeats. Yours sells once and never comes back. VYA is the storefront, the listing engine, and the marketplace. Built for one-of-one.</p>
         <div class="actions fade"><a class="btn btn-dark" href="#book">Book a demo</a><a class="btn btn-ghost" href="#listing">See how it works</a></div>
         <div class="meta fade">Built for one-of-one. Made for scale.</div>
       </div>
@@ -37,7 +37,7 @@ export const infraMarkup = `<div class="grain"></div>
 <section class="manifesto" id="manifesto">
   <div class="wrap">
     <div class="index reveal"><span class="ix">01</span> The thesis</div>
-    <p class="big serif reveal d1">Ecommerce was built to sell the same thing twice. Vintage <em>never</em> does — every piece is the only one there is.</p>
+    <p class="big serif reveal d1">Ecommerce was built to sell the same thing twice. Vintage <em>never</em> does. Every piece is the only one there is.</p>
     <p class="note reveal d2">VYA is the infrastructure built for exactly that: one-of-one, end to end.</p>
   </div>
 </section>
@@ -47,12 +47,12 @@ export const infraMarkup = `<div class="grain"></div>
     <div class="sec-head reveal">
       <div class="index"><span class="ix">02</span> The platform</div>
       <h2 class="serif">Everything you need to sell the unrepeatable.</h2>
-      <p>One tool, front to back — no Shopify, no app stack, no cobbling five subscriptions together.</p>
+      <p>One tool, front to back, no Shopify, no app stack, no cobbling five subscriptions together.</p>
     </div>
     <div class="flist reveal d1">
-      <div class="frow"><div class="fi">01</div><h3>Snap to listing</h3><p>Photograph a piece — VYA cleans it onto a ghost mannequin and drafts the whole listing. You confirm a detail or two.</p></div>
-      <div class="frow"><div class="fi">02</div><h3>Your own storefront</h3><p>Your brand, your customers, your data — not a layer on someone else's platform.</p></div>
-      <div class="frow"><div class="fi">03</div><h3>One-of-one inventory</h3><p>Quantity one, done right. Sold means gone — instantly, everywhere.</p></div>
+      <div class="frow"><div class="fi">01</div><h3>Snap to listing</h3><p>Photograph a piece. VYA cleans it onto a ghost mannequin and drafts the whole listing. You confirm a detail or two.</p></div>
+      <div class="frow"><div class="fi">02</div><h3>Your own storefront</h3><p>Your brand, your customers, your data, not a layer on someone else's platform.</p></div>
+      <div class="frow"><div class="fi">03</div><h3>One-of-one inventory</h3><p>Quantity one, done right. Sold means gone: instantly, everywhere.</p></div>
       <div class="frow"><div class="fi">04</div><h3>Payments &amp; payouts</h3><p>Checkout, payouts, and splits handled natively. Paid to your bank on schedule.</p></div>
     </div>
   </div>
@@ -64,12 +64,12 @@ export const infraMarkup = `<div class="grain"></div>
       <div class="reveal">
         <div class="index"><span class="ix">03</span> The listing flow</div>
         <h2 class="serif" style="font-size:clamp(30px,4.2vw,52px);font-weight:500;letter-spacing:-.018em;margin:20px 0 18px;line-height:1.02">As easy as texting<br>a friend about a find.</h2>
-        <p style="color:var(--ink-soft);font-size:17px;max-width:480px">No fifteen-field form. Send a photo, say a casual line — "Anna Molinari, F/W 2004 dress" — and VYA cleans the photo onto a ghost mannequin, reads the piece, and drafts the listing. It only asks what it genuinely can't know, one quick tap at a time.</p>
+        <p style="color:var(--ink-soft);font-size:17px;max-width:480px">No fifteen-field form. Send a photo, say a casual line, "Anna Molinari, F/W 2004 dress", and VYA cleans the photo onto a ghost mannequin, reads the piece, and drafts the listing. It only asks what it genuinely can't know, one quick tap at a time.</p>
         <div class="voice-note" style="margin-top:24px;border-left:2px solid var(--oxblood);padding:13px 0 13px 18px;max-width:480px">
           <div class="lab" style="color:var(--oxblood);margin-bottom:6px">Written in your voice</div>
-          <p style="color:var(--ink-soft);font-size:15px">VYA reads through your past listings to learn how you write — your tone, the details you always call out — and drafts every new listing to match. It still sounds like your store, not a template.</p>
+          <p style="color:var(--ink-soft);font-size:15px">VYA reads through your past listings to learn how you write, your tone, the details you always call out, and drafts every new listing to match. It still sounds like your store, not a template.</p>
         </div>
-        <p style="color:var(--mauve);font-size:15px;margin-top:18px;font-style:italic;font-family:var(--head)">Try it — tap to answer VYA and post the listing.</p>
+        <p style="color:var(--mauve);font-size:15px;margin-top:18px;font-style:italic;font-family:var(--head)">Try it: tap to answer VYA and post the listing.</p>
       </div>
       <div class="reveal d1">
         <div class="cd" id="cd">
@@ -78,11 +78,11 @@ export const infraMarkup = `<div class="grain"></div>
             <div class="cd-photo cdb" id="cdPhoto" style="background:#6f6153 url('/infrastructure/listing-example.jpg') center/cover"><span>IMG_2847</span></div>
             <div class="cdb me" id="cdM1">just got this anna molinari fw 2004 dress</div>
             <div class="typing" id="cdT1"><i></i><i></i><i></i></div>
-            <div class="cdb vy" id="cdM2">On it — cleaning your photo onto a ghost mannequin and reading the piece.</div>
+            <div class="cdb vy" id="cdM2">On it. Cleaning your photo onto a ghost mannequin and reading the piece.</div>
             <div class="typing" id="cdT2"><i></i><i></i><i></i></div>
             <div class="cd-card cdb" id="cdCard"><div style="display:flex;gap:11px;align-items:flex-start"><div class="cd-ghost" style="width:52px;height:66px;border-radius:8px;flex:none;background:#f5efe4 url('/infrastructure/listing-ghost.jpg') center/cover;border:1px solid var(--line)"></div><div style="flex:1"><div class="t">Anna Molinari · F/W 2004 dress<span class="cd-live" id="cdLive">● live</span></div><div class="chips"><span class="cdchip">F/W 2004</span><span class="cdchip">Silk chiffon</span><span class="cdchip">Beaded bodice</span><span class="cdchip">Excellent</span></div></div></div></div>
             <div class="typing" id="cdT3"><i></i><i></i><i></i></div>
-            <div class="cdb vy" id="cdM4">Two quick things — what size is it, and what do you want to list it at? Comps put it around $420.</div>
+            <div class="cdb vy" id="cdM4">Two quick things. What size is it, and what do you want to list it at? Comps put it around $420.</div>
             <div class="cdb me" id="cdM5">Size S · $420</div>
           </div>
           <div class="cd-foot">
@@ -91,7 +91,7 @@ export const infraMarkup = `<div class="grain"></div>
               <div class="qrow" id="cdPriceRow" style="display:none"><span class="qlabel">List at</span><button class="qchip" data-price="$380">$380</button><button class="qchip" data-price="$420">$420</button><button class="qchip" data-price="$460">$460</button></div>
             </div>
             <div class="cd-post" id="cdPost">Tap a size to continue</div>
-            <div class="cd-success" id="cdSuccess">✓ Listed in 12s — live on your store + Depop + eBay</div>
+            <div class="cd-success" id="cdSuccess">✓ Listed in 12s. Live on your store + Depop + eBay</div>
             <button class="cd-replay" id="cdReplay">↻ Replay the demo</button>
           </div>
         </div>
@@ -105,19 +105,19 @@ export const infraMarkup = `<div class="grain"></div>
     <div class="sec-head reveal">
       <div class="index"><span class="ix">04</span> Make your store</div>
       <h2 class="serif">Build your store from a sentence.</h2>
-      <p>Describe your shop and VYA designs it — or drop in your existing site and we'll bring it over, listings and all.</p>
+      <p>Describe your shop and VYA designs it, or drop in your existing site and we'll bring it over, listings and all.</p>
     </div>
     <div class="build">
       <div class="build-input reveal">
         <div class="tabs"><button class="tab on" data-tab="desc">Describe it</button><button class="tab" data-tab="import">Import a site</button></div>
         <div id="paneDesc">
-          <textarea id="prompt" rows="3">The Vintage Guild — we curate 80s &amp; 90s pieces focused on quality and timelessness. Black and white, old money.</textarea>
+          <textarea id="prompt" rows="3">The Vintage Guild. We curate 80s &amp; 90s pieces focused on quality and timelessness. Black and white, old money.</textarea>
           <div class="chips-row"><span class="pchip">Old money · B&amp;W</span><span class="pchip">Warm &amp; earthy</span><span class="pchip">Bold &amp; playful</span><span class="pchip">Dark &amp; moody</span></div>
           <button class="btn btn-dark buildbtn" id="buildBtn">Build my store →</button>
         </div>
         <div id="paneImport" style="display:none">
           <input class="url-in" id="importUrl" value="sassysowhat.com" placeholder="paste your Shopify, Etsy, or Instagram shop">
-          <div class="impnote">We'll import your listings, photos, and details — and rebuild them as a VYA store.</div>
+          <div class="impnote">We'll import your listings, photos, and details, and rebuild them as a VYA store.</div>
           <button class="btn btn-dark buildbtn" id="importBtn">Import my store →</button>
         </div>
       </div>
@@ -142,7 +142,7 @@ export const infraMarkup = `<div class="grain"></div>
             </div>
           </div>
         </div>
-        <div class="result-tag" id="resultTag">✓ Store ready — published to vyaplatform.com</div>
+        <div class="result-tag" id="resultTag">✓ Store ready. Published to vyaplatform.com</div>
       </div>
     </div>
   </div>
@@ -153,12 +153,12 @@ export const infraMarkup = `<div class="grain"></div>
     <div class="sec-head reveal">
       <div class="index"><span class="ix">05</span> Every way you do resale</div>
       <h2 class="serif">Built for owned, consignment, and rental.</h2>
-      <p>Vintage businesses don't only sell what they own. VYA runs every model in one place — so nothing about how you actually operate gets left out.</p>
+      <p>Vintage businesses don't only sell what they own. VYA runs every model in one place, so nothing about how you actually operate gets left out.</p>
     </div>
     <div class="grid3c">
-      <div class="card reveal"><div class="mode">Owned</div><h3>Sell what you've sourced</h3><p>Sell your finds direct — listing to payout, handled natively.</p></div>
+      <div class="card reveal"><div class="mode">Owned</div><h3>Sell what you've sourced</h3><p>Sell your finds direct. Listing to payout, handled natively.</p></div>
       <div class="card reveal d1"><div class="mode">Consignment</div><h3>Take pieces on consignment</h3><p>Custom splits per item, automatic payouts to every consignor, and each one gets their own view to track sales.</p></div>
-      <div class="card reveal d2"><div class="mode">Rental</div><h3>Lend the pieces too good to part with</h3><p>Rent archival pieces with calendars, deposits, and condition checks built in — so one-of-one earns again and again.</p></div>
+      <div class="card reveal d2"><div class="mode">Rental</div><h3>Lend the pieces too good to part with</h3><p>Rent archival pieces with calendars, deposits, and condition checks built in, so one-of-one earns again and again.</p></div>
     </div>
   </div>
 </section>
@@ -168,7 +168,7 @@ export const infraMarkup = `<div class="grain"></div>
     <div class="sec-head reveal">
       <div class="index"><span class="ix">06</span> Built-in analytics</div>
       <h2 class="serif">Your business, measured.</h2>
-      <p>Revenue, sell-through, days-to-sell, payouts — the numbers a serious resale business runs on, in plain view.</p>
+      <p>Revenue, sell-through, days-to-sell, payouts. The numbers a serious resale business runs on, in plain view.</p>
     </div>
     <div class="an-grid">
       <div class="panel reveal">
@@ -212,7 +212,7 @@ export const infraMarkup = `<div class="grain"></div>
       <div class="reveal d1">
         <div class="index"><span class="ix">07</span> Trend intelligence</div>
         <h2 class="serif" style="font-size:clamp(26px,3.6vw,40px);font-weight:500;letter-spacing:-.014em;margin:18px 0 12px;line-height:1.04">Know what's next,<br>before you source it.</h2>
-        <p style="color:var(--ink-soft);font-size:16px">VYA reads demand across every store and sale on the platform — so you source what's rising, list what moves, and price where it sells.</p>
+        <p style="color:var(--ink-soft);font-size:16px">VYA reads demand across every store and sale on the platform, so you source what's rising, list what moves, and price where it sells.</p>
         <div class="trend-panel">
           <div class="trend-row"><span class="name serif">Y2K denim</span><span class="right"><span class="bar"><i data-w="88%"></i></span><span class="up">▲ 42%</span></span></div>
           <div class="trend-row"><span class="name serif">Archival Margiela</span><span class="right"><span class="bar"><i data-w="79%"></i></span><span class="up">▲ 36%</span></span></div>
@@ -230,17 +230,17 @@ export const infraMarkup = `<div class="grain"></div>
     <div class="sec-head reveal">
       <div class="index"><span class="ix">08</span> Two sides, one brand</div>
       <h2 class="serif">Run your store. Reach the world.</h2>
-      <p>VYA powers your own storefront — and connects it to VYA Platform, the marketplace where shoppers discover the world's best vintage, all in one place.</p>
+      <p>VYA powers your own storefront, and connects it to VYA Platform, the marketplace where shoppers discover the world's best vintage, all in one place.</p>
     </div>
     <div class="two">
       <div class="side reveal">
         <div class="tag">Infrastructure · for sellers</div><h3 class="serif">VYA</h3>
-        <p>The platform you run your resale business on — listing, storefront, inventory, consignment, rental, and payouts in one place.</p>
+        <p>The platform you run your resale business on. Listing, storefront, inventory, consignment, rental, and payouts in one place.</p>
         <ul><li>Your own branded storefront</li><li>AI listing &amp; one-of-one inventory</li><li>Consignment splits &amp; rental built in</li><li>Every store carries "powered by VYA"</li></ul>
       </div>
       <div class="side edit reveal d1">
         <div class="tag">Marketplace · for buyers</div><h3 class="serif">VYA Platform</h3>
-        <p>The first online department store for vintage and secondhand — a curated destination where shoppers discover one-of-a-kind pieces across every VYA store.</p>
+        <p>The first online department store for vintage and secondhand. A curated destination where shoppers discover one-of-a-kind pieces across every VYA store.</p>
         <span class="live"><span class="dot"></span> Now live in pilot</span>
         <ul><li>Opt your inventory in with one toggle</li><li>New buyers, beyond your own audience</li><li>Curated by era, designer &amp; collection</li></ul>
       </div>
@@ -256,8 +256,8 @@ export const infraMarkup = `<div class="grain"></div>
       <p style="color:var(--ink-soft);font-size:17px;max-width:540px;margin:16px auto 0">No code, no Shopify, no app stack. If you can text a photo, you can open a store.</p>
     </div>
     <div class="grid3">
-      <div class="stepcard reveal"><div class="k">01</div><h4>Sign up</h4><p>Create your VYA store in a couple of minutes. Pick your name, your look — done.</p></div>
-      <div class="stepcard reveal d1"><div class="k">02</div><h4>Add your pieces</h4><p>Snap or import your inventory and VYA drafts every listing for you — owned, consignment, or rental.</p></div>
+      <div class="stepcard reveal"><div class="k">01</div><h4>Sign up</h4><p>Create your VYA store in a couple of minutes. Pick your name, your look. Done.</p></div>
+      <div class="stepcard reveal d1"><div class="k">02</div><h4>Add your pieces</h4><p>Snap or import your inventory and VYA drafts every listing for you. Owned, consignment, or rental.</p></div>
       <div class="stepcard reveal d2"><div class="k">03</div><h4>Go live</h4><p>Publish your storefront and opt into VYA Platform to reach buyers from day one.</p></div>
     </div>
     <div style="margin-top:48px" class="reveal"><a class="btn btn-dark" href="#book" style="padding:15px 34px">Book a demo</a></div>

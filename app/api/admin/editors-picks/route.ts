@@ -8,7 +8,7 @@ import {
  getActiveCollectionSlugs,
 } from "@/app/lib/editors-picks-db";
 
-// Curating a collection changes what the marketplace shows — but the homepage is ISR-cached
+// Curating a collection changes what the marketplace shows, but the homepage is ISR-cached
 // (revalidate = 1800). Refresh the affected pages NOW so a newly-populated collection appears
 // immediately in the nav / homepage / collection page instead of up to 30 minutes later.
 function revalidateMarketplace(slug: string) {

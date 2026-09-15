@@ -78,7 +78,7 @@ function Compose() {
  const [sending, setSending] = useState(false);
  const [note, setNote] = useState<{ text: string; tone: "ok" | "err" } | null>(null);
 
- // Load the chosen starting point. Its words land in the fields as a draft — editable immediately,
+ // Load the chosen starting point. Its words land in the fields as a draft. Editable immediately,
  // rather than as something to accept or reject.
  useEffect(() => {
   // Opened from the Emails page: its words come back so editing is editing, not retyping.
@@ -124,7 +124,7 @@ function Compose() {
  }, [audience]);
 
  // The layout, in ONE place. The preview posts it and the send posts it, and they were separate
- // object literals before — which is how the send quietly stopped carrying the design at all while
+ // object literals before, which is how the send quietly stopped carrying the design at all while
  // the preview kept showing it. One object, so they cannot drift again; and because the memo lists
  // every field, a control left out of it is a control that visibly does nothing rather than one
  // that works on screen and not in the inbox. (Background and Show prices were both missing.)
@@ -133,7 +133,7 @@ function Compose() {
   [design, headline, subhead, ctaLabel, link, pieceCount, itemIds, eyebrow, preheader, productsHeading, code, links, ground, showPrices],
  );
 
- // Re-render as you type, but not on every keystroke — this hits the server.
+ // Re-render as you type, but not on every keystroke. This hits the server.
  const render = useCallback(() => {
   fetch("/api/store/campaign/render", {
    method: "POST", headers: { "Content-Type": "application/json" },
@@ -146,7 +146,7 @@ function Compose() {
  async function send(test: boolean) {
   setSending(true); setNote(null);
   // The body the sender expects: first line is the headline, the rest sits under it. It is only the
-  // plain-text fallback now — `design` is what actually renders, and it has to be the SAME set of
+  // plain-text fallback now: `design` is what actually renders, and it has to be the SAME set of
   // fields the preview posts to /render, or the test lands in her inbox looking like a different
   // email than the one on screen. That is exactly what used to happen.
   const body = [headline, subhead].filter(Boolean).join("\n");
@@ -192,7 +192,7 @@ function Compose() {
       </Field>
       <Field
        label="Inbox preview line"
-       hint="The grey line next to your subject in someone's inbox. Left blank, they'll see your shop's name instead — a wasted line."
+       hint="The grey line next to your subject in someone's inbox. Left blank, they'll see your shop's name instead. A wasted line."
       >
        <input className={input} value={preheader} onChange={(e) => setPreheader(e.target.value)} placeholder="Four new pieces, one of each." />
       </Field>
@@ -201,7 +201,7 @@ function Compose() {
       </Field>
      </TechCard>
 
-     {/* Who it goes to. Everyone subscribed, unless she narrows it — the count on the button follows. */}
+     {/* Who it goes to. Everyone subscribed, unless she narrows it. The count on the button follows. */}
      <TechCard className="flex flex-col gap-3 p-5" data-testid="audience-picker">
       <Field label="Who gets it" hint={`${describeAudience(audience)} · ${count.toLocaleString()} ${count === 1 ? "person" : "people"}`}>
        <div className="flex flex-wrap items-center gap-1.5">
@@ -276,7 +276,7 @@ function Compose() {
       </Field>
      </TechCard>
 
-     {/* Links along the bottom — collections, a sale page, an Instagram. Four at most: a row of
+     {/* Links along the bottom. Collections, a sale page, an Instagram. Four at most: a row of
          links people scan, not a menu they read. */}
      <TechCard className="p-5">
       <p className="mb-2 text-[12px] font-medium text-stone-700">Links at the bottom</p>
@@ -336,7 +336,7 @@ function Compose() {
       </div>
 
       {/* A mail client, not an admin card describing one.
-          A preview of an inbox should LOOK like an inbox — the previous version listed the parts in
+          A preview of an inbox should LOOK like an inbox. The previous version listed the parts in
           labelled grey boxes stacked above the email, which reads as documentation and costs the
           email half its height. One frame, two moments, toggled above.
           The frame runs cool (slate) where the workspace runs warm (stone). That temperature shift
@@ -344,7 +344,7 @@ function Compose() {
           glyphs settle it in about a second. */}
       <div className="bg-slate-100/70 p-3">
        <div className="overflow-hidden rounded-xl border border-slate-300/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
-        {/* Inert chrome. Nothing here is clickable — it exists so the eye reads "mail app" at once. */}
+        {/* Inert chrome. Nothing here is clickable. It exists so the eye reads "mail app" at once. */}
         <div className="flex items-center gap-3 border-b border-slate-200/80 px-3 py-2 text-slate-300" aria-hidden="true">
          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="5" rx="1" /><path d="M5 9v10h14V9M10 13h4" /></svg>
@@ -355,7 +355,7 @@ function Compose() {
         {shopperView === "In the list" ? (
          /* Her email in a list, with other mail above and below it. The competition is the point:
             it is where you can see whether the sender name carries, and where the subject stops
-            and the preview line takes over — the two are written in boxes far apart on the form and
+            and the preview line takes over. The two are written in boxes far apart on the form and
             arrive as one line. The neighbours are deliberately unreadable; they are context, not
             content, so they can't be mistaken for real mail. */
          <div className="divide-y divide-slate-100" data-testid="inbox-preview">
@@ -378,7 +378,7 @@ function Compose() {
             {/* Subject and preview line run together on one line, the way a client renders them. */}
             <p className="truncate text-[12.5px] text-slate-700">
              <span className="font-medium text-slate-900">{subject || "No subject yet"}</span>
-             <span className="text-slate-400"> — {preheader.trim() || `${senderName || "Your shop"}`}</span>
+             <span className="text-slate-400"> · {preheader.trim() || `${senderName || "Your shop"}`}</span>
             </p>
            </div>
           </div>
@@ -413,7 +413,7 @@ function Compose() {
        </div>
        {shopperView === "In the list" && !preheader.trim() && (
         <p className="mt-2 px-0.5 text-[11.5px] leading-relaxed text-slate-500">
-         With no inbox preview line, the grey text falls back to whatever the email opens with — usually
+         With no inbox preview line, the grey text falls back to whatever the email opens with. Usually
          your shop’s name, right under a subject that already says it.
         </p>
        )}

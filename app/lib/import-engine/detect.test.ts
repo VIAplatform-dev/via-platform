@@ -21,7 +21,7 @@ test("detects Shopify from its theme object, and keeps the theme name for the sh
 });
 
 test("distinguishes headless Shopify from a themed Shopify store", () => {
- // Shopify's CDN serves the images, but the page is a JS app with no Liquid sections — so
+ // Shopify's CDN serves the images, but the page is a JS app with no Liquid sections, so
  // products.json won't exist on this domain and the seller needs to give us their myshopify one.
  const d = detectPlatform(page(`<script>window.__remixContext = {};</script><img src="https://cdn.shopify.com/x.jpg">`));
  assert.equal(d.platform, "shopify-headless");
@@ -92,7 +92,7 @@ test("declines name the platform and offer a real alternative", () => {
 
 test("a bot-protection interstitial is recognised, not mistaken for the storefront", () => {
  // ec.2ndstreetusa.com sits behind Cloudflare's managed challenge. Under load it serves the
- // challenge page with **HTTP 200** for the first stretch and only switches to 429 later — and
+ // challenge page with **HTTP 200** for the first stretch and only switches to 429 later, and
  // captureSite's only gate is `res.ok`. So a crawl would have stored a 9KB "Verifying your
  // connection..." page AS the seller's storefront, on every page, and reported success. Measured by
  // hand: ~35 requests in 20s triggers it, and it holds for roughly 20 minutes.
@@ -103,7 +103,7 @@ test("a bot-protection interstitial is recognised, not mistaken for the storefro
   </body></html>`;
  assert.equal(looksLikeBotChallenge(cf), true);
  assert.equal(looksLikeBotChallenge(`<html><head><title>Just a moment...</title></head><body><div id="cf-challenge-running"></div></body></html>`), true);
- // A real storefront is never flagged — not for mentioning Cloudflare, and not even if a marker
+ // A real storefront is never flagged, not for mentioning Cloudflare, and not even if a marker
  // string appears somewhere in its own scripts: a real page carries thousands of characters of the
  // seller's own copy, and BOTH halves are required.
  assert.equal(looksLikeBotChallenge(`<html><body><h1>Vintage</h1><p>Our site is protected by Cloudflare.</p><p>${"shop ".repeat(400)}</p></body></html>`), false, "no marker");

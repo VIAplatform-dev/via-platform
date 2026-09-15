@@ -1,9 +1,9 @@
 import { test, expect, type Page } from "playwright/test";
 import { createHash } from "node:crypto";
 
-// Surface parity, as the owner sees it: a hold she places is a hold EVERYWHERE — the ⌘K search
+// Surface parity, as the owner sees it: a hold she places is a hold EVERYWHERE. The ⌘K search
 // says "on hold", the storefront keeps the piece on the shelf with an "On hold" badge, the web
-// Inventory pill names the customer and offers Release — and Settings › Notifications shows the
+// Inventory pill names the customer and offers Release, and Settings › Notifications shows the
 // same seven switches the phone does and writes one key per flip.
 //
 // The hold runs for real on the throwaway store and is released in `finally`. Inventory and
@@ -18,7 +18,7 @@ const adminToken = () => {
 const cookie = () => ({ Cookie: `via_admin_token=${adminToken()}` });
 
 async function signIn(page: Page) {
- // The base the config runs against (playwright.config.ts) — read from the environment rather
+ // The base the config runs against (playwright.config.ts). Read from the environment rather
  // than the context's private `_options`, which the older specs reach into and tsc dislikes.
  const base = new URL(process.env.E2E_BASE || "http://localhost:3001");
  await page.context().addCookies([{ name: "via_admin_token", value: adminToken(), domain: base.hostname, path: "/" }]);

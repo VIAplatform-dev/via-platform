@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // What a seller actually did, in her own words.
 //
-// PostHog answers "how many" across everyone. This answers "what happened to HER" — the question you
+// PostHog answers "how many" across everyone. This answers "what happened to HER". The question you
 // have when one store is trying VYA for the first time and you want to know whether she got stuck on
 // step two or listed nine pieces and left happy.
 //
@@ -24,7 +24,7 @@ export type Activity = {
  storeSlug: string | null;
  email: string | null;
  kind: ActivityKind;
- /** What it was — a page path, a piece's title, the name of a setting. */
+ /** What it was. A page path, a piece's title, the name of a setting. */
  detail: string | null;
  at: string;
 };
@@ -96,7 +96,7 @@ export function screenName(path: string): string {
 export function describeActivity(a: Pick<Activity, "kind" | "detail">): string {
  const verb = VERB[a.kind] ?? a.kind;
  if (a.kind === "viewed") return `Opened ${screenName(a.detail || "")}`;
- return a.detail ? `${verb} — ${a.detail}` : verb;
+ return a.detail ? `${verb}: ${a.detail}` : verb;
 }
 
 /**
@@ -119,7 +119,7 @@ export function collapse(events: Activity[]): (Activity & { times: number })[] {
  return out;
 }
 
-/** "3 minutes ago", "yesterday" — a log is read for recency, not for timestamps. */
+/** "3 minutes ago", "yesterday". A log is read for recency, not for timestamps. */
 export function ago(iso: string, now = Date.now()): string {
  const t = Date.parse(iso);
  if (!Number.isFinite(t)) return "";

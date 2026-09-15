@@ -44,7 +44,7 @@ test("unrecognised input is null, not a guess", () => {
 
 test("canonical vs custom categories are told apart", () => {
  for (const slug of CATEGORY_SLUGS) assert.ok(isCanonicalCategory(slug), `${slug} is canonical`);
- // Free text the seller typed under "Other" must never be mistaken for a taxonomy slug —
+ // Free text the seller typed under "Other" must never be mistaken for a taxonomy slug,
  // that's what keeps it out of the Boots filter and in its own group.
  for (const raw of ["Deadstock band tees", "boots ", "Boots", "", null, undefined]) {
   assert.equal(isCanonicalCategory(raw), false, `${JSON.stringify(raw)} is not canonical`);

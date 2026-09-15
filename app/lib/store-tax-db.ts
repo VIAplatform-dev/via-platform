@@ -7,8 +7,8 @@ import { normalizeCountry } from "./tax-inclusive";
 // VYA does not calculate tax and should not: storefront sales are DIRECT charges
 // on the seller's own Stripe account (checkout/route.ts), so the seller is
 // merchant of record and the registrations, collection and filing are theirs.
-// That is the model Stripe documents for Connect — "connected account is
-// responsible" — and it is the same posture Shopify takes for merchant stores.
+// That is the model Stripe documents for Connect. "connected account is
+// responsible", and it is the same posture Shopify takes for merchant stores.
 //
 // So this holds one thing: whether the store has turned tax collection ON. When
 // it is on, checkout asks Stripe Tax to calculate against THAT store's
@@ -17,15 +17,15 @@ import { normalizeCountry } from "./tax-inclusive";
 // Two deliberate choices:
 //
 //   ON BY DEFAULT. Stripe does not error in jurisdictions where the account has
-//   no registration — it simply calculates nothing. So "on" collects exactly
+//   no registration: it simply calculates nothing. So "on" collects exactly
 //   where the seller is registered and nowhere else, which is the legally correct
 //   behaviour: you cannot collect tax you aren't registered to collect. Leaving
 //   it off would instead mean a registered seller silently under-collects, which
 //   is a real liability. A store can still opt out, but it has to choose to.
 //
 //   NO RATE FIELD, AND NO SINGLE PRODUCT CODE. A flat per-store rate would be
-//   wrong for this vertical — New York exempts clothing and footwear under $110,
-//   Pennsylvania and New Jersey exempt most apparel outright — and so would one
+//   wrong for this vertical. New York exempts clothing and footwear under $110,
+//   Pennsylvania and New Jersey exempt most apparel outright, and so would one
 //   product code, because those exemptions do not cover handbags, jewelry or
 //   sunglasses. Rates come from Stripe Tax; the product code comes per listing
 //   from its category (tax-codes.ts).
@@ -42,13 +42,13 @@ export type TaxSettings = {
  enabled: boolean;
  /**
   * Optional override applied to EVERY listing. Null (the normal case) means each
-  * item is coded from its own category — see tax-codes.ts.
+  * item is coded from its own category. See tax-codes.ts.
   */
  productTaxCode: string | null;
 };
 
 /**
- * An OPTIONAL per-store override. Left null — which is the normal case — each
+ * An OPTIONAL per-store override. Left null, which is the normal case. Each
  * listing is coded from its own category (see tax-codes.ts), because a bag and a
  * dress are not taxed alike. This exists only for a store that sells one narrow
  * thing and knows better than the category mapping.
@@ -73,7 +73,7 @@ export async function getTaxSettings(storeSlug: string): Promise<TaxSettings> {
   await ensure();
   const rows = (await db()`SELECT enabled, product_tax_code FROM store_tax_settings WHERE store_slug = ${storeSlug}`) as Array<Record<string, unknown>>;
   const r = rows[0];
-  // No row means the store has never touched this, which is ON — see the header.
+  // No row means the store has never touched this, which is ON. See the header.
   return {
    enabled: r ? Boolean(r.enabled) : true,
    productTaxCode: r?.product_tax_code ? String(r.product_tax_code) : null,
@@ -105,7 +105,7 @@ export async function setTaxSettings(storeSlug: string, s: Partial<TaxSettings>)
 /**
  * Is Stripe Tax actually usable on this connected account?
  *
- * Registrations are NOT the gate — Stripe calculates zero where a seller isn't
+ * Registrations are NOT the gate. Stripe calculates zero where a seller isn't
  * registered, which is exactly right. The gate is whether the account has
  * completed Stripe Tax setup at all (origin address + default tax code). Asking
  * for automatic_tax on an account that hasn't can fail the Checkout Session, and
@@ -114,7 +114,7 @@ export async function setTaxSettings(storeSlug: string, s: Partial<TaxSettings>)
 /**
  * Is this connected account ready to charge tax, and where is it established?
  *
- * The country comes from Stripe's tax HEAD OFFICE rather than a separate account lookup — it's the
+ * The country comes from Stripe's tax HEAD OFFICE rather than a separate account lookup. It's the
  * seller's tax home, it's the right field for the question, and it rides along on a call checkout
  * already makes. It decides whether the seller's typed prices include tax (see tax-inclusive.ts).
  */
@@ -139,7 +139,7 @@ export async function stripeTaxReady(stripeAccountId: string): Promise<{ active:
 }
 
 /* ── registrations ────────────────────────────────────────────────────────
- * Where a store is registered to collect, read from and written to Stripe Tax — which is the
+ * Where a store is registered to collect, read from and written to Stripe Tax, which is the
  * source of truth, because it is what actually decides whether tax is calculated on an order.
  * VYA keeps no copy: a second list would drift, and the drifting one would be the one a seller
  * trusted.
@@ -175,7 +175,7 @@ export async function listTaxRegistrations(stripeAccountId: string): Promise<Tax
 /**
  * The Stripe shape for one country's registration.
  *
- * Every country has its own key and its own idea of what a registration is — the US wants a state
+ * Every country has its own key and its own idea of what a registration is. The US wants a state
  * and a sales-tax type, the EU and UK want "standard", and getting it wrong is rejected outright.
  * Only the countries VYA's stores actually operate in are handled; anything else is refused with a
  * message rather than guessed at, because a wrong registration collects the wrong tax.
@@ -197,7 +197,7 @@ export function registrationPayload(country: string, state?: string | null): Rec
  * Make sure Stripe Tax knows where this store is established.
  *
  * WHY VYA HAS TO DO THIS. Stripe refuses to accept any tax registration until the account has a
- * tax "head office" address — and VYA's stores are Connect EXPRESS accounts, whose dashboard does
+ * tax "head office" address, and VYA's stores are Connect EXPRESS accounts, whose dashboard does
  * not include Tax Settings at all. Left to itself the seller sees Stripe's own error telling her to
  * visit a page she has no way to open. So the platform sets it, from the ship-from address she has
  * already given VYA.
@@ -235,7 +235,7 @@ export async function ensureTaxHeadOffice(
 
 export async function addTaxRegistration(stripeAccountId: string, country: string, state?: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
  const payload = registrationPayload(country, state);
- if (!payload) return { ok: false, error: "That country needs a state — pick one, or check the country code." };
+ if (!payload) return { ok: false, error: "That country needs a state. Pick one, or check the country code." };
  try {
   const { stripePost } = await import("./stripe");
   await stripePost("tax/registrations", payload, stripeAccountId);
@@ -245,7 +245,7 @@ export async function addTaxRegistration(stripeAccountId: string, country: strin
  }
 }
 
-/** Stripe doesn't delete registrations — it expires them, which keeps the historic record intact. */
+/** Stripe doesn't delete registrations. It expires them, which keeps the historic record intact. */
 export async function endTaxRegistration(stripeAccountId: string, id: string): Promise<boolean> {
  try {
   const { stripePost } = await import("./stripe");

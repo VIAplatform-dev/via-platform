@@ -5,7 +5,7 @@ import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 export const dynamic = "force-dynamic";
 
-// eBay Marketplace Account Deletion / Closure notification endpoint — required to enable
+// eBay Marketplace Account Deletion / Closure notification endpoint. Required to enable
 // a Production keyset. GET = eBay's one-time validation challenge; POST = a real deletion
 // notice (we drop that user's stored eBay data and ack 200).
 
@@ -25,11 +25,11 @@ export async function GET(req: NextRequest) {
 
 // Real notification: acknowledge fast, best-effort delete the user's eBay data.
 //
-// eBay's Marketplace Account Deletion notifications aren't signed per-request — the GET
+// eBay's Marketplace Account Deletion notifications aren't signed per-request. The GET
 // challenge above is the only verification eBay's spec provides, so this endpoint is
 // unavoidably reachable by anyone who knows the URL. To keep that from being a trivial
 // "wipe any seller's eBay tokens" primitive: rate-limit per IP, and require the payload to
-// actually match eBay's real notification shape (topic + a username) before acting on it —
+// actually match eBay's real notification shape (topic + a username) before acting on it,
 // this filters out arbitrary POSTs while still accepting genuine eBay notifications.
 export async function POST(req: NextRequest) {
  const ip = clientIp(req.headers);

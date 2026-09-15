@@ -6,19 +6,19 @@ import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Formats a browser can render directly — stored as-is (keeps PNG transparency, GIF animation).
+// Formats a browser can render directly. Stored as-is (keeps PNG transparency, GIF animation).
 // Anything else (notably iPhone HEIC) is transcoded to JPEG so it actually displays on the storefront.
 // SVG is deliberately excluded even though browsers render it directly: it's XML that can carry
 // embedded <script>, this is client-asserted MIME with no magic-byte check, and the file is stored
-// at a public URL — so an SVG here would be a stored-XSS vector. Rejected outright below.
+// at a public URL, so an SVG here would be a stored-XSS vector. Rejected outright below.
 const WEB_SAFE = /^image\/(jpeg|png|webp|gif|avif)$/i;
 
-// A store's media library — photos they upload to drop into their storefront (hero,
-// banners, lookbook). Stored in Blob under a per-store prefix; no DB table needed —
+// A store's media library. Photos they upload to drop into their storefront (hero,
+// banners, lookbook). Stored in Blob under a per-store prefix; no DB table needed,
 // the prefix IS the library, and it namespaces each store's assets.
 const prefixFor = (slug: string) => `assets/${slug}/`;
 
-// GET — list the store's uploaded photos, newest first.
+// GET: list the store's uploaded photos, newest first.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
  }
 }
 
-// POST (multipart) — upload one photo into the library.
+// POST (multipart): upload one photo into the library.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
  const file = formData.get("file") as File | null;
  if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
- // Video (section background) — stored as-is (no transcode); the storefront plays it muted + looping.
+ // Video (section background): stored as-is (no transcode); the storefront plays it muted + looping.
  if ((file.type || "").startsWith("video/")) {
  if (!/^video\/(mp4|webm|quicktime)$/i.test(file.type)) return NextResponse.json({ error: "Use an MP4, WebM, or MOV video." }, { status: 400 });
  if (file.size > 64 * 1024 * 1024) return NextResponse.json({ error: "Video must be under 64MB." }, { status: 400 });
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
  output = await toJpeg(jpeg);
  } catch (e2) {
  console.error("[assets] image decode failed:", e1, e2);
- return NextResponse.json({ error: "Couldn’t read that image — try a JPG or PNG." }, { status: 400 });
+ return NextResponse.json({ error: "Couldn’t read that image. Try a JPG or PNG." }, { status: 400 });
  }
  }
  const blob = await put(`${stamp}.jpg`, output, { access: "public", contentType: "image/jpeg" });
@@ -92,12 +92,12 @@ export async function POST(request: NextRequest) {
  }
 }
 
-// DELETE ?url= — remove a photo (only from the acting store's own library).
+// DELETE ?url= remove a photo (only from the acting store's own library).
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const url = request.nextUrl.searchParams.get("url") || "";
- // Ownership must be a real path-prefix check, not `.includes()` — a substring match lets a
+ // Ownership must be a real path-prefix check, not `.includes()`: a substring match lets a
  // crafted URL (e.g. a query/fragment appended after the victim's path) satisfy `.includes()`
  // for OUR prefix while `del()` still resolves and deletes the victim store's blob.
  let ownPath: string;

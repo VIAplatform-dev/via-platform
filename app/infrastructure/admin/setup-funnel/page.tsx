@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AdminPage, AdminHeader, TechCard, TH, TD, StatusPill } from "../ui";
 import type { FunnelStep, FunnelStore } from "@/app/lib/setup-funnel-core";
 
-// Where stores get stuck — the owner's view of "Set up your store" across every store.
+// Where stores get stuck. The owner's view of "Set up your store" across every store.
 //
 // "If 3 sellers out of 10 get stuck somewhere, we need to explain better." One bar per required
 // step (count and percent of all stores), then every store, longest-stuck first, with the step it
@@ -63,7 +63,7 @@ export default function SetupFunnelPage() {
       <p className="text-[14px] font-semibold text-stone-900">Every store</p>
       <p className="text-[12px] text-stone-500">Longest stuck first. Days since the store’s workspace was created.</p>
       {/* Phone: one block per store. Five columns in a 300px card scrolled sideways, which hid the
-          one thing each row is for — the link into that store's Home. */}
+          one thing each row is for. The link into that store's Home. */}
       <ul className="mt-2 divide-y divide-stone-100 sm:hidden">
        {data.stores.map((s) => (
         <li key={s.slug} className="py-3">
@@ -91,7 +91,7 @@ export default function SetupFunnelPage() {
            <TD><span className="font-medium text-stone-900">{s.name}</span><span className="ml-2 font-mono text-[11px] text-stone-400">{s.slug}</span></TD>
            <TD>{s.complete ? <StatusPill tone="live" dot>Set up</StatusPill> : <span className="text-stone-700">{s.nextLabel ?? s.next}</span>}</TD>
            <TD right className="tabular-nums">{s.done}/{s.total}</TD>
-           <TD right className="tabular-nums">{s.complete ? "—" : s.stuckSinceDays}</TD>
+           <TD right className="tabular-nums">{s.complete ? "-" : s.stuckSinceDays}</TD>
            <TD right><Link href={`/admin/home?store=${encodeURIComponent(s.slug)}`} className="text-[12.5px] font-medium text-[var(--accent-ink,#0b7a5c)] hover:underline">Open Home ›</Link></TD>
           </tr>
          ))}

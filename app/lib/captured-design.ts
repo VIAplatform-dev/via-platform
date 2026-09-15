@@ -1,18 +1,18 @@
 // Global "design" layer for imported/captured storefronts. The seller picks accent / background / text
 // colours, a corner style, and heading/body fonts; we express that as a CSS block injected over their
-// theme (via the site-wide custom-CSS row). The block is self-describing — a JSON comment header lets the
-// editor read the current settings back — and any OTHER custom CSS (e.g. added by the VYA assistant) is
+// theme (via the site-wide custom-CSS row). The block is self-describing. A JSON comment header lets the
+// editor read the current settings back, and any OTHER custom CSS (e.g. added by the VYA assistant) is
 // preserved alongside it.
 //
 // WHERE THE COLOURS GO. A theme does not paint its bands from <body>: Shopify's themes paint every
 // section from colour-scheme variables on scheme classes, and Squarespace from section-theme variables.
-// So `body{background;color}` changed <body> and nothing a shopper could see — measured on a Dawn store,
+// So `body{background;color}` changed <body> and nothing a shopper could see. Measured on a Dawn store,
 // the first section covered the new background and the scheme's own text colour beat the inherited one.
 // Colours are therefore written INTO the theme's variables (detectThemeModel says which dialect), on the
 // default scheme and every scheme of the same light/dark polarity; a deliberately contrasting band (a dark
 // footer, a red announcement bar) keeps its own colours. Unrecognised themes get the body-level fallback.
 //
-// WHY `:not(#vya-d)`. No element has that id, so it matches everything — and adds id-level specificity.
+// WHY `:not(#vya-d)`. No element has that id, so it matches everything, and adds id-level specificity.
 // The overlay then beats the theme's own declarations (important ones included) regardless of where it
 // lands in the document: the editor's live preview puts it in <head>, before the theme's in-body styles.
 
@@ -52,7 +52,7 @@ const toHex = (c: Rgb) => "#" + c.map((n) => n.toString(16).padStart(2, "0")).jo
 // ── Reading the theme ────────────────────────────────────────────────────────────────────────────
 
 // Only plain scheme selectors are recoloured. Themes also set these variables on complex selectors
-// (a transparent header, slideshow controls over a photo) — those are local effects, not bands.
+// (a transparent header, slideshow controls over a photo). Those are local effects, not bands.
 const SCHEME_SEL = /^(?::root|\.[A-Za-z0-9_-]{1,80})$/;
 const SQ_SECTION_SEL = /^\[data-section-theme=["']?([a-z0-9-]{1,30})["']?\]$/i;
 // What may reach the generated CSS. The model travels through the editor, so it is checked again here.
@@ -60,7 +60,7 @@ const SAFE_SCOPE = /^(?::root|\.[A-Za-z0-9_-]{1,80}|\[data-section-theme="[a-z0-
 const MAX_SCHEMES = 60;
 
 type Rule = { selectors: string[]; body: string };
-/** Every rule that DECLARES `prop`, found by scanning for the property rather than parsing all CSS —
+/** Every rule that DECLARES `prop`, found by scanning for the property rather than parsing all CSS,
  *  captured pages run to megabytes, and a rule-matching regex over them backtracks for seconds. */
 function rulesDefining(src: string, prop: string): Rule[] {
  const out: Rule[] = [];
@@ -94,10 +94,10 @@ function channels(v: string): Rgb | null {
 /**
  * Work out how a captured page's theme sets its colours.
  *
- *  · dawn        — Dawn and the themes built on it (Taste, Spotlight, …): comma triplets, `rgb(var(--x))`.
- *  · horizon     — Horizon and its family (Savor, Vessel, Dwell, …): full colours plus `-rgb` channels.
- *  · squarespace — 7.1 section themes: `--siteBackgroundColor` and friends on [data-section-theme].
- *  · generic     — anything else; only the body-level fallback applies.
+ *  · dawn: Dawn and the themes built on it (Taste, Spotlight, …): comma triplets, `rgb(var(--x))`.
+ *  · horizon: Horizon and its family (Savor, Vessel, Dwell, …): full colours plus `-rgb` channels.
+ *  · squarespace: 7.1 section themes: `--siteBackgroundColor` and friends on [data-section-theme].
+ *  · generic: anything else; only the body-level fallback applies.
  *
  * `schemes` is `:root`, the default scheme, and every scheme of the same light/dark polarity.
  */
@@ -221,7 +221,7 @@ export function buildDesignCss(settings: DesignSettings, rest: string, theme?: T
  if (kind === "generic") {
   if (bg) block += `body${BOOST}{background-color:${bg}!important}\n`;
   if (text) block += `body${BOOST}{color:${text}!important}\n`;
-  // Theme button classes only — never bare `button`, which is every icon, arrow and VYA's own cart control.
+  // Theme button classes only, never bare `button`, which is every icon, arrow and VYA's own cart control.
   if (accent) block += `:is(.button,.btn,[type="submit"],.shopify-payment-button__button,.sqs-block-button-element):not([id^="vya-"]):not([id^="vya-"] *){background-color:${accent}!important;border-color:${accent}!important;color:${toHex(onColour(rgbOf(accent)))}!important}\n`;
  } else {
   const vars = colourVars(kind, bg, text, accent);

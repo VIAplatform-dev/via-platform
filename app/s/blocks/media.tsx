@@ -1,10 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
-// Media sections — image, gallery, video. The picture is the content, so the layouts differ mainly
+// Media sections. Image, gallery, video. The picture is the content, so the layouts differ mainly
 // in how much of the page it's allowed to take and how it's framed.
 import { ImageSlot, emptyHint, type EditKit, ArrangeHandle } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
-// "Fill" — edge to edge, no margin around the photo.
+// "Fill": edge to edge, no margin around the photo.
 //
 // An image section frames its picture by default: page measure, real padding, the photo reading as a
 // plate rather than a banner. That framing is right until it isn't, and the merchant who wants the
@@ -41,7 +41,7 @@ function ImageInset({ kit }: { kit: EditKit }) {
  );
 }
 
-// Portrait photo with the caption set beside it in the margin — the gallery-label treatment, for a
+// Portrait photo with the caption set beside it in the margin. The gallery-label treatment, for a
 // single piece worth talking about.
 function ImageCaptioned({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
@@ -72,7 +72,7 @@ function galleryOps(kit: EditKit) {
  return { shots, slots, pick, setPos };
 }
 
-// A tight grid, no gutters to speak of — the contact sheet. What shipped.
+// A tight grid, no gutters to speak of. The contact sheet. What shipped.
 function GalleryGrid({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const { shots, slots, pick, setPos } = galleryOps(kit);
@@ -101,7 +101,7 @@ function GalleryLoose({ kit }: { kit: EditKit }) {
  );
 }
 
-// An uneven rhythm — every third photo runs tall. Stops a set of similar shots reading as a
+// An uneven rhythm: every third photo runs tall. Stops a set of similar shots reading as a
 // spreadsheet, without needing the merchant to crop anything.
 function GalleryMosaic({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
@@ -171,7 +171,7 @@ function VideoFramed({ kit }: { kit: EditKit }) {
  );
 }
 
-// Edge to edge, no margin. The video becomes the section — for a campaign film rather than a clip.
+// Edge to edge, no margin. The video becomes the section, for a campaign film rather than a clip.
 function VideoBleed({ kit }: { kit: EditKit }) {
  const { p } = kit;
  const url = (p.url || "").trim();
@@ -184,7 +184,7 @@ function VideoBleed({ kit }: { kit: EditKit }) {
  );
 }
 
-// Portrait, held narrow — the shape a phone shoots. Suits a reel or a try-on clip, which look wrong
+// Portrait, held narrow: the shape a phone shoots. Suits a reel or a try-on clip, which look wrong
 // letterboxed into 16:9.
 function VideoPortrait({ kit }: { kit: EditKit }) {
  const { p } = kit;

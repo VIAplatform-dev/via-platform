@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 // Passwordless, PER-STORE buyer access. A signed token carries (store, email). The buyer's
 // message inbox is looked up by that exact pair, so a token only ever exposes that one buyer's
-// threads with that ONE store. Stores are never linked and never share a buyer identity — a
+// threads with that ONE store. Stores are never linked and never share a buyer identity. A
 // buyer of Store A does not exist to Store B. No cross-store account, no customer-list bleed.
 
 const SECRET =
@@ -27,7 +27,7 @@ export function signBuyerToken(storeSlug: string, email: string): string {
 // ── Unsubscribe token ────────────────────────────────────────────────────────
 // Store-scoped, NON-EXPIRING (an unsubscribe link in a months-old email must still
 // work). Carries (store, email); the /unsubscribe route flips this store's subscription
-// for that email only — never touches any other store.
+// for that email only, never touches any other store.
 export function signUnsubToken(storeSlug: string, email: string): string {
  if (!SECRET) throw new Error("Auth secret not configured");
  const payload = b64url(JSON.stringify({ s: storeSlug, e: email.toLowerCase(), u: 1 }));

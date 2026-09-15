@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mayOpenStore, chooseStoreSlug, normaliseEmail, isEmail } from "./seller-access.ts";
 
-test("no invite, no store — the gate fails closed", () => {
+test("no invite, no store. The gate fails closed", () => {
  assert.deepEqual(mayOpenStore({ email: "someone@example.com", invited: false }), { ok: false, reason: "not-invited" });
 });
 

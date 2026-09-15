@@ -41,10 +41,10 @@ export type Radius = "sharp" | "soft" | "round";
 // ── Free-form overlay elements (a button / text / image dragged onto a section) ──
 // Rendered both live (interactive: real anchors/images) and in the editor (inert content, the wrapper
 // owns pointer events for drag/select). Positioned in % so it scales; the stacking on narrow screens is
-// handled by a container query in the root <style> (see below) — no per-element JS.
+// handled by a container query in the root <style> (see below), no per-element JS.
 const OVL_TEXT_SIZE: Record<string, string> = { sm: "text-sm", md: "text-xl", lg: "text-3xl @xl:text-4xl", xl: "text-5xl @xl:text-6xl" };
 // A section's resize handle: just the bottom-edge pill (dragging it down grows the section, up
-// shrinks it). No corners, no top handle — a section is full-bleed with no width to speak of, and
+// shrinks it). No corners, no top handle. A section is full-bleed with no width to speak of, and
 // one clear handle beat a box of six that fought neighbouring sections for clicks along the edges.
 const SEC_HANDLE_POS: [edge: "bottom", pos: string][] = [
  ["bottom", "left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2"],
@@ -54,13 +54,13 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
  if (o.kind === "button") {
  // Size: padding + type scale. "md" matches the pre-existing default exactly, so unset buttons don't shift.
  const SIZE_CLS: Record<string, string> = { sm: "px-5 py-2 text-[10px]", md: "px-7 py-3 text-[12px]", lg: "px-9 py-3.5 text-[13px]" };
- // fontPx (set by a corner-drag) scales the button continuously — inline font-size + proportional
+ // fontPx (set by a corner-drag) scales the button continuously. Inline font-size + proportional
  // padding override the preset class. Unset → preset, so existing buttons don't shift.
  const fpx = p.fontPx ? Math.min(200, Math.max(8, Number(p.fontPx))) : null;
  const cls = `vya-cta inline-block whitespace-nowrap font-medium uppercase tracking-[0.18em] ${fpx ? "" : SIZE_CLS[p.size || "md"]}`;
  // Shape overrides the theme's global corner style for this one button (undefined = inherit it, via .vya-cta's own CSS rule).
  const SHAPE_RADIUS: Record<string, string> = { square: "0", rounded: "10px", pill: "999px" };
- // "No fill": transparent background, coloured border + text — defaults to the button's own fill
+ // "No fill": transparent background, coloured border + text. Defaults to the button's own fill
  // colour so toggling Fill→No-fill keeps the same colour, just hollowed out (mirrors the section CTA).
  const outline = p.outline === "1";
  const outlineColor = p.borderColor || p.bg || "#1a1a1a";
@@ -99,14 +99,14 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
  }
  if (o.kind === "form") {
  // Live: a real, working form that posts to the store, labelled with its own purpose. In the editor
- // it renders inert — the same swap the contact SECTION uses, so a seller never accidentally sends
+ // it renders inert: the same swap the contact SECTION uses, so a seller never accidentally sends
  // themselves a test message while arranging the page.
  const title = p.title || "Enquire";
  return (
  <div className="w-full rounded-md p-4" style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 10px 30px -12px rgba(0,0,0,0.35)" }}>
   <p className="mb-1 text-[13px] font-semibold text-stone-800">{title}</p>
   {p.note && <p className="mb-2 text-[11px] leading-snug text-stone-500">{p.note}</p>}
-  {/* A form element asks whatever the seller wants, exactly like the contact section — a wholesale
+  {/* A form element asks whatever the seller wants, exactly like the contact section. A wholesale
       enquiry and a sourcing request don't need the same three boxes. */}
   {live && storeSlug
    ? <ContactForm accent={accent} storeSlug={storeSlug} topic={p.topic || title} cta={p.cta || "Send"} fields={readContactFields(p)} compact />
@@ -124,7 +124,7 @@ function overlayContent(o: Overlay, shopHref: string, head: string | undefined, 
  );
  }
  if (o.kind === "line") {
- // border-top (not a background block) so dashed/dotted styles are possible — solid looks identical to before.
+ // border-top (not a background block) so dashed/dotted styles are possible. Solid looks identical to before.
  return <div className="flex h-full w-full items-center"><div className="w-full" style={{ borderTopWidth: `${p.thickness ?? "2"}px`, borderTopStyle: (p.dash || "solid") as React.CSSProperties["borderTopStyle"], borderTopColor: p.color || "#1a1a1a" }} /></div>;
  }
  const font = p.font ? ff(p.font) : (p.size === "lg" || p.size === "xl" ? head : undefined);
@@ -151,7 +151,7 @@ function bgFor(bg: string | undefined, colors: Colors): { background?: string; f
  if (!bg) return { fg: colors.text };
  if (bg === "dark") {
  // A "dark" section is the palette's OWN deep tone (its text on a light palette, its bg on a dark
- // one) — so a warm tan/oxblood store gets a warm espresso section, not a cold generic black.
+ // one), so a warm tan/oxblood store gets a warm espresso section, not a cold generic black.
  let darkBg = lum(colors.text) <= lum(colors.bg) ? colors.text : colors.bg;
  let lightFg = darkBg === colors.text ? colors.bg : colors.text;
  if (lum(darkBg) > 110) { darkBg = "#1b1613"; lightFg = "#f2ede4"; } // palette has no deep tone
@@ -184,7 +184,7 @@ function sectionBg(st: BlockStyle, colors: Colors): string | undefined {
  return undefined;
 }
 
-// The effective solid colours a section actually renders with — for the editor's colour swatches, so the
+// The effective solid colours a section actually renders with, for the editor's colour swatches, so the
 // displayed box matches what's on the page. `bg` falls back to the page/theme background when the section
 // has no solid fill of its own (Page default, or a gradient/photo that isn't a single colour); `text`
 // resolves exactly like the section's foreground (explicit override → contrast-aware default).
@@ -198,14 +198,14 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  const sel = `.vya-b-${id}`;
  const out: string[] = [];
  if (st.align) {
- // Section-wide default — applies to any text (by class, so it also covers fields with no dedicated
+ // Section-wide default: applies to any text (by class, so it also covers fields with no dedicated
  // per-field override below, like "quote"/"price"/"attribution"). The per-field rules that follow are
  // emitted after this, so they win for the fields they cover without touching the others.
  out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{text-align:${st.align}!important}`);
  out.push(`${sel} .vya-hero-inner{align-items:${ALIGN_FLEX[st.align]}!important;text-align:${st.align}!important}`);
  // Headings and subtext carry `mx-auto` so they centre inside a wide hero. That auto-margin wins
  // over the flex alignment above, so an aligned section ended up with a CENTRED box containing
- // right-aligned text — which reads as a broken layout rather than a right-aligned one. Releasing
+ // right-aligned text, which reads as a broken layout rather than a right-aligned one. Releasing
  // the margin on the side we're aligning to lets the box itself move.
  if (st.align !== "center") {
   const [ml, mr] = st.align === "right" ? ["auto", "0"] : ["0", "auto"];
@@ -213,15 +213,15 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  }
  }
  // Per-field alignment: heading/subtext/cta/body can each be aligned independently of one another and
- // of the section-wide default above — targeted by `data-field`, not by class, since the class alone
+ // of the section-wide default above. Targeted by `data-field`, not by class, since the class alone
  // can't tell two DIFFERENT fields apart (e.g. a "quote" also renders with the .vya-heading class).
- // `align-self` is a no-op outside a flex container, so it's safe to always include — it only actually
+ // `align-self` is a no-op outside a flex container, so it's safe to always include. It only actually
  // repositions the field within a flex hero, where align-items alone would otherwise move every field together.
  for (const [field, a] of [["heading", st.headingAlign], ["subtext", st.subtextAlign], ["body", st.bodyAlign]] as const) {
  if (!a) continue;
  const decls = [`text-align:${a}!important`, `align-self:${ALIGN_FLEX[a]}!important`];
  // If the field has an explicit width (dragged narrower), text-align can only move the text INSIDE
- // that shrunk box — the box itself stays pinned left, so "center" looked off-center. Position the
+ // that shrunk box: the box itself stays pinned left, so "center" looked off-center. Position the
  // box with auto margins too (same idea as the button below), so the alignment actually lands.
  if (st.free?.[field]?.w != null) {
   decls.push("display:block!important", `margin-left:${a === "left" ? "0" : "auto"}!important`, `margin-right:${a === "right" ? "0" : "auto"}!important`);
@@ -229,11 +229,11 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  out.push(`${sel} [data-field="${field}"]{${decls.join(";")}}`);
  }
  // The button needs a DIFFERENT technique: it's a small inline-block pill, not full-width running
- // text, so `text-align` on itself has nothing to do — text-align only matters to a box's OWN wrapped
+ // text, so `text-align` on itself has nothing to do. Text-align only matters to a box's OWN wrapped
  // content. What actually repositions a small box is `display:block` + `width:max-content` (so it
  // shrinks back to its label instead of stretching full-width) + auto-margins, which centers/pins it
  // regardless of whether the parent happens to be a flex container (the hero WITH a photo) or a plain
- // block (the hero with none — align-self alone does nothing there, which is why an earlier version
+ // block (the hero with none. Align-self alone does nothing there, which is why an earlier version
  // of this control visibly did nothing for that variant).
  if (st.ctaAlign) {
  const a = st.ctaAlign;
@@ -241,7 +241,7 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  out.push(`${sel} [data-field="cta"]{display:block!important;width:max-content!important;max-width:100%!important;margin-left:${ml}!important;margin-right:${mr}!important;align-self:${ALIGN_FLEX[a]}!important}`);
  }
  if (st.textColor) out.push(`${sel},${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{color:${st.textColor}!important}`);
- // Explicit px wins over the preset scale — same "numeric overrides preset" pattern as padY/space.
+ // Explicit px wins over the preset scale. Same "numeric overrides preset" pattern as padY/space.
  if (st.headingSizePx) out.push(`${sel} .vya-heading{font-size:${st.headingSizePx}px!important;line-height:1.12!important}`);
  else if (st.headingSize) out.push(`${sel} .vya-heading{font-size:${HEAD_SCALE[st.headingSize]}!important;line-height:1.12!important}`);
  if (st.headingFont) out.push(`${sel} .vya-heading{font-family:'${st.headingFont}',Georgia,serif!important}`);
@@ -252,7 +252,7 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  if (st.textBold) out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{font-weight:700!important}`);
  if (st.textItalic) out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{font-style:italic!important}`);
  if (st.textUnderline) out.push(`${sel} .vya-heading,${sel} .vya-sub,${sel} .vya-body{text-decoration:underline!important}`);
- // Per-ELEMENT text styling (free[key]) — the Figma/Canva-style per-field overrides. Emitted AFTER the
+ // Per-ELEMENT text styling (free[key]): the Figma/Canva-style per-field overrides. Emitted AFTER the
  // section-wide size/weight/etc. rules above so a field's own styling always wins (equal specificity → later).
  if (st.free) for (const [field, fv] of Object.entries(st.free)) {
  const d: string[] = [];
@@ -269,8 +269,8 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  if (d.length) out.push(`${sel} [data-field="${field}"]{${d.map((x) => x + "!important").join(";")}}`);
  // Alignment has to move the BOX, not only the words in it.
  //
- // Every one of these fields runs to a measure — a hero heading is capped at max-w-3xl, a subtext at
- // max-w-xl — so the box is narrower than the space it sits in. `text-align` can only shuffle text
+ // Every one of these fields runs to a measure. A hero heading is capped at max-w-3xl, a subtext at
+ // max-w-xl, so the box is narrower than the space it sits in. `text-align` can only shuffle text
  // WITHIN that box, and the box itself stays wherever the layout left it. Which is why picking
  // "Align · Centre" on a heading that was already centre-aligned visibly did nothing at all: it was
  // already true, and the thing actually off-centre was the box.
@@ -278,7 +278,7 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  // Auto margins place the box; text-align then places the text inside it. `align-self` covers the
  // flex heroes, where the parent's align-items would otherwise move every field at once. Emitted for
  // the element (the live storefront, which has no wrapper) AND for the editor's selection wrapper,
- // which is the box there — so both surfaces land in the same place.
+ // which is the box there, so both surfaces land in the same place.
  //
  // The built-in button is excluded: it's a shrink-to-fit pill with its own ctaAlign rule above,
  // and a second set of margin declarations here would fight it.
@@ -287,7 +287,7 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
   out.push(`${sel} [data-field="${field}"],${sel} [data-field-box="${field}"]{margin-left:${ml}!important;margin-right:${mr}!important;align-self:${ALIGN_FLEX[fv.align]}!important}`);
  }
  }
- // The section's own built-in CTA (`.vya-cta`) — distinct from a free-form overlay button.
+ // The section's own built-in CTA (`.vya-cta`): distinct from a free-form overlay button.
  // "Fill" (default) vs "No fill" (outline): the outline's border/text colour defaults to ctaBg, so
  // toggling Fill→No-fill on an already-coloured button keeps the same colour, just hollowed out.
  const ctaBase: string[] = [];
@@ -306,11 +306,11 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  const ctaBorderW = st.ctaBorder ?? (st.ctaOutline ? 2 : undefined); // outline defaults to a visible 2px if no width was set
  if (ctaBorderW != null) ctaBase.push("border-style:solid!important", `border-width:${ctaBorderW}px!important`);
  // Full width wins over any per-field alignment set above (a 100%-wide button has nowhere left/right
- // to move to) — this rule is declared after that one, so it correctly takes precedence for `.vya-cta`.
+ // to move to): this rule is declared after that one, so it correctly takes precedence for `.vya-cta`.
  if (st.ctaFullWidth) ctaBase.push("display:block!important", "width:100%!important", "max-width:none!important", "text-align:center!important");
  if (ctaBase.length) out.push(`${sel} .vya-cta{${ctaBase.join(";")}}`);
  if (st.ctaHoverBg || st.ctaHoverColor || st.ctaOutline) {
- // A "No fill" button fills in on hover by default — reads as an intentional action even if no
+ // A "No fill" button fills in on hover by default. Reads as an intentional action even if no
  // explicit hover colour was set.
  const hoverBg = st.ctaHoverBg || (st.ctaOutline ? (st.ctaBorderColor || st.ctaBg) : undefined);
  const hoverColor = st.ctaHoverColor || (st.ctaOutline ? "#ffffff" : undefined);
@@ -319,7 +319,7 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  }
  // Padding. Vertical space resolves PER EDGE, most specific first: an explicit padTop/padBottom wins,
  // then padY (which moves both edges together), then the `space` preset. That order is what makes
- // "close the gap above this photo but keep the one below it" expressible at all — with only padY,
+ // "close the gap above this photo but keep the one below it" expressible at all, with only padY,
  // the two edges could never disagree.
  const preset = st.space ? PAD_SCALE[st.space] : null;
  const bothY = st.padY != null ? `${st.padY}px` : preset;
@@ -335,11 +335,11 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  }
  if (st.minH) {
  // A HARD height, not a floor: `min-height` can only ever grow a box, never shrink it below its
- // content's natural size — so dragging a resize handle inward (smaller) would silently do nothing.
+ // content's natural size, so dragging a resize handle inward (smaller) would silently do nothing.
  // `height` (+ clipping the overflow) makes the box match exactly what was dragged, in both directions.
  out.push(`${sel}{height:${st.minH}px!important;overflow:hidden}`);
- // A section can force its own height from INSIDE itself — a hero's image frame carries an inline
- // 84vh, and (when the content isn't free-positioned) its text wrapper carries min-h-[84vh] — both
+ // A section can force its own height from INSIDE itself. A hero's image frame carries an inline
+ // 84vh, and (when the content isn't free-positioned) its text wrapper carries min-h-[84vh]: both
  // independent of the section box above. Override those too, or resizing visibly does nothing.
  // `.vya-fill` is the general contract for this: any layout whose wrapper sets its own height wears
  // it, so a NEW variant participates in section resizing without this compiler learning about it.
@@ -349,9 +349,9 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  // Whatever the merchant builds on desktop gets scaled down for a phone, automatically.
  //
  // Every number in this compiler is authored against a ~1440px canvas: a 700px section height, 96px
- // of padding, a 51px headline. Applied unchanged at 390px they are absurd — the section becomes a
+ // of padding, a 51px headline. Applied unchanged at 390px they are absurd. The section becomes a
  // screen and a half of empty colour with five lines of oversized type stranded in it. That is not a
- // layout bug (nothing overflows or clips, which is why a structural audit passes it) — it is a
+ // layout bug (nothing overflows or clips, which is why a structural audit passes it). It is a
  // proportion bug, and it appears the moment anyone touches a size control.
  //
  // So the same values are re-emitted, scaled, inside a narrow-container query. Floors stop anything
@@ -386,7 +386,7 @@ function sectionOverrideCss(id: string, st: BlockStyle): string {
  }
  if (mob.length) out.push(`@container (max-width:640px){${mob.join("")}}`);
 
- // Border · radius · shadow — the section reads as a styled card.
+ // Border · radius · shadow. The section reads as a styled card.
  const box: string[] = [];
  if (st.radius) box.push(`border-radius:${st.radius}px`, "overflow:hidden");
  if (st.border) box.push(`border:${st.border}px solid ${st.borderColor || "currentColor"}`);
@@ -406,7 +406,7 @@ function overlayOverrideCss(o: Overlay): string {
 }
 
 function blockBody(b: Block, ctx: Ctx) {
- // Every editing affordance a layout needs — see blocks/kit.tsx.
+ // Every editing affordance a layout needs. See blocks/kit.tsx.
  const kit = makeKit(b, ctx);
  const { p } = kit;
  const { colors, head, fg } = ctx;
@@ -416,7 +416,7 @@ function blockBody(b: Block, ctx: Ctx) {
  switch (b.type) {
  case "announcement": return renderAnnouncement(kit, variant);
 
- // The hero family lives in blocks/hero.tsx — five layouts sharing one editing contract. The
+ // The hero family lives in blocks/hero.tsx. Five layouts sharing one editing contract. The
  // default ("bleed") is the exact markup this switch used to hold, so existing storefronts are
  // unchanged.
  case "hero": return renderHero(kit, variant);
@@ -457,7 +457,7 @@ function blockBody(b: Block, ctx: Ctx) {
  case "appointments": return renderAppointments(kit, variant);
 
  case "custom": {
- // Interactive components (js present, or mode "sandbox") run in an isolated sandboxed iframe —
+ // Interactive components (js present, or mode "sandbox") run in an isolated sandboxed iframe,
  // full HTML+CSS+JS, but walled off from the store (see SandboxEmbed). Everything else is static
  // markup rendered inline: sanitized on save, indexable, and inheriting the store's styles.
  if (p.mode === "sandbox" || (p.js && p.js.trim())) {
@@ -509,19 +509,19 @@ export default function Blocks({
  colors: Colors;
  fonts: { heading?: string; body?: string };
  products: BlockProduct[];
- // The store's collections with their items — lets a product section show a curated set instead of
+ // The store's collections with their items. Lets a product section show a curated set instead of
  // the newest few. Optional: a storefront that has never made a collection behaves exactly as before.
  collections?: { slug: string; title: string; products: BlockProduct[] }[];
  shopHref?: string;
- // Global corner style ("shapes") — rounds product cards, images, and buttons store-wide.
+ // Global corner style ("shapes"). Rounds product cards, images, and buttons store-wide.
  radius?: Radius;
- // Global style skin — type scale, spacing, and button shape across every section at once.
+ // Global style skin: type scale, spacing, and button shape across every section at once.
  // Emitted with NO !important, so any per-section override the merchant sets still beats it.
  skin?: string;
  // Editor-only: click a section in the preview to select/edit it.
  onSelect?: (id: string) => void;
  selectedId?: string | null;
- // Editor-only: type directly on the canvas — a text element's blur syncs back the new copy.
+ // Editor-only: type directly on the canvas. A text element's blur syncs back the new copy.
  edit?: boolean;
  onEditField?: (id: string, key: string, value: string) => void;
  // Editor-only: drag a section by its grip to reorder, with a drop line. State lives in the parent
@@ -552,7 +552,7 @@ export default function Blocks({
  // Live-site only: lowercased collection title -> its page href, so shop-by-category tiles
  // deep-link the collection they name instead of all landing on the bare shop page.
  collectionHrefs?: Record<string, string>;
- // Editor-only: focusing a text field inside a section reports (blockId, field key) — the parent
+ // Editor-only: focusing a text field inside a section reports (blockId, field key): the parent
  // uses this to show that field's own contextual toolbar instead of the section's background one.
  onFieldFocus?: (blockId: string, key: string) => void;
  // Editor-only: drag a section's top/bottom resize handle to set its height explicitly.
@@ -560,7 +560,7 @@ export default function Blocks({
  // Editor-only: drag a layout's spacing / card width / split seam directly on the canvas.
  onArrangeStart?: (blockId: string, prop: string, e: React.PointerEvent) => void;
  // Editor-only: the ✕ on a section's hover chrome. Deleting used to live only on the floating bar
- // you get after selecting the section itself — and a section full of tiles or text has almost
+ // you get after selecting the section itself, and a section full of tiles or text has almost
  // nowhere to click that isn't a tile or text, so sellers looked for an X, found none, and gave
  // up ("i cant delete all of these"). Now it sits next to the move arrows on every section.
  onRemove?: (id: string) => void;
@@ -580,7 +580,7 @@ export default function Blocks({
  // `.vya-field` keeps form inputs on the same curve as the images rather than a fixed 6px.
  const radiusRules = radiusCss(radius);
  // Overlay elements are absolutely placed (% coords) on wide layouts; on a narrow container they stack
- // into normal flow — centred, padded — so a button dragged over the hero never overlaps or runs off a
+ // into normal flow, centred, padded, so a button dragged over the hero never overlaps or runs off a
  // phone. Container-query (not viewport) so the editor's device-preview reflows truthfully too.
  // z-index:20 so overlays float ABOVE section content that sets its own stacking (e.g. the hero's
  // z-10 inner) instead of hiding behind it. Layer is click-through; only the elements catch pointers.
@@ -589,17 +589,17 @@ export default function Blocks({
  //
  // ImageSlot and PhotoFrame each label their own placeholder, but they aren't the only things that
  // render one: category tiles, blog thumbnails, column images and spotlight photos all draw their own
- // markup. Covering them one by one means covering nine renderers and missing the tenth — and a
+ // markup. Covering them one by one means covering nine renderers and missing the tenth, and a
  // placeholder that looks like a real photograph is one a seller publishes by accident.
  //
  // So it's an attribute selector on the source path: one rule, no renderer can escape it, and a new
  // layout added tomorrow inherits it for free.
  //
  // The MARK is a border, not a repaint. It used to be `grayscale(1) contrast(.92) opacity(.62)`, over
- // the 45% white sheet the badge sits on — between them the picture kept about a third of itself, and
+ // the 45% white sheet the badge sits on. Between them the picture kept about a third of itself, and
  // the editor stopped being a preview: a seller put her own site beside the canvas and saw a vivid
  // photograph next to a grey rectangle, and reasonably asked which one was her store. It also hid the
- // problems it should have shown — dark hero type over a busy photo looks fine against 45% white and
+ // problems it should have shown. Dark hero type over a busy photo looks fine against 45% white and
  // is illegible over the real thing, so the one view meant to catch that couldn't.
  //
  // An outline marks the photo without touching a pixel of it: same universal coverage, and what the
@@ -610,7 +610,7 @@ export default function Blocks({
   : "";
  const skinRules = skinCss(skin);
  // A photo that has been MOVED is positioned, and a positioned element later in the DOM paints over
- // its siblings — so dragging a hero's photo put it on top of the headline. Content sits above it by
+ // its siblings, so dragging a hero's photo put it on top of the headline. Content sits above it by
  // default; overlays (z-20) stay above both. Moving a picture should rearrange the picture, not bury
  // the words.
  // Whatever a merchant builds has to survive a phone.
@@ -618,14 +618,14 @@ export default function Blocks({
  // A framed photo carries a desktop position, a percentage width and an aspect ratio. None of that
  // reflows: on a narrow screen the frames keep their desktop proportions, so they overlap each other,
  // bury the copy, and run off the side. So below the same 640px breakpoint the overlay layer already
- // uses, a framed photo gives up its framing entirely and returns to the flow as a full-width band —
+ // uses, a framed photo gives up its framing entirely and returns to the flow as a full-width band,
  // stacked, in order, nothing on top of anything else.
  //
  // Only `.vya-photo-framed` is touched. A photo the merchant never moved or resized keeps rendering
  // exactly as its layout draws it, at every width, which is what makes this safe to apply globally.
  const photoLayerCss = ".vya-free-canvas,.vya-hero-inner{position:relative;z-index:2}.vya-photo{z-index:0}"
   // RELATIVE, not static. Every photo frame holds an `<img class="absolute inset-0">`, so the frame
-  // has to stay a containing block — made static it stops being one, the image resolves against the
+  // has to stay a containing block. Made static it stops being one, the image resolves against the
   // whole section instead, and it renders far too large and spills out of its frame. That is the
   // overflow on the phone: not the position of the frame, but what un-positioning it did to the
   // picture inside. `position:relative` with left/top/transform reset puts the frame back in normal
@@ -633,18 +633,18 @@ export default function Blocks({
   + "@container (max-width:640px){.vya-photo-framed{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;max-width:100%!important;aspect-ratio:auto!important;height:auto!important;min-height:38vh!important;flex:initial!important;z-index:0!important}}";
  // A field the merchant DRAGGED somewhere is an inline-flex box positioned by x/y. On a phone the
  // position is dropped (it can't survive a reflow), and what's left is an inline box that falls to
- // the left edge — a centred hero headline came out hard against the margin. A positioned field never
+ // the left edge: a centred hero headline came out hard against the margin. A positioned field never
  // carries the layout's own `mx-auto`, because on desktop its wrapper is placed absolutely and a
  // margin would nudge it; so once the position is gone there is nothing left to centre it. Give it
  // back here, for narrow screens only. Same treatment `.vya-hero-free` already gets.
  const freePosCss = "@container (max-width:640px){.vya-free-pos{display:block!important;margin-left:auto!important;margin-right:auto!important;text-align:inherit}}";
  // `width:auto` in that rule is load-bearing. A merchant who narrows a headline to 32% of a 1440px
- // canvas means "about 460px of measure" — applied literally at 390px it is 125px, and a three-word
+ // canvas means "about 460px of measure". Applied literally at 390px it is 125px, and a three-word
  // store name breaks onto three lines. A width chosen against the desktop canvas cannot survive the
  // phone, so on narrow screens the field takes its natural measure and the text re-wraps sanely.
  const overlayCss = ".vya-ovl-layer{position:absolute;inset:0;z-index:20;pointer-events:none}.vya-ovl{position:absolute;pointer-events:auto}@container (max-width:640px){.vya-ovl-layer{position:static;display:flex;flex-direction:column;align-items:center;gap:.85rem;padding:1.75rem 1.25rem}.vya-ovl{position:static!important;left:auto!important;top:auto!important;width:auto!important;height:auto!important;max-width:100%}.vya-ovl-shape{width:52%!important}.vya-ovl-line{width:82%!important}.vya-hero-free{position:static!important;left:auto!important;top:auto!important;transform:none!important;width:auto!important;max-width:100%!important;margin:0 auto;padding:6rem 1.25rem}.vya-free,.vya-free-el{position:static!important;left:auto!important;top:auto!important;transform:none!important;max-width:100%!important;width:auto!important}.vya-free-spacer{display:none!important}}";
  return (
- // `@container` makes the sections respond to THIS element's width, not the viewport — so the
+ // `@container` makes the sections respond to THIS element's width, not the viewport, so the
  // editor's device preview reflows truthfully, and on the live site (where this is full-width) it
  // behaves like before. Breakpoints below are container variants (@xl/@lg/@2xl), not viewport ones.
  <div className={`@container${skinRules ? ` vya-skin-${skin}` : ""}`} style={{ fontFamily: body, color: colors.text }}>
@@ -659,10 +659,10 @@ export default function Blocks({
  const secClass = `vya-sec vya-${b.type} vya-b-${b.id}`;
  const dragging = reorder?.dragIndex ?? null;
  const showLine = editable && reorder && reorder.overIndex === i && dragging !== null && dragging !== i;
- // An image section set to "Fill" is edge to edge, which has to include the section's OWN padding —
+ // An image section set to "Fill" is edge to edge, which has to include the section's OWN padding,
  // the layout can drop its margins but not the preset spacing the section box carries above it.
  const imgFill = b.type === "image" && b.props?.fill === "1";
- // Fill zeroes the section's own padding as well as the layout's margins — but it yields to an edge
+ // Fill zeroes the section's own padding as well as the layout's margins, but it yields to an edge
  // the merchant set deliberately, so "edge to edge, with 60px of air above it" is reachable by using
  // both controls rather than by them cancelling each other out.
  const fillCss = imgFill
@@ -671,7 +671,7 @@ export default function Blocks({
  const overrideCss = (b.style ? sectionOverrideCss(b.id, b.style) : "") + (b.overlays?.length ? b.overlays.map(overlayOverrideCss).join("") : "") + fillCss;
  // A section background photo (full-bleed, behind everything). Wins over a bg colour; a soft scrim
  // keeps overlaid text legible without forcing the seller to fiddle. url() is quote-escaped.
- // Hero/image sections render their OWN picture (props.image), so they ignore this layer — otherwise a
+ // Hero/image sections render their OWN picture (props.image), so they ignore this layer. Otherwise a
  // stale bgImage would show a grey scrim behind them.
  // Background media: a bgMedia object (image/video/embed) supersedes the legacy bgImage string.
  // Hero/image sections paint their own picture, so they opt out of this full-bleed layer.
@@ -687,7 +687,7 @@ export default function Blocks({
  //
  // As a CSS background it could only ever be `cover` at `center`: there was no way to say which part
  // of the picture mattered, no way to scale it, and the merchant's only recourse was to crop the file
- // and re-upload. Every other photo in the product — hero, split, spotlight, gallery tile — is an
+ // and re-upload. Every other photo in the product, hero, split, spotlight, gallery tile. Is an
  // <img> that drags to reposition and zooms about that focal point. This makes the section background
  // the same kind of object, so one gesture works everywhere.
  //
@@ -707,7 +707,7 @@ export default function Blocks({
  onDragOver={editable && reorder ? (e) => { if (Array.from(e.dataTransfer.types).includes("Files")) return; e.preventDefault(); reorder.onOver(i); } : undefined}
  onDrop={editable && reorder ? (e) => { if (Array.from(e.dataTransfer.types).includes("Files")) return; e.preventDefault(); reorder.onDrop(i); } : undefined}
  // A section CLIPS its own content. A free-positioned heading dragged near an edge (or any position
- // stored before the drag clamp existed) would otherwise paint over the section above or below it —
+ // stored before the drag clamp existed) would otherwise paint over the section above or below it,
  // on the live storefront as much as in the editor. Sections resized with the handle already did
  // this via style.minH; this makes it true of every section.
  className={editable ? `${secClass} group/sec relative overflow-hidden cursor-pointer transition-shadow ${dragging === i ? "opacity-40" : ""} ${selectedId === b.id ? "shadow-[inset_0_0_0_2px_#5D0F17]" : "hover:shadow-[inset_0_0_0_2px_rgba(93,15,23,0.45)]"}` : `${secClass} relative overflow-hidden`}
@@ -765,7 +765,7 @@ export default function Blocks({
   aria-hidden={edit ? undefined : true}
   // Selecting the section by clicking it has to keep working. The pan handler calls preventDefault
   // on pointerdown (to kill the browser's image-drag), which also suppresses the click that
-  // normally reaches the section — and this layer covers the whole section, so without this a
+  // normally reaches the section, and this layer covers the whole section, so without this a
   // section with a background photo would become unselectable by clicking. pointerup still fires,
   // and selecting the section you just finished panning is the right outcome either way.
   onPointerUp={editable ? (e) => { e.stopPropagation(); onSelect!(b.id); } : undefined}
@@ -781,7 +781,7 @@ export default function Blocks({
  <div className="pointer-events-none absolute inset-0" style={{ background: scrim }} />
  </div>
  )}
- {/* Full-bleed video / embed background behind the section — click-through, muted, looping. */}
+ {/* Full-bleed video / embed background behind the section. Click-through, muted, looping. */}
  {(bgVideo || bgEmbed) && (
  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
  {bgVideo

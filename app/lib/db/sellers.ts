@@ -19,7 +19,7 @@ export async function getSellerBySlug(slug: string): Promise<Seller | null> {
  return row ?? null;
 }
 
-/** Every store with a workspace, oldest first — the roster the owner's setup funnel walks. */
+/** Every store with a workspace, oldest first. The roster the owner's setup funnel walks. */
 export async function listSellers(): Promise<Seller[]> {
  const db = getDb();
  return db.select().from(sellers).orderBy(sellers.createdAt);
@@ -34,8 +34,8 @@ export async function getSellerById(id: string): Promise<Seller | null> {
 /**
  * Give a store its real name, if it is still going by its slug.
  *
- * Only ever replaces a PLACEHOLDER (empty, or the slug itself). A name a human typed — in the
- * portal, or in stores.ts — outranks anything the importer reads off a homepage, so it is never
+ * Only ever replaces a PLACEHOLDER (empty, or the slug itself). A name a human typed, in the
+ * portal, or in stores.ts. Outranks anything the importer reads off a homepage, so it is never
  * overwritten by a later re-import. See store-display-name.ts.
  */
 export async function setSellerNameIfPlaceholder(slug: string, name: string): Promise<boolean> {

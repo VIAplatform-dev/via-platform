@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Appointment settings — a shop's diary rules.
+// Appointment settings. A shop's diary rules.
 //
 // Deliberately NOT part of rentals. A store that only sells still takes fittings, sourcing chats
 // and collections, and it should never have to switch on renting to open its diary. These lived
@@ -13,14 +13,14 @@ export type OpeningWindow = { day: number; start: string; end: string };
 
 export type AppointmentSettings = {
  enabled: boolean;
- /** Opening windows, per weekday — how a shop actually thinks about its week. */
+ /** Opening windows, per weekday. How a shop actually thinks about its week. */
  openingHours: OpeningWindow[];
  blackoutDates: string[];
  slotMinutes: number;
  /**
   * Quiet minutes after each appointment before the next can start. 0 = back to back.
   *
-  * The appointment itself is still `slotMinutes` long — this is the gap AFTER it, for putting the
+  * The appointment itself is still `slotMinutes` long. This is the gap AFTER it, for putting the
   * rail back, steaming what was tried on, and not having the next person walk in on the last one.
   */
  bufferMinutes: number;
@@ -40,7 +40,7 @@ export type AppointmentSettings = {
  bookingUrl: string | null;
  /** Show that link's real schedule in the page, rather than a button that leaves the site. */
  embedBooking: boolean;
- /** Shown above the picker — what an appointment with this shop actually is. */
+ /** Shown above the picker. What an appointment with this shop actually is. */
  intro: string | null;
  /** Email the store when someone books. Off for a shop that lives in its diary, not its inbox. */
  notifyOnBooking: boolean;
@@ -85,7 +85,7 @@ function count(v: unknown, fallback: number, max: number): number {
  return Math.min(Math.max(Math.round(n), 0), max);
 }
 
-/** Drop anything that isn't a real weekday window — one malformed row must not break the diary. */
+/** Drop anything that isn't a real weekday window. One malformed row must not break the diary. */
 export function windows(v: unknown): OpeningWindow[] {
  if (!Array.isArray(v)) return [];
  return v
@@ -104,7 +104,7 @@ export function windows(v: unknown): OpeningWindow[] {
  *
  * A shop is rarely one person: the owner wants booking alerts and so does whoever is behind the
  * counter that day. Anything that isn't an address is DROPPED rather than stored and silently
- * ignored at send time — a typo that costs a shop its booking alerts goes unnoticed for a month.
+ * ignored at send time. A typo that costs a shop its booking alerts goes unnoticed for a month.
  * Five is a counter, not a mailing list.
  */
 export function cleanEmailList(raw: unknown): string | null {
@@ -157,7 +157,7 @@ export function resolveAppointmentSettings(stored?: Partial<AppointmentSettings>
 
 export type AppointmentWarning = "no-hours" | "deposit-without-payments" | "external-link-hides-diary";
 
-/** Combinations that are legal but will confuse — surfaced on the form, not discovered later. */
+/** Combinations that are legal but will confuse. Surfaced on the form, not discovered later. */
 export function appointmentWarnings(s: AppointmentSettings, opts?: { paymentsReady?: boolean }): AppointmentWarning[] {
  const w: AppointmentWarning[] = [];
  if (s.enabled && !s.bookingUrl && s.openingHours.length === 0) w.push("no-hours");

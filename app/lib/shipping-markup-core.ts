@@ -1,13 +1,13 @@
 // What the buyer pays for shipping: the real label, plus a markup.
 //
-// WHY THIS REPLACES THE FLAT TIERS. VYA charged one national price per parcel size — $8 / $14 /
-// $24 — and bought the real label afterwards. Carriers charge by DISTANCE, so one national price
+// WHY THIS REPLACES THE FLAT TIERS. VYA charged one national price per parcel size. $8 / $14 /
+// $24, and bought the real label afterwards. Carriers charge by DISTANCE, so one national price
 // is wrong at both ends of the country at once:
 //
 //   · A large coat across town costs $14.02 and the buyer was charged $24. Ten dollars of postage
 //     markup on an order is the kind of number that loses the sale, and the store's customer.
 //   · The same coat coast-to-coast costs $31.07 and the buyer was still charged $24, so VYA ate
-//     $7.07 — every time.
+//     $7.07: every time.
 //
 // The tiers were also a fiction in a way nobody expected: measured on USPS Ground Advantage, a
 // 12oz parcel costs $6.00 and a 40oz parcel costs $5.68 over the same route. Heavier is CHEAPER,
@@ -38,7 +38,7 @@ export const DEFAULT_MARKUP: MarkupPolicy = { pct: 0.15, minMarginCents: 150 };
  *
  * Rounded UP to the whole unit. Up, not nearest: rounding $13.20 down to $13 gives away part of
  * the margin the policy just calculated, and a shipping line reading $13 rather than $13.20 is
- * worth the few cents either way. Whole numbers only — postage quoted to the penny reads as a
+ * worth the few cents either way. Whole numbers only: postage quoted to the penny reads as a
  * carrier passthrough, and invites the question of why it isn't exactly the carrier's price.
  */
 export function buyerShippingCents(realCostCents: number, policy: MarkupPolicy = DEFAULT_MARKUP): number {
@@ -49,13 +49,13 @@ export function buyerShippingCents(realCostCents: number, policy: MarkupPolicy =
   return Math.ceil(Math.max(byPct, byFloor) / 100) * 100;
 }
 
-/** What VYA clears on that quote. Never negative by construction — that is the point. */
+/** What VYA clears on that quote. Never negative by construction. That is the point. */
 export function markupMarginCents(realCostCents: number, policy: MarkupPolicy = DEFAULT_MARKUP): number {
   return buyerShippingCents(realCostCents, policy) - Math.max(0, Math.round(realCostCents));
 }
 
 /**
- * Which rule bound this quote — the percentage or the floor.
+ * Which rule bound this quote. The percentage or the floor.
  *
  * Worth being able to see: if the floor binds on nearly every order, the percentage is decoration
  * and the policy is really a flat fee, which is a different conversation about pricing.

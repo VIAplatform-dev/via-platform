@@ -1,7 +1,7 @@
 // New arrivals, waiting as a draft rather than sent behind the seller's back.
 //
 // Every other automatic email answers something a shopper did. "Here are four new pieces" is a shop
-// choosing to advertise — which pieces, and how it reads, is the seller's call. So the pieces are
+// choosing to advertise, which pieces, and how it reads, is the seller's call. So the pieces are
 // gathered for her and left as a draft she can open, change and send.
 //
 // One draft at a time: if yesterday's is still unsent, it's updated rather than joined by a second.

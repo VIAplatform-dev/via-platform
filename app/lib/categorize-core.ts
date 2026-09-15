@@ -1,12 +1,12 @@
 // The product taxonomy: title → category slug, and the ONLY place those rules live.
 //
 // Pure on purpose. It is imported by loadStoreProducts (store pages), inventory (category
-// and brand pages) and the public API, so all three agree — and it carries no database or
+// and brand pages) and the public API, so all three agree, and it carries no database or
 // Next.js import, which is what lets categorize-core.test.ts run it under `node --test`.
 // That test is the guard: it pins the decisions that are easy to break by reordering a
 // keyword, so wallets can't quietly slide back into accessories.
 //
-// Corrections to an individual item do NOT belong here — they go in `category_overrides`
+// Corrections to an individual item do NOT belong here. They go in `category_overrides`
 // (see category-overrides-db.ts), which every read path applies on top of this.
 
 import type { CategorySlug } from "./categoryMap.ts";
@@ -17,17 +17,17 @@ import { bagsSlugs, shoesSlugs, accessoriesSlugs, clothingSlugs } from "./catego
 // BEFORE material/fabric keywords (denim, jeans) so that e.g. a "Denim Skirt"
 // is classified as a skirt, not jeans. Accessories is checked last.
 const categoryKeywords: [CategorySlug, string[]][] = [
- // Compound overrides — checked first to prevent single-word false positives.
+ // Compound overrides. Checked first to prevent single-word false positives.
  // e.g. "Beaded Dress Pants" should be pants, not dresses.
  ["pants", ["dress pants", "dress pant", "slacks"]],
  ["skirts", ["skirt suit", "mini skirt", "midi skirt", "maxi skirt"]],
  ["jumpsuits", ["shirt dress jumpsuit", "dress jumpsuit"]],
- // Compound shoe overrides — must precede single-word shoe rules
+ // Compound shoe overrides. Must precede single-word shoe rules
  ["flats", ["ballet flat", "ballerina flat", "ballet flats", "flat shoe"]],
  ["boots", ["flat boot", "ankle boot", "knee-high boot", "thigh-high boot", "chelsea boot", "combat boot", "cowboy boot"]],
  ["sandals", ["wedge sandal", "thong sandal"]],
  ["heels", ["wedge heel", "kitten heel", "block heel", "cone heel"]],
- // Bag styles whose names contain a jewelry word — matched BEFORE the jewelry
+ // Bag styles whose names contain a jewelry word. Matched BEFORE the jewelry
  // NOUNS below so "Bracelet Bag" / "Ring Handle Bag" land in bags, not jewelry.
  // (Kept to explicit bag compounds so it can't steal real jewelry.)
  ["bags", [
@@ -38,22 +38,22 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  // Key Holder" doesn't get taken by the key-holder rule below.
  ["accessories", ["bag charm", "charm & key", "keyring", "key ring", "key chain", "keychain"]],
  // Small leather goods whose names contain a jewelry word ("4 Ring Key Holder",
- // "Card Case") — matched BEFORE the jewelry NOUNS so "ring"/"chain" can't steal them.
+ // "Card Case"): matched BEFORE the jewelry NOUNS so "ring"/"chain" can't steal them.
  // These are WALLETS (a bags-family slug), not accessories: see the main wallets block
  // further down for why. This entry exists only for its position in the order.
  ["wallets", [
  "key holder", "key case", "key pouch", "key cles",
  "card holder", "cardholder", "card case", "card wallet", "pochette cles", "cles",
  ]],
- // Jewelry NOUNS checked first — an earring/necklace/ring title should never be
+ // Jewelry NOUNS checked first. An earring/necklace/ring title should never be
  // misclassified as bags or clothing even if it shares a designer keyword.
  // NOTE: gemstone/material words (ruby, emerald, pearl…) are intentionally NOT
- // here — they double as colors ("ruby red", "pearl white") and are checked
- // later (see "jewelry — gemstone" block below) so they don't steal shoes/bags.
- // Only UNAMBIGUOUS jewelry nouns here (checked before shoes/bags/clothing) — a title with
+ // here: they double as colors ("ruby red", "pearl white") and are checked
+ // later (see "jewelry: gemstone" block below) so they don't steal shoes/bags.
+ // Only UNAMBIGUOUS jewelry nouns here (checked before shoes/bags/clothing). A title with
  // "necklace"/"earring"/"bracelet" is jewelry regardless of designer/other words. The ambiguous
  // detail-words ("ring", "cuff", "pendant") that ALSO describe garments/shoes ("ring-accent dress",
- // "cuff heels") are deliberately NOT here — they're checked in the LATE jewelry pass below, after
+ // "cuff heels") are deliberately NOT here. They're checked in the LATE jewelry pass below, after
  // the garment/shoe/bag nouns, so a real dress/heel/bag wins.
  ["jewelry", [
  "earring", "necklace", "bracelet",
@@ -62,7 +62,7 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "charm bracelet",
  "jewelry", "jewellery",
  ]],
- // Shoe subcategories — checked before the generic "shoes" catch-all
+ // Shoe subcategories. Checked before the generic "shoes" catch-all
  ["boots", ["boot", "bootie"]],
  ["heels", ["heel", "pump", "stiletto", "wedge", "blahnik", "louboutin", "roger vivier"]],
  ["sneakers", ["sneaker", "trainer"]],
@@ -74,16 +74,16 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  ]],
  // "shoes" / "flat" (adj) / designer catch-all for shoes that don't fit above
  ["shoes", ["shoe", "footwear", "stuart weitzman"]],
- // Bag subcategories — checked before the generic "bags" catch-all
+ // Bag subcategories. Checked before the generic "bags" catch-all
  ["totes", ["tote", "shopper", "neverfull", "cabas"]],
  ["clutches", ["clutch", "minaudiere", "minaudière", "wristlet", "evening bag", "envelope"]],
  ["crossbody-bags", ["crossbody", "cross-body", "satchel", "belt bag", "fanny pack"]],
- // "bags" — handbags merged in (bags & handbags are one category). Specific
+ // "bags". Handbags merged in (bags & handbags are one category). Specific
  // styles above (totes/clutches/crossbody) still win; everything else → bags.
  ["bags", [
  "bag", "pouch", "backpack", "rucksack", "luggage", "suitcase", "duffel", "duffle", "chain wallet",
  "handbag", "purse", "hobo", "baguette", "bucket bag", "top handle", "chain bag", "frame bag",
- // LV / Fendi / Chanel / Gucci / Prada / Balenciaga icon styles — bag-exclusive MODEL names,
+ // LV / Fendi / Chanel / Gucci / Prada / Balenciaga icon styles. Bag-exclusive MODEL names,
  // distinctive enough to be safe here (unlike the hardware/material names below, a brand doesn't
  // reuse "Speedy" or "Birkin" to describe a skirt or a loafer).
  "pochette", "musette", "keepall", "speedy", "alma", "papillon", "noé", "noe", "deauville", "vanity",
@@ -94,7 +94,7 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "petite malle", "metis", "loulou", "cassette", "arco",
  "birkin", "constance", "lindy", "picotin", "bolide", "evelyne",
  ]],
- // Wallets & small leather goods — a BAGS item, not an accessory. A Gucci long wallet
+ // Wallets & small leather goods. A BAGS item, not an accessory. A Gucci long wallet
  // belongs beside the handbags, not beside the sunglasses, and these were the single
  // biggest thing wrongly filling the generic "accessories" bucket. Checked AFTER the bags
  // block above so "wallet on chain" / "chain wallet" (a Chanel WOC is a bag with a strap,
@@ -104,7 +104,7 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "card holder", "cardholder", "card case", "cardcase",
  "key case", "key pouch", "key holder", "coin case",
  ]],
- // Specific garment types first — these take priority over material keywords
+ // Specific garment types first. These take priority over material keywords
  ["dresses", ["dress", "gown", "kaftan", "caftan", "sundress", "slip dress", "maxi", "mini dress", "midi dress"]],
  ["skirts", ["skirt", "sarong"]],
  ["shorts", ["shorts"]],
@@ -122,19 +122,19 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "pants", "trousers", "chino", "jogger", "slacks",
  "sweatpant", "wide-leg", "flare", "legging", "culottes",
  ]],
- // Lingerie & intimates — a true-vintage category; checked before tops so a
+ // Lingerie & intimates. A true-vintage category; checked before tops so a
  // corset/bustier isn't swallowed as a generic top. (Slip DRESSES stay dresses.)
  ["lingerie", [
  "lingerie", "corset", "bustier", "bralette", "negligee", "negligée",
  "chemise", "babydoll", "garter", "girdle", "slip top", "camisole set",
  ]],
- // Swimwear — previously fell through to generic clothing.
+ // Swimwear: previously fell through to generic clothing.
  ["swimwear", ["swimsuit", "swimwear", "bikini", "tankini", "bathing suit", "monokini"]],
  ["tops", [
  "top", "blouse", "shirt", "tee", "t-shirt", "tank", "cami",
  "bodysuit", "halter", "polo", "henley",
  "tube top", "crop", "tunic", "wrap top", "sheer top",
- // Button-up/-down shirts — matched here (before the gemstone block) so a
+ // Button-up/-down shirts. Matched here (before the gemstone block) so a
  // "Pearl Accent ... Button Up" reads as a top, not jewelry.
  "button up", "button-up", "button down", "button-down",
  ]],
@@ -142,7 +142,7 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  // not jeans. "jeans" (plural only) avoids matching designer first names
  // like "Jean Paul Gaultier".
  ["jeans", ["jeans", "denim"]],
- // Home & lifestyle — checked before accessories so "vase", "candle", etc. don't fall through
+ // Home & lifestyle: checked before accessories so "vase", "candle", etc. don't fall through
  ["home", [
  "book", "plate", "dish", "cup", "mug", "bowl", "vase", "candle", "candlestick",
  "pitcher", "jug", "teapot", "tea set", "coffee set", "carafe",
@@ -153,7 +153,7 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "cutting board", "cheese board", "soap dish", "diffuser",
  "trinket", "trinket dish", "ashtray",
  ]],
- // Jewelry — gemstone/material words. Checked AFTER garment/shoe/bag nouns
+ // Jewelry: gemstone/material words. Checked AFTER garment/shoe/bag nouns
  // because they're commonly used as colors ("ruby red mules", "emerald green
  // dress", "pearl white sandals"). A gemstone-only title (e.g. "Art Deco Sapphire
  // Clip") still lands here as jewelry rather than falling through to accessories.
@@ -162,7 +162,7 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "ruby", "emerald", "pearl", "amethyst", "opal", "garnet",
  "turquoise", "onyx",
  // Ambiguous jewelry words that also appear as garment/shoe/bag DETAILS ("ring accents",
- // "cuff heels", "pendant sleeve"). Checked here — after every garment/shoe/bag noun above —
+ // "cuff heels", "pendant sleeve"). Checked here, after every garment/shoe/bag noun above,
  // so they classify as jewelry ONLY when nothing else matched (a bare "gold ring", "wide cuff").
  // Word-boundary matching keeps them safe (\bring\b never hits "string"/"earring"/"keyring").
  "ring", "cuff", "pendant",
@@ -181,12 +181,12 @@ const categoryKeywords: [CategorySlug, string[]][] = [
  "hair pin", "charm", "signet",
  "accessories",
  ]],
- // Ambiguous bag HARDWARE/LINE and fabric-pattern names — a brand reuses these across its whole
+ // Ambiguous bag HARDWARE/LINE and fabric-pattern names. A brand reuses these across its whole
  // product range (Gucci's Horsebit is as much a loafer as a bag; Bamboo and Marmont hardware turns
  // up on wallets and belts; Saffiano and Matelassé are leather/quilting finishes, not bag words at
- // all) — unlike the bag-exclusive MODEL names in the "bags" block above, these can legitimately
- // describe a non-bag item. Checked LAST — after every other category above, garment through
- // accessories — so "Gucci Bamboo Leather Detail Skirt" or "Gucci Horsebit Loafers" classify by
+ // all): unlike the bag-exclusive MODEL names in the "bags" block above, these can legitimately
+ // describe a non-bag item. Checked LAST, after every other category above, garment through
+ // accessories, so "Gucci Bamboo Leather Detail Skirt" or "Gucci Horsebit Loafers" classify by
  // what they actually ARE, and these only win as a final fallback (a bare "Gucci Marmont" listing
  // with nothing else in its title to go on).
  ["bags", ["marmont", "dionysus", "bamboo", "ophidia", "horsebit", "galleria", "saffiano", "flap", "puzzle", "matelasse", "matelassé"]],
@@ -194,8 +194,8 @@ const categoryKeywords: [CategorySlug, string[]][] = [
 
 // Pre-compile word-boundary patterns once at module load.
 // Single-word keywords use \b…(?:s|es)?\b so that:
-// • "top" matches "Silk Top" / "Silk Tops" — but NOT "Topaz"
-// • "tote" matches "Leather Tote" / "Canvas Totes" — but NOT "Toteme"
+// • "top" matches "Silk Top" / "Silk Tops", but NOT "Topaz"
+// • "tote" matches "Leather Tote" / "Canvas Totes", but NOT "Toteme"
 // • "boot" matches "Ankle Boot" / "Black Boots"
 // • "watch" matches "Vintage Watch" / "Vintage Watches"
 // Multi-word keywords (e.g. "tube top", "mary jane") keep substring matching.
@@ -211,7 +211,7 @@ const compiledCategories: [CategorySlug, Array<RegExp | string>][] =
  keywords.map(buildPattern),
  ]);
 
-// Specific product title overrides — for items whose titles don't contain matchable keywords.
+// Specific product title overrides, for items whose titles don't contain matchable keywords.
 // Uses case-insensitive substring matching (title must contain the phrase).
 const TITLE_OVERRIDES: Array<[string, CategorySlug]> = [
  ["coastal charm", "home"],
@@ -239,7 +239,7 @@ export const inferCategoryFromTitle = (title: string | null | undefined): Catego
 // A row in `category_overrides` (written by the AI sweep or an admin) names a top-level
 // FAMILY, not a slug. Everything that reads a product's category goes through categoryFor,
 // so a correction made once holds on store pages, category pages, brand pages, collections,
-// search and the app — which it did not before: inventory.ts inferred from the title and
+// search and the app, which it did not before: inventory.ts inferred from the title and
 // never looked at the override table, so a fix applied in the admin was invisible on every
 // page that page built.
 
@@ -265,7 +265,7 @@ export function familyOf(slug: CategorySlug): string | null {
  * The category to actually use: the title's, unless a correction says otherwise.
  *
  * When the correction only confirms the family the title already implies, the SPECIFIC
- * slug wins — correcting a tote to "bags" should leave it a tote, not flatten it into the
+ * slug wins. Correcting a tote to "bags" should leave it a tote, not flatten it into the
  * generic bucket and lose it from the Totes filter.
  */
 export function categoryFor(title: string | null | undefined, overrideFamily?: string | null): CategorySlug {

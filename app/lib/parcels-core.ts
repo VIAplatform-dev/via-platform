@@ -1,9 +1,9 @@
-// Parcels, not pieces. Pure — no I/O.
+// Parcels, not pieces. Pure, no I/O.
 //
 // VYA records one order per piece (one-of-one inventory, one row per item), so a buyer who takes
 // three things in one checkout is three orders. She posts ONE bag. Everything that counts, labels
-// or marks "posted" should count the bag: that is what this groups. The key is the payment — every
-// piece bought together shares a Stripe PaymentIntent — with a fallback for rows recorded without
+// or marks "posted" should count the bag: that is what this groups. The key is the payment. Every
+// piece bought together shares a Stripe PaymentIntent, with a fallback for rows recorded without
 // one (the same buyer, the same way home, paid within two minutes).
 //
 // Mirrored on the phone in mobile/lib/seller/parcels.ts. Keep the two in step.
@@ -109,7 +109,7 @@ export function parcelsToPost<T extends ParcelOrder>(parcels: Parcel<T>[]): Parc
  return parcels.filter((p) => p.status === "paid" && p.deliveryMethod === "ship");
 }
 
-// "Packages", not "parcels" — the seller reading this is American and said so. The unit is
+// "Packages", not "parcels". The seller reading this is American and said so. The unit is
 // unchanged: one bag for one buyer, however many pieces are in it.
 export function parcelsToPostLabel(count: number): string {
  if (count === 0) return "Nothing to ship";
@@ -118,7 +118,7 @@ export function parcelsToPostLabel(count: number): string {
 
 /**
  * One tracking email per bag. True only when there is a tracking number to give and no piece in
- * the bag has been emailed about — the per-order route and the parcel route both ask this, so a
+ * the bag has been emailed about. The per-order route and the parcel route both ask this, so a
  * buyer of three pieces gets one email whichever button the seller pressed.
  */
 export function shouldSendParcelEmail(orders: ParcelOrder[]): boolean {

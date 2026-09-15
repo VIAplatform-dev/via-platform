@@ -7,14 +7,14 @@
 // Two decisions worth stating, because they're what make this different from a folder of HTML:
 //
 //  1. A template is CONTENT, not markup. Each one is a subject and a few lines, rendered through the
-//     same storeEmailHtml every automatic email uses — so it arrives in the store's own logo,
+//     same storeEmailHtml every automatic email uses, so it arrives in the store's own logo,
 //     colours and fonts rather than in a stock design that looks like everyone else's.
 //
 //  2. The words are written to be SENT AS-IS. A template full of "Lorem ipsum" or "[YOUR TEXT HERE]"
 //     is a blank box with extra steps. Anything that must change is a {token} the store's own data
 //     fills in, and the rest is real copy for a vintage shop.
 //
-// Tokens: {store} {piece} {count} {code} — filled from the store and its stock before the seller
+// Tokens: {store} {piece} {count} {code}: filled from the store and its stock before the seller
 // sees them, so the draft opens already true rather than as a form to complete.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -39,7 +39,7 @@ export type EmailTemplate = {
 export const TEMPLATES: EmailTemplate[] = [
  // The copy here is deliberately PLAIN.
  //
- // These are drafts a shop owner opens and rewrites in her own voice — so anything clever we write
+ // These are drafts a shop owner opens and rewrites in her own voice, so anything clever we write
  // is something she has to delete first. A starting point should say the obvious thing in the
  // fewest words and get out of the way. Square brackets mark the bits only she can fill in, so
  // they're easy to spot and replace.
@@ -198,7 +198,7 @@ export type TemplateFill = { store?: string | null; piece?: string | null; count
 /**
  * Fill a template's tokens from the store's real data.
  *
- * Any token we can't answer is REMOVED rather than left as {piece} — a draft that opens with braces
+ * Any token we can't answer is REMOVED rather than left as {piece}: a draft that opens with braces
  * in it is a form to complete, and the whole point is that it opens ready to send. Sentences that
  * lose their subject are dropped whole, so nothing reads as a fragment.
  */

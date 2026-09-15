@@ -87,7 +87,7 @@ export async function GET(request: Request) {
  console.error(`[Generate Collabs Links] Fetch error for ${store.name}:`, fetchError);
  storeResults.push({ store: store.name, slug: store.slug, saved: 0, created: 0, failed: 0, error: fetchError });
  if (fetchError.includes("401")) {
- console.error("[Generate Collabs Links] 401 detected — Collabs credentials may be expired");
+ console.error("[Generate Collabs Links] 401 detected. Collabs credentials may be expired");
  }
  continue;
  }
@@ -118,7 +118,7 @@ export async function GET(request: Request) {
  totalFailed++;
  if (result.error?.includes("Daily links limit")) {
  rateLimited = true;
- console.warn("[Generate Collabs Links] Daily links limit reached — stopping link creation");
+ console.warn("[Generate Collabs Links] Daily links limit reached. Stopping link creation");
  } else {
  console.error(
  `[Generate Collabs Links] Failed to create link for ${product.title}:`,
@@ -152,7 +152,7 @@ export async function GET(request: Request) {
 
  // Detect products still unmatched after processing all stores.
  // These are in our DB with a shopify_product_id but were never found in any
- // Collabs catalog — they'll stay invisible on VYA until resolved.
+ // Collabs catalog: they'll stay invisible on VYA until resolved.
  const stillMissingDbIds = new Set(missingByShopifyId.values());
  const stillMissingProducts = missingProducts.filter(
  (p) => p.shopify_product_id && stillMissingDbIds.has(p.shopify_product_id)

@@ -11,7 +11,7 @@ import { ensureSizeKeysColumn } from "@/app/lib/db";
 export const dynamic = "force-dynamic";
 
 // Paginated full-catalog feed (newest first). The mobile app loads this via
-// infinite scroll, so there is no 7-day window and no hard cap — every product
+// infinite scroll, so there is no 7-day window and no hard cap. Every product
 // is reachable by paging with ?offset=. Page size is bounded per request.
 export async function GET(request: Request) {
  if (!(await isApprovedRequest(request))) return NextResponse.json({ error: "Approval required", needsApproval: true }, { status: 403 });

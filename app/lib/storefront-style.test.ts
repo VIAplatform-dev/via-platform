@@ -5,7 +5,7 @@ import { sanitizeBlocks, type BlockStyle } from "./storefront-blocks.ts";
 // Every autosave round-trips through sanitizeBlocks (see app/api/store/storefront/design/route.ts),
 // and that function rebuilds `style` from scratch as a whitelist. So a field that BlockStyle declares
 // and the CSS compiler renders, but the whitelist forgets, is written to the block, drawn once, and
-// silently discarded on the next save — it looks like it works right up until the page is reloaded.
+// silently discarded on the next save. It looks like it works right up until the page is reloaded.
 //
 // That is exactly what happened to 23 of these: section height, the entire button style panel,
 // per-field alignment, explicit heading/subtext px sizes, line-height, and bold/italic/underline.
@@ -73,7 +73,7 @@ test("sanitizeBlocks is idempotent for style", () => {
 });
 
 test("section height is clamped to the same bounds the canvas resize handle enforces", () => {
- // A hero may run tall; a strip section (announcement/marquee) may not — the clamp is per type, so a
+ // A hero may run tall; a strip section (announcement/marquee) may not: the clamp is per type, so a
  // value copied from one onto the other can't produce a 2000px announcement bar.
  const [tall] = sanitizeBlocks([{ id: "x", type: "hero", props: {}, style: { minH: 99999 } }]);
  assert.equal(tall.style?.minH, 2000);
@@ -90,7 +90,7 @@ test("a photo's free transform (position AND size) round-trips", () => {
  }]);
  assert.deepEqual(b.style?.free?.image, { x: 40, y: 60, w: 55, h: 70 });
 
- // `h` is an aspect ratio (percent of the frame's own width), so it must be allowed past 100 — a
+ // `h` is an aspect ratio (percent of the frame's own width), so it must be allowed past 100. A
  // portrait photo is taller than it is wide. Clamped at the old 5–100 a portrait frame silently
  // became a square.
  const [tall] = sanitizeBlocks([{ id: "y", type: "hero", props: {}, style: { free: { image: { w: 40, h: 180 } } } as unknown as BlockStyle }]);

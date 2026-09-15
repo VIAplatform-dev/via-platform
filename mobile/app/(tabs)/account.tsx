@@ -5,7 +5,7 @@ import { useAuth } from "../../lib/auth";
 import AppHeader from "../../components/AppHeader";
 import { colors, eyebrow, fonts, spacing } from "../../lib/theme";
 
-// Account is a short list of destinations, not a settings screen — everything adjustable lives one
+// Account is a short list of destinations, not a settings screen. Everything adjustable lives one
 // level down under Settings, which is why that row sits apart from the other three.
 
 function Row({
@@ -59,9 +59,9 @@ export default function AccountScreen() {
         <Row href="/settings" icon="settings" label="Settings" hint="Sizes, notifications, policies & more" />
         {/* The way back to the seller side. The marketplace used to bounce a store owner out of it
             on sight, so no route back was needed; now that she can browse, she needs one that
-            survives switching tabs — a back gesture doesn't. */}
-        {/* "Switch to", not "My store". This is a change of MODE — out of the marketplace and into
-            the shop — and naming it after the destination made it read as one more page about her
+            survives switching tabs. A back gesture doesn't. */}
+        {/* "Switch to", not "My store". This is a change of MODE. Out of the marketplace and into
+            the shop, and naming it after the destination made it read as one more page about her
             store, alongside Purchases and Saved items. She went looking for "switch to store". */}
         {storeSlug ? <Row href="/(seller)" icon="briefcase" label="Switch to my store" hint={`Sell, list and manage ${storeSlug}`} /> : null}
         {storeSlug ? <Row href="/store-inbox" icon="inbox" label="Store inbox" hint={`Customer messages for ${storeSlug}`} /> : null}

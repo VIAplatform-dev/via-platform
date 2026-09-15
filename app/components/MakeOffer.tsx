@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import OfferAuthorise, { type OfferAuth } from "./OfferAuthorise";
 
 type Props = { storeSlug: string; itemId: string; itemTitle: string; listPriceCents: number; accent: string };
 
@@ -16,6 +17,9 @@ export default function MakeOffer({ storeSlug, itemId, itemTitle, listPriceCents
  const [busy, setBusy] = useState(false);
  const [err, setErr] = useState("");
  const [token, setToken] = useState<string | null>(null);
+ // Set when this shop takes BINDING offers: the offer row exists, and the buyer now authorises a
+ // card and gives an address before the seller hears about it at all. See OfferAuthorise.
+ const [auth, setAuth] = useState<OfferAuth | null>(null);
  // The lowest this store will look at. Told up front rather than discovered by being refused.
  const [minPct, setMinPct] = useState(0);
 
@@ -54,6 +58,16 @@ export default function MakeOffer({ storeSlug, itemId, itemTitle, listPriceCents
  setBusy(false);
  }
 
+ if (auth) {
+  return (
+   <OfferAuthorise
+    auth={auth}
+    accent={accent}
+    amount={`$${Math.round((parseFloat(price) || 0)).toLocaleString()}`}
+    onDone={() => { setToken(auth.token); setAuth(null); }}
+   />
+  );
+ }
  if (token) {
  return <p className="mt-1.5 text-[11px] opacity-60">Offer sent. <a href={`/offer/${token}`} className="underline hover:opacity-100">track it →</a></p>;
  }

@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-// The hero family — five genuinely different compositions, one shared editing contract.
+// The hero family: five genuinely different compositions, one shared editing contract.
 //
 // Every layout here renders its text through <FreeField>, so heading/subtext/button are selectable,
 // draggable, corner-scalable, and inline-editable in all five without any layout-specific wiring.
@@ -8,7 +8,7 @@
 //
 // Height: any element that forces its own height carries `.vya-fill`, which is what the section's
 // resize handle (style.minH) targets. A layout that invents its own height mechanism silently breaks
-// dragging the section taller — this class is the contract.
+// dragging the section taller. This class is the contract.
 import { FreeField, PhotoFrame, emptyHint, panBgImg, type EditKit, ArrangeHandle, splitRatioOf } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 import { backgroundEmbedSrc } from "@/app/lib/storefront-blocks";
@@ -28,7 +28,7 @@ function heroMedia(kit: EditKit) {
 
 // ── bleed ───────────────────────────────────────────────────────────────────────────────────────
 // The layout that shipped before variants existed. A block with no `variant` renders THIS, and its
-// markup is deliberately unchanged — every storefront saved to date depends on it byte for byte.
+// markup is deliberately unchanged. Every storefront saved to date depends on it byte for byte.
 function HeroBleed({ kit }: { kit: EditKit }) {
  const { b, ctx, p, moveGrip } = kit;
  const { colors, head, shopHref } = ctx;
@@ -62,11 +62,11 @@ function HeroBleed({ kit }: { kit: EditKit }) {
 // ── slides ──────────────────────────────────────────────────────────────────────────────────────
 // A swipeable set of full-bleed slides. Deliberately CSS-only (scroll-snap): this renderer is shared
 // with the live storefront's server component and must stay hook-free, and a scroll track degrades
-// perfectly — it's swipeable on a phone, drag/trackpad-scrollable on desktop, and needs no JS.
+// perfectly: it's swipeable on a phone, drag/trackpad-scrollable on desktop, and needs no JS.
 //
 // Per-slide copy is edited in place (click the text and type); slides themselves are added, removed,
 // and reordered from the section panel. Free DRAG positioning is per-field rather than per-slide, so
-// it isn't offered here — the overlay layer covers "put this anywhere" for a slideshow.
+// it isn't offered here. The overlay layer covers "put this anywhere" for a slideshow.
 function HeroSlides({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { head, shopHref } = ctx;
@@ -94,14 +94,14 @@ function HeroSlides({ kit }: { kit: EditKit }) {
         />
        )}
       </div>
-      {/* Position dots — which slide of how many. Anchors on the live site (a real, keyboard-reachable
+      {/* Position dots, which slide of how many. Anchors on the live site (a real, keyboard-reachable
           control); inert markers in the editor so clicking one selects the section instead of jumping. */}
       <div className="absolute inset-x-0 bottom-7 z-10 flex justify-center gap-2">
        {slides.map((_, j) => (ctx.edit
         ? <span key={j} className="h-1.5 w-1.5 rounded-full" style={{ background: j === i ? "#fff" : "rgba(255,255,255,0.45)" }} />
         // The dot stays 6px because that is the design; the TAP TARGET around it does not. A 6×6
         // hit area is unhittable with a thumb, so the link is a 28px box with the dot centred in it
-        // — same look, an actual target. (Negative margin keeps the row's visual spacing unchanged.)
+        // same look, an actual target. (Negative margin keeps the row's visual spacing unchanged.)
         : <a key={j} href={`#slide-${j}`} aria-label={`Slide ${j + 1}`} className="-m-3.5 grid h-9 w-9 place-items-center rounded-full transition"><span className="h-1.5 w-1.5 rounded-full" style={{ background: j === i ? "#fff" : "rgba(255,255,255,0.45)" }} /></a>
        ))}
       </div>
@@ -116,7 +116,7 @@ function HeroSlides({ kit }: { kit: EditKit }) {
 }
 
 // ── split ───────────────────────────────────────────────────────────────────────────────────────
-// Photo on one side, copy on the other, at hero scale. The calmer, more editorial opening — and the
+// Photo on one side, copy on the other, at hero scale. The calmer, more editorial opening, and the
 // only hero layout where the headline sits on the page's own background rather than over a photo.
 function HeroSplit({ kit }: { kit: EditKit }) {
  const { b, ctx, p, moveGrip } = kit;
@@ -126,7 +126,7 @@ function HeroSplit({ kit }: { kit: EditKit }) {
  // in props). Clamped to keep both panels usable no matter how far the handle is dragged.
  const ratio = splitRatioOf(p);
  // A split hero with no photo is half a tinted rectangle and half a squeezed column of text. When
- // there is nothing to show, the whole split collapses and the type takes the full width — the
+ // there is nothing to show, the whole split collapses and the type takes the full width. The
  // panel is hidden AND the grid stops splitting, because hiding only the panel would leave the
  // headline stranded in a 50% column with nothing beside it.
  const showMedia = !!p.image || ctx.edit;
@@ -135,7 +135,7 @@ function HeroSplit({ kit }: { kit: EditKit }) {
    className={`vya-arrange-box vya-fill relative grid w-full items-stretch ${showMedia ? "@lg:grid-cols-[var(--vya-split)]" : ""}`}
    style={showMedia ? { ["--vya-split" as string]: `${ratio}% 1fr` } : undefined}
   >
-   {/* The seam itself is the handle — the comment above has described a draggable divider since
+   {/* The seam itself is the handle. The comment above has described a draggable divider since
        this layout shipped, and there was never anything to drag. Only on the wide layout, where
        the split actually exists; below @lg the two panels stack. */}
    {showMedia && <span className="hidden @lg:block"><ArrangeHandle kit={kit} prop="splitRatio" at="seam" title="Drag to move the split" style={{ left: `${ratio}%` }} /></span>}
@@ -181,7 +181,7 @@ function HeroStack({ kit }: { kit: EditKit }) {
 }
 
 // ── frame ───────────────────────────────────────────────────────────────────────────────────────
-// An inset photo with generous margin, the headline sitting across its lower edge — the gallery-wall
+// An inset photo with generous margin, the headline sitting across its lower edge. The gallery-wall
 // opening. The margin is real whitespace, so it reads as deliberate rather than as a hero that failed
 // to reach the edges.
 function HeroFrame({ kit }: { kit: EditKit }) {

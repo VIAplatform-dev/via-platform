@@ -100,7 +100,7 @@ export async function setPasswordFromInvite(token: string, password: string): Pr
  * Self-service password reset: issue a fresh token for an EXISTING, ACTIVE admin so they can
  * reset from their own inbox. Returns the token + canonical email, or null if the email isn't a
  * known active admin (the caller returns a generic success either way to avoid user enumeration).
- * Deliberately separate from inviteAdmin — this never creates accounts and never touches inactive
+ * Deliberately separate from inviteAdmin. This never creates accounts and never touches inactive
  * (never-onboarded) rows, so the public endpoint can't be used to provision or probe admins.
  */
 export async function requestPasswordReset(email: string): Promise<{ token: string; email: string } | null> {

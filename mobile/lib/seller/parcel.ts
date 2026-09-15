@@ -1,4 +1,4 @@
-// The parcel a piece ships as — the phone's mirror of app/lib/parcel-core.ts. Pure.
+// The parcel a piece ships as. The phone's mirror of app/lib/parcel-core.ts. Pure.
 //
 // The tier thresholds are COPIED from app/lib/shipping-tiers.ts (small ≤ 16 oz, medium ≤ 48 oz);
 // parcel.test.ts pins them. The category table is the server's, matched by a few words because the
@@ -67,9 +67,18 @@ export function parcelMismatch(args: { typedWeightOz: number | null | undefined;
   const under = idx(typedTier) < idx(est.tier);
   const [, looks] = match(args.category);
   const what = looks ? `${looks} (${est.tier} parcel)` : `a ${est.tier} parcel`;
+  // THE WEIGHT IS THE ONE THING THAT COMES BACK TO HER.
+  //
+  // Not the price. A store's postage price, whether VYA worked it out or she set it flat, is
+  // settled between VYA and the carrier: the buyer's postage goes to VYA in the application fee
+  // (see cart-intent) and VYA buys the label, so a price that turns out thin is VYA's problem.
+  //
+  // A WRONG SIZE is different, and it is the difference worth her reading. Everything downstream is
+  // built from this number: the buyer's quote, and then the label itself. Understate it and the
+  // carrier re-rates the parcel after it has gone and bills the correction back.
   const message = under
-    ? `You typed ${args.typedWeightOz} oz, but this looks like ${what}. Buyers get quoted the ${typedTier} tier and you pay the difference.`
-    : `You typed ${args.typedWeightOz} oz, but this looks like ${what}. Buyers get quoted the ${typedTier} tier — that's more than it needs.`;
+    ? `You typed ${args.typedWeightOz} oz, but this looks like ${what}. Buyers get quoted the ${typedTier} tier, and the carrier bills you the difference once it ships.`
+    : `You typed ${args.typedWeightOz} oz, but this looks like ${what}. Buyers get quoted the ${typedTier} tier: that's more than it needs.`;
   return { typedTier, estimatedTier: est.tier, message };
 }
 

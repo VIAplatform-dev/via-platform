@@ -6,7 +6,7 @@
 
 import { setupSummary, stepVerb, type SetupStep, type SetupStepId } from "./setup-core.ts";
 
-/** How long the step takes, in her terms — the cue under the headline. */
+/** How long the step takes, in her terms. The cue under the headline. */
 const TIME_CUE: Record<SetupStepId, string> = {
  ship_from: "Two minutes.",
  payments: "About five minutes.",

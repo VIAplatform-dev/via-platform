@@ -2,14 +2,14 @@
 //
 // `captureCartTemplate` puts a real product into a throwaway cart on the source store and captures
 // what the theme renders, so `injectCartPage` can clone the theme's own row markup. It is explicitly
-// best-effort and returns null on any failure — and an audit of the stored captures found five
+// best-effort and returns null on any failure, and an audit of the stored captures found five
 // stores where it had failed silently. For those, `/cart` finds no captured page and the serve path
 // answers a plain-text "Page not found." at the exact moment a shopper is trying to buy. One of them
 // has a cart drawer on all 24 of its pages; another has 781 pages captured and no cart page.
 //
 // Re-capturing those five would fix those five. This fixes the CLASS: when there is no cart capture,
-// borrow the chrome from any page we DO hold — header, footer, fonts, colours, all inlined by the
-// crawler — and render the visitor's real VYA cart inside it. The shopper stays in the store's own
+// borrow the chrome from any page we DO hold. Header, footer, fonts, colours, all inlined by the
+// crawler, and render the visitor's real VYA cart inside it. The shopper stays in the store's own
 // design, and a future capture failure degrades to a working page instead of a 404.
 //
 // Pure and unit-tested: it takes HTML and cart lines and returns HTML, with no database, no network
@@ -24,7 +24,7 @@ function escHtml(s: string): string {
  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/** Two decimals, in the line's own currency — the theme prints "$575.00" and a bare "$575" reads
+/** Two decimals, in the line's own currency. The theme prints "$575.00" and a bare "$575" reads
  *  wrong beside it. */
 function money(cents: number, currency: string | null): string {
  try { return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD" }).format(cents / 100); }
@@ -69,7 +69,7 @@ function rowHtml(l: CartPageLine, interactive: boolean): string {
 /**
  * Build a cart page inside a borrowed capture.
  *
- * `chromeHtml` is any page of this store we hold — the home page is the natural choice, since the
+ * `chromeHtml` is any page of this store we hold. The home page is the natural choice, since the
  * crawler inlines every stylesheet into it, so the theme's fonts and colours come along for free.
  * Falls back gracefully all the way down to empty/invalid input, because the stores that need this
  * are precisely the ones where capture has already proven unreliable.
@@ -89,7 +89,7 @@ export function buildFallbackCartPage(
  const currency = lines[0]?.currency || "USD";
 
  // Checkout is a plain LINK, not a scripted button. On VYA's own origin the serve path runs
- // stripScripts() AFTER this page is built (route.ts), which removes every <script> on the page —
+ // stripScripts() AFTER this page is built (route.ts), which removes every <script> on the page,
  // so a button that depends on a click handler arrives dead. (That is exactly why injectCartPage's
  // checkout button does nothing on a Plan A cart page today.) An anchor needs no JavaScript, works
  // on both origins, and is what a shopper's browser already knows how to do.
@@ -101,7 +101,7 @@ export function buildFallbackCartPage(
 
  const cart = `<div data-vya-fallback-cart style="${S.wrap}"><h1 style="${S.head}">Your cart</h1>${body}</div>`;
 
- // Her header and footer, around VYA's cart. Same swap a page she ADDS gets — see borrow-chrome.ts
+ // Her header and footer, around VYA's cart. Same swap a page she ADDS gets. See borrow-chrome.ts
  // for why it prefers the theme's main container and what it falls back to.
  borrowChrome($, cart);
 

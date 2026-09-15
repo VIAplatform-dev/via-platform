@@ -7,7 +7,7 @@ import { getSellerBySlug } from "@/app/lib/db/sellers";
 import { overRateLimit, clientIp } from "@/app/lib/rate-limit-db";
 
 /**
- * POST { email } — email this shopper a link that signs them in to THIS store.
+ * POST { email }: email this shopper a link that signs them in to THIS store.
  *
  * The store is taken from the host, never from the request body: a link is scoped to one seller and
  * letting the caller name the store would let anyone mint a sign-in for any store.
@@ -25,12 +25,12 @@ export async function POST(request: NextRequest) {
  if (!store) return NextResponse.json({ error: "Unknown store." }, { status: 404 });
 
  // A LIMIT, because this endpoint spends money and somebody else's reputation. Without one, a loop
- // makes us send mail to any address at will — our bill, and our sending domain in the spam folder.
+ // makes us send mail to any address at will. Our bill, and our sending domain in the spam folder.
  // Per IP and per store: a shared office IP must not lock a seller's other shoppers out.
  if (await overRateLimit({ bucket: `signin:${store.slug}`, ip: clientIp(request.headers), max: 8, windowMinutes: 15 })) {
   // Deliberately the same shape as a success. Telling a prober they hit a limit tells them the
   // endpoint is worth probing; the shopper who genuinely typed twice is told to check their email,
-  // which is true — the first link still works.
+  // which is true: the first link still works.
   return NextResponse.json(SAME_ANSWER);
  }
 
@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
 
  const token = signInLinkToken({ email, storeSlug: store.slug }, secret);
  // HER STORE'S ADDRESS, not `new URL(request.url).origin`. Next resolves request.url from the
- // server's own view of the request — measured as http://localhost:3000 even when the Host header
- // is the store — so that origin put a link in every sign-in email pointing at a host with no store
+ // server's own view of the request. Measured as http://localhost:3000 even when the Host header
+ // is the store, so that origin put a link in every sign-in email pointing at a host with no store
  // on it, and clicking it answered "Unknown store." See storeEmailLinkOrigin for why the Host
  // header isn't trusted in production either.
  const origin = storeEmailLinkOrigin(store.slug, request.headers.get("host"));
@@ -61,13 +61,13 @@ export async function POST(request: NextRequest) {
  const apiKey = process.env.RESEND_API_KEY;
  if (apiKey) {
   const client = new Resend(apiKey);
-  // Sent as the SHOP, not as VYA — the shopper is signing in to a vintage store, and an email from
+  // Sent as the SHOP, not as VYA. The shopper is signing in to a vintage store, and an email from
   // a marketplace they have never heard of reads as phishing.
   await client.emails.send({
    from: `${shopName} <hana@vyaplatform.com>`,
    to: email,
    subject: `Sign in to ${shopName}`,
-   text: `Tap to sign in to ${shopName}:\n\n${link}\n\nThe link works once and expires in 30 minutes. If you didn't ask for this, ignore it — nothing has changed.`,
+   text: `Tap to sign in to ${shopName}:\n\n${link}\n\nThe link works once and expires in 30 minutes. If you didn't ask for this, ignore it. Nothing has changed.`,
   }).catch(() => {});
  }
  return NextResponse.json(SAME_ANSWER);

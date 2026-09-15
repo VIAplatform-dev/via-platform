@@ -4,7 +4,7 @@ import { stripePost, stripeConfigured } from "@/app/lib/stripe";
 import { logError } from "@/app/lib/error-log";
 
 // Auto-payout: for stores that turned it on, direct-deposit each consignor's balance once their
-// sales clear the store's return window (hold_days) — no clicking. Only touches consignors who
+// sales clear the store's return window (hold_days), no clicking. Only touches consignors who
 // connected a bank; cash/check/store-credit stay manual. Model A: VYA disburses via a platform
 // transfer from its own balance (which holds the consignor's cut routed at checkout).
 export const maxDuration = 300;
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
  // Platform transfer from VYA's balance (holds the consignor's cut routed from the sale).
  // Idempotency key = consignor + amount + the payable-balance-at-time. The balance term is what
  // makes DISTINCT payouts distinct (a $50 payout of $100 vs a $50 payout of $50 differ), so they
- // no longer collide and short-pay — while a retry of the SAME payout (ledger write failed → balance
+ // no longer collide and short-pay, while a retry of the SAME payout (ledger write failed → balance
  // unchanged) still re-sends the SAME key, so Stripe returns the existing transfer, not a second one.
  const idem = `consignor-payout-${c.id}-${payable}-of-${payable}`;
  const transfer = await stripePost("transfers", { amount: payable, currency: "usd", destination: c.stripeAccountId }, undefined, idem);
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
  paid++;
  totalCents += payable;
  } catch (e) {
- // Critical: a Stripe transfer may have gone out while the ledger write failed — surfaces to ops
+ // Critical: a Stripe transfer may have gone out while the ledger write failed. Surfaces to ops
  // so a stuck/undebited payout is caught before the next run (the idempotency key prevents a
  // double-transfer, but this failure still needs eyes).
  await logError("consignment-payout", e, { severity: "critical", context: { consignorId: c.id, storeSlug: c.storeSlug, payable } });

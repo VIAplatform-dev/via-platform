@@ -5,7 +5,7 @@ import { ensureEbayReady } from "@/app/lib/ebay";
 export const dynamic = "force-dynamic";
 
 // Seller-triggered "Finish eBay setup": opt into Business Policies + create default payment/shipping/
-// return policies for any that are missing. Runs automatically on connect too — this is the manual
+// return policies for any that are missing. Runs automatically on connect too. This is the manual
 // re-run button for accounts connected earlier or where a policy was removed.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

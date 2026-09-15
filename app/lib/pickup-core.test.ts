@@ -17,7 +17,7 @@ test("a store that has not turned it on does not offer it", () => {
  assert.equal(pickupOffered(null), false);
 });
 
-test("pickup with no address is not offered — a shopper cannot collect from nowhere", () => {
+test("pickup with no address is not offered. A shopper cannot collect from nowhere", () => {
  // The likeliest way this breaks in practice: the toggle is on and the address was never filled in.
  assert.equal(pickupOffered({ ...OPEN, address: null }), false);
  assert.equal(pickupOffered({ ...OPEN, address: { city: "Washington" } }), false, "a partial address is not an address");

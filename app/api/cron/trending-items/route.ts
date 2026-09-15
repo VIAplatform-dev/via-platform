@@ -19,7 +19,7 @@ export async function GET(request: Request) {
  try {
  const candidates = await getTrendingCandidates();
 
- // Group all trending items by user — one email per user, never one per product
+ // Group all trending items by user. One email per user, never one per product
  const byUser = new Map<string, typeof candidates>();
  for (const c of candidates) {
  const existing = byUser.get(c.user_id) ?? [];
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 
  // Atomically claim notification slots before sending. If another cron
  // instance (e.g. from a concurrent deployment) already claimed these
- // products for this user, claimed will be empty and we skip — preventing
+ // products for this user, claimed will be empty and we skip. Preventing
  // duplicate emails when two instances race.
  const claimed = await claimTrendingNotificationSlots(userId, allProductIds);
  if (claimed.length === 0) {

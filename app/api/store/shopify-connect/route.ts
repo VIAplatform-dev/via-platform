@@ -5,7 +5,7 @@ import { saveConnection, getConnection, deleteConnection } from "@/app/lib/shopi
 
 export const dynamic = "force-dynamic";
 
-// GET — connection status for the acting store.
+// GET: connection status for the acting store.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ connected: !!conn, shopDomain: conn?.shopDomain ?? null, shopName: conn?.shopName ?? null });
 }
 
-// POST { shopDomain, token } — verify the token, then save the connection.
+// POST { shopDomain, token }: verify the token, then save the connection.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,13 +23,13 @@ export async function POST(request: NextRequest) {
  if (!shopDomain || !token) return NextResponse.json({ error: "Shop domain and token are required." }, { status: 400 });
 
  const result = await verifyConnection(shopDomain, token);
- if (!result.ok) return NextResponse.json({ error: result.error || "Couldn’t connect — check the domain and token." }, { status: 400 });
+ if (!result.ok) return NextResponse.json({ error: result.error || "Couldn’t connect: check the domain and token." }, { status: 400 });
 
  await saveConnection(slug, shopDomain, token, result.shopName ?? null);
  return NextResponse.json({ ok: true, shopName: result.shopName ?? null });
 }
 
-// DELETE — disconnect.
+// DELETE: disconnect.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,5 +1,5 @@
 "use client";
-// The editor for any section's repeated content — hero slides, category tiles, reviews, columns,
+// The editor for any section's repeated content. Hero slides, category tiles, reviews, columns,
 // blog posts, gallery photos. One component, driven by the section's ITEM_SCHEMA, because "a list of
 // things you can add to, delete from, and reorder" is the same interaction every time.
 //
@@ -19,7 +19,7 @@ const FIELD_LABEL: Record<string, string> = {
 };
 
 /**
- * A non-text control for one schema field. Some lists have fields that aren't free text — a contact
+ * A non-text control for one schema field. Some lists have fields that aren't free text. A contact
  * form's answer type is one of five, and "required" is a yes or no. Typing those into a text box is
  * how you end up with a field of type "Emial".
  */
@@ -28,7 +28,7 @@ export type ItemControl =
  | { kind: "toggle"; on: string; off: string; hint: string };
 const IMAGE_FIELDS = new Set(["image", "img", "src"]);
 const label = (f: string) => FIELD_LABEL[f] || f.charAt(0).toUpperCase() + f.slice(1);
-// The field that names a row in its collapsed header — the first non-image field carries the meaning.
+// The field that names a row in its collapsed header. The first non-image field carries the meaning.
 const titleField = (schema: ItemSchema) => schema.fields.find((f) => !IMAGE_FIELDS.has(f)) || schema.fields[0];
 
 export default function ItemsEditor({ props, schema, onChange, pick, uploading, addLabel = "Add item", singular = "Item", controls, hide, seed }: {
@@ -41,7 +41,7 @@ export default function ItemsEditor({ props, schema, onChange, pick, uploading, 
  singular?: string;
  /** Fields that need a picker or a switch instead of a text box, keyed by schema field name. */
  controls?: Record<string, ItemControl>;
- /** Hide a field for rows where it means nothing — a list of options on a yes/no question. */
+ /** Hide a field for rows where it means nothing. A list of options on a yes/no question. */
  hide?: (field: string, item: Item) => boolean;
  /** What a freshly added row starts as. A row of nothing but blanks doesn't survive a save, so any
    * schema whose first field must be filled in should seed it. */
@@ -53,7 +53,7 @@ export default function ItemsEditor({ props, schema, onChange, pick, uploading, 
  const [open, setOpen] = useState<number | null>(items.length === 1 ? 0 : null);
  const commit = (next: Item[]) => onChange(schema.key, writeItems(next, schema));
 
- // `open` is a POSITION, so every operation that shifts rows has to move it too — otherwise you nudge
+ // `open` is a POSITION, so every operation that shifts rows has to move it too. Otherwise you nudge
  // the slide you're editing up one and find yourself typing into a different slide. Each helper below
  // pairs the list change with the matching index change.
  const move = (from: number, to: number) => {

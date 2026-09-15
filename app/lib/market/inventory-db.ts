@@ -3,7 +3,7 @@ import { listSessionItemIds } from "./sessions-db";
 import { ensureMarketOrderCols } from "@/app/lib/db/orders";
 
 // What's "at this market": the seller's sellable items (active + quick-listed drafts), optionally
-// narrowed to the session's bring list. Reads `items` directly — the single source of truth.
+// narrowed to the session's bring list. Reads `items` directly: the single source of truth.
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -90,7 +90,7 @@ export async function searchMarketItems(sellerId: string, q: string, sessionId: 
  const term = q.trim();
  if (!term) return [];
  const bring = await bringSet(sessionId);
- // EVERY WORD, ANYWHERE — not the whole phrase in one field.
+ // EVERY WORD, ANYWHERE, not the whole phrase in one field.
  //
  // This used to build a single `%dior blazer%` and test it against title, brand, size and category
  // separately. No one field holds that string: the brand is "Dior", the title says "Jacket". So a
@@ -98,7 +98,7 @@ export async function searchMarketItems(sellerId: string, q: string, sessionId: 
  // for a piece sitting right there. Any natural multi-word search failed, and the failure looked
  // exactly like the item not existing.
  //
- // Now each word must appear somewhere in the piece's text — and description is included, because
+ // Now each word must appear somewhere in the piece's text, and description is included, because
  // "the yellow one" is a real way to search for something you can see in your hand.
  const tokens = term.split(/\s+/).filter(Boolean).slice(0, 6).map((t) => `%${t.replace(/[%_]/g, (m) => "\\" + m)}%`);
  const rows = await db()`SELECT id, title, price_cents, currency, images, brand, size, category, status, sold_at FROM items i

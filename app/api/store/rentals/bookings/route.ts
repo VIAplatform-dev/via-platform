@@ -5,11 +5,11 @@ import { seller, unauthorized } from "../_shared";
 
 export const dynamic = "force-dynamic";
 
-// GET — the seller's own bookings, optionally filtered.
+// GET: the seller's own bookings, optionally filtered.
 //
 // Each booking comes back with WHERE IT IS as well as when it's due: the turnaround settings are an
 // estimate made before anything shipped, and once a return label has been scanned the carrier knows
-// better. Refreshed here rather than on a cron because it's rate-limited per booking — a store with
+// better. Refreshed here rather than on a cron because it's rate-limited per booking. A store with
 // nothing out makes no carrier calls at all, and a page load is exactly when the answer is wanted.
 export async function GET(request: NextRequest) {
  const acting = await seller(request);
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
  //
  // Refreshing here rather than on a cron is right for the Rentals screen: it is rate-limited per
  // booking, and opening the queue is exactly when the answer is wanted. It is wrong for the phone's
- // Home, which fetches this only to say "2 back today" and is opened many times a day — that would
+ // Home, which fetches this only to say "2 back today" and is opened many times a day. That would
  // put a carrier round-trip in front of the seller's first screen. `?tracking=0` asks for the rows
  // without it.
  //

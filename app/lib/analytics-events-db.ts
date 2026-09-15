@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 // The clean, go-forward analytics stream (World A). One row per behavioral event, keyed on the
-// CANONICAL product id (items.id) stamped at capture time — never re-derived from a name or a
+// CANONICAL product id (items.id) stamped at capture time, never re-derived from a name or a
 // composite string. One vocabulary of event types, one table, so every seller funnel is a single
 // clean query. Written ALONGSIDE the legacy capture tables (additive, non-breaking): new data is
 // clean from launch, existing analytics keep working. See the "VYA Event Model" spec.
@@ -68,7 +68,7 @@ export async function recordEvent(e: {
 }
 
 /** The funnel, over a window: how many views → favorites → checkout-starts → purchases. This is the
- *  whole payoff of the clean model — one query, one key, no fuzzy joins. */
+ *  whole payoff of the clean model. One query, one key, no fuzzy joins. */
 export async function getStoreFunnel(storeSlug: string, sinceISO: string): Promise<Record<EventType, number>> {
  const out: Record<EventType, number> = { view: 0, favorite: 0, click: 0, checkout_start: 0, purchase: 0 };
  try {
@@ -80,7 +80,7 @@ export async function getStoreFunnel(storeSlug: string, sinceISO: string): Promi
  return out;
 }
 
-/** Per-item funnel — top pieces by views, with favorites, checkout-starts + purchases. Joins on item_id.
+/** Per-item funnel: top pieces by views, with favorites, checkout-starts + purchases. Joins on item_id.
  * `checkouts` = times a shopper began checkout; abandonments = checkouts a buyer never completed. */
 export async function getItemFunnel(storeSlug: string, sinceISO: string, limit = 20): Promise<Array<{ itemId: string; views: number; favorites: number; checkouts: number; purchases: number }>> {
  try {

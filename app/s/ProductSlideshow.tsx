@@ -7,7 +7,7 @@ import { useState } from "react";
  *
  * The only product arrangement that needs state, and the reason it's worth having: a piece shot from
  * eight angles reads as eight photographs in a grid, or as one photograph you page through. Vintage
- * sells on the second — the detail shot of a seam or a label is a thing you look AT, not scroll past.
+ * sells on the second. The detail shot of a seam or a label is a thing you look AT, not scroll past.
  *
  * Keyboard and screen readers get the same page: the thumbnails are real buttons, so arrowing and
  * tabbing through them works without anything extra.

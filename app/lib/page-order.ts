@@ -2,7 +2,7 @@
 //
 // This is housekeeping, not publishing: it changes which thumbnails sit where in her editor and
 // nothing at all about her site. A shop with eighty pages is mostly pages she never opens, and the
-// four she lives in — home, a couple of collections, the journal — are scattered through an
+// four she lives in, home, a couple of collections, the journal. Are scattered through an
 // alphabetical list. Letting her drag those to the front costs nothing and saves her the scroll
 // every single time.
 //
@@ -51,7 +51,7 @@ export function movePage(order: string[], from: number, to: number): string[] {
 /**
  * What to persist.
  *
- * Only paths that exist, deduplicated, and capped — the order arrives from a browser, so it is not
+ * Only paths that exist, deduplicated, and capped. The order arrives from a browser, so it is not
  * trusted to be a permutation of anything. A cap because this is stored per store and an unbounded
  * array from a client is an unbounded row.
  */

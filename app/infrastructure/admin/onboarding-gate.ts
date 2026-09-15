@@ -17,7 +17,7 @@ export type Whoami = {
 } | null | undefined;
 
 export type GateDecision =
-  /** Nobody is signed in — the wizard needs an identity to attach a store to. */
+  /** Nobody is signed in. The wizard needs an identity to attach a store to. */
   | { go: "sign-in" }
   /** Show the wizard. `again` means they already have a store, so this run makes an extra one. */
   | { go: "wizard"; again: boolean }
@@ -25,12 +25,12 @@ export type GateDecision =
   | { go: "home" };
 
 export function onboardingGate(me: Whoami): GateDecision {
-  // Not signed in at all. `needsOnboarding` counts as signed in — it is what whoami says about
+  // Not signed in at all. `needsOnboarding` counts as signed in. It is what whoami says about
   // somebody with a session and no store yet, which is precisely who this wizard is for.
   if (!me || (!me.needsOnboarding && !me.slug && me.admin !== true)) return { go: "sign-in" };
 
   // VYA's own people always stay. `admin` is the admin cookie; `staff` is one of our own addresses
-  // signed in as a seller — either is enough, and neither requires a flag in the URL.
+  // signed in as a seller. Either is enough, and neither requires a flag in the URL.
   if (me.admin === true || me.staff === true) {
     return { go: "wizard", again: Boolean(me.admin === true || me.slug) };
   }

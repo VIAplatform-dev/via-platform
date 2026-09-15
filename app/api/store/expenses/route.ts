@@ -8,7 +8,7 @@ import { resolvePeriod } from "@/app/lib/analytics/period";
 
 export const dynamic = "force-dynamic";
 
-// The acting store's operating costs — the half of a P&L that isn't inventory.
+// The acting store's operating costs. The half of a P&L that isn't inventory.
 // Reads and writes share the analytics period vocabulary (?period=2026-Q3&tz=…)
 // so what you see here is exactly what the Profit tab is adding up.
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
    categories: EXPENSE_CATEGORIES,
    ...totals,
    expenses,
-   // Rates are returned whole, not clipped to the window — they're settings, not events.
+   // Rates are returned whole, not clipped to the window. They're settings, not events.
    recurring,
   });
  } catch (e) {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
  }
 }
 
-// POST { amountUsd, label, category, occurredOn?, recurs? } — add one cost by hand,
+// POST { amountUsd, label, category, occurredOn?, recurs? }: add one cost by hand,
 // or a rate: recurs "monthly" (a fixed bill) or "per_order" (a packing-recipe line).
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
  }
 }
 
-// DELETE ?id= — remove a cost the seller entered by mistake.
+// DELETE ?id= remove a cost the seller entered by mistake.
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

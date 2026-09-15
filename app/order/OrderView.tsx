@@ -12,16 +12,16 @@ function fontsHref(fams: (string | undefined)[]): string | null {
 }
 
 /**
- * The buyer's order card — store-branded, no third-party app. Shown on the checkout success page
+ * The buyer's order card. Store-branded, no third-party app. Shown on the checkout success page
  * (mode="confirmation") and on the persistent, revisitable status page (mode="status"). Deliberately
- * keeps the shopper with the STORE — "Continue shopping" points back to their storefront, never a
+ * keeps the shopper with the STORE. "Continue shopping" points back to their storefront, never a
  * competing marketplace app.
  */
 export default function OrderView({ v, mode }: { v: BuyerOrderView; mode: "confirmation" | "status" }) {
  const heading = ff(v.fonts.heading);
  const body = ff(v.fonts.body);
  const c = v.colors;
- // `amountCents` is the ITEM total, with shipping held separately — the refund path proves it:
+ // `amountCents` is the ITEM total, with shipping held separately. The refund path proves it:
  // it charges back `amountCents + shippingPaidCents` as the full amount. Subtracting shipping OUT of
  // it made the confirmation page under-report both lines: a buyer who paid $333 for a $325 bag plus
  // $8 shipping was shown "Subtotal $317 · Shipping $8 · Total $325".
@@ -47,7 +47,7 @@ export default function OrderView({ v, mode }: { v: BuyerOrderView; mode: "confi
  { label: "Delivered", note: "Enjoy your piece." },
  ];
 
- // Soft ETA ~10 days from payment — labelled "estimated", not a promise. Meaningless for a
+ // Soft ETA ~10 days from payment. Labelled "estimated", not a promise. Meaningless for a
  // collection: it's ready when the store says so, not ten days from now.
  const eta = !collecting && v.paidAt ? new Date(v.paidAt.getTime() + 10 * 86_400_000) : null;
  const etaStr = eta ? eta.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : null;
@@ -125,7 +125,7 @@ export default function OrderView({ v, mode }: { v: BuyerOrderView; mode: "confi
  </div>
  </section>
 
- {/* Where it's going — or where to go and get it */}
+ {/* Where it's going, or where to go and get it */}
  {collecting ? (
  <section className="mt-4 rounded-2xl border p-5 sm:p-6 text-sm" style={{ borderColor: border }}>
  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-45">Collect from</p>
@@ -147,7 +147,7 @@ export default function OrderView({ v, mode }: { v: BuyerOrderView; mode: "confi
  </section>
  )}
 
- {/* Actions — always back to the STORE, never a third-party app */}
+ {/* Actions: always back to the STORE, never a third-party app */}
  <div className="mt-8 flex flex-col items-center gap-3">
  <a href={shopHref} className="w-full rounded-lg border py-3.5 text-center text-[12px] font-semibold uppercase tracking-[0.16em] transition hover:opacity-80" style={{ borderColor: c.accent, color: c.accent }}>Continue shopping at {v.storeName}</a>
  {mode === "confirmation" && v.token && (

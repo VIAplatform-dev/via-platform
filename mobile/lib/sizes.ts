@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // Kept on the device, which is what the shipped app told people in as many words: "Your sizes are
 // saved on this device. Sign in to sync across devices (coming soon)." There is a server-side taste
 // profile (/api/public/taste) that also holds sizes, but the app owned this locally and the two
-// were never wired together — worth doing, but not silently, since it changes what people see.
+// were never wired together. Worth doing, but not silently, since it changes what people see.
 //
 // The groups mirror TASTE_SIZE_GROUPS in the web repo (app/lib/tasteVibes.ts). Keeping them
 // identical matters: a size the API doesn't recognise filters everything out rather than nothing.

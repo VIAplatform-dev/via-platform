@@ -16,7 +16,7 @@ test("the running key decides which Stripe world we are in", () => {
 
 const connected = (mode: "test" | "live" | null) => ({ stripeAccountId: "acct_1Abc", chargesEnabled: true, stripeMode: mode });
 
-test("a live account is never charged by a server holding test keys — the whole point", () => {
+test("a live account is never charged by a server holding test keys. The whole point", () => {
  // Both ids read `acct_…`, so without the stamp this is indistinguishable from a working account
  // and the charge fails at Stripe with an error that looks like an outage.
  assert.equal(payableAccountId(connected("live"), TEST_ENV), null);
@@ -29,7 +29,7 @@ test("an account matching the running key is charged as normal", () => {
 });
 
 test("accounts connected before the stamp existed keep working", () => {
- // Every one of them is live — production has only ever run one key — and refusing them would take
+ // Every one of them is live, production has only ever run one key, and refusing them would take
  // every existing seller's checkout down the moment this shipped.
  assert.equal(payableAccountId(connected(null), LIVE_ENV), "acct_1Abc");
  assert.equal(accountUsableHere(null, TEST_ENV), true);

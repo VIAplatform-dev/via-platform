@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computePriceFlag } from "./price-engine.ts";
+import { computePriceFlag } from "./price-flag-core.ts";
 
 // The floor rule, stated once so a test can hold it:  floor = cost × (1 + markup).
 const floorOf = (costCents: number, bps: number) => Math.round(costCents * (1 + bps / 10000));
@@ -16,7 +16,7 @@ test("the floor wins when the market sits below it", () => {
  assert.equal(Math.max(market, floor), 13_000);
 });
 
-test("the market wins when it sits above the floor — a floor is not a target", () => {
+test("the market wins when it sits above the floor. A floor is not a target", () => {
  const market = 40_000, floor = floorOf(10_000, 3000);
  assert.equal(Math.max(market, floor), 40_000);
 });
@@ -33,7 +33,7 @@ test("a premium stance still clears the floor and keeps its premium", () => {
  assert.equal(Math.max(adjusted, floor), 50_000);
 });
 
-test("no cost means no floor — a floor over an unknown cost is not a floor", () => {
+test("no cost means no floor. A floor over an unknown cost is not a floor", () => {
  const costCents: number | null = null;
  assert.equal(costCents ? floorOf(costCents, 3000) : null, null);
 });
@@ -44,7 +44,7 @@ test("a zero markup floors at cost itself", () => {
 
 // ── the flag ───────────────────────────────────────────────────────────────────────────────────
 // It answers "what will buyers pay", so it is measured against RAW market. The client was measuring
-// against the suggestion — market × the store's stance — so a premium store's own premium cancelled
+// against the suggestion, market × the store's stance, so a premium store's own premium cancelled
 // out its own warning and the two halves of the app disagreed by exactly the multiplier.
 test("a premium store priced at its stance IS above market, and is told so", () => {
  const market = 40_000;
@@ -54,14 +54,14 @@ test("a premium store priced at its stance IS above market, and is told so", () 
  assert.equal(flag.pct, 25);
 });
 
-test("quoting the suggestion misstates the gap — the client said 0% above a market it was 25% above", () => {
+test("quoting the suggestion misstates the gap. The client said 0% above a market it was 25% above", () => {
  // Half one of the bug. The band was raw-market, so the LEVEL was right; the percentage and the
  // "~$X" in the message came from the suggestion, so the sentence contradicted itself.
  const market = 40_000, suggestion = Math.round(market * 1.25);
  const wrong = computePriceFlag(suggestion, suggestion, Math.round(market * 0.85), Math.round(market * 1.2));
  assert.equal(wrong.level, "over");
  assert.equal(wrong.pct, 0);            // "About 0% above market"
- assert.equal(wrong.marketUsd, 500);    // "(~$500)" — that is the suggestion, not the market
+ assert.equal(wrong.marketUsd, 500);    // "(~$500)": that is the suggestion, not the market
  const right = computePriceFlag(suggestion, market, Math.round(market * 0.85), Math.round(market * 1.2));
  assert.equal(right.pct, 25);
  assert.equal(right.marketUsd, 400);

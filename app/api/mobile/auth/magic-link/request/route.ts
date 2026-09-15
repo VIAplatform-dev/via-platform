@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 // A fixed demo account that signs in instantly (see the short-circuit in POST) so
 // Apple's Beta App Review can get past the passwordless login wall. It's a plain
-// shopper account — no admin or store access — so this is harmless.
+// shopper account, no admin or store access, so this is harmless.
 const REVIEWER_EMAIL = "partnerships@vyaplatform.com";
 
 /**

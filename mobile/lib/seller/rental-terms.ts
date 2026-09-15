@@ -1,7 +1,7 @@
 // Renting a piece out, from the phone.
 //
 // A piece becomes rentable when terms exist for it and stops being rentable when they are deleted
-// — that is the whole model (app/api/store/rentals/terms/[itemId]). The endpoint has always
+// that is the whole model (app/api/store/rentals/terms/[itemId]). The endpoint has always
 // accepted the phone's token; the phone simply never called it, so renting was a thing you could
 // only set up at a laptop, on pieces you had usually photographed with the phone.
 //
@@ -21,7 +21,7 @@ export const tierLabel = (days: number): string =>
  *
  * Mirrors starterTiers in app/infrastructure/admin/rentals/RentalPanel.tsx, proportions included:
  * a few days is a fraction of retail, a month is most of the way to it. A starting point to argue
- * with, not a recommendation — and never zero, because saving filters unpriced tiers out and an
+ * with, not a recommendation, and never zero, because saving filters unpriced tiers out and an
  * all-zero ladder makes the toggle look broken.
  */
 export function starterTiers(priceCents: number | null | undefined): Tier[] {
@@ -65,7 +65,7 @@ export function tiersFromForm(form: TermsForm): Tier[] {
  * Why this cannot be saved yet, or null.
  *
  * The route rejects an empty ladder with "At least one duration and price is needed", which is the
- * right rule and the wrong moment to learn it — so the same check runs here and the Save button
+ * right rule and the wrong moment to learn it, so the same check runs here and the Save button
  * says it before she taps.
  */
 export function termsProblem(form: TermsForm): string | null {

@@ -28,7 +28,7 @@ export type Zone = "near" | "far";
 /**
  * Measured cheapest-available carrier cost per tier, in cents, near and far.
  *
- * Not a guess: sampled from live rate calls. Re-sample and update when carriers re-price — every
+ * Not a guess: sampled from live rate calls. Re-sample and update when carriers re-price. Every
  * number that depends on real postage reads from here, so there is one place to correct.
  */
 export const MEASURED_COST_CENTS: Record<TierId, Record<Zone, number>> = {
@@ -88,7 +88,7 @@ export const allTierEconomics = (): TierEconomics[] => SHIPPING_TIERS.map((t) =>
 /**
  * What to charge for a label that costs this much, to clear the target margin.
  *
- * Rounded UP to the nearest dollar — a price ending in .37 reads as a carrier passthrough, which
+ * Rounded UP to the nearest dollar. A price ending in .37 reads as a carrier passthrough, which
  * is exactly what the flat tier is trying not to be.
  */
 export function breakEvenPriceCents(costCents: number, minMarginCents: number = MIN_MARGIN_CENTS): number {
@@ -105,7 +105,7 @@ export function expeditedCostCents(tierId: TierId, zone: Zone): number {
  *
  * Priced off the far zone, not an average, and this is the whole lesson of the table above. One
  * flat national price has to survive its worst case or the long-haul orders quietly fund
- * themselves out of the short-haul ones — which is exactly how Large ended up losing $7.
+ * themselves out of the short-haul ones, which is exactly how Large ended up losing $7.
  */
 export function expeditedPriceCents(tierId: TierId): number {
   return breakEvenPriceCents(expeditedCostCents(tierId, "far"));
@@ -114,7 +114,7 @@ export function expeditedPriceCents(tierId: TierId): number {
 /**
  * What a STORE should expect to pay when it absorbs shipping.
  *
- * It is charged the real label — no VYA margin on top — so this is the carrier cost, and it is a
+ * It is charged the real label, no VYA margin on top, so this is the carrier cost, and it is a
  * RANGE because the store cannot know where the buyer is when it decides to offer free shipping.
  * Showing one number here would be a promise we cannot keep.
  */

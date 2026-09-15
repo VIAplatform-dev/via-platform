@@ -5,7 +5,7 @@ import { sendAbandonedCartEmail } from "@/app/lib/automation-engine";
 export const maxDuration = 300;
 
 // Every few hours: nudge shoppers who opened a recommerce checkout 1h+ ago and never
-// finished — honoring each store's "abandoned cart" toggle. One email per attempt.
+// finished. Honoring each store's "abandoned cart" toggle. One email per attempt.
 export async function GET(request: Request) {
  const cronSecret = process.env.CRON_SECRET;
  if (!cronSecret || request.headers.get("authorization") !== `Bearer ${cronSecret}`) {

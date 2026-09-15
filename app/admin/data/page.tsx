@@ -67,26 +67,26 @@ export default function AdminDataPage() {
 
  const move = (b: BrandHeat) => {
  if (b.rankPrev == null) return <span style={{ color: "#d4af37" }}>NEW</span>;
- if (!b.rankDelta) return <span style={{ color: FAINT }}>—</span>;
+ if (!b.rankDelta) return <span style={{ color: FAINT }}>-</span>;
  return b.rankDelta > 0 ? <span style={{ color: "#4ade80" }}>▲ {b.rankDelta}</span> : <span style={{ color: "#f87171" }}>▼ {Math.abs(b.rankDelta)}</span>;
  };
  const mom = (b: BrandHeat) => {
  if (b.isBreakout) return <span style={{ color: "#d4af37" }}>Breakout</span>;
- if (b.momentumPct == null) return <span style={{ color: FAINT }}>—</span>;
+ if (b.momentumPct == null) return <span style={{ color: FAINT }}>-</span>;
  const up = b.momentumPct >= 0;
  return <span style={{ color: up ? "#4ade80" : "#f87171" }}>{up ? "+" : ""}{b.momentumPct}%</span>;
  };
  const sig = (d: { views: number; hearts: number; purchases: number }) =>
- [d.views ? `${d.views.toLocaleString()} views` : null, d.hearts ? `${d.hearts} hearts` : null, d.purchases ? `${d.purchases} sold` : null].filter(Boolean).join(" · ") || "—";
+ [d.views ? `${d.views.toLocaleString()} views` : null, d.hearts ? `${d.hearts} hearts` : null, d.purchases ? `${d.purchases} sold` : null].filter(Boolean).join(" · ") || "-";
 
  const groupMove = (g: GroupHeat) => {
  if (g.rankPrev == null) return <span style={{ color: "#d4af37" }}>NEW</span>;
- if (!g.rankDelta) return <span style={{ color: FAINT }}>—</span>;
+ if (!g.rankDelta) return <span style={{ color: FAINT }}>-</span>;
  return g.rankDelta > 0 ? <span style={{ color: "#4ade80" }}>▲ {g.rankDelta}</span> : <span style={{ color: "#f87171" }}>▼ {Math.abs(g.rankDelta)}</span>;
  };
  const groupMom = (g: GroupHeat) => {
  if (g.isBreakout) return <span style={{ color: "#d4af37" }}>Breakout</span>;
- if (g.momentumPct == null) return <span style={{ color: FAINT }}>—</span>;
+ if (g.momentumPct == null) return <span style={{ color: FAINT }}>-</span>;
  const up = g.momentumPct >= 0;
  return <span style={{ color: up ? "#4ade80" : "#f87171" }}>{up ? "+" : ""}{g.momentumPct}%</span>;
  };
@@ -121,12 +121,12 @@ export default function AdminDataPage() {
  </div>
  </div>
  <p style={{ color: MUTED, fontSize: 12.5, maxWidth: 760, marginTop: 6, marginBottom: 24 }}>
- Cross-store demand intelligence — brand momentum, what shoppers want, and where supply is missing. Aggregated across every store. <span style={{ color: FAINT }}>Internal / beta — not visible to stores.</span>
+ Cross-store demand intelligence: brand momentum, what shoppers want, and where supply is missing. Aggregated across every store. <span style={{ color: FAINT }}>Internal / beta, not visible to stores.</span>
  </p>
 
  {loading && <p style={{ color: MUTED }}>Loading…</p>}
 
- {/* Revenue summary — headline numbers for the window */}
+ {/* Revenue summary: headline numbers for the window */}
  {demand && demand.summary && (
  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 22 }}>
  {[
@@ -158,7 +158,7 @@ export default function AdminDataPage() {
    <td style={{ padding: "9px 10px", textAlign: "right" }}>{mom(b)}</td>
    <Td right>{b.views.toLocaleString()}</Td><Td right>{b.favorites.toLocaleString()}</Td>
    <Td right>{b.searches.toLocaleString()}</Td><Td right>{b.sold.toLocaleString()}</Td>
-   <Td right>{b.gmv ? `$${b.gmv.toLocaleString()}` : "—"}</Td>
+   <Td right>{b.gmv ? `$${b.gmv.toLocaleString()}` : "-"}</Td>
    </tr>
   ))}
   </tbody>
@@ -175,7 +175,7 @@ export default function AdminDataPage() {
  {demand && (
  <div style={card}>
  <h2 style={{ fontSize: 16, margin: "0 0 4px" }}>Unmet demand</h2>
- <p style={{ color: FAINT, fontSize: 12, margin: "0 0 14px" }}>Searched repeatedly, few or no results — what to source.</p>
+ <p style={{ color: FAINT, fontSize: 12, margin: "0 0 14px" }}>Searched repeatedly, few or no results. What to source.</p>
  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
  {demand.unmetSearches.length === 0 ? <span style={{ color: MUTED, fontSize: 13 }}>None.</span> :
   demand.unmetSearches.map((u) => (
@@ -204,10 +204,10 @@ export default function AdminDataPage() {
  </div>
  )}
 
- {/* Whitespace — demand outstripping supply (the headline sourcing signal) */}
+ {/* Whitespace: demand outstripping supply (the headline sourcing signal) */}
  {demand && demand.whitespace && demand.whitespace.length > 0 && (
  <div style={card}>
- <h2 style={{ fontSize: 16, margin: "0 0 4px" }}>⚪ Whitespace — demand vs supply</h2>
+ <h2 style={{ fontSize: 16, margin: "0 0 4px" }}>⚪ Whitespace. Demand vs supply</h2>
  <p style={{ color: FAINT, fontSize: 12, margin: "0 0 14px" }}>Brands shoppers want that the marketplace is under-stocked on. High ratio = sourcing opportunity.</p>
  <div style={{ overflowX: "auto" }}>
  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -272,11 +272,11 @@ export default function AdminDataPage() {
   <tr key={b.brand} style={{ borderTop: LINE }}>
    <Td bold>{b.brand}</Td><Td right>{b.listings.toLocaleString()}</Td>
    <Td right>${b.avgListPrice.toLocaleString()}</Td>
-   <Td right>{b.markdownPct != null ? `${b.markdownPct}%` : "—"}</Td>
+   <Td right>{b.markdownPct != null ? `${b.markdownPct}%` : "-"}</Td>
    <Td right>{b.sold.toLocaleString()}</Td>
-   <Td right>{b.avgSoldPrice != null ? `$${b.avgSoldPrice.toLocaleString()}` : "—"}</Td>
-   <td style={{ padding: "9px 10px", textAlign: "right", color: (b.sellThroughPct ?? 0) >= 10 ? "#4ade80" : MUTED }}>{b.sellThroughPct != null ? `${b.sellThroughPct}%` : "—"}</td>
-   <Td right>{b.avgDaysToSell != null ? `${b.avgDaysToSell}d` : "—"}</Td>
+   <Td right>{b.avgSoldPrice != null ? `$${b.avgSoldPrice.toLocaleString()}` : "-"}</Td>
+   <td style={{ padding: "9px 10px", textAlign: "right", color: (b.sellThroughPct ?? 0) >= 10 ? "#4ade80" : MUTED }}>{b.sellThroughPct != null ? `${b.sellThroughPct}%` : "-"}</td>
+   <Td right>{b.avgDaysToSell != null ? `${b.avgDaysToSell}d` : "-"}</Td>
   </tr>
   ))}</tbody>
  </table>
@@ -330,7 +330,7 @@ export default function AdminDataPage() {
    <Td bold>{s.size}</Td><Td right>{s.demand.toLocaleString()}</Td>
    <Td right>{s.views.toLocaleString()}</Td><Td right>{s.favorites.toLocaleString()}</Td>
    <Td right>{s.supply.toLocaleString()}</Td>
-   <td style={{ padding: "9px 10px", textAlign: "right", color: (s.ratio ?? 0) >= 10 ? "#d4af37" : MUTED, fontWeight: 600 }}>{s.ratio != null ? s.ratio.toLocaleString() : "—"}</td>
+   <td style={{ padding: "9px 10px", textAlign: "right", color: (s.ratio ?? 0) >= 10 ? "#d4af37" : MUTED, fontWeight: 600 }}>{s.ratio != null ? s.ratio.toLocaleString() : "-"}</td>
   </tr>
   ))}</tbody>
  </table>

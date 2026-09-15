@@ -32,7 +32,7 @@ test("medium confidence returns up to five candidates above the floor", () => {
  assert.deepEqual(r.candidates.map((c) => c.id), ["0", "1", "2", "3", "4"]);
 });
 
-test("below the floor is no match — never guess", () => {
+test("below the floor is no match, never guess", () => {
  const r = classifyMatch([{ id: "a", score: 0.6 }, { id: "b", score: 0.55 }]);
  assert.equal(r.level, "none");
  assert.equal(r.candidates.length, 0);

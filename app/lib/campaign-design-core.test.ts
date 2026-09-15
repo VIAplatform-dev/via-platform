@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { parseCampaignDesign } from "./campaign-design-core.ts";
 
 // The composer's layout, sanitised. Both the preview and the send read a design through this, and a
-// scheduled campaign reads one back out of the database months later — so it has to survive junk
+// scheduled campaign reads one back out of the database months later, so it has to survive junk
 // without either path having to guess.
 
 test("a full design survives the round trip", () => {

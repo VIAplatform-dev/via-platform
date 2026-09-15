@@ -11,24 +11,24 @@ import { colors, spacing, fonts } from "../../lib/theme";
 import { formatMoney } from "../../lib/seller/home";
 import { filterRack, sortRack, rackSubtitle, rackEmptyMessage, SELLABLE, type RackItem } from "../../lib/market/rack";
 
-// Market Mode — selling in person.
+// Market Mode: selling in person.
 //
 // PORTED FROM THE WEB, NOT REBUILT. This is app/infrastructure/admin/market/page.tsx in React
 // Native primitives: the same "wine band + sheet" shape, the same numbers, and above all the SAME
-// ENDPOINTS — app/lib/market/auth.ts already resolves the acting seller from the mobile JWT.
+// ENDPOINTS: app/lib/market/auth.ts already resolves the acting seller from the mobile JWT.
 //
 // It calls no market API the web app doesn't. CLAUDE.md is explicit that there must never be a
 // parallel inventory or payment path: reserve via reserveItemForMarket, complete only through
 // finalizeMarketSale. Every one of those lives behind these routes, so the phone stays a client.
 //
-// IT TAKES OVER THE SCREEN. No tab bar — it is a session (camera, cart, cash), not a destination,
+// IT TAKES OVER THE SCREEN. No tab bar: it is a session (camera, cart, cash), not a destination,
 // and it owns the screen until she closes it, exactly as it does on desktop.
 //
 // THE RACK IS THE SCREEN. It used to be two enormous buttons and three numbers: you could see how
 // the day was going but not one thing you had brought, and the only way to find a piece was to
 // PHOTOGRAPH it. Standing at a stall with the buyer holding the thing, "take a picture and wait"
 // is not an answer, and you could not type "fendi bag" at all. Now every sellable piece is listed,
-// searchable by typing, and one tap from a sale. Find by photo and Quick list are still here —
+// searchable by typing, and one tap from a sale. Find by photo and Quick list are still here,
 // smaller, because they are the two exceptions, not the main event.
 
 type Home = {
@@ -85,7 +85,7 @@ export default function MarketHome() {
 
   // Her currency AND her shop's name. The name is not decoration: this screen is where she takes
   // real cash, and until it said so there was nothing anywhere in Market Mode identifying WHICH
-  // store the app was signed in as — the big title is the market SESSION, which reads like an
+  // store the app was signed in as. The big title is the market SESSION, which reads like an
   // account name and isn't one.
   const me = useQuery({
     queryKey: ["store", "me"],
@@ -125,7 +125,7 @@ export default function MarketHome() {
   const all = useMemo(() => rack.data?.items ?? [], [rack.data]);
   const shown = useMemo(() => sortRack(filterRack(all, query)), [all, query]);
 
-  /** One tap from the rack to a cash checkout — the same single path find.tsx uses. */
+  /** One tap from the rack to a cash checkout. The same single path find.tsx uses. */
   async function sell(item: RackItem) {
     if (starting) return;
     setError(null);
@@ -164,9 +164,9 @@ export default function MarketHome() {
           </Text>
 
           <View style={{ flexDirection: "row", gap: spacing.xxl, marginTop: spacing.lg }}>
-            <Stat value={c ? formatMoney(c.grossTodayCents, currency) : "—"} label="today" />
-            <Stat value={c ? c.soldToday : "—"} label="sold" />
-            <Stat value={onRack ?? "—"} label="on the rack" />
+            <Stat value={c ? formatMoney(c.grossTodayCents, currency) : "-"} label="today" />
+            <Stat value={c ? c.soldToday : "-"} label="sold" />
+            <Stat value={onRack ?? "-"} label="on the rack" />
           </View>
 
           {c && (c.cashCents > 0 || c.cardCents > 0) ? (
@@ -300,7 +300,7 @@ export default function MarketHome() {
           <Text style={{ fontWeight: "700", color: colors.accent }}>›</Text>
         </Pressable>
 
-        {/* Cards or cash — she needs to know before the first buyer, not at the card reader. */}
+        {/* Cards or cash: she needs to know before the first buyer, not at the card reader. */}
         <Text style={{ fontSize: 10, letterSpacing: 1.4, color: colors.textDim, fontWeight: "700", marginTop: spacing.xl, marginHorizontal: spacing.xl }}>
           PAYMENTS
         </Text>
@@ -323,7 +323,7 @@ export default function MarketHome() {
             </View>
           ) : q.data ? (
             // Was "Set up cards on the desktop". Connecting Stripe is a button on Payouts now, so
-            // this points at it — a market is exactly when she notices she can't take a card.
+            // this points at it. A market is exactly when she notices she can't take a card.
             <Pressable hitSlop={8} onPress={() => router.push("/(seller)/payouts")}>
               <Text style={{ fontSize: 12, color: colors.accent, fontWeight: "600" }}>Set up cards</Text>
             </Pressable>

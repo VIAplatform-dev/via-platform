@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
  FROM clicks
  `,
 
- // Repeat buyers — users with 2+ orders within the selected period
+ // Repeat buyers. Users with 2+ orders within the selected period
  sql`
  SELECT COUNT(DISTINCT user_id)::int AS repeat_buyers
  FROM conversions

@@ -6,13 +6,13 @@ import { normalizeDraft, readEstimate, costFromText, type DraftFields } from "./
 // The listing pipeline, in one place.
 //
 // Three server calls, in order, all of them the SAME endpoints the desktop uses:
-//   1. /api/store/listings/upload   — multipart, one photo at a time → a blob URL
-//   2. /api/store/intake            — { imageUrls, filled } → drafted fields
-//   3. /api/store/intake/pricing    — { fields, imageUrls } → price + comps count
-//   4. /api/store/intake/publish    — { ...fields, status } → a real item
+//   1. /api/store/listings/upload: multipart, one photo at a time → a blob URL
+//   2. /api/store/intake: { imageUrls, filled } → drafted fields
+//   3. /api/store/intake/pricing. { fields, imageUrls } → price + comps count
+//   4. /api/store/intake/publish: { ...fields, status } → a real item
 //
 // Upload has to come first because intake takes URLs, not bytes: the server re-encodes every
-// photo to JPEG with sharp, which is not optional — iPhone photos are HEIC and the AI cannot read
+// photo to JPEG with sharp, which is not optional. IPhone photos are HEIC and the AI cannot read
 // HEIC at all ("file format is invalid or unsupported").
 
 export type { DraftFields };
@@ -42,7 +42,7 @@ export async function uploadPhoto(uri: string): Promise<string> {
 }
 
 /**
- * Phase 1 — the fields. `draftOnly` so the form can render before pricing is done.
+ * Phase 1: the fields. `draftOnly` so the form can render before pricing is done.
  *
  * The response is normalised here rather than at the call sites: the raw shape has the fields
  * under `draft` and wraps half of them in {value, confidence}, and every screen that touched it
@@ -63,11 +63,11 @@ export async function draftListing(imageUrls: string[], typedFields: Record<stri
 }
 
 /**
- * Phase 2 — the number, and how many comparable sales stand behind it.
+ * Phase 2: the number, and how many comparable sales stand behind it.
  *
  * The route answers { ok, estimate, priceFlag, runway, celebrity }; the price lives at
  * estimate.suggestedCents and the comps count is estimate.comps.length. There is no top-level
- * `price` — reading for one returned undefined and the Review screen showed an empty row.
+ * `price`: reading for one returned undefined and the Review screen showed an empty row.
  */
 export async function priceListing(imageUrls: string[], fields: DraftFields, extras: Record<string, unknown> = {}) {
   const r = await apiPost<{ estimate?: { suggestedCents?: number | null; marketCents?: number | null; comps?: unknown[] | null } }>(
@@ -78,7 +78,7 @@ export async function priceListing(imageUrls: string[], fields: DraftFields, ext
 }
 
 /**
- * Publish, or save as a draft. Same route either way — `status` decides.
+ * Publish, or save as a draft. Same route either way. `status` decides.
  *
  * `priceCents` in, MAJOR units out: the route does `Number(body.price) * 100`. Sending cents
  * would list a $219 pair of shoes at $21,921, so the conversion lives here rather than in each
@@ -99,10 +99,10 @@ export async function publishListing(
   status: "active" | "draft",
 ) {
   const { priceCents, cost, imageUrls, ...rest } = fields;
-  // Cost travels like price: major units, and only when she gave one — a blank must not be sent
+  // Cost travels like price: major units, and only when she gave one. A blank must not be sent
   // as 0, which the margin report would read as free stock.
   const costMajor = costFromText(cost);
-  // The route answers { ok, itemId, status, scheduled, publishAt, crossListing } — itemId at the
+  // The route answers { ok, itemId, status, scheduled, publishAt, crossListing }. ItemId at the
   // top level, not a nested item object.
   return apiPost<{ ok: boolean; itemId?: string; status?: string }>("/api/store/intake/publish", {
     ...rest,

@@ -1,8 +1,8 @@
-# Hosted Stores — Handoff (2026-08-29)
+# Hosted Stores. Handoff (2026-08-29)
 
 Read this first if you are a new Claude Code session picking up the hosted-store work. It is
 written to be executed, not admired. Everything referenced exists on disk on branch
-`import/m0-capture-shim` (uncommitted — see §10).
+`import/m0-capture-shim` (uncommitted. See §10).
 
 ---
 
@@ -15,7 +15,7 @@ written to be executed, not admired. Everything referenced exists on disk on bra
 - **Never write to production (Neon DB, Vercel Blob, sellers' sites) without explicit confirmation
   in the current message.** Reads are fine. Blessed writable test stores: `test-import`,
   `test-import-2`, `sourcedbyscottie`, and `blummier` (authorised for `store_health` publish only).
-  A fleet run writes to every store — it needs a fresh "go".
+  A fleet run writes to every store. It needs a fresh "go".
 - **The user's machine is not a server.** Do not leave long CPU/Playwright jobs running unattended
   without telling them; kill anything that runs longer than expected. One heavy process at a time.
   Stop the Next dev server when checks are done (`pkill -f next-server`).
@@ -35,8 +35,8 @@ written to be executed, not admired. Everything referenced exists on disk on bra
 > JavaScript, products, and UI."
 
 A seller's store on VYA (`<slug>.vyasites.test:3348` locally; a real host suffix in prod) must be
-indistinguishable from their own site for a shopper — same products at the same prices in the same
-collections, same look, same theme behaviour — **and must keep working if the seller cancels
+indistinguishable from their own site for a shopper. Same products at the same prices in the same
+collections, same look, same theme behaviour. **and must keep working if the seller cancels
 Shopify.** And this must hold for every current store and every future one *without per-store
 hand fixing*.
 
@@ -45,7 +45,7 @@ hand fixing*.
 | Layer | State | Proof |
 |---|---|---|
 | Catalog (every product, price, currency, sold status) | **Done and self-checking** | parity `CATALOG 100%` on blummier, test-import |
-| Placement (which products in which collection) | **One engine fix left** | 9 stores off by a few — throttled reads (§6.1) |
+| Placement (which products in which collection) | **One engine fix left** | 9 stores off by a few. Throttled reads (§6.1) |
 | Look (theme HTML/CSS/fonts/photos) | **Done** | side-by-side screenshots |
 | Survives Shopify cancellation | **Done on small stores; backlog on large** | blackout gate (§4.3) |
 | Theme JavaScript (menus, drawers, carousels) | **Done** (Plan B keeps theme JS) | interaction pass in verifier |
@@ -60,7 +60,7 @@ is deliverable now; "nothing changes" is not.
 
 - **Capture** (`app/lib/site-capture.ts`): crawl the seller's site, store each page's HTML in Neon
   `site_captures` (`store_slug, path, html`). Product grids are re-rendered from live VYA inventory
-  at serve time (`liveGridHtml`, `renderThemeCard`) — never frozen source HTML. Sold items stay
+  at serve time (`liveGridHtml`, `renderThemeCard`), never frozen source HTML. Sold items stay
   visible with a Sold badge and no add-to-cart.
 - **Plan A vs Plan B**: Plan A serves from VYA origin `/site/<slug>` with scripts stripped; Plan B
   serves from the store's own host (`<slug>.vyasites.test`) keeping theme JS, proxying `/cdn/`.
@@ -69,13 +69,13 @@ is deliverable now; "nothing changes" is not.
   products from `products.json` (home-market forced via `Cookie: localization=<CC>`, read from the
   homepage's `countryCode`), items upserted, membership from `/collections/<h>/products.json`
   with an **unread-collection guard** (a throttled `200 {"products":[]}` never wipes a collection).
-  A product that disappears from the feed is marked `sold` (an inference — see §9).
+  A product that disappears from the feed is marked `sold` (an inference: see §9).
 - **Rehost** (`app/lib/rehost-theme-assets.ts`): copy every theme asset (JS, fonts, images, video,
   import maps, extensionless `/cdn/fonts/`) to Vercel Blob under `theme/<slug>/…`, then rewrite
   every textual form of the URL in every page. Lives **inside `captureSite`** (`opts.rehost`), so
   new captures own their assets; `scripts/rehost-theme-assets.mts` is only the backfill. Idempotent:
   already-owned URLs are skipped (`list({prefix})`). **Rewrite is single-pass (`rewritePageUrls`)**
-  — the old per-URL split/join took 5 h on a 369-page store.
+. The old per-URL split/join took 5 h on a 369-page store.
 - **Serve**: `app/site/[slug]/[[...path]]/route.ts`, `app/site/[slug]/products/[handle]/route.ts`,
   `middleware.ts`, `app/lib/plan-b/*` (cart drawer, cart submit, scripts allow/deny list).
 - **Checks** (all in `scripts/`, all Playwright/Node, all read-only unless stated):
@@ -84,10 +84,10 @@ is deliverable now; "nothing changes" is not.
   kind), `repair-store.mts` (**writes** items/collections), `fleet.sh` (all of it, per store).
 - **Seller-facing**: `app/lib/store-health.ts` (grading), `store-health-db.ts` (`store_health`,
   `store_health_reviews`), `app/api/store/hosted-review/route.ts`, portal tab **Hosted Store**
-  (`app/store/dashboard/HostedStoreReview.tsx`) — findings in seller words + side-by-side
+  (`app/store/dashboard/HostedStoreReview.tsx`): findings in seller words + side-by-side
   screenshots + *Looks right / Something's off / Skip*.
 
-Deeper design notes: `docs/superpowers/specs/2026-08-28-market-mode-design.md` (Market Mode —
+Deeper design notes: `docs/superpowers/specs/2026-08-28-market-mode-design.md` (Market Mode,
 unrelated but same branch), memory files listed in §11.
 
 ---
@@ -115,7 +115,7 @@ node --experimental-strip-types --env-file=.env.local scripts/grade-store.mts <s
 node --env-file=.env.local --import tsx scripts/repair-store.mts <slug>   # WRITES items/collections (hits seller's site)
 node --experimental-strip-types --env-file=.env.local scripts/rehost-theme-assets.mts <slug>     # WRITES Blob + site_captures
 
-# the whole fleet, unattended (WRITES everything above for every store — needs the user's go)
+# the whole fleet, unattended (WRITES everything above for every store. Needs the user's go)
 nohup scripts/fleet.sh > .verify/fleet2.log 2>&1 &
 tail -f .verify/fleet2.log        # ends with "══════ FLEET DONE"; report .verify/FLEET-REPORT.md; census .verify/CENSUS.md
 npm run census                    # re-cluster from existing .verify/*/health.json, no network
@@ -136,13 +136,13 @@ Gotchas learned the hard way:
 
 ## 4. The checks, what each proves, and its known blind spots
 
-### 4.1 `verify-store.mts` — does it behave
+### 4.1 `verify-store.mts`. Does it behave
 Loads key pages, checks tiles/images/overlays, opens the cart drawer, adds to cart (via `/cart.js`
 count), searches, filters. Sold-aware. Blind spots: it mutates a real cart; keep it off nightly.
 
-### 4.2 `parity-check.mts` — is it the same store
+### 4.2 `parity-check.mts`. Is it the same store
 - **Catalog**: feed vs `items`. `missingHere` excludes unsellable feed products (no price, nothing
-  available — archive display pieces). `extraHere` counts **active** items only (sold pieces stay
+  available: archive display pieces). `extraHere` counts **active** items only (sold pieces stay
   here on purpose; the seller's feed drops them). Per-collection counts.
 - **Pages**: sitemap vs captures (locale variants like `/de/…` inflate "missing"; known).
 - **Shopper**: 3 pages (home, busiest collection, latest product) loaded on both sides; titles,
@@ -150,13 +150,13 @@ count), searches, filters. Sold-aware. Blind spots: it mutates a real cart; keep
   Records `missingTitles`/`missingPrices` so findings can quote them.
 - Writes `.verify/<slug>/parity.json` and `parity-{source,ours}_<page>.png`.
 
-### 4.3 `blackout-check.mts` — does it survive cancellation
+### 4.3 `blackout-check.mts`. Does it survive cancellation
 Loads 3 pages normally and with every Shopify host **and** our `/cdn/` proxy blocked; compares
 imgs loaded, product links, header, logo, videos playing, CSS backgrounds. Writes
 `blackout-<label>.json` + screenshots. Blind spot: only 3 pages; below-the-fold losses don't show in
 the viewport screenshot (blummier home: 28 photos lost, screenshot identical).
 
-### 4.4 `grade-store.mts` + `store-health.ts` — what it means
+### 4.4 `grade-store.mts` + `store-health.ts`. What it means
 No score. Findings carry a **tier**; verdict = worst tier present.
 - **blocking** (`fail`): product missing / active-but-gone / wrong sold-out status; a price
   differs (only beyond what absent products explain); a page didn't load; product links or header
@@ -167,15 +167,15 @@ No score. Findings carry a **tier**; verdict = worst tier present.
 - **cosmetic** (`pass`): order, menu links, and on product pages the "you may also like" strip.
 Messages are seller-worded; a test forbids "Shopify/blackout/cdn/parity" in them.
 
-### 4.5 `census.mts` — where the fixes go
+### 4.5 `census.mts`, where the fixes go
 Groups every finding across stores by *kind* (`findingKind`: counts → N, examples dropped, page →
 home/collection/product). A kind on many stores is **our** bug (engine or checker), fix once. A
-singleton is that store's fact — it belongs on the seller's Hosted Store tab, not in the engine.
+singleton is that store's fact. It belongs on the seller's Hosted Store tab, not in the engine.
 The loop: **fleet → census → fix the top line → fleet.**
 
 ### 4.6 What none of this verifies (be honest with the user)
-Pixel sameness (deliberately not built — masks would be per-store tuning in disguise); every page
-under blackout; behaviour on mobile; geo/logged-in views; and anything past the storefront — order
+Pixel sameness (deliberately not built: masks would be per-store tuning in disguise); every page
+under blackout; behaviour on mobile; geo/logged-in views; and anything past the storefront. Order
 emails, shipping, tax, discounts, accounts, DNS/SSL cutover. **Never show "Ready".**
 
 ---
@@ -204,20 +204,20 @@ we-thieves.
 
 ### Round-1 census (stale rules; annotated)
 ```
-10 stores  products not shown here [product]      recommendation strip — FIXED (cosmetic now)
- 9 stores  collection counts differ                throttled reads — NEXT ENGINE FIX (§6.1)
- 7/5/5     photos would stop loading [home/product/collection]   rehost pre-cap backlog — round 2 clears
- 6 stores  products missing here (blocking)        £0 sold-out archive pieces — FIXED
+10 stores  products not shown here [product]      recommendation strip: FIXED (cosmetic now)
+ 9 stores  collection counts differ                throttled reads. NEXT ENGINE FIX (§6.1)
+ 7/5/5     photos would stop loading [home/product/collection]   rehost pre-cap backlog. Round 2 clears
+ 6 stores  products missing here (blocking)        £0 sold-out archive pieces. FIXED
  6 stores  products not shown here [collection]    LOOK: probably pagination (we render page 1)
  5 stores  products not shown here [home]          LOOK: live "new in" strips on their side
  4 stores  section headings missing [home]         LOOK: app-injected sections we strip (popups)
- 3/3       prices differ [collection/product]      GBP-as-USD — FIXED, needs round-2 repair
+ 3/3       prices differ [collection/product]      GBP-as-USD: FIXED, needs round-2 repair
  3 stores  pages not copied                        LOOK: /de/ /it/ locale variants in sitemap
- 3 stores  products no longer on your site         sold items — FIXED
- 2 stores  video would stop playing [home]         old 20 s video timeout — FIXED, round 2
+ 3 stores  products no longer on your site         sold items. FIXED
+ 2 stores  video would stop playing [home]         old 20 s video timeout. FIXED, round 2
  cosmetic  menu links / order differ               noted, never gating
 singletons: chill-boutique (sold-out status, home prices), shop-vintage-charm (product links lost
-under blackout — the one true blackout failure), test-import (a product page didn't load),
+under blackout: the one true blackout failure), test-import (a product page didn't load),
 montrose-edit (heading).
 ```
 
@@ -225,14 +225,14 @@ montrose-edit (heading).
 
 ## 6. Backlog, in priority order (each is engine-level; none is per-store)
 
-1. **Paced collection reader** — `getShopifyCollectionMembership` in `store-import.ts`: add a
+1. **Paced collection reader** `getShopifyCollectionMembership` in `store-import.ts`: add a
    delay between collection requests (start 700 ms), retry the empty-`200` response as a throttle
    (it already retries 429/5xx), cap concurrency at 1 per seller. Removes the #1 census line.
-   Then also investigate `gucci 0/24` on blummier (source serves an empty collection — unpublished?
+   Then also investigate `gucci 0/24` on blummier (source serves an empty collection. Unpublished?
    then hide ours too).
-2. **Product-page price text is frozen at capture** — the PDP HTML carries the capture-time price
+2. **Product-page price text is frozen at capture** the PDP HTML carries the capture-time price
    markup. Must render the item's live `priceCents`/`currency` (the GBP fix exposed this).
-3. **Crawl in the home market** — `fetchHeaders` in `site-capture.ts` should send
+3. **Crawl in the home market** `fetchHeaders` in `site-capture.ts` should send
    `Cookie: localization=<CC>` too, so captured pages don't bake `Shopify.currency = USD`.
 4. **`syncCollectionOrder` reads page 1 only** of a captured collection.
 5. **Locale page variants** (`/de/…`, `/it/…`): exclude from "pages missing" or capture them
@@ -240,13 +240,13 @@ montrose-edit (heading).
 6. **Frozen "N products" count labels** in collection headers (cosmetic).
 7. **Blackout: gate all pages weekly** (`blackout-check` already takes a page list); import-time
    stays at 3 pages.
-8. **Fold `verify:store` into the fleet** with a blessed test item per store — never mutate a real
+8. **Fold `verify:store` into the fleet** with a blessed test item per store, never mutate a real
    cart nightly.
 9. **Mobile viewport pass** in parity (most vintage shoppers are on phones).
 10. Known cosmetic: hachi-archive/thenicheshop card-width drift; bag-crush empty hero;
     awoke-vintage missing collection header; maison logo clip; loved-again PRADA vendor; lamash £
     on "Under $1,000".
-11. `/etc/hosts` still has `unique-vintage.vyasites.test` — user removes with sudo.
+11. `/etc/hosts` still has `unique-vintage.vyasites.test`. User removes with sudo.
 
 Do **not** build: a pixel diff, a single numeric score, a "Ready" label, a nightly fleet (weekly
 is in `.github/workflows/fleet.yml`; needs a `FLEET_ENV_FILE` secret to run).
@@ -283,7 +283,7 @@ is in `.github/workflows/fleet.yml`; needs a `FLEET_ENV_FILE` secret to run).
 ## 9. Decisions the user owes (ask, don't assume)
 
 1. **Vanished pieces**: a product that disappears from the seller's feed is marked **Sold**. That is
-   an inference (blummier's 9 were all 404 on their site — deleted or sold, unknown). Options: keep
+   an inference (blummier's 9 were all 404 on their site. Deleted or sold, unknown). Options: keep
    "Sold"; label "No longer available" when inferred and "Sold" only when Shopify said sold-out
    (`available:false` while still listed); or hide deleted pieces. No code written.
 2. **What "1:1" promises sellers**: "your store, our checkout" vs "nothing changes".
@@ -321,8 +321,8 @@ Verify before claiming green: `npx tsc --noEmit`, `npx eslint <files>`, `npm tes
 ## 12. First 15 minutes for a new session
 
 1. Read §0 and §9. Ask the user for round-2 go and the "Sold" decision if they haven't given them.
-2. `npm test`, `npx tsc --noEmit` — confirm the baseline (747/749, 0 errors).
-3. `npm run census` — read the table; it is the to-do list.
+2. `npm test`, `npx tsc --noEmit`. Confirm the baseline (747/749, 0 errors).
+3. `npm run census`. Read the table; it is the to-do list.
 4. If round 2 is a go: `npm run dev -- -p 3348`, then `nohup scripts/fleet.sh > .verify/fleet2.log 2>&1 &`,
    tell the user roughly how long (≈10 min/store now), and **do not poll**. Stop the dev server when done.
 5. While it runs (it is one process; don't add a second on the same sellers): build §6.1 with a

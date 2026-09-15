@@ -10,7 +10,7 @@ export const runtime = "nodejs";
  * Crop a listing photo to the card's shape.
  *
  * The pixels are changed rather than a focal point stored, because a listing photo is sent to eBay
- * and Depop as a bare URL — they decide the crop, and no instruction of ours travels with it. It
+ * and Depop as a bare URL. They decide the crop, and no instruction of ours travels with it. It
  * also means the eighty-odd places that render an item photo need no change at all.
  *
  * The original blob is left in storage; this writes a new file beside it.

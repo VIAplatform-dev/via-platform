@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
  const to = isDay(q.get("to")) ? String(q.get("to")) : addDays(from, Math.min(ctx.settings.horizonDays, 60));
  const booked = await bookedSlots(ctx.sellerId, from, to);
 
- // Lead time is in HOURS, so it can bite inside today — "not before tomorrow" and "not for another
+ // Lead time is in HOURS, so it can bite inside today. "not before tomorrow" and "not for another
  // two hours" are different promises and a shop means the second one.
  const cutoff = new Date(Date.now() + ctx.settings.leadHours * 3_600_000);
  const cutoffDay = cutoff.toISOString().slice(0, 10);
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
  const ctx = await publicContext({ storeSlug, itemId, request });
  if (!ctx) return notFound("This store isn't taking appointments.");
  // Appointments off means OFF. The section disappears from the storefront when a store turns
- // them off, but this route booked anyway — so a page left open, or a stale link, still put a
+ // them off, but this route booked anyway, so a page left open, or a stale link, still put a
  // stranger in her diary. Same gate the rental intent needs, for the same reason.
  if (!ctx.settings.enabled) return notFound("This store isn't taking appointments.");
 
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
  });
 
  // INTO THE INBOX AS WELL AS THE DIARY. An appointment is somebody asking the store for time, and
- // the inbox is where the seller looks for "who wants something from me" — an email alone means she
+ // the inbox is where the seller looks for "who wants something from me". An email alone means she
  // has to remember to check a second screen. Swallowed: the booking is made either way.
  void openEnquiryThread({
   storeSlug: ctx.storeSlug,

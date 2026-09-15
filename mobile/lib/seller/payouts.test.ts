@@ -21,7 +21,7 @@ test("owed entirely off-platform, by deposit, offers nothing and says why", () =
   // The marketplace paid the store. VYA has no money to send, however much is owed.
   const a = payoutActionFor({ method: "stripe", balanceCents: 4000, payableCents: 0, offPlatform: { totalCents: 4000 } });
   assert.equal(a.canPay, false);
-  assert.match(a.note ?? "", /record it as cash/);
+  assert.match(a.note ?? "", /Record it as cash/);
 });
 
 test("owed but still in the return hold says so rather than failing on tap", () => {
@@ -36,7 +36,7 @@ test("a debit still clearing blocks a second payment", () => {
   assert.match(a.note ?? "", /still clearing/);
 });
 
-test("owing nothing is quiet — no button, no explanation", () => {
+test("owing nothing is quiet, no button, no explanation", () => {
   const a = payoutActionFor({ method: "cash", balanceCents: 0, payableCents: 0 });
   assert.equal(a.canPay, false);
   assert.equal(a.note, null);

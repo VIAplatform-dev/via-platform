@@ -11,19 +11,19 @@ import { setupSteps, type SetupInput, type SetupStepId } from "./setup-core";
 // The flags "Set up your store" is computed from, gathered once per store. Shared by the seller's
 // own onboarding-status route and the owner's setup funnel, so both see the same checklist.
 //
-// Payments reads the CACHED Stripe flags (seller_payments, kept current by the Connect webhook) —
+// Payments reads the CACHED Stripe flags (seller_payments, kept current by the Connect webhook),
 // never a live Stripe call from a screen that opens forty times a day, nor forty-five of them from
 // the funnel. Live listings are a COUNT, not the rows: a 1,400-piece store must cost the funnel the
 // same as an empty one. Every read degrades to "not done" on error rather than failing the status.
 export type SetupStatusInput = SetupInput & {
- /** The storefront is published — half of the older "has this store set up yet?" bit. */
+ /** The storefront is published. Half of the older "has this store set up yet?" bit. */
  storefrontEnabled: boolean;
 };
 
 const OPTIONAL: SetupStepId[] = setupSteps({ shipFromSet: false, paymentsConnected: false, chargesEnabled: false, shippingConfigured: false, servedZoneCount: 0, liveListings: 0, policySet: false, customDomain: null })
  .filter((s) => s.optional).map((s) => s.id);
 
-/** Is this an optional step id — the only kind that can be skipped. */
+/** Is this an optional step id. The only kind that can be skipped. */
 export function isSkippableStep(id: unknown): id is SetupStepId {
  return typeof id === "string" && (OPTIONAL as string[]).includes(id);
 }

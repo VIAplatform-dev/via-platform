@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// POST /api/admin/reconcile-conversions?limit=500 — re-enrich existing Shopify
+// POST /api/admin/reconcile-conversions?limit=500: re-enrich existing Shopify
 // Collabs conversions with the REAL line items from the order-webhook cache.
 // Collabs stays the recorder; this only fixes the `items` (product labels), not
 // totals or commission. Safe to re-run. Only matches orders the webhook has

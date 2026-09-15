@@ -29,7 +29,7 @@ export default function AdminLoginClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
-        // Always show the same confirmation — the endpoint never reveals whether the email matched.
+        // Always show the same confirmation. The endpoint never reveals whether the email matched.
         setResetSent(true);
         return;
       }

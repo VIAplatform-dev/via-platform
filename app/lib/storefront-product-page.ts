@@ -6,14 +6,14 @@
 // what it's called, and the two sentences VYA used to put in every seller's mouth.
 //
 // Most of these fields were already on every listing and shown to nobody: brand, era, material,
-// condition and origin were fed to the meta description and the schema.org block — so Google was
+// condition and origin were fed to the meta description and the schema.org block, so Google was
 // told the era of a piece and the shopper looking at it wasn't.
 //
 // Pure and dependency-free: the settings panel, the live page and the editor preview all read one
 // definition, so what a seller arranges is what a shopper gets.
 // ───────────────────────────────────────────────────────────────────────────
 
-/** The facts a listing carries. Loosely typed on purpose — the DB row, the editor's sample product
+/** The facts a listing carries. Loosely typed on purpose. The DB row, the editor's sample product
  *  and a test fixture all satisfy it without this module knowing about Drizzle. */
 export type ProductFacts = {
  brand?: string | null;
@@ -31,7 +31,7 @@ export type ProductFieldKey = keyof ProductFacts;
  * inline = printed in the column.
  * drawer = folded into a <details> the shopper opens.
  * chip   = the value as a pill, the way a size is shown on most fashion sites. Only worth it for
- *          SHORT values — a paragraph in a pill is a paragraph with a border round it.
+ *          SHORT values. A paragraph in a pill is a paragraph with a border round it.
  */
 export type FieldMode = "inline" | "drawer" | "chip";
 
@@ -44,7 +44,7 @@ export type ProductField = { key: ProductFieldKey; show: boolean; mode: FieldMod
 /**
  * How the buy / rent buttons look.
  *
- * Every CTA a product page renders — Buy now, Rent now, Buy outright, the appointment button —
+ * Every CTA a product page renders, Buy now, Rent now, Buy outright, the appointment button,
  * already carries `vya-cta`, so one rule reaches all of them. Colours default to null meaning
  * "the storefront accent", so a store that never opens this looks exactly as it does today.
  */
@@ -53,10 +53,10 @@ export type ButtonStyle = {
  bg: string | null;
  text: string | null;
  uppercase: boolean;
- /** Letter-spacing in hundredths of an em — 20 = 0.2em, the wide tracking these buttons ship with. */
+ /** Letter-spacing in hundredths of an em. 20 = 0.2em, the wide tracking these buttons ship with. */
  tracking: number;
  /**
-  * Corner radius in px. `null` follows the store's corner style, which is the right default — a
+  * Corner radius in px. `null` follows the store's corner style, which is the right default. A
   * shop that chose round corners wants round buttons. It's here as its own control because the
   * reverse is a real want too: pill buttons on a page whose photographs stay square.
   */
@@ -76,7 +76,7 @@ export const BUTTON_RADII: { value: number | null; label: string }[] = [
 /**
  * The order of the details column.
  *
- * A product page is a TEMPLATE — it renders against every listing a store will ever have — so this
+ * A product page is a TEMPLATE, it renders against every listing a store will ever have, so this
  * is a list of slots, not a canvas. Dragging parts to arbitrary positions would be authored against
  * one piece and break on the next: twelve photos or one, no measurements, a rental with no sale
  * price. An ordered list survives all of them, and still lets a store put its price under the
@@ -110,7 +110,7 @@ export const SLOT_CATALOGUE: { kind: SlotKind; name: string; hint: string }[] = 
  { kind: "assurance", name: "Your closing line", hint: "The sentence under the buttons." },
 ];
 
-/** The blocks a store can add of its own — a sizing note, a link to a guide, a rule. */
+/** The blocks a store can add of its own. A sizing note, a link to a guide, a rule. */
 export const ADDABLE_SLOTS: { kind: SlotKind; name: string }[] = [
  { kind: "text", name: "A line of text" },
  { kind: "link", name: "A link" },
@@ -131,13 +131,13 @@ export type ProductPageConfig = {
 
 /** Our words, until a store writes its own. Kept here so the page never hardcodes a sentence. */
 export const DEFAULT_BACK_LABEL = "← Back to shop";
-export const DEFAULT_ASSURANCE = "One-of-one vintage — once it’s gone, it’s gone. Secure checkout by Stripe.";
+export const DEFAULT_ASSURANCE = "One-of-one vintage. Once it’s gone, it’s gone. Secure checkout by Stripe.";
 
 /** Every field, with the name a seller sees and the heading printed on the page. */
 export const FIELD_CATALOGUE: { key: ProductFieldKey; name: string; label: string; hint: string }[] = [
  { key: "description", name: "Description", label: "Description", hint: "What you wrote about the piece." },
  { key: "size", name: "Size", label: "Size", hint: "Printed as you entered it." },
- { key: "measurements", name: "Measurements", label: "Measurements", hint: "Chest, length, waist — however you took them." },
+ { key: "measurements", name: "Measurements", label: "Measurements", hint: "Chest, length, waist: however you took them." },
  { key: "condition", name: "Condition", label: "Condition", hint: "Already on every listing. Off by default." },
  { key: "brand", name: "Brand", label: "Brand", hint: "Already on every listing. Off by default." },
  { key: "era", name: "Era", label: "Era", hint: "Already on every listing. Off by default." },
@@ -149,7 +149,7 @@ const CATALOGUE_KEYS = FIELD_CATALOGUE.map((f) => f.key);
 const isKey = (v: unknown): v is ProductFieldKey => CATALOGUE_KEYS.includes(v as ProductFieldKey);
 
 /**
- * What a store gets if it touches nothing: EXACTLY the page it has today — size, description and
+ * What a store gets if it touches nothing: EXACTLY the page it has today. Size, description and
  * measurements, inline, in that order. A seller who never opens this panel must not find their live
  * product pages rearranged, so every newly-surfaced field starts off.
  */
@@ -187,7 +187,7 @@ const str = (v: unknown, fallback: string, max: number): string =>
  * Fold a stored blob onto the defaults.
  *
  * Order is the array's order, so this preserves what the seller arranged. Anything the blob doesn't
- * mention is appended in catalogue order at its default — which is what lets a NEW field ship
+ * mention is appended in catalogue order at its default, which is what lets a NEW field ship
  * without every store's saved config having to be migrated.
  */
 export function resolveProductPage(stored?: Partial<ProductPageConfig> | null): ProductPageConfig {
@@ -250,7 +250,7 @@ export function resolveProductPage(stored?: Partial<ProductPageConfig> | null): 
     ? null : Math.min(Math.max(Math.round(Number(b.radius)), 0), 999),
   },
   comparePrice: typeof s.comparePrice === "boolean" ? s.comparePrice : DEFAULT_PRODUCT_PAGE.comparePrice,
-  // "" is a real answer here — it means "don't print that sentence" — so an empty string is kept
+  // "" is a real answer here, it means "don't print that sentence", so an empty string is kept
   // rather than falling back to ours. Only a missing/non-string value takes the default.
   backLabel: str(s.backLabel, DEFAULT_BACK_LABEL, 40),
   assurance: str(s.assurance, DEFAULT_ASSURANCE, 300),
@@ -289,8 +289,8 @@ export function reorderFields(fields: ProductField[], from: number, to: number):
 /**
  * The button rules, scoped to the product page (`.vya-pp`).
  *
- * Scoped and `!important` on purpose. Every CTA sets its colour inline — an inline style beats any
- * class — so a class alone would do nothing; and confining it to the product page means it can't
+ * Scoped and `!important` on purpose. Every CTA sets its colour inline. An inline style beats any
+ * class, so a class alone would do nothing; and confining it to the product page means it can't
  * fight the per-section button controls a seller already has on their home page. Returns "" when
  * the store has changed nothing, so the default page ships no extra CSS at all.
  */
@@ -304,7 +304,7 @@ export function buttonCss(buttons: ButtonStyle, accent: string): string {
  const box = buttons.fill === "outline"
   ? `background:transparent!important;color:${bg}!important;border:1px solid ${bg}!important;`
   : `background:${bg}!important;color:${fg}!important;border:1px solid ${bg}!important;`;
- // Omitted when it's null, so the store's own corner style keeps governing — the radiusCss rule
+ // Omitted when it's null, so the store's own corner style keeps governing. The radiusCss rule
  // already sets `.vya-cta`, and a second rule repeating it would only be a thing to drift.
  const corner = buttons.radius === null ? "" : `border-radius:${buttons.radius}px!important;`;
  return `.vya-pp .vya-cta{${box}${corner}text-transform:${buttons.uppercase ? "uppercase" : "none"}!important;`

@@ -37,7 +37,7 @@ export type BigCartelResult = {
 
 /**
  * Fetches and parses products from a Big Cartel store's public JSON API.
- * No API key required — Big Cartel's product feed is publicly accessible.
+ * No API key required. Big Cartel's product feed is publicly accessible.
  * @param storeSlug - The store's Big Cartel slug (e.g. "kikiddesignandconsign")
  * @param storeName - Display name to tag products with
  */

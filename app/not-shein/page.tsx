@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import FlyerLanding from "@/app/components/FlyerLanding";
 import { flyerBySlug } from "@/app/lib/flyers";
 
-// Printed flyer landing — vyaplatform.com/not-shein
+// Printed flyer landing. Vyaplatform.com/not-shein
 //
 // A real route rather than a redirect, so the address on the paper is the address in the bar.
 // This path is listed in proxy.ts's PUBLIC_ROUTES; without that every scan reaches /login.

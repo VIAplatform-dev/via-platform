@@ -1,5 +1,5 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Klaviyo and Mailchimp — a store's own email tool.
+// Klaviyo and Mailchimp: a store's own email tool.
 //
 // Plenty of shops already run their marketing from one of these, with flows and segments they've
 // spent a year tuning. Asking them to move that into VYA to use VYA is a bad trade, and pretending
@@ -7,14 +7,14 @@
 // what they bought, and pushes that to whichever tool they already send from.
 //
 // What this deliberately does NOT do: send campaigns through their account. Their templates, their
-// flows, their send times — a campaign composed here and pushed there would fight everything they've
+// flows, their send times. A campaign composed here and pushed there would fight everything they've
 // built, and every failure would look like ours. Audience and purchase data is the part they can't
 // get anywhere else.
 //
 // The two providers differ in ways that matter, which is most of what this file encodes:
 //  · Mailchimp keys carry their own datacentre ("...-us21") and the API host is derived from it.
 //    A key without that suffix cannot be used, and saying so up front beats a 401 later.
-//  · Mailchimp addresses a member by the MD5 of the lowercased email — not a hash for secrecy, it's
+//  · Mailchimp addresses a member by the MD5 of the lowercased email, not a hash for secrecy, it's
 //    how their URLs are built.
 //  · Klaviyo is one host for everyone, keys start "pk_", and it wants a dated revision header.
 //
@@ -44,7 +44,7 @@ export type KeyCheck = { ok: true } | { ok: false; reason: string };
  * Is this even the right shape of key?
  *
  * Checked before we call anyone, because "that isn't a Klaviyo key, it's a Mailchimp one" is a far
- * more useful thing to read than "401 Unauthorized" — and pasting the wrong one into the wrong box
+ * more useful thing to read than "401 Unauthorized", and pasting the wrong one into the wrong box
  * is the single most common way this goes wrong.
  */
 export function checkKey(provider: EspProvider, key: string): KeyCheck {
@@ -52,7 +52,7 @@ export function checkKey(provider: EspProvider, key: string): KeyCheck {
  if (!k) return { ok: false, reason: "Paste your API key first." };
  if (provider === "klaviyo") {
   if (/-[a-z]{2}\d{1,2}$/i.test(k)) return { ok: false, reason: "That looks like a Mailchimp key. Klaviyo keys start with pk_." };
-  if (!/^pk_[A-Za-z0-9]{10,}$/.test(k)) return { ok: false, reason: "A Klaviyo private key starts with pk_ — check you copied the whole thing." };
+  if (!/^pk_[A-Za-z0-9]{10,}$/.test(k)) return { ok: false, reason: "A Klaviyo private key starts with pk_. Check you copied the whole thing." };
   return { ok: true };
  }
  if (/^pk_/.test(k)) return { ok: false, reason: "That looks like a Klaviyo key. Mailchimp keys end with your region, like -us21." };
@@ -62,7 +62,7 @@ export function checkKey(provider: EspProvider, key: string): KeyCheck {
  return { ok: true };
 }
 
-/** Mailchimp's API host lives in the key's suffix. No suffix, no host — hence the check above. */
+/** Mailchimp's API host lives in the key's suffix. No suffix, no host. Hence the check above. */
 export function mailchimpHost(key: string): string | null {
  const dc = (key || "").trim().split("-").pop();
  return dc && /^[a-z]{2}\d{1,2}$/i.test(dc) ? `https://${dc.toLowerCase()}.api.mailchimp.com/3.0` : null;
@@ -126,7 +126,7 @@ export function mailchimpMember(c: Contact) {
  const { first, last } = firstLast(c.name);
  return {
   email_address: c.email.trim().toLowerCase(),
-  // Existing members keep whatever status they already have — including "unsubscribed", which we
+  // Existing members keep whatever status they already have, including "unsubscribed", which we
   // must never overwrite. A sync that resubscribes people is how a store gets reported for spam.
   status_if_new: c.subscribed ? "subscribed" : "unsubscribed",
   merge_fields: {
@@ -150,7 +150,7 @@ export function batches<T>(items: T[], size = BATCH): T[][] {
  * Who to send.
  *
  * Unsubscribed people go too, marked unsubscribed, because a store's other tool needs to know NOT to
- * email them — leaving them out means the ESP keeps sending to someone who opted out here.
+ * email them: leaving them out means the ESP keeps sending to someone who opted out here.
  */
 export function syncable(contacts: Contact[]): Contact[] {
  const seen = new Set<string>();

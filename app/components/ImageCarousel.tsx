@@ -66,7 +66,7 @@ export default function ImageCarousel({
  img.src = url;
  }
  });
- // Only run once on mount — safeImages won't change
+ // Only run once on mount. SafeImages won't change
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, []);
 

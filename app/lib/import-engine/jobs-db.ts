@@ -1,4 +1,4 @@
-// Persistence for import jobs — the record that makes an import visible and resumable.
+// Persistence for import jobs. The record that makes an import visible and resumable.
 //
 // Raw neon + `CREATE TABLE IF NOT EXISTS` (same pattern as site-capture-db.ts) rather than a Drizzle
 // migration: the table self-heals on first call, so deploying this needs no migration step and a
@@ -78,7 +78,7 @@ export async function getJob(id: string): Promise<ImportJob | null> {
  return rows[0] ? toJob(rows[0]) : null;
 }
 
-/** The store's most recent job — what the portal polls to show progress. */
+/** The store's most recent job. What the portal polls to show progress. */
 export async function getLatestJob(slug: string): Promise<ImportJob | null> {
  await ensure();
  const rows = (await sql()`SELECT * FROM import_jobs WHERE store_slug = ${slug} ORDER BY created_at DESC LIMIT 1`) as Row[];
@@ -105,7 +105,7 @@ export type JobPatch = {
  error?: string | null;
 };
 
-/** Write progress. Always bumps updated_at — that timestamp is how the sweeper tells a live crawl
+/** Write progress. Always bumps updated_at: that timestamp is how the sweeper tells a live crawl
  *  from one whose instance died. */
 export async function saveJob(id: string, patch: JobPatch): Promise<void> {
  await ensure();
@@ -149,7 +149,7 @@ export async function listPausedJobs(limit = 5): Promise<ImportJob[]> {
  return rows.map(toJob);
 }
 
-/** Test/admin cleanup — remove a store's job history. */
+/** Test/admin cleanup: remove a store's job history. */
 export async function deleteJobs(slug: string): Promise<void> {
  await ensure();
  await sql()`DELETE FROM import_jobs WHERE store_slug = ${slug}`;

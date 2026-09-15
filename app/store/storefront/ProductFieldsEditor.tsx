@@ -3,7 +3,7 @@
 //
 // Shared by the two editors, because it is one setting: the block builder's Design → Product details
 // and the imported-site editor's Design tab both write the same `theme.productPage`. It lived only in
-// the studio, which a seller who brought her own site across never sees — so the one place to decide
+// the studio, which a seller who brought her own site across never sees, so the one place to decide
 // whether her pages print an era, a material or a condition was behind a door she had no key to.
 import { GripVertical } from "lucide-react";
 import { canChip, FIELD_CATALOGUE, type ProductField, type ProductFieldKey, type FieldMode, type ProductFacts } from "@/app/lib/storefront-product-page";
@@ -38,9 +38,9 @@ export function ProductFieldsEditor({ fields, onSet, onMove, sample }: ProductFi
        <GripVertical size={13} className="shrink-0 cursor-grab text-stone-300" />
        <button type="button" onClick={() => onSet(f.key, { show: !f.show })} className="min-w-0 flex-1 text-left">
         <span className={cn("block truncate text-[12.5px] font-medium", f.show ? "text-stone-700" : "text-stone-400")}>{cat?.name || f.key}</span>
-        {/* The answer to "I switched it on and nothing happened" — given where the switch is. */}
+        {/* The answer to "I switched it on and nothing happened". Given where the switch is. */}
         {f.show && sample && empty && (
-         <span className="mt-0.5 block truncate text-[10.5px] text-amber-700">Empty on this listing — add it in Inventory</span>
+         <span className="mt-0.5 block truncate text-[10.5px] text-amber-700">Empty on this listing. Add it in Inventory</span>
         )}
        </button>
        <button type="button" role="switch" aria-checked={f.show} aria-label={`Show ${cat?.name || f.key}`} onClick={() => onSet(f.key, { show: !f.show })}
@@ -50,14 +50,14 @@ export function ProductFieldsEditor({ fields, onSet, onMove, sample }: ProductFi
       </div>
       {f.show && (
        <div className="mt-2 flex items-center gap-1.5 pl-[21px]">
-        {/* Chip is offered only where the value is short — see LONG_FIELDS. */}
+        {/* Chip is offered only where the value is short. See LONG_FIELDS. */}
         {(["inline", "drawer", "chip"] as FieldMode[]).filter((m) => m !== "chip" || canChip(f.key)).map((m) => (
          <button key={m} type="button" onClick={() => onSet(f.key, { mode: m })}
           className={cn("rounded-md border px-2 py-0.5 text-[11px] transition", f.mode === m ? "border-[#5D0F17] text-[#5D0F17]" : "border-black/10 text-stone-400 hover:border-black/25")}>
           {m === "inline" ? "On the page" : m === "drawer" ? "In a drawer" : "As a chip"}
          </button>
         ))}
-        {/* Description is the piece's own writing — inline it needs no heading, so a label would
+        {/* Description is the piece's own writing. Inline it needs no heading, so a label would
             only ever apply to the drawer. Every other field is labelled either way. */}
         {(f.mode !== "inline" || f.key !== "description") && (
          <input

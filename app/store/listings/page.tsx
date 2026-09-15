@@ -34,7 +34,7 @@ const label = "block text-[11px] uppercase tracking-[0.18em] text-[#5D0F17]/55 m
 export default function ListingsManager() {
  // Admin preview: the page URL carries ?store={slug}, and every API call has to carry it too.
  // Without this the page rendered the previewed store but SAVED against whichever store the session
- // belongs to — so a listing added while previewing simply never appeared on that storefront.
+ // belongs to, so a listing added while previewing simply never appeared on that storefront.
  const withStore = useCallback((path: string) => {
   if (typeof window === "undefined") return path;
   const s = new URLSearchParams(window.location.search).get("store");

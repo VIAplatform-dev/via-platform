@@ -5,7 +5,7 @@ import { describeReason } from "@/app/lib/capture-versions-core";
 
 export const dynamic = "force-dynamic";
 
-// Version history for a captured page — the operator's view, which unlike the seller's undo shows
+// Version history for a captured page. The operator's view, which unlike the seller's undo shows
 // EVERY version including re-imports and asset rehosting. This is what a broken import is recovered
 // from: `site_captures` holds one row per page and every write overwrites it in place.
 
@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, slug, path, versions: versions.map((v) => ({ ...v, label: describeReason(v.reason) })) });
 }
 
-// POST { id, confirm: true } — put a page back to that version.
+// POST { id, confirm: true }: put a page back to that version.
 //
 // A restore is itself a write to `site_captures`, so it goes through the normal save path and leaves
-// a version of what it replaced. Undoing a bad restore is therefore the same operation again — there
+// a version of what it replaced. Undoing a bad restore is therefore the same operation again. There
 // is no state this can strand a page in.
 export async function POST(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
  if (!/^\d+$/.test(id)) return NextResponse.json({ error: "Missing version." }, { status: 400 });
  // Restoring overwrites a live page of a seller's storefront. Deliberate and explicit, never a
  // consequence of a stray request.
- if (body?.confirm !== true) return NextResponse.json({ error: "Restoring overwrites the live page — send confirm: true." }, { status: 400 });
+ if (body?.confirm !== true) return NextResponse.json({ error: "Restoring overwrites the live page. Send confirm: true." }, { status: 400 });
 
  const v = await readVersion(id);
  if (!v) return NextResponse.json({ error: "That version is no longer stored." }, { status: 404 });

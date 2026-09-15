@@ -14,11 +14,11 @@
 //
 // The consequence is far bigger than any cart bug. That JavaScript is the theme's menus, carousels,
 // mobile navigation, image galleries, filters, quick-add AND its cart. On those stores none of it
-// runs — Add to cart is a button with nothing bound to it, and the storefront is inert.
+// runs. Add to cart is a button with nothing bound to it, and the storefront is inert.
 //
 // THE FIX. VYA already proxies the theme's assets at /cdn/* (app/cdn/[...path]/route.ts), fetching
 // them from the captured origin server-side. Pointing the page at that path makes every asset
-// same-origin, which removes the CORS question entirely — a same-origin module needs no headers.
+// same-origin, which removes the CORS question entirely. A same-origin module needs no headers.
 //
 // Applied at SERVE time rather than capture time, deliberately: it fixes all 22 stores on the next
 // request instead of after 22 re-imports.
@@ -74,7 +74,7 @@ function rewriteUrlsInText(text: string, hosts: Set<string>): string {
  let out = text;
  for (const host of hosts) {
   const h = host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // https://host/cdn/  |  //host/cdn/  — with an optional leading www.
+  // https://host/cdn/  |  //host/cdn/ with an optional leading www.
   out = out.replace(new RegExp(`(https?:)?//(www\\.)?${h}/cdn/`, "gi"), "/cdn/");
   // the same, with every slash escaped, as JSON embedded in JS writes it
   out = out.replace(new RegExp(`(https?:)?\\\\/\\\\/(www\\.)?${h}\\\\/cdn\\\\/`, "gi"), "\\/cdn\\/");
@@ -107,13 +107,13 @@ export function sameOriginAssets(html: string, captureOrigin: string | null, mys
     const $el = $(el);
     const raw = $el.attr("srcset");
     if (!raw) continue;
-    // A data: URI CONTAINS commas, and a srcset is comma-separated — so splitting one on commas
+    // A data: URI CONTAINS commas, and a srcset is comma-separated, so splitting one on commas
     // cuts `data:image/svg+xml;utf8,<svg…>` in half, and rejoining with ", " leaves a space where
     // the URI's own comma was. In a srcset a space starts the size descriptor, so the candidate
     // becomes nonsense; and because the browser prefers srcset to src, our correctly re-hosted src
     // was never used. 29 images on every bag-crush product page rendered blank because of it.
     //
-    // Nothing in a data: URI can be proxied anyway — it carries its own bytes — so there is no
+    // Nothing in a data: URI can be proxied anyway, it carries its own bytes, so there is no
     // work here to lose by leaving these alone.
     if (raw.includes("data:")) continue;
     const rewritten = raw.split(",").map((part) => {
@@ -125,14 +125,14 @@ export function sameOriginAssets(html: string, captureOrigin: string | null, mys
    }
   }
   // Import maps and inline scripts. Modern Shopify themes resolve most of their modules through an
-  // IMPORT MAP, and reference more assets from inside inline scripts — neither of which is a src
+  // IMPORT MAP, and reference more assets from inside inline scripts. Neither of which is a src
   // attribute, so the attribute pass above never sees them. On one store that left 21 map specifiers
   // and 29 inline references still pointing cross-origin, and the theme still could not boot.
   for (const el of $("script").toArray() as DomEl[]) {
    const $el = $(el);
    if ($el.attr("src")) continue; // external scripts were handled above
    // Write straight to the text node. cheerio's .text() setter builds a new Text node, which is
-   // HTML-escaped on serialisation — inside a <script> that corrupts the JavaScript (`&&` becomes
+   // HTML-escaped on serialisation: inside a <script> that corrupts the JavaScript (`&&` becomes
    // `&amp;&amp;`), so the rewrite appeared to do nothing and the page shipped broken code.
    const node = (el.children || [])[0] as unknown as { type?: string; data?: string } | undefined;
    if (!node || typeof node.data !== "string" || !node.data) continue;

@@ -1,10 +1,10 @@
 // Splitting one payment across several pieces, and the line that describes it. Mirrors
-// app/lib/cost-split.ts — the phone and the web must divide a batch the same way to the penny.
+// app/lib/cost-split.ts. The phone and the web must divide a batch the same way to the penny.
 //
 // All that remains of lot.ts: lots (a batch’s source, acquired date and lot id) were removed;
 // dividing what a batch cost is a separate feature and stayed.
 
-// Pennies matter on a per-piece cost (£33.34, not £33), so this formats its own — Home's
+// Pennies matter on a per-piece cost (£33.34, not £33), so this formats its own. Home's
 // formatMoney rounds to whole units on purpose.
 const SYMBOLS: Record<string, string> = { GBP: "£", USD: "$", EUR: "€" };
 function pennies(cents: number, currency: string): string {
@@ -35,7 +35,7 @@ export function splitCostAcross(totalCents: number, ids: string[], weights?: Rec
   return out;
 }
 
-/** "£33.34 each, give or take a penny" — or nothing when there is nothing to say. */
+/** "£33.34 each, give or take a penny", or nothing when there is nothing to say. */
 export function batchCostLine(count: number, totalCents: number, currency: string): string | null {
   if (!(count > 0) || !(totalCents > 0)) return null;
   return `${pennies(Math.round(totalCents / count), currency)} each, give or take a penny`;

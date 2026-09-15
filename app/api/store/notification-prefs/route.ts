@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // The store's notification preferences. GET → the whole object (defaults filled in).
 // PUT { push?: { sold?: bool, … }, email?: { … } } → only the keys named change; returns the whole.
-// Web session or the phone's JWT — the phone's Notifications screen is the main caller.
+// Web session or the phone's JWT. The phone's Notifications screen is the main caller.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -25,13 +25,13 @@ async function ensure() {
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
  )`;
  // Signing in through Mailchimp or Klaviyo, rather than pasting a key. Nullable because a store
- // connected the old way still works — api_key stays, and these stay empty.
+ // connected the old way still works. Api_key stays, and these stay empty.
  for (const col of [
   "access_token TEXT", "refresh_token TEXT", "token_expires_at TIMESTAMPTZ",
-  "server_prefix TEXT",           // Mailchimp's datacentre, e.g. "us21" — their API host comes from it
+  "server_prefix TEXT",           // Mailchimp's datacentre, e.g. "us21": their API host comes from it
   "auth_kind TEXT NOT NULL DEFAULT 'key'",  // 'oauth' | 'key'
   // True (the default) hands the MARKETING emails to their tool, so nobody gets two of the same.
-  // Order emails are never affected — see email-ownership.ts.
+  // Order emails are never affected. See email-ownership.ts.
   "hand_over_marketing BOOLEAN NOT NULL DEFAULT true",
  ]) await sql`ALTER TABLE store_esp ADD COLUMN IF NOT EXISTS ${sql.unsafe(col)}`;
  ensured = true;

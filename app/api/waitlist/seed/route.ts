@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import { isAdminRequest } from "@/app/lib/storeAuth";
 
-// One-time seed script (backfills `waitlist` from app/data/waitlist.json). Admin-only —
+// One-time seed script (backfills `waitlist` from app/data/waitlist.json). Admin-only,
 // it's reachable under the public /api/waitlist prefix, and was previously callable by
 // anyone, letting an unauthenticated caller trigger CREATE TABLE + bulk inserts at will.
 export async function POST(request: NextRequest) {

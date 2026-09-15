@@ -17,7 +17,7 @@ export type FieldAccuracy = {
  field: string;
  accepted: number; // AI's guess kept by the seller
  corrected: number; // AI's guess changed by the seller
- accuracyPct: number; // accepted ÷ (accepted + corrected) — true per-field accuracy
+ accuracyPct: number; // accepted ÷ (accepted + corrected). True per-field accuracy
 };
 export type BrandMiss = { from: string; to: string; n: number };
 export type PriceCalibration = {
@@ -131,10 +131,10 @@ export async function getSegmentCalibration(days = 30): Promise<SegmentStat[]> {
 }
 
 // ── what sellers are actually putting in: the live correction feed ────────────
-// Every field a seller changed from the AI's draft, newest first — AI guess → their value,
+// Every field a seller changed from the AI's draft, newest first. AI guess → their value,
 // with the photo. This is the raw "where the model is wrong" stream.
 // ── brand accuracy BY CATEGORY: where does the model get the brand right vs wrong? ──────────────
-// Only listings where the AI actually predicted the brand (the seller didn't type it) are scored —
+// Only listings where the AI actually predicted the brand (the seller didn't type it) are scored,
 // that's the model doing the identifying. Graded house-level (Dior ≡ Christian Dior) at read time,
 // so all history counts and the number isn't a false low.
 export type BrandSegmentStat = { category: string; graded: number; correct: number; pct: number };

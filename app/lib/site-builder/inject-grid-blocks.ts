@@ -1,7 +1,7 @@
 // Product grids she added, filled from LIVE inventory at serve time.
 //
-// A grid is stored as an empty marker (grid-config.ts). On every request — every hosted page type:
-// home, pages, collections, search, the product route and the cart page — each marker is filled with
+// A grid is stored as an empty marker (grid-config.ts). On every request: every hosted page type:
+// home, pages, collections, search, the product route and the cart page. Each marker is filled with
 // the pieces of its collection right now, in her theme's own card when a kit exists (grid-kit.ts) and
 // in the plain card otherwise. The editor gets the same render, so what she arranges is what shoppers get.
 //
@@ -61,7 +61,7 @@ export function gridScopedCss(id: string, c: GridConfig, opts: { theme: boolean;
 }
 
 function simpleGridHtml(items: CollectionCardItem[], hrefFor: HrefFor): string {
- // The plain card, at a page width of its own — it has no theme wrapper to borrow one from.
+ // The plain card, at a page width of its own. It has no theme wrapper to borrow one from.
  const grid = liveGridHtml(items, hrefFor).replace('<div data-vya-collection="1"', '<div data-vya-collection="1" data-vya-kit-grid="1"');
  return `<div data-vya-simple-grid="1" style="max-width:1200px;margin:0 auto;padding:24px 20px;box-sizing:border-box">${grid}</div>`;
 }

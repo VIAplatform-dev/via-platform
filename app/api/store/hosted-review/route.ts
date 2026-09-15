@@ -4,7 +4,7 @@ import { addStoreReview, getStoreHealth, listStoreReviews, type ReviewAnswer } f
 
 export const dynamic = "force-dynamic";
 
-// GET — the store's latest check (tiered findings + side-by-side screenshots) and the seller's
+// GET: the store's latest check (tiered findings + side-by-side screenshots) and the seller's
 // own answers so far. Findings are already worded for a seller (app/lib/store-health.ts).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
 const ANSWERS = new Set<ReviewAnswer>(["looks_right", "something_off", "skip"]);
 
-// POST { page, answer, note? } — the seller's verdict on one side-by-side. This is the 1:1 check
+// POST { page, answer, note? }: the seller's verdict on one side-by-side. This is the 1:1 check
 // no pixel diff can do: the person who knows what their store should look like says so.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

@@ -4,7 +4,7 @@ import { etsyAuthUrl, etsyConfigured, etsySignState, makePkce } from "@/app/lib/
 
 export const dynamic = "force-dynamic";
 
-// GET — start the Etsy connection (PKCE). We stash the code_verifier in an httpOnly cookie and
+// GET: start the Etsy connection (PKCE). We stash the code_verifier in an httpOnly cookie and
 // send the seller to Etsy's consent screen; the callback reads the cookie to complete the exchange.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

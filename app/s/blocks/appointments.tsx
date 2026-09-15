@@ -1,10 +1,10 @@
-// Appointments — booking a time with the shop.
+// Appointments: booking a time with the shop.
 //
 // Not a rental section. A store that only sells still takes fittings, sourcing chats and
 // collections, so this sits in its own category and never asks whether the store rents anything.
 //
-// Everything here goes through the SAME hooks as every other section — `vya-cta` on the button,
-// `vya-round` on the chips, FreeField on the copy — so a seller styles it with the controls they
+// Everything here goes through the SAME hooks as every other section. `vya-cta` on the button,
+// `vya-round` on the chips, FreeField on the copy, so a seller styles it with the controls they
 // already know. A section that needs its own bespoke settings panel is a section that will drift.
 //
 // In the editor the times are a disabled sketch: the real ones come from the store's opening hours
@@ -27,7 +27,7 @@ function Sub({ kit, className }: { kit: EditKit; className: string }) {
 }
 
 /** The button. A FreeField so its words are edited on the canvas, `vya-cta` so its look follows the
- *  section's button controls — colour, hover, corner style — like every other section's button. */
+ *  section's button controls, colour, hover, corner style, like every other section's button. */
 function Cta({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
  if (!p.cta && !ctx.edit) return null;
@@ -60,8 +60,8 @@ function Sketch({ kit }: { kit: EditKit }) {
 function Booker({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  // A shop already running Calendly, Cal.com or Google's appointment schedules shouldn't have to
- // move its diary here. Where the provider can be framed we show the real calendar in place —
- // every hand-off to another website loses people — and otherwise fall back to a button.
+ // move its diary here. Where the provider can be framed we show the real calendar in place,
+ // every hand-off to another website loses people, and otherwise fall back to a button.
  const link = p.bookingUrl?.trim();
  if (link) {
   const embed = bookingEmbed(link);
@@ -79,7 +79,7 @@ function Booker({ kit }: { kit: EditKit }) {
   );
  }
  // Show the store's REAL setup, in the editor as well as live. A canvas that always drew a stock
- // picker meant a seller could paste their Calendly, come back, and see no sign of it — with
+ // picker meant a seller could paste their Calendly, come back, and see no sign of it, with
  // nothing to tell them whether it had worked.
  if (ctx.storeSlug || ctx.edit) {
   return (

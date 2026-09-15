@@ -20,7 +20,7 @@ test("nothing typed searches for nothing", () => {
   assert.equal(searchTermFrom("!!!"), "");
 });
 
-test("every registrant field is required — a blank one fails the whole purchase", () => {
+test("every registrant field is required. A blank one fails the whole purchase", () => {
   assert.equal(missingRegistrantFields(EMPTY_REGISTRANT).length, 8, "country is prefilled US");
   const full = { ...EMPTY_REGISTRANT, firstName: "A", lastName: "B", email: "a@b.c", phone: "1", address1: "x", city: "y", state: "z", zip: "1" };
   assert.deepEqual(missingRegistrantFields(full), []);
@@ -34,7 +34,7 @@ test("what's missing is named, so a failed charge never explains it instead", ()
   assert.equal(describeMissing({ ...one, firstName: "A" }), null);
 });
 
-test("a price always carries its unit — a domain is billed yearly", () => {
+test("a price always carries its unit. A domain is billed yearly", () => {
   assert.equal(priceLine({ domain: "a.com", tld: "com", available: true, priceCents: 1200 }), "$12/year");
   assert.equal(priceLine({ domain: "a.com", tld: "com", available: true, priceCents: 1200 }, "GBP"), "£12/year");
 });

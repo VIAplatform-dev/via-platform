@@ -3,7 +3,7 @@
  *
  * A Shopify shop selling into several markets lists every page once per language in its sitemap:
  * `/collections/heels` and `/ja/collections/heels` are the same page, rendered twice. Comparing the
- * sitemap against what we captured therefore reported the translations as missing pages — 47 of them
+ * sitemap against what we captured therefore reported the translations as missing pages. 47 of them
  * on ascensio-demo, which is the whole of that store's "pages not copied" finding.
  *
  * The rule is deliberately narrow. A first segment only counts as a language when removing it
@@ -12,7 +12,7 @@
  * a two-letter prefix.
  */
 
-/** `ja`, `en-gb`, `pt-BR` — a language, optionally with a region. */
+/** `ja`, `en-gb`, `pt-BR`: a language, optionally with a region. */
 const LOCALE_SEGMENT = /^[a-z]{2}(?:-[a-z]{2})?$/i;
 
 const normalise = (p: string) => (p || "").replace(/\/+$/, "") || "/";
@@ -32,7 +32,7 @@ export function withoutLocale(path: string): string | null {
 export function pagesGenuinelyMissing(missing: string[], captured: Set<string>): string[] {
  return missing.filter((p) => {
   const base = withoutLocale(p);
-  // Not a translation, or a translation of something we do not hold either — a real gap.
+  // Not a translation, or a translation of something we do not hold either. A real gap.
   return base === null || !captured.has(base);
  });
 }

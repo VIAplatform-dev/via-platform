@@ -1,4 +1,4 @@
-// Columns — the general-purpose "content side by side" family: feature rows, values, how-it-works,
+// Columns: the general-purpose "content side by side" family: feature rows, values, how-it-works,
 // service promises. Each column is a repeated item (heading, body, image, button label, button link),
 // so all four layouts share one editor and one set of add/reorder controls.
 import { FreeField, emptyHint, ImageSlot, type EditKit, type Item, ArrangeHandle } from "./kit";
@@ -16,7 +16,7 @@ function Heading({ kit, className }: { kit: EditKit; className: string }) {
 const gridFor = (cols?: string) => (cols === "2" ? "@lg:grid-cols-2" : cols === "4" ? "@lg:grid-cols-4" : "@lg:grid-cols-3");
 
 // A column's button. It's one of several in a repeated list rather than a single top-level field, so
-// it has no dedicated "edit button" panel of its own — but it carries `.vya-cta`, so every
+// it has no dedicated "edit button" panel of its own, but it carries `.vya-cta`, so every
 // section-level button style (fill, shape, outline, border, hover) applies to it automatically. In
 // the editor the link is inert, so clicking it edits the label instead of navigating away.
 function ColButton({ kit, c, i, set }: { kit: EditKit; c: Item; i: number; set: (i: number, patch: Item) => void }) {
@@ -78,7 +78,7 @@ function ColumnsClaims({ kit }: { kit: EditKit }) {
 }
 
 // ── steps ───────────────────────────────────────────────────────────────────────────────────────
-// Numbered, in sequence, with a hairline running between them — for anything that happens in an
+// Numbered, in sequence, with a hairline running between them, for anything that happens in an
 // order: how consignment works, how to sell, what happens after you buy. The number comes from
 // position, so reordering a step renumbers it automatically.
 function ColumnsSteps({ kit }: { kit: EditKit }) {
@@ -106,7 +106,7 @@ function ColumnsSteps({ kit }: { kit: EditKit }) {
 }
 
 // ── bordered ────────────────────────────────────────────────────────────────────────────────────
-// Each column is a bordered card with real padding, sitting flush against its neighbours — a grid
+// Each column is a bordered card with real padding, sitting flush against its neighbours. A grid
 // of framed panels rather than floating text. Holds together on a busy page where plain columns drift.
 function ColumnsBordered({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;

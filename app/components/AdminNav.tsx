@@ -125,7 +125,7 @@ export default function AdminNav({
  VYA Admin
  </span>
  </Link>
- {/* Close button — mobile only */}
+ {/* Close button: mobile only */}
  <button
  onClick={onMobileClose}
  className="flex md:hidden items-center p-1"

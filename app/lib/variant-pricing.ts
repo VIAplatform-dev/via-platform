@@ -1,4 +1,4 @@
-// Which of a listing's options is its BUY price — and whether it has one at all.
+// Which of a listing's options is its BUY price, and whether it has one at all.
 //
 // A Shopify listing can carry several options at several prices. The importer used to take the first
 // option's price as the piece's price. That is right for a one-of-one or a size run, and wrong for a
@@ -8,9 +8,9 @@
 // $22 rental.
 //
 // So: a $0 option is not offered, a rental option is never the buy price, and a piece whose only
-// priced options are rentals is RENT-ONLY — it has no buy price, rather than being sold at its rental.
+// priced options are rentals is RENT-ONLY. It has no buy price, rather than being sold at its rental.
 //
-// Pure — no I/O — so the public feed, the collection reader and the connected-store Admin API all
+// Pure, no I/O, so the public feed, the collection reader and the connected-store Admin API all
 // price a listing the same way.
 
 const RENTAL_WORD = /\b(rent|rental|rentals|hire)\b/i;
@@ -43,7 +43,7 @@ export function pickBuyVariant<V>(variants: V[], read: (v: V) => OptionRead): Bu
  const chosen = rows.find((r) => !r.rental && isPriced(r.price));
  if (chosen) return { variant: chosen.v, price: chosen.price as number, rentOnly: false };
  if (hasRental) return { variant: null, price: null, rentOnly: rows.some((r) => r.rental && isPriced(r.price)) };
- // Nothing priced anywhere. Keep exactly what the first-option read gave — a seller zeroes the price
+ // Nothing priced anywhere. Keep exactly what the first-option read gave. A seller zeroes the price
  // of a SOLD piece and keeps it as archive, and the importer decides what that means from availability.
  const first = rows[0];
  return { variant: first.v, price: typeof first.price === "number" && Number.isFinite(first.price) ? first.price : null, rentOnly: false };
@@ -66,9 +66,9 @@ export function sizeFromOptionLabel(label: string | null | undefined): string | 
 const RENTAL_DAYS = /(\d+)\s*day/i;
 
 /**
- * The piece's rental price ladder — one tier per priced rental option, e.g. "3 Day Rental" $22 and
+ * The piece's rental price ladder. One tier per priced rental option, e.g. "3 Day Rental" $22 and
  * "7 Day Rental" $80 both real, "3 Day Rental" $0 not offered. Empty for a listing with no rental
- * options, or a rental option that doesn't say how many days ("Weekend Rental") — there is nothing to
+ * options, or a rental option that doesn't say how many days ("Weekend Rental"): there is nothing to
  * bill a longer or shorter stay against, and guessing a day count would misprice every booking.
  *
  * Purchase is never a tier: buying and renting are different transactions with different money, and

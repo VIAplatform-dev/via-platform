@@ -7,7 +7,7 @@ import {
 import { CATEGORY_SLUGS } from "./item-tags.ts";
 
 // The stakes: New York exempts clothing and footwear under $110, and Pennsylvania
-// and New Jersey exempt most apparel outright — but NOT handbags, jewelry or
+// and New Jersey exempt most apparel outright, but NOT handbags, jewelry or
 // eyewear. Mislabel a bag as clothing and the seller owes tax they never charged.
 
 test("clothing is clothing", () => {
@@ -22,7 +22,7 @@ test("footwear shares the clothing code, as Stripe defines it", () => {
  }
 });
 
-test("bags are never clothing — this is the expensive one", () => {
+test("bags are never clothing. This is the expensive one", () => {
  for (const c of ["handbags", "totes", "clutches", "crossbody-bags", "bags"]) {
   const code = taxCodeForItem(c, "Gucci GG Supreme tote");
   assert.notEqual(code, TAX_CODE_CLOTHING, `${c} must not be taxed as clothing`);
@@ -46,7 +46,7 @@ test("a wallet in the bags bucket is taxed as a wallet", () => {
 
 test("a title never overrides a confident category", () => {
  // "bag not included" must not turn a jacket into a handbag.
- assert.equal(taxCodeForItem("coats-jackets", "Chanel jacket — matching bag not included"), TAX_CODE_CLOTHING);
+ assert.equal(taxCodeForItem("coats-jackets", "Chanel jacket: matching bag not included"), TAX_CODE_CLOTHING);
  assert.equal(taxCodeForItem("dresses", "Dress with watch-print silk"), TAX_CODE_CLOTHING);
 });
 

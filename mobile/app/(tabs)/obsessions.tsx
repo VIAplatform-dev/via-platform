@@ -12,12 +12,12 @@ import { colors, fonts, spacing } from "../../lib/theme";
 
 // Saved things, in three views behind one tab.
 //
-//   Obsessions — still buyable
-//   Sold Out   — saved and gone. Kept deliberately: on one-of-one vintage, what you missed is how
+//   Obsessions: still buyable
+//   Sold Out: saved and gone. Kept deliberately: on one-of-one vintage, what you missed is how
 //                you learn what to watch for, and deleting it silently would look like a bug.
-//   Searches   — standing searches, which are obsessions for pieces that don't exist yet.
+//   Searches: standing searches, which are obsessions for pieces that don't exist yet.
 //
-// The split comes from the `soldOut` flag on each entry in /api/mobile/favorites — that response
+// The split comes from the `soldOut` flag on each entry in /api/mobile/favorites. That response
 // already carries it, so no second request is needed.
 
 const TABS = ["Obsessions", "Sold Out", "Searches"] as const;

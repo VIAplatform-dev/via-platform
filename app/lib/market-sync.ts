@@ -10,14 +10,14 @@ import { logError } from "./error-log";
 
 // "Sold anywhere → pulled everywhere", as one function instead of two crons.
 //
-// THE DOUBLE-SELL WINDOW. Marketplace sales reach VYA by polling — eBay on the hour, Depop at
+// THE DOUBLE-SELL WINDOW. Marketplace sales reach VYA by polling. EBay on the hour, Depop at
 // twenty past. A piece sold on eBay at 10:02 is still live on her storefront until 11:00, and a
 // buyer in VYA checkout in between holds a reservation that eBay knows nothing about. One-of-one
 // means that is a refund, an apology and a review; it is the failure a vintage seller never
 // forgives a tool for.
 //
 // The crons keep running on their schedule. What this module adds is the same sync, callable ON
-// DEMAND for one store at the moment it matters — inside checkout, before the charge, for any
+// DEMAND for one store at the moment it matters. Inside checkout, before the charge, for any
 // piece that is live on a marketplace with a sale feed. A piece that is only on VYA costs nothing:
 // no marketplace call, no delay.
 
@@ -28,7 +28,7 @@ export type SyncResult = { checked: number; pulled: string[]; notes: string[] };
 
 /**
  * Pull one store's recent marketplace sales into VYA: mark each sold piece sold, delist it
- * elsewhere, credit the consignor if it was consigned. Idempotent — a piece already sold on
+ * elsewhere, credit the consignor if it was consigned. Idempotent: a piece already sold on
  * VYA is skipped, so re-seeing the same sale is a no-op.
  *
  * `only` narrows to the feeds that matter (a checkout asks about the feeds the bag is live on);
@@ -55,14 +55,14 @@ export async function syncMarketplaceSalesForStore(slug: string, sinceISO: strin
   if (!item || item.status === "sold") continue;
   await markSold(s.sku).catch(() => {});
   await delistEverywhere(s.sku, s.channel).catch(() => {});
-  // Consigned? Credit the consignor their split. Payout stays manual — the marketplace paid the
+  // Consigned? Credit the consignor their split. Payout stays manual: the marketplace paid the
   // store, not VYA, so there is no routed balance to auto-transfer from.
   //
   // A FAILURE HERE IS SOMEBODY'S MONEY. This used to be `.catch(() => {})`, which is worse than it
   // looks: markSold has already run, so the next pass sees status === "sold" and skips the piece
   // entirely (the `continue` above). One dropped connection and the consignor is never credited,
-  // permanently, with nothing written down anywhere. The credit itself is idempotent — it keys on
-  // the product — so the only thing needed is to say so loudly enough that someone can put it
+  // permanently, with nothing written down anywhere. The credit itself is idempotent. It keys on
+  // the product, so the only thing needed is to say so loudly enough that someone can put it
   // right by hand.
   await creditConsignedSale({ productId: s.sku, orderId: `${s.channel}-${s.orderId}`, soldPriceCents: s.soldPriceCents, channel: s.channel })
    .catch((e) => logError("market-sync-consignor-credit", e, {
@@ -70,7 +70,7 @@ export async function syncMarketplaceSalesForStore(slug: string, sinceISO: strin
     severity: "critical",
    }));
   // Her phone: a sale she did not see happen, because it happened on eBay or Depop. Fire-and-forget,
-  // gated by her preferences inside. (A Market Mode sale or a manual "mark sold" never pushes — she
+  // gated by her preferences inside. (A Market Mode sale or a manual "mark sold" never pushes. She
   // was there for those; see seller-push.ts.)
   void pushSellerSale(slug, { itemTitle: item.title, amountCents: s.soldPriceCents, currency: item.currency, channel: s.channel, orderId: `${s.channel}-${s.orderId}` });
   result.pulled.push(s.sku);
@@ -94,7 +94,7 @@ export async function syncAllStores(feed: Feed, sinceISO: string): Promise<{ sto
 /**
  * Called by checkout, before anything is charged. For every piece in the bag that is live on a
  * marketplace with a sale feed, pull that store's sales from the last day and return the ids
- * that turn out to be already sold — so checkout can refuse them instead of double-selling.
+ * that turn out to be already sold, so checkout can refuse them instead of double-selling.
  *
  * Returns an empty array in the common case (nothing cross-listed) without touching the network.
  * On any marketplace error it also returns empty: a flaky feed must not block a legitimate sale,

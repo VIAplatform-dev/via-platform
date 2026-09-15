@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
  getSetting("collabs_csrf_token"),
  ]);
  if (!cookie || !csrfToken) {
- return NextResponse.json({ error: "No Collabs credentials — update them in the admin sync panel first" }, { status: 400 });
+ return NextResponse.json({ error: "No Collabs credentials. Update them in the admin sync panel first" }, { status: 400 });
  }
 
  const sql = neon(dbUrl);

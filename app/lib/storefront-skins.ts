@@ -1,4 +1,4 @@
-// Global style SKINS — the second axis of the storefront builder.
+// Global style SKINS: the second axis of the storefront builder.
 //
 // `block.variant` decides a section's BONES (where the photo sits, how many columns). A skin decides
 // the SKIN across every section at once: type scale and weight, letter-spacing, case, the shape of
@@ -8,15 +8,15 @@
 //
 //  1. Skin CSS carries NO `!important` and stays at single-class specificity. Per-section overrides
 //     (sectionOverrideCss in Blocks.tsx) are emitted with `!important`, so anything a merchant sets
-//     on a section — its font, size, padding, button shape — always beats the skin. Applying a skin
+//     on a section, its font, size, padding, button shape. Always beats the skin. Applying a skin
 //     can never silently undo work, and it never has to be "removed" before customizing.
 //
 //  2. A skin SEEDS colour and type, it does not own them. Applying one writes its palette and font
-//     pairing into the theme like any other colour choice — editable immediately afterwards, and never
+//     pairing into the theme like any other colour choice. Editable immediately afterwards, and never
 //     re-applied on render, so later edits stick.
 //
 //     Every skin carries a palette deliberately. An earlier cut gave one only to Statement, on the
-//     reasoning that a skin shouldn't touch colour — which produced a trap: try Statement once and its
+//     reasoning that a skin shouldn't touch colour, which produced a trap: try Statement once and its
 //     dark ground stayed put under every other skin, so the rest of the picker looked identical and
 //     there was no way back. Either all of them set colour or none can. Choosing a skin is now a
 //     complete look, and ⌘Z (or picking another palette) is the way back.
@@ -38,9 +38,9 @@ export type Skin = {
 // so a skin never lands the store somewhere the palette picker couldn't also reach.
 export const SKINS: Skin[] = [
  { id: "gallery", label: "Gallery", description: "Photography first: wide margins, small caps, hairline rules, and type that gets out of the way.", palette: { bg: "#FAF6EE", text: "#211D16", accent: "#2A2521" }, fonts: { heading: "Inter", body: "Inter" } },
- { id: "editorial", label: "Editorial", description: "Magazine hierarchy — large serif headings, left aligned, generous line height.", palette: { bg: "#F4F0E8", text: "#1C1814", accent: "#6C2126" }, fonts: { heading: "Playfair Display", body: "Inter" } },
+ { id: "editorial", label: "Editorial", description: "Magazine hierarchy: large serif headings, left aligned, generous line height.", palette: { bg: "#F4F0E8", text: "#1C1814", accent: "#6C2126" }, fonts: { heading: "Playfair Display", body: "Inter" } },
  { id: "boutique", label: "Boutique", description: "Warmer and softer: rounded corners, pill buttons, roomy sections.", palette: { bg: "#F2E7DA", text: "#372620", accent: "#B15E37" }, fonts: { heading: "Playfair Display", body: "Inter" } },
- { id: "archive", label: "Archive", description: "Dense and technical — tight, uppercase, sharp corners, everything on a grid.", palette: { bg: "#EBE7DE", text: "#262218", accent: "#877A65" }, fonts: { heading: "Inter", body: "Inter" } },
+ { id: "archive", label: "Archive", description: "Dense and technical: tight, uppercase, sharp corners, everything on a grid.", palette: { bg: "#EBE7DE", text: "#262218", accent: "#877A65" }, fonts: { heading: "Inter", body: "Inter" } },
  { id: "statement", label: "Statement", description: "Dark ground, oversized type, high contrast.", palette: { bg: "#191A1E", text: "#ECE6DB", accent: "#C6A24A" }, fonts: { heading: "Playfair Display", body: "Inter" } },
 ];
 
@@ -49,7 +49,7 @@ export const skinDef = (id?: string) => SKINS.find((s) => s.id === id);
 
 // A note on units: heading sizes are in `cqw`, NOT `vw`.
 //
-// `vw` measures the browser window, which is the wrong ruler for a storefront — the storefront is laid
+// `vw` measures the browser window, which is the wrong ruler for a storefront. The storefront is laid
 // out inside a container, and in the studio that container is a 390px phone artboard sitting in a
 // 1440px window. Sized in `vw` the skin read the WINDOW, so a heading stayed at its full desktop size
 // in the phone preview no matter how narrow the artboard was: the preview said the design was fine on
@@ -57,7 +57,7 @@ export const skinDef = (id?: string) => SKINS.find((s) => s.id === id);
 // clamp gives the same result on a real desktop and finally tells the truth in the preview.
 //
 // The CSS a skin emits, scoped to `.vya-skin-<id>` on the storefront root. Single-class selectors
-// only — see rule 1 above. These target the stable classes every layout renders with, which is why a
+// only: see rule 1 above. These target the stable classes every layout renders with, which is why a
 // skin works on all ~75 layouts without knowing any of them exist.
 const SKIN_CSS: Record<SkinId, string> = {
  gallery: `
@@ -99,11 +99,11 @@ const SKIN_CSS: Record<SkinId, string> = {
 
 // Sections that are STRIPS, not content: a thin full-width band that belongs flush against whatever
 // sits above it. Every skin sets roomy `.vya-sec` padding, which is right for a hero or a text block
-// and wrong here — "Boutique" turned a 35px announcement bar into a 224px box with the message
+// and wrong here: "Boutique" turned a 35px announcement bar into a 224px box with the message
 // floating in the middle of it, in the editor and on the live storefront alike. Emitted AFTER the
 // skin's own rules at equal specificity, so it wins the tie; a seller's explicit per-section padding
 // still beats both, because those carry !important.
-// Every skin sets roomy section padding for a desktop canvas — 7rem top and bottom on Gallery. At
+// Every skin sets roomy section padding for a desktop canvas. 7rem top and bottom on Gallery. At
 // 390px that is 224px of empty ground between every section, which is most of a phone screen. Each
 // skin therefore gets a narrow-container counterpart. Emitted AFTER the skin's own rule (equal
 // specificity, later wins) but BEFORE stripReset, so a thin announcement strip still collapses to

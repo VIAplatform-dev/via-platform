@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
       // If no name match, we'll search all partnerships
       if (!partnershipId) {
-        // Try all partnerships — return their IDs and names for debugging
+        // Try all partnerships. Return their IDs and names for debugging
         const ids = collabsData.map((p) => ({ id: p.id, name: p.name }));
         // Use all of them in our search below
         const headers = {
@@ -188,7 +188,7 @@ export async function GET(request: NextRequest) {
   }
 
   // If every group errored (and none returned data), it's almost certainly a stale Collabs
-  // session (refresh collabs_cookie / collabs_csrf_token) — not a real miss.
+  // session (refresh collabs_cookie / collabs_csrf_token), not a real miss.
   const likelyAuthFailure = collabsErrors.length === GROUPS.length && nodesScanned === 0;
   return NextResponse.json({
     found: false,

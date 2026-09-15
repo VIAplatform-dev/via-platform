@@ -28,7 +28,7 @@ test("a shopper sees her own order the way she'd describe it", () => {
 
 test("the seller's private numbers never leave the server", () => {
  // What VYA charged, what the piece cost the seller, and the buyer's own address on file are the
- // seller's business. A shopper's account panel is a public page — anything here is public.
+ // seller's business. A shopper's account panel is a public page. Anything here is public.
  const [v] = shopperOrderView([row]);
  const keys = Object.keys(v);
  for (const secret of ["feeCents", "costCents", "buyerEmail"]) {

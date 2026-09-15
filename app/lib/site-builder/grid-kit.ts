@@ -2,8 +2,8 @@
 // page looks like the grids her theme already draws.
 //
 // Derived from captured pages, never invented. For each candidate page (her shop-all page first) the
-// largest real product grid is taken apart — one card, the grid container, the wrappers that give it
-// its width and colour scheme, and the stylesheets that page has and her home page lacks — and then
+// largest real product grid is taken apart. One card, the grid container, the wrappers that give it
+// its width and colour scheme, and the stylesheets that page has and her home page lacks, and then
 // TESTED: one made-up piece is rendered through it, and the kit is refused if the template's own
 // product name or price is still showing (finding F8: a card can look usable and still not be), if
 // the grid is a carousel, or if each slot is styled on its own (Squarespace Fluid Engine). No page
@@ -19,7 +19,7 @@ export type GridKit = {
  v: 1;
  sourcePath: string;
  platform: GridPlatform;
- /** One card, with no <style>/<link>/<script> — fillGrid's clone source. */
+ /** One card, with no <style>/<link>/<script> fillGrid's clone source. */
  cardHtml: string;
  /** The grid container, children removed. */
  gridEl: KitNode;
@@ -31,7 +31,7 @@ export type GridKit = {
  labels: { add?: string; sold?: string };
 };
 
-/** Cap on the stylesheets a kit carries — every page with a grid pays for them once. */
+/** Cap on the stylesheets a kit carries. Every page with a grid pays for them once. */
 export const KIT_CSS_CAP = 300_000;
 /** How many collection pages are tried before the home page. Pages are up to a few MB each (F1). */
 export const KIT_MAX_PAGES = 5;
@@ -68,7 +68,7 @@ function styleTexts(html: string): string[] {
  return out;
 }
 
-/** The stylesheets a page has that the home page doesn't — what a card from that page needs to look
+/** The stylesheets a page has that the home page doesn't. What a card from that page needs to look
  *  right anywhere else. Deduplicated, in document order, never over `cap` bytes in total. */
 export function missingCss(pageHtml: string, homeHtml: string, cap = KIT_CSS_CAP): string[] {
  const home = new Set(styleTexts(homeHtml || ""));

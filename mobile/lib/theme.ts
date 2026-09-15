@@ -1,6 +1,6 @@
 // VYA's visual language, read off the shipped app's screenshots.
 //
-// The palette is a warm cream ground with a single deep burgundy carrying every piece of ink —
+// The palette is a warm cream ground with a single deep burgundy carrying every piece of ink,
 // headings, icons, prices, the wordmark. There is no second accent. Hierarchy comes from opacity of
 // that one colour, which is why the muted tones below are alpha ramps rather than separate hues.
 
@@ -24,13 +24,13 @@ export const colors = {
   // ── Seller app only ────────────────────────────────────────────────────────────────────────
   // The shopper app has one ink colour and no second accent. The seller app needs exactly one
   // more, because it reports numbers that can be good or bad: a rise, a live storefront, a piece
-  // that sold. Burgundy cannot say "up 22%" — it is the colour everything else is already in.
+  // that sold. Burgundy cannot say "up 22%". It is the colour everything else is already in.
 
   /** Positive movement only: the ↑ delta, the live dot, "Label sent to you". Never decoration. */
   positive: "#1F7A5C",
   /** Ground behind an unselected filter chip and the tiles on Home. */
   chip: "#EFEAE1",
-  /** Ground behind a SELECTED filter chip — near-black, as the mockups draw "All". */
+  /** Ground behind a SELECTED filter chip. Near-black, as the mockups draw "All". */
   chipActive: "#1A1A1A",
   chipActiveText: "#FFFFFF",
 };
@@ -38,10 +38,13 @@ export const colors = {
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const fonts = {
-  // Headings, the wordmark and screen titles are all serif. Product titles are NOT — they are the
-  // system sans at semibold, which is what keeps a dense grid legible at 15px.
-  serif: "Georgia",
-  sans: undefined as string | undefined,
+  // Headings, the wordmark and screen titles are all serif. Product titles are NOT. They are the
+  // sans at semibold, which is what keeps a dense grid legible at 15px.
+  //
+  // Newsreader rather than Georgia: it is the face getvya.ai sets its headings in, and it is bundled
+  // for the seller side already (see portal-theme PORTAL_FONTS), so this costs nothing to load.
+  serif: "Newsreader_500Medium",
+  sans: "HankenGrotesk_400Regular" as string | undefined,
 };
 
 /** The uppercase, letter-spaced label above every section heading ("JUST IN", "SHOP BY"). */

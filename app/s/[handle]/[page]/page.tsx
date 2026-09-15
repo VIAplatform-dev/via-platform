@@ -4,28 +4,28 @@ import { isStoreHost } from "@/app/lib/plan-b/store-host";
 import type { CSSProperties } from "react";
 import { getStorefrontByHandleAny } from "@/app/lib/storefront-db";
 import { storefrontVisibility } from "@/app/lib/storefront-visibility";
-import { viewerCanEdit } from "@/app/lib/storefront-viewer";
-import NotOpenYet from "@/app/s/NotOpenYet";
 import ContactForm from "../../ContactForm";
 import StorefrontView from "../../StorefrontView";
 import StorefrontTracker from "../../StorefrontTracker";
 import { sanitizePages } from "@/app/lib/storefront-blocks";
+import { isPolicySlug, policyParagraphs } from "@/app/lib/policy-pages";
+import { getStoreProfile } from "@/app/lib/store-profile-db";
+import PolicyPage from "@/app/s/PolicyPage";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ handle: string; page: string }>; searchParams: Promise<{ preview?: string }> };
 
-// A cloned content page (Our Story, Contact, …) — same nav + theme as the storefront.
+// A cloned content page (Our Story, Contact, …). Same nav + theme as the storefront.
 export default async function StorefrontContentPage({ params, searchParams }: Props) {
  const { handle, page } = await params;
  const { preview } = await searchParams;
 
- // Resolved whether or not it is published; who is asking decides. Same rule as the shop's
- // home page — a seller following her own menu must not fall off a 404 halfway round.
+ // Resolved whether or not it is published. An unpublished shop shows its preview.
+ // home page: a seller following her own menu must not fall off a 404 halfway round.
  const sf = await getStorefrontByHandleAny(handle).catch(() => null);
  if (!sf) return notFound();
- const visibility = storefrontVisibility(!!sf.enabled, { previewing: !!preview, hasAccess: await viewerCanEdit(sf.storeSlug) });
- if (visibility === "closed") return <NotOpenYet />;
+ const visibility = storefrontVisibility(!!sf.enabled);
  const previewing = visibility === "preview";
 
  const theme = sf.theme || {};
@@ -46,7 +46,9 @@ export default async function StorefrontContentPage({ params, searchParams }: Pr
 
  const pages = theme.pages ?? [];
  const pg = pages.find((p) => p.slug === page);
- if (!pg) return notFound();
+
+ // A policy slug is allowed past this gate; everything else must be one of her pages.
+ if (!pg && !isPolicySlug(page)) return notFound();
 
  const bg = theme.colors?.bg || "#FFFDF8";
  const text = theme.colors?.text || "#241c17";
@@ -63,11 +65,12 @@ export default async function StorefrontContentPage({ params, searchParams }: Pr
 
  // Page shape drives the layout: contact → a real form, faq → Q&A, otherwise the
  // captured content (text over a lead image if there is one).
- const pageType = (pg as { pageType?: string }).pageType;
- const isContact = pageType === "contact" || /contact|enquir/i.test(pg.label || "") || /contact/i.test(pg.slug || "");
- const isFaq = pageType === "faq" || /faq/i.test(pg.label || "") || /faq/i.test(pg.slug || "");
- const leadImage = pg.blocks.find((b) => b.type === "image")?.value || null;
- const textBlocks = pg.blocks.filter((b) => b.type !== "image");
+ // Optional throughout: a policy slug reaches here with no page of its own, and is answered below.
+ const pageType = (pg as { pageType?: string } | undefined)?.pageType;
+ const isContact = pageType === "contact" || /contact|enquir/i.test(pg?.label || "") || /contact/i.test(pg?.slug || "");
+ const isFaq = pageType === "faq" || /faq/i.test(pg?.label || "") || /faq/i.test(pg?.slug || "");
+ const leadImage = pg?.blocks.find((b) => b.type === "image")?.value || null;
+ const textBlocks = pg?.blocks.filter((b) => b.type !== "image") ?? [];
 
  const vars: Record<string, string> = { "--accent": accent };
  if (headingFont) vars["--font-heading"] = `'${headingFont}', Georgia, serif`;
@@ -77,6 +80,30 @@ export default async function StorefrontContentPage({ params, searchParams }: Pr
  const fontsHref = gf.length
  ? `https://fonts.googleapis.com/css2?${gf.map((f) => `family=${encodeURIComponent(f).replace(/%20/g, "+")}:wght@400;500;600;700`).join("&")}&display=swap`
  : null;
+
+ // HER POLICIES, ON HER SITE. Served here rather than from four routes of their own: this one
+ // already resolves a slug against her shop and already carries her theme, her fonts and her nav,
+ // so a policy page looks like the rest of her site instead of like a form. Checked AFTER her own
+ // pages, so a shop that has written its own "Shipping" page keeps it. See policy-pages.ts.
+ if (!pg && isPolicySlug(page)) {
+ const written = (await getStoreProfile(sf.storeSlug).catch(() => null))?.policies?.[page] ?? "";
+ const paragraphs = policyParagraphs(written);
+ // Not written is not a page. A blank policy 404s rather than serving an empty heading.
+ if (!paragraphs.length) return notFound();
+ return (
+  <PolicyPage
+   slug={page}
+   paragraphs={paragraphs}
+   storeName={storeName}
+   enabled={!!sf.enabled}
+   nav={navItems}
+   home={withPreview(base)}
+   theme={{ bg, text, headingFont, bodyFont, fontsHref }}
+  />
+ );
+ }
+ // Past the policy branch, this is one of her own pages or it is nothing.
+ if (!pg) return notFound();
 
  return (
  <main style={rootStyle} className="min-h-screen">

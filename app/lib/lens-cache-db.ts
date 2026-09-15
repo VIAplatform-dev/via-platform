@@ -3,12 +3,12 @@ import type { VisualMatch } from "./comps";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Google Lens (reverse-image) cache. The image URL is immutable, so the SAME photo
-// returns the SAME visual matches — yet without this every re-draft ("Fill with AI"
+// returns the SAME visual matches, yet without this every re-draft ("Fill with AI"
 // again), edit, retry, or QA-cron re-scan pays SerpApi again for an identical result.
 // Caching by URL removes that pure-duplicate spend with ZERO accuracy impact (same
 // input → same output). A 30-day TTL captures all the short-term repeats (which happen
 // within minutes) while letting the web refresh occasionally. Pricing FRESHNESS is
-// unaffected — the live comp basket (eBay-sold etc.) still runs on the pricing path;
+// unaffected. The live comp basket (eBay-sold etc.) still runs on the pricing path;
 // this only dedupes the visual-match lookup.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ async function ensure(): Promise<void> {
  ensured = true;
 }
 
-/** Cached visual matches for this image URL, or null on a miss/expiry. Best-effort — never throws. */
+/** Cached visual matches for this image URL, or null on a miss/expiry. Best-effort, never throws. */
 export async function getCachedLens(imageUrl: string): Promise<VisualMatch[] | null> {
  if (!imageUrl) return null;
  try {
@@ -47,7 +47,7 @@ export async function getCachedLens(imageUrl: string): Promise<VisualMatch[] | n
  if (!rows.length) return null;
  return Array.isArray(rows[0].matches) ? (rows[0].matches as VisualMatch[]) : null;
  } catch {
- return null; // cache miss on any error — the caller falls back to a live SerpApi call
+ return null; // cache miss on any error. The caller falls back to a live SerpApi call
  }
 }
 
@@ -63,6 +63,6 @@ export async function saveCachedLens(imageUrl: string, matches: VisualMatch[]): 
   ON CONFLICT (image_url) DO UPDATE SET matches = EXCLUDED.matches, fetched_at = NOW()
  `;
  } catch {
- // best-effort — a failed cache write just means the next lookup pays again
+ // best-effort: a failed cache write just means the next lookup pays again
  }
 }

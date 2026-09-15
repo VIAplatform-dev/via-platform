@@ -30,7 +30,7 @@ async function ensureTable() {
  ensured = true;
 }
 
-/** `ends_at` — when a code stops working on its own. Added lazily and idempotently, like the other
+/** `ends_at`, when a code stops working on its own. Added lazily and idempotently, like the other
  *  additive columns here, so a deploy never lands code that reads a column the database lacks. */
 let endsAtReady = false;
 async function ensureEndsAt() {
@@ -87,7 +87,7 @@ export async function addDiscount(storeSlug: string, d: { code: string; label?: 
  * Change a code. Everything about it, not only whether it is switched on.
  *
  * This used to take `active` and `autoApply` and nothing else, so a code created with the wrong
- * number — a WELCOME10 saved before the "10" was typed, which is how it was reported — could only be
+ * number, a WELCOME10 saved before the "10" was typed, which is how it was reported. Could only be
  * deleted and made again. The percentage, the code itself, its label and when it stops are all
  * editable now; only fields actually present in the patch are written.
  */
@@ -234,7 +234,7 @@ export async function redemptionCount(storeSlug: string, code: string): Promise<
 }
 
 /**
- * When this buyer last bought from THIS store — null if never.
+ * When this buyer last bought from THIS store. Null if never.
  *
  * The one fact an audience-gated code needs. Matched on the email the buyer is checking out with,
  * case-insensitively, because that is the only identity a guest checkout has.

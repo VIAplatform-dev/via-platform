@@ -1,5 +1,5 @@
-// Grade whether two brand strings name the SAME fashion house. Exact string match tanks accuracy —
-// "Dior" ≠ "Christian Dior", "YSL" ≠ "Yves Saint Laurent", "Levi's" ≠ "Levi Strauss" — so we allow
+// Grade whether two brand strings name the SAME fashion house. Exact string match tanks accuracy,
+// "Dior" ≠ "Christian Dior", "YSL" ≠ "Yves Saint Laurent", "Levi's" ≠ "Levi Strauss", so we allow
 // abbreviations, corporate/location suffixes, punctuation, diacritics, and reordering. Shared by the
 // eval harness AND the production correction log so both report true brand accuracy, not a false low.
 

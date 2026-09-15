@@ -8,7 +8,7 @@ import { storeHasCapture } from "@/app/lib/domain-routing-edge";
 
 export const dynamic = "force-dynamic";
 
-// GET — everything a first-run card needs to decide whether to appear, in one request: what has
+// GET: everything a first-run card needs to decide whether to appear, in one request: what has
 // been answered, whether she brought a website over, and whether anything has come from Depop yet.
 // Three calls for one small card is three chances to flicker.
 export async function GET(request: NextRequest) {
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-// POST { key } — she answered one. See store-prompts-db for why this is not localStorage.
+// POST { key }: she answered one. See store-prompts-db for why this is not localStorage.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

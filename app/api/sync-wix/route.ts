@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
  const apiKey = process.env[apiKeyEnvVar];
  if (!apiKey) {
  return NextResponse.json(
- { error: `Missing env var ${apiKeyEnvVar} — add it in Vercel project settings` },
+ { error: `Missing env var ${apiKeyEnvVar}: add it in Vercel project settings` },
  { status: 500 }
  );
  }

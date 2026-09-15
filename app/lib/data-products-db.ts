@@ -3,7 +3,7 @@ import { inferBrandFromTitle } from "./market-data-db";
 import { stripSizePrefix } from "./publicFilters";
 
 // ---------------------------------------------------------------------------
-// VYA Data Layer — modules 1-4 of the monetizable B2B product line.
+// VYA Data Layer: modules 1-4 of the monetizable B2B product line.
 //
 //  1. Conversion funnel    view → favorite → click(checkout intent) → purchase
 //  2. Price & velocity     list price, markdown depth, sell-through, days-to-sell
@@ -30,7 +30,7 @@ const round = (n: number, d = 0) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════
-// 1. CONVERSION FUNNEL — where demand leaks between interest and purchase.
+// 1. CONVERSION FUNNEL, where demand leaks between interest and purchase.
 //    Per brand: view → favorite → click(checkout intent) → purchase, plus the
 //    rates between stages. Surfaces brands that get looked at but don't convert
 //    (overpriced / wrong fit) and brands that punch above their view count.
@@ -106,7 +106,7 @@ export async function getConversionFunnel(windowDays = 30): Promise<ConversionFu
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// 2. PRICE & VELOCITY — what brands list for, how hard they're discounted,
+// 2. PRICE & VELOCITY: what brands list for, how hard they're discounted,
 //    and how fast they turn over. The benchmark resale buyers / merchandisers
 //    pay most for. List price + markdown from the live catalog; sold units +
 //    realized price from real orders; sell-through = sold ÷ listings.
@@ -194,7 +194,7 @@ export async function getPriceVelocity(windowDays = 30): Promise<PriceVelocity> 
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// 3. SEARCH-TREND INTELLIGENCE — what shoppers are typing, and which queries
+// 3. SEARCH-TREND INTELLIGENCE: what shoppers are typing, and which queries
 //    are accelerating vs cooling. Current window vs the equal prior window.
 //    Rising + new queries are a leading indicator of demand; results=low on a
 //    rising query is a sourcing alarm.
@@ -257,7 +257,7 @@ export async function getSearchTrends(windowDays = 30): Promise<SearchTrends> {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// 4. SIZING & FIT DEMAND — which sizes shoppers want vs what's in stock.
+// 4. SIZING & FIT DEMAND, which sizes shoppers want vs what's in stock.
 //    Demand = views + favorites on products of a size (region prefix stripped
 //    so "US 8" / "EU 8" / "8" group together). Supply = in-stock count. A high
 //    demand:supply ratio = under-served sizes to source.

@@ -7,8 +7,8 @@ import { neon } from "@neondatabase/serverless";
 // and being asked again reads as VYA not listening. It is also how a prompt becomes noise, and a
 // seller who learns to ignore one card learns to ignore the next one.
 //
-// Deliberately a general table rather than a column per question. There will be more of these —
-// every on-ramp has a "have you got one of these already?" — and each new one should be a string,
+// Deliberately a general table rather than a column per question. There will be more of these,
+// every on-ramp has a "have you got one of these already?", and each new one should be a string,
 // not a migration.
 
 function db() {
@@ -39,7 +39,7 @@ export async function answeredPrompts(storeSlug: string): Promise<string[]> {
  return rows.map((r) => String(r.prompt_key));
 }
 
-/** Record an answer. Idempotent — pressing the X twice is not an error. */
+/** Record an answer. Idempotent: pressing the X twice is not an error. */
 export async function answerPrompt(storeSlug: string, key: string): Promise<void> {
  const k = (key || "").trim().slice(0, 80);
  if (!storeSlug || !k) return;

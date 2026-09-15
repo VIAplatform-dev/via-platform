@@ -3,7 +3,7 @@
 // untouched). Set SHIP_PROVIDER=easypost to route through EasyPost instead.
 //
 // `accountId` is the store's shipping sub-account handle (EasyPost Child-User key). Null ⇒ run on the
-// platform's own account — which is today's behaviour AND the pre-Forge EasyPost path. Per-store
+// platform's own account, which is today's behaviour AND the pre-Forge EasyPost path. Per-store
 // sub-accounts stay dormant until Forge is enabled (see getOrCreateShipAccount).
 
 import * as shippo from "./shippo";
@@ -30,8 +30,8 @@ export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parce
 }
 
 export async function buyLabel(rateId: string, accountId?: string | null, printer: LabelPrinter = DEFAULT_LABEL_PRINTER): Promise<PurchasedLabel | null> {
- // The two providers take the format at different moments — EasyPost on the shipment (already
- // applied in getRates), Shippo on the transaction — so it is passed to both and each uses it
+ // The two providers take the format at different moments. EasyPost on the shipment (already
+ // applied in getRates), Shippo on the transaction, so it is passed to both and each uses it
  // where it belongs. Getting this wrong means the seller's choice silently does nothing.
  return activeProvider() === "easypost"
   ? easypost.buyLabel(rateId, accountId ?? undefined)
@@ -42,7 +42,7 @@ export async function buyLabel(rateId: string, accountId?: string | null, printe
  * Where a parcel is, from whichever carrier account is active.
  *
  * EasyPost's trackers are created at purchase time and we don't hold their ids, so this is Shippo's
- * for now and returns null elsewhere — a null means "we don't know", which the rental screen already
+ * for now and returns null elsewhere. A null means "we don't know", which the rental screen already
  * handles by falling back to the booking's own dates.
  */
 export async function getTracking(trackingNumber: string, carrier?: string | null): Promise<shippo.TrackingSnapshot | null> {
@@ -56,12 +56,12 @@ export async function voidLabel(transactionId: string, accountId?: string | null
 }
 
 /**
- * Resolve (creating on first use) a store's shipping sub-account handle — the "automation" that makes
+ * Resolve (creating on first use) a store's shipping sub-account handle. The "automation" that makes
  * every new store self-provision with no manual step, mirroring how payments/connect auto-creates each
  * store's Stripe Express account. Returns null (⇒ platform account) unless the sub-account path is fully
  * turned on, so it's a safe no-op today:
  *   • Provider must be EasyPost and EASYPOST_API_KEY set, AND
- *   • SHIP_SUBACCOUNTS=on — an explicit gate so we don't spawn Child Users during testing or before
+ *   • SHIP_SUBACCOUNTS=on: an explicit gate so we don't spawn Child Users during testing or before
  *     Forge is enabled + the child-auth/FlexRate flow is verified live.
  */
 export async function getOrCreateShipAccount(storeSlug: string, storeName: string): Promise<string | null> {

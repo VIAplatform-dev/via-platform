@@ -10,7 +10,7 @@ type Check = { key: string; done: boolean; label: string; fix?: { label: string;
 
 const WINE = "#5D0F17";
 
-// "Before you sell" as a checklist: every check is a row — done ones ticked and struck through,
+// "Before you sell" as a checklist: every check is a row. Done ones ticked and struck through,
 // open ones with the fix on the right. The seller always sees the full picture and gets the small
 // satisfaction of watching it fill in.
 export default function ReadinessTasks({ compact }: { compact?: boolean }) {

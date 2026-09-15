@@ -19,12 +19,12 @@ const PLATFORMS: { key: string; label: string }[] = [
 export default function ShareLinksPage() {
  const [handle, setHandle] = useState<string | null>(null);
  const [customDomain, setCustomDomain] = useState<string | null>(null);
- // The address her store actually answers on — {slug}.vyasites.com, or her own domain. The API has
+ // The address her store actually answers on. {slug}.vyasites.com, or her own domain. The API has
  // resolved this since storePublicOrigin existed; this page was still assembling
  // "vyaplatform.com/s/{handle}" out of a handle, which is a VYA path, not her shop.
  const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
- // Sharing one piece is the most common social post there is — a Story with a
- // single item — so the picker below points the same tagged links at that item.
+ // Sharing one piece is the most common social post there is. A Story with a
+ // single item, so the picker below points the same tagged links at that item.
  const [items, setItems] = useState<Item[]>([]);
  const [itemId, setItemId] = useState<string>("");
  const [query, setQuery] = useState("");
@@ -44,10 +44,10 @@ export default function ShareLinksPage() {
  }).catch(() => {});
  }, []);
 
- // A store on its own domain must get links to THAT domain — sending their audience
+ // A store on its own domain must get links to THAT domain. Sending their audience
  // to vyaplatform.com is the fastest way to make them stop using these. Matches how
  // instagram-publish.ts already builds a shareable item URL.
- // NO VYA FALLBACK. These links are for a seller's own audience — a bio link, a Story — and one
+ // NO VYA FALLBACK. These links are for a seller's own audience, a bio link, a Story, and one
  // that lands on vyaplatform.com sends the people she brought to the marketplace instead of to her
  // shop. When there is no address yet there is nothing to copy, and the panel says so rather than
  // handing her a link she would regret posting.
@@ -69,7 +69,7 @@ export default function ShareLinksPage() {
  <AdminHeader
  eyebrow="Store · Marketing · Share links"
  title="Share links"
- subtitle="One link to your own shop, written out once per platform. They all open the same page — the tag on the end is what tells you which post someone came from."
+ subtitle="One link per platform, all opening your shop. The tag on the end tells you which post someone came from."
  />
  {/* Rather than handing her a link to the marketplace, which is what this page used to do when a
      store had no address of its own. A link she posts to her audience is not a place to guess. */}
@@ -81,7 +81,7 @@ export default function ShareLinksPage() {
   </div>
  )}
  <p className="mb-4 text-[12px] leading-relaxed text-stone-500">
-  These aren&rsquo;t links to your Instagram or Pinterest — they&rsquo;re links <b>to your store</b>, for you to
+  These aren&rsquo;t links to your Instagram or Pinterest. They&rsquo;re links <b>to your store</b>, for you to
   paste <i>into</i> those places. Put the Instagram one in your Instagram bio, the TikTok one in your
   TikTok bio, and so on. Then{" "}
   <a href="/admin/analytics" className="font-medium text-stone-700 underline underline-offset-2 hover:text-stone-900">Analytics</a>{" "}
@@ -92,7 +92,7 @@ export default function ShareLinksPage() {
 
  <TechCard className="mb-4 p-4">
  <p className="mb-1 text-[13px] font-medium text-stone-700">What are you linking to?</p>
- <p className="mb-3 text-[11px] text-stone-400">Your whole storefront, or one piece — the links below update either way.</p>
+ <p className="mb-3 text-[11px] text-stone-400">Your whole storefront, or one piece. The links below update either way.</p>
  <div className="flex flex-wrap gap-2">
  <button
  onClick={() => { setItemId(""); setQuery(""); }}
@@ -118,7 +118,7 @@ export default function ShareLinksPage() {
  />
  {query.trim() && (
  <div className="mt-2 divide-y divide-stone-100 overflow-hidden rounded-lg border border-stone-200">
- {matches.length === 0 && <p className="px-3 py-2.5 text-[12px] text-stone-400">No live piece by that name. This searches your own listings — it isn&rsquo;t a place to paste a link.</p>}
+ {matches.length === 0 && <p className="px-3 py-2.5 text-[12px] text-stone-400">No live piece by that name. This searches your own listings. It isn&rsquo;t a place to paste a link.</p>}
  {matches.map((i) => (
  <button key={i.id} onClick={() => { setItemId(i.id); setQuery(""); }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition hover:bg-stone-50">
  <span className="h-7 w-7 shrink-0 overflow-hidden rounded bg-stone-100">{i.image && <img src={i.image} alt="" className="h-full w-full object-cover" />}</span>

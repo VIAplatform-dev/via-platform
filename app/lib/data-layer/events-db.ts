@@ -17,15 +17,15 @@ import {
 } from "./event-filters";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — the unified `events` table and its ETL.
+// Data Layer: the unified `events` table and its ETL.
 //
 // The marketplace captures events in four differently-shaped tables
 // (product_views, product_favorites, clicks, conversions). This builds ONE
-// append-only, enriched event log that every market metric reads from — the
+// append-only, enriched event log that every market metric reads from. The
 // single source of truth. Built by a daily batch ETL (idempotent): each event
 // is keyed by a unique `source` string, so re-runs skip what already exists.
 //
-// We do NOT touch the existing capture tables or the old metric path here — the
+// We do NOT touch the existing capture tables or the old metric path here. The
 // old analytics keep running until the events-based metrics are validated, then
 // we cut over (per the agreed incremental-convergence plan).
 // ───────────────────────────────────────────────────────────────────────────
@@ -109,18 +109,18 @@ export async function ensureDataLayerTables(): Promise<void> {
  // Title is stored so brand attribution is auditable and the coverage report can
  // surface high-volume UNRESOLVED titles. Safe migration for pre-existing tables.
  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS title TEXT`;
- // Colour dimension — added after the table shipped; self-heals in place.
+ // Colour dimension: added after the table shipped; self-heals in place.
  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS color TEXT`;
  await sql`CREATE INDEX IF NOT EXISTS idx_events_color ON events(color)`;
- // Model/line dimension — same self-healing migration.
+ // Model/line dimension: same self-healing migration.
  await sql`ALTER TABLE events ADD COLUMN IF NOT EXISTS model TEXT`;
  await sql`CREATE INDEX IF NOT EXISTS idx_events_model ON events(model)`;
 
- // Canonical brand alias map (seeded like era_buckets) — brand resolution routes
+ // Canonical brand alias map (seeded like era_buckets). Brand resolution routes
  // through it so an alias can be added to fix coverage without a code deploy.
  await ensureBrandTable();
 
- // Era buckets reference table — seeded from config so buckets can be retuned
+ // Era buckets reference table. Seeded from config so buckets can be retuned
  // by editing rows (no schema migration), exactly as agreed.
  await sql`
  CREATE TABLE IF NOT EXISTS era_buckets (
@@ -156,7 +156,7 @@ export async function loadEraBuckets(): Promise<EraBucket[]> {
 }
 
 // Enrich a listing's text into the dimensions we group/sell on. Brand resolves
-// through the CANONICAL reference (alias map) — null when no alias matches.
+// through the CANONICAL reference (alias map): null when no alias matches.
 function enrich(title: string | null, description: string | null, buckets: EraBucket[], brandRef: BrandRef[]) {
  const t = title ?? "";
  const brand = resolveBrand(t, brandRef, WHOLE_WORD_ALIASES);
@@ -167,7 +167,7 @@ function enrich(title: string | null, description: string | null, buckets: EraBu
  // Colour of the season is a cross-market signal (retail + resale move together), so it's a
  // first-class trend dimension. Resolved from the title to the site's canonical palette word.
  color: normalizeColor(t),
- // The exact model/line ("Saddle", "Baguette") — the deepest sourcing granularity. Needs the brand.
+ // The exact model/line ("Saddle", "Baguette"): the deepest sourcing granularity. Needs the brand.
  model: inferModel(t, brand),
  condition: inferCondition(description),
  };
@@ -180,7 +180,7 @@ const num = (v: unknown): number | null => {
 };
 const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString());
 
-// Bulk insert via unnest — one statement per chunk. ON CONFLICT(source) DO
+// Bulk insert via unnest. One statement per chunk. ON CONFLICT(source) DO
 // NOTHING makes the whole ETL idempotent.
 async function insertEvents(rows: EventRow[]): Promise<number> {
  if (rows.length === 0) return 0;
@@ -216,7 +216,7 @@ async function insertEvents(rows: EventRow[]): Promise<number> {
 
 // Colour was added to events after rows already existed, so fill it in for older rows from their
 // stored title. Incremental (LIMIT) + idempotent; the daily cron chips away at the backlog. Titles
-// with no palette colour get '' (a "processed, no colour" sentinel) so they're never re-scanned —
+// with no palette colour get '' (a "processed, no colour" sentinel) so they're never re-scanned,
 // distinct from NULL (not yet processed). Both '' and NULL are excluded from the demand aggregate.
 export async function backfillEventColors(limit = 5000): Promise<{ scanned: number; colored: number; remaining: number }> {
  const sql = db();
@@ -238,7 +238,7 @@ export async function backfillEventColors(limit = 5000): Promise<{ scanned: numb
  return { scanned: rows.length, colored, remaining: n };
 }
 
-// Model backfill — same shape as the colour one. Needs the brand (already populated), so it only
+// Model backfill: same shape as the colour one. Needs the brand (already populated), so it only
 // scans branded rows; '' = "processed, no recognized model" so they aren't re-scanned.
 export async function backfillEventModels(limit = 5000): Promise<{ scanned: number; filled: number; remaining: number }> {
  const sql = db();
@@ -270,14 +270,14 @@ export type BuildResult = {
 };
 
 // A candidate event carrying both the row to insert and the transient signals
-// (user-agent, email) the quality filter needs — never stored in `events`.
+// (user-agent, email) the quality filter needs, never stored in `events`.
 type Item = FilterableEvent & { row: EventRow };
 
 /**
  * ETL the four capture tables into `events`, dropping junk traffic (bots,
  * internal/seller accounts, bursts) via the quality filter first. Default
  * incremental (last `sinceDays`); `full` rebuilds from the entire history.
- * `dryRun` computes the filter breakdown WITHOUT writing — used for the
+ * `dryRun` computes the filter breakdown WITHOUT writing. Used for the
  * "% would be filtered" report.
  */
 export async function buildEvents(
@@ -305,7 +305,7 @@ export async function buildEvents(
  const result: BuildResult = { views: 0, favorites: 0, clicks: 0, orderItems: 0, filtered: emptyFilterStats() };
  const CHUNK = 500;
 
- // Seller accounts (single source of truth) — their browsing is not consumer demand.
+ // Seller accounts (single source of truth). Their browsing is not consumer demand.
  const sellerEmails = new Set(
  Object.values(storeContactEmails).filter(Boolean).map((e) => (e as string).toLowerCase()),
  );
@@ -341,7 +341,7 @@ export async function buildEvents(
  : await sql`SELECT f.id, f.created_at AS ts, f.user_id::text AS user_id, f.product_snapshot, p.id AS pid, p.store_slug, p.title, p.description, p.price, p.currency, u.email FROM product_favorites f LEFT JOIN products p ON p.id = f.product_id LEFT JOIN users u ON u.id::text = f.user_id::text`) as Array<Record<string, unknown>>;
  result.favorites = await ingest(favRows.map((r): Item => {
  // When the live product is gone (sold out / re-synced away), fall back to the snapshot
- // captured at favorite time — otherwise these strong-intent signals for our best-selling
+ // captured at favorite time. Otherwise these strong-intent signals for our best-selling
  // pieces get dropped, biasing demand DOWN for exactly the hot items.
  const snap = r.product_snapshot as { title?: string; store_slug?: string; price?: number } | null;
  const title = (r.title as string) ?? snap?.title ?? "";
@@ -365,7 +365,7 @@ export async function buildEvents(
 
  // 4. Orders → one event per line item (sale_price = item price). Real money:
  // skip burst (multi-item orders share a timestamp), but still drop internal/test.
- // Returned/refunded orders must NOT count as sales — the admin market path already
+ // Returned/refunded orders must NOT count as sales. The admin market path already
  // excludes them, so filter here too or the two systems disagree on GMV/sell-through.
  // Ensure the column exists first (it's created lazily by admin routes, not everywhere).
  await sql`ALTER TABLE conversions ADD COLUMN IF NOT EXISTS returned BOOLEAN`;

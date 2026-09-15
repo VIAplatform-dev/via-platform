@@ -1,6 +1,6 @@
 // Reshape a VYA piece to fit eBay's rules, without asking the seller to reshape her listing.
 //
-// eBay's 2026 fashion update requires a STANDARD size on Apparel and Footwear — its own list, no
+// eBay's 2026 fashion update requires a STANDARD size on Apparel and Footwear. Its own list, no
 // free text. VYA does not have that constraint and should not inherit it: a vintage seller writes
 // what is true of the piece ("Leather", "Waist 28", nothing at all), and it is our job to translate
 // that for one marketplace rather than make her edit her shop to satisfy it.
@@ -26,7 +26,7 @@ export type AdaptInput = {
 export type Adapted = {
  /** The value to send as eBay's Size aspect, or null if none could be found. */
  size: string | null;
- /** The value to send as Material — possibly rescued out of the Size field. */
+ /** The value to send as Material. Possibly rescued out of the Size field. */
  material: string | null;
  /** Where the size came from, for the message when there isn't one. */
  sizeSource: "given" | "recovered" | "one-size" | null;
@@ -47,7 +47,7 @@ const SAYS_ONE_SIZE = /\b(one[\s-]?size|os|osfa|free[\s-]?size|no size|n\/a|unis
 /**
  * A size hiding in text the seller already wrote.
  *
- * Deliberately requires a MARKER — "size", a region prefix, a waist letter, or the measurements
+ * Deliberately requires a MARKER. "size", a region prefix, a waist letter, or the measurements
  * field's own label. A bare number in a title is far more likely to be a decade ("1970s wool coat")
  * than a size, and reading it as one would put a wrong size in front of a buyer.
  */
@@ -63,7 +63,7 @@ export function recoverSize(input: AdaptInput): string | null {
  const waist = hay.match(/\bw(?:aist)?\s*[:\-]?\s*(\d{2})\b/i) || (input.measurements || "").match(/\bwaist\s*[:\-]?\s*(\d{2})\b/i);
  if (waist) return waist[1];
 
- // A letter size standing on its own in the size field only — not loose in a title, where "S" and
+ // A letter size standing on its own in the size field only, not loose in a title, where "S" and
  // "M" appear inside ordinary words far more often than they appear as sizes.
  const alone = (input.size || "").trim().match(/^(x{0,3}s|s|m|l|x{0,3}l|\d{1,2}(?:\.\d)?)$/i);
  if (alone) return alone[1].toUpperCase();
@@ -90,7 +90,7 @@ export function adaptForEbay(
  const given = rawSize ? standardize(rawSize) : null;
  if (given) return { size: given, material, sizeSource: "given", movedSizeToMaterial };
 
- // 2. A fabric in the Size box is still true — it is just filed in the wrong drawer. Use it as the
+ // 2. A fabric in the Size box is still true. It is just filed in the wrong drawer. Use it as the
  //    material rather than discarding it, which is what happened before: rejected AND thrown away.
  if (rawSize && MATERIAL_WORDS.test(rawSize)) {
   if (!material) material = rawSize;
@@ -104,7 +104,7 @@ export function adaptForEbay(
   if (std) return { size: std, material, sizeSource: "recovered", movedSizeToMaterial };
  }
 
- // 4. One size — where that is a fact about the piece, not a guess about a body.
+ // 4. One size, where that is a fact about the piece, not a guess about a body.
  const saysOneSize = SAYS_ONE_SIZE.test(rawSize) || SAYS_ONE_SIZE.test(input.title || "");
  const oneSizeCategory = ONE_SIZE_CATEGORIES.test(`${input.category || ""} ${input.title || ""}`);
  if (saysOneSize || oneSizeCategory) {
@@ -116,10 +116,10 @@ export function adaptForEbay(
  return { size: null, material, sizeSource: null, movedSizeToMaterial };
 }
 
-/** What to tell her when nothing could be found — naming the field, and what we already tried. */
+/** What to tell her when nothing could be found. Naming the field, and what we already tried. */
 export function missingSizeMessage(input: AdaptInput, adapted: Adapted): string {
  if (adapted.movedSizeToMaterial) {
-  return `“${(input.size || "").trim()}” is in this piece’s Size field — we’ve sent it to eBay as the material instead. eBay still needs a size for this category, and it isn’t anywhere on the listing: add S/M/L or a number.`;
+  return `“${(input.size || "").trim()}” is in this piece’s Size field. We’ve sent it to eBay as the material instead. eBay still needs a size for this category, and it isn’t anywhere on the listing: add S/M/L or a number.`;
  }
- return `eBay needs a standard size for this category and there isn’t one on this piece — add S/M/L or a number (we check the title, description and measurements too).`;
+ return `eBay needs a standard size for this category and there isn’t one on this piece. Add S/M/L or a number (we check the title, description and measurements too).`;
 }

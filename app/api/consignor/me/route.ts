@@ -6,7 +6,7 @@ import { stores } from "@/app/lib/stores";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// The signed-in consignor's statement(s) — one per store they consign with. Gated by the
+// The signed-in consignor's statement(s). One per store they consign with. Gated by the
 // session cookie, and only ever returns records whose email matches the session.
 export async function GET(request: Request) {
  const email = getConsignorEmail(request);
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
  return NextResponse.json({ email, consignments });
 }
 
-// Sign out — clear the session cookie.
+// Sign out: clear the session cookie.
 export async function DELETE() {
  const res = NextResponse.json({ ok: true });
  res.cookies.set(CONSIGNOR_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });

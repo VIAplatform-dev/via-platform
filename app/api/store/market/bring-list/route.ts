@@ -5,7 +5,7 @@ import { listBringList } from "@/app/lib/market/inventory-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — the bring list (or everything available, when no list was made) for the printout.
+// GET: the bring list (or everything available, when no list was made) for the printout.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

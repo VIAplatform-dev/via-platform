@@ -1,7 +1,7 @@
 // Store descriptions arrive as HTML, because that is what the stores' own platforms store.
 //
 // Shopify's rich-text editor writes `<p style="white-space:pre-wrap;" data-rte-preserve-empty="true">`
-// around every line. Rendered as plain text — which is what a <Text> does — that markup IS the
+// around every line. Rendered as plain text, which is what a <Text> does. That markup IS the
 // description, and the actual words are lost in it. This turns it back into paragraphs.
 
 const BLOCK = /<\/(p|div|li|h[1-6]|br)\s*>|<br\s*\/?>/gi;

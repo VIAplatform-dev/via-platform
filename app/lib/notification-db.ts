@@ -26,7 +26,7 @@ export async function initNotificationTables() {
  await sql`CREATE INDEX IF NOT EXISTS idx_fav_notif_user_product ON favorite_notifications(user_id, product_id)`;
  await sql`CREATE INDEX IF NOT EXISTS idx_fav_notif_sent_at ON favorite_notifications(sent_at)`;
 
- // All other per-user send tables — kept here so the cross-flow 48h frequency
+ // All other per-user send tables. Kept here so the cross-flow 48h frequency
  // check (which UNIONs all of them) always has tables to reference.
  await sql`
  CREATE TABLE IF NOT EXISTS trending_notifications (
@@ -46,7 +46,7 @@ export async function initNotificationTables() {
  )
  `;
  await sql`CREATE INDEX IF NOT EXISTS idx_winback_user_tier ON winback_emails(user_id, tier, sent_at DESC)`;
- // "Last seen" heartbeat column — stamped on any authenticated browse so winback
+ // "Last seen" heartbeat column. Stamped on any authenticated browse so winback
  // sees browse-only sessions (not just product taps). See touchLastActive.
  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`;
  await sql`CREATE INDEX IF NOT EXISTS idx_users_last_active ON users(last_active_at) WHERE last_active_at IS NOT NULL`;
@@ -500,7 +500,7 @@ async function ensureLastActiveColumn(): Promise<void> {
 /**
  * Best-effort "last seen" heartbeat. Stamps users.last_active_at when a logged-in
  * person uses the site/app, throttled to once per 30 min (the WHERE clause makes
- * it a cheap PK no-op the rest of the time). Never throws — must not block a
+ * it a cheap PK no-op the rest of the time). Never throws. Must not block a
  * request. This is what keeps winback from emailing someone who browsed yesterday.
  */
 export async function touchLastActive(userId: string | null | undefined): Promise<void> {
@@ -514,7 +514,7 @@ export async function touchLastActive(userId: string | null | undefined): Promis
   AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '30 minutes')
  `;
  } catch {
- // swallow — a missed heartbeat is harmless (throttled; next request catches it)
+ // swallow: a missed heartbeat is harmless (throttled; next request catches it)
  }
 }
 

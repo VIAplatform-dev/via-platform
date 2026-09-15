@@ -11,7 +11,7 @@ type Status = {
  chargesEnabled: boolean;
  payoutsEnabled: boolean;
  detailsSubmitted: boolean;
- /** How long Stripe holds a payout — the store's return window plus the return's journey back. */
+ /** How long Stripe holds a payout. The store's return window plus the return's journey back. */
  payoutDelayDays?: number | "minimum";
  returnWindowDays?: number;
  /** Set only when their policy promises buyers longer than Stripe will hold the money. */
@@ -22,7 +22,7 @@ export default function PaymentsPage() {
  const [loading, setLoading] = useState(true);
  const [authErr, setAuthErr] = useState<string | null>(null);
  const [s, setS] = useState<Status | null>(null);
- // Which embedded surface (if any) is open — onboarding replaces the Stripe redirect; manage
+ // Which embedded surface (if any) is open. Onboarding replaces the Stripe redirect; manage
  // replaces the Stripe-hosted Express dashboard. Both render inside getvya.ai.
  const [embed, setEmbed] = useState<null | "onboarding" | "manage">(null);
  // Extra checkout methods the store offers (card + wallets are always on, not shown here).
@@ -68,7 +68,7 @@ export default function PaymentsPage() {
 
  return (
  <div className="mx-auto max-w-2xl px-6 py-10 sm:px-8">
- <PageHeader title="Payments" subtitle="Accept payments on your storefront and settle to your own bank. You’re the merchant of record — VYA just powers the checkout." />
+ <PageHeader title="Payments" subtitle="Take payments on your storefront, settled to your own bank. You are the merchant of record on every sale." />
 
  {!s?.configured ? (
  <Card className="p-6 text-sm text-stone-500">Payments aren’t enabled on the server yet.</Card>
@@ -86,7 +86,7 @@ export default function PaymentsPage() {
  ? "You can accept payments and receive payouts to your bank."
  : s?.connected
  ? "Stripe still needs a few details before you can accept payments."
- : "Set up payments with Stripe — takes a couple of minutes. You’ll add your bank and a few business details."}
+ : "Set up payments with Stripe. Takes a couple of minutes. You’ll add your bank and a few business details."}
  </p>
 
  {active && (
@@ -102,7 +102,7 @@ export default function PaymentsPage() {
  <p className="mt-3 text-[12px] leading-relaxed text-stone-500">
  {s.payoutDelayDays === "minimum"
  ? "Your sales are final, so payouts reach your bank as fast as Stripe allows."
- : `Payouts reach your bank ${s.payoutDelayDays} days after a sale — your ${s.returnWindowDays}-day return window, plus time for a return to arrive. Until then the money sits in your Stripe balance, so a refund never comes out of your bank account.`}
+ : `Payouts reach your bank ${s.payoutDelayDays} days after a sale. Your ${s.returnWindowDays}-day return window, plus time for a return to arrive. Until then the money sits in your Stripe balance, so a refund never comes out of your bank account.`}
  {" "}Change it in your <a className="underline underline-offset-2 hover:text-stone-700" href="/store/settings?tab=policy">returns policy</a>.
  </p>
  )}
@@ -121,7 +121,7 @@ export default function PaymentsPage() {
  </div>
  </div>
 
- {/* Embedded Connect surfaces — rendered right here inside getvya.ai, no redirect to Stripe. */}
+ {/* Embedded Connect surfaces. Rendered right here inside getvya.ai, no redirect to Stripe. */}
  {embed && (
  <div className="mt-6 border-t border-stone-100 pt-6">
  <EmbeddedPayments mode={embed} onComplete={embed === "onboarding" ? onOnboardingComplete : undefined} />
@@ -136,10 +136,10 @@ export default function PaymentsPage() {
  <h3 className="text-[15px] font-semibold text-stone-900">Checkout payment methods</h3>
  <p className="mt-1.5 text-[13px] leading-relaxed text-stone-500">Turn on the extras you want buyers to see at checkout. Everything else stays clean and card-first.</p>
  <div className="mt-4 space-y-2">
- <MethodRow label="Card · Apple Pay · Google Pay · Link" desc="Always on — wallets show automatically on supported devices." locked />
- <MethodRow label="Cash App Pay" desc="Pay from a Cash App balance — popular with younger US buyers." on={methods.cashapp} onToggle={() => toggle("cashapp")} />
- <MethodRow label="Affirm — buy now, pay later" desc="Buyer pays over time; you’re still paid in full up front." on={methods.affirm} onToggle={() => toggle("affirm")} />
- <MethodRow label="Klarna — buy now, pay later" desc="Pay in 4 or financing, at no cost to you." on={methods.klarna} onToggle={() => toggle("klarna")} />
+ <MethodRow label="Card · Apple Pay · Google Pay · Link" desc="Always on. Wallets show automatically on supported devices." locked />
+ <MethodRow label="Cash App Pay" desc="Pay from a Cash App balance. Popular with younger US buyers." on={methods.cashapp} onToggle={() => toggle("cashapp")} />
+ <MethodRow label="Affirm: buy now, pay later" desc="Buyer pays over time; you’re still paid in full up front." on={methods.affirm} onToggle={() => toggle("affirm")} />
+ <MethodRow label="Klarna: buy now, pay later" desc="Pay in 4 or financing, at no cost to you." on={methods.klarna} onToggle={() => toggle("klarna")} />
  </div>
  <p className="mt-3 text-[11px] text-stone-400">Each extra must also be activated on your Stripe account. If one isn’t, checkout quietly falls back to card.</p>
  </Card>

@@ -5,7 +5,7 @@ import { getOpenCheckoutForItem } from "@/app/lib/market/checkout-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — one item for the Confirm screen, plus any checkout already in progress on it.
+// GET: one item for the Confirm screen, plus any checkout already in progress on it.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

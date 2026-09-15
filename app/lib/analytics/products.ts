@@ -3,16 +3,16 @@ import { ensureAnalyticsViews } from "./views";
 import type { ResolvedPeriod } from "./period";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — product performance.
+// Analytics: product performance.
 //
 // Which pieces earn, which pieces sit, and which are quietly ageing out of
 // relevance. On one-of-one inventory a "best seller" isn't a repeat SKU, it's
-// the piece that moved fast at a good price — so ranking is by revenue, and the
+// the piece that moved fast at a good price, so ranking is by revenue, and the
 // mirror image (worst performers) is judged on attention earned per day live
 // rather than on sales a sold-once item never had a second chance at.
 //
 // Engagement comes from `vya_store_engagement`, the de-duplicated union of the
-// capture tables and the event stream (see views.ts), keyed on items.id — so
+// capture tables and the event stream (see views.ts), keyed on items.id, so
 // views and favourites join the catalog exactly, with no fuzzy matching.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ export async function getProductMetrics(sellerId: string, slug: string, period: 
   await ensureAnalyticsViews();
   const sql = sqlRows();
 
-  // Pass 1 — engagement for the window, per item. Everything below reads from this.
+  // Pass 1: engagement for the window, per item. Everything below reads from this.
   const engagementRows = (await sql`
    SELECT item_id,
     COUNT(*) FILTER (WHERE event_type = 'view')::int AS views,
@@ -97,7 +97,7 @@ export async function getProductMetrics(sellerId: string, slug: string, period: 
   );
   const engagedIds = [...eng.keys()];
 
-  // Pass 2 — the catalog context, in one round trip.
+  // Pass 2: the catalog context, in one round trip.
   const [soldRows, activeRows, engagedRows, agingRows, activeTotals] = await Promise.all([
    sql`
     SELECT i.id AS item_id, i.title, i.images, i.price_cents, i.status, i.brand, i.category,
@@ -114,7 +114,7 @@ export async function getProductMetrics(sellerId: string, slug: string, period: 
      EXTRACT(EPOCH FROM (now() - i.created_at)) / 86400.0 AS days_live
     FROM items i WHERE i.seller_id = ${sellerId}::uuid AND i.status = 'active'
    `,
-   // Anything with engagement this window that isn't necessarily still active — so a
+   // Anything with engagement this window that isn't necessarily still active, so a
    // piece that sold last quarter but is being viewed today keeps its real title.
    engagedIds.length
     ? sql`

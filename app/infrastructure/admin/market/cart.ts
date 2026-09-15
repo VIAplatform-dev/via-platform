@@ -1,7 +1,7 @@
 "use client";
 
 // The seller's in-progress basket: items picked on Find/Confirm before ONE payment. Lives in
-// sessionStorage (per tab, survives refresh, gone when the tab closes) — never a source of truth;
+// sessionStorage (per tab, survives refresh, gone when the tab closes), never a source of truth;
 // the server re-validates every line when the checkout starts.
 import type { CartLine, Discount } from "@/app/lib/market/sale-core";
 

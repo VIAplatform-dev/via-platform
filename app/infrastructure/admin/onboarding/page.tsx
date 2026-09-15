@@ -8,13 +8,13 @@ import { BuildWizardInner } from "./build/page";
 
 // The signup wizard for a self-onboarded store.
 //
-// ONE question, then the real builder. It used to ask four — website, what you sell, where you
-// sell now, store name — and only then hand off to a SEPARATE build wizard by navigating to
+// ONE question, then the real builder. It used to ask four. Website, what you sell, where you
+// sell now, store name, and only then hand off to a SEPARATE build wizard by navigating to
 // /admin/onboarding/build. That was two wizards bolted together, and the first one asked a seller
 // to describe their inventory before they had seen a single thing.
 //
 // Now the only question is the fork the whole thing hangs on: bring an existing site, or build
-// one. Building drops straight into the Squarespace-style builder, rendered INLINE — the same
+// one. Building drops straight into the Squarespace-style builder, rendered INLINE. The same
 // component /admin/onboarding/build serves, so there is one builder, not two. The store NAME is
 // asked there, on the Look step, next to the logo and the template.
 //
@@ -45,10 +45,10 @@ export default function OnboardingWizard() {
  const [websiteUrl, setWebsiteUrl] = useState("");
  const [busy, setBusy] = useState(false);
  const [error, setError] = useState<string | null>(null);
- // The address the invite gate turned away, when it did — shown so she can recognise it.
+ // The address the invite gate turned away, when it did. Shown so she can recognise it.
  const [wrongAccount, setWrongAccount] = useState<string | null>(null);
  // Check she's signed in BEFORE she does any work. The wizard used to let her choose a template,
- // pick pages, colours and fonts — and only then fail on the final button, which is where
+ // pick pages, colours and fonts, and only then fail on the final button, which is where
  // "sign in first" came from on a page that never offered a sign-in. If there's no session she
  // goes to /login now and comes straight back here afterwards.
  const [checking, setChecking] = useState(true);
@@ -61,12 +61,12 @@ export default function OnboardingWizard() {
    /* no-store: this answer decides whether she is sent to the signup wizard. A cached "no store" survives the fix that gave her one, and strands her in the wizard on every reload. */
    const me = await fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
    if (!active) return;
-   // The decision itself lives in onboarding-gate.ts, with a case table — it has been wrong twice
+   // The decision itself lives in onboarding-gate.ts, with a case table. It has been wrong twice
    // and both times the mistake was invisible here and obvious to whoever hit it.
    const decision = onboardingGate(me);
    if (decision.go === "sign-in") {
     // NOT a dead end: this page bouncing a signed-in seller to /store/login was an infinite loop
-    // once — login asked whoami, got a valid identity, honoured ?next and returned her here.
+    // once: login asked whoami, got a valid identity, honoured ?next and returned her here.
     window.location.href = "/store/login?next=%2Fadmin%2Fonboarding";
     return;
    }
@@ -85,7 +85,7 @@ export default function OnboardingWizard() {
 
  const canContinue = hasWebsite === false || (hasWebsite === true && websiteUrl.trim().length > 3);
 
- /** Build-from-scratch: no store yet, nothing to save — straight into the builder. */
+ /** Build-from-scratch: no store yet, nothing to save. Straight into the builder. */
  const startBuilding = () => {
   setError(null);
   setLeaving(true);
@@ -103,7 +103,7 @@ export default function OnboardingWizard() {
   * Wait until the workspace gate can actually SEE the new store before leaving this page.
   *
   * This is the bounce. Creating the store writes store_users, then the wizard navigated straight
-  * into /admin — where the layout asks whoami, doesn't find the row yet, and sends her back here.
+  * into /admin, where the layout asks whoami, doesn't find the row yet, and sends her back here.
   * The import path papered over it with a sessionStorage breadcrumb and one 1.2s retry; the build
   * path had nothing at all, so it bounced every time.
   *
@@ -115,7 +115,7 @@ export default function OnboardingWizard() {
   for (let i = 0; i < 10; i++) {
    const me = await fetch("/api/infrastructure/whoami", { cache: "no-store" })
     .then((r) => (r.ok ? r.json() : null)).catch(() => null);
-   // On a REPEAT run "any store" is already true before we start — she owns the one from last time —
+   // On a REPEAT run "any store" is already true before we start, she owns the one from last time,
    // so waiting on that would return instantly and the next screen would open the wrong shop.
    // Naming the slug makes this wait for the store actually just made.
    if (expected ? me?.slug === expected : me?.slug) return true;
@@ -129,7 +129,7 @@ export default function OnboardingWizard() {
   *
   * WITHOUT THIS, A TEST RUN EDITS HER REAL SHOP. resolveStoreSlug() answers with the OLDEST store an
   * email owns (store_users, ORDER BY created_at ASC), so on a repeat run every screen after this one
-  * — the storefront editor, and worse, /api/store/capture — would resolve to the store she already
+  * the storefront editor, and worse, /api/store/capture. Would resolve to the store she already
   * had. The import path would have crawled a test URL straight over her live storefront's captured
   * pages. Switching pins the new one, and the endpoint re-checks membership, so this can only ever
   * move her between shops she genuinely owns.
@@ -157,14 +157,14 @@ export default function OnboardingWizard() {
    // plainly was. Each now has a way forward instead of a dead end.
    if (data?.needsSignIn) { window.location.href = "/store/login?next=%2Fadmin%2Fonboarding"; return false; }
    // Name the account being refused. "VYA is invite-only" to someone who already HAS a shop under
-   // another address is a dead end she cannot reason about — the answer is nearly always that she
+   // another address is a dead end she cannot reason about. The answer is nearly always that she
    // is signed in as the wrong Google account, and only we can see which one.
    if (data?.notInvited && data?.email) {
     setWrongAccount(String(data.email));
     setError(null);
     return false;
    }
-   setError(data?.error || "We couldn’t create your store — try again.");
+   setError(data?.error || "We couldn’t create your store. Try again.");
    return false;
   }
   // Breadcrumb for the layout's own retry, and then WAIT here until the gate sees the store.
@@ -190,13 +190,13 @@ export default function OnboardingWizard() {
    const data = await res.json().catch(() => ({}));
    if (!res.ok) {
     // The same THREE failures as the build path. This branch used to handle two and say so, which
-    // meant an owner refused by the invite gate here got the bare "VYA is invite-only" — no address,
-    // no way to switch — while the identical refusal on the build path named her account and offered
+    // meant an owner refused by the invite gate here got the bare "VYA is invite-only", no address,
+    // no way to switch, while the identical refusal on the build path named her account and offered
     // to change it. Same route, same 403, same payload; only this caller ignored it.
     setBusy(false);
     if (data?.needsSignIn) { window.location.href = "/store/login?next=%2Fadmin%2Fonboarding"; return; }
     if (data?.notInvited && data?.email) { setWrongAccount(String(data.email)); setError(null); return; }
-    setError(data?.error || "Something went wrong — try again.");
+    setError(data?.error || "Something went wrong: try again.");
     return;
    }
    // The workspace gate (whoami) reads store_users; the row was written a moment ago. Leave a
@@ -205,12 +205,12 @@ export default function OnboardingWizard() {
    // BEFORE the capture below, not after: /api/store/capture writes into whichever store the
    // request resolves to, and on a repeat run that is her existing shop until this switch lands.
    await switchTo(String(data?.slug || ""));
-   // Same wait as the build path — the import screen lives inside the workspace, so the gate has
+   // Same wait as the build path. The import screen lives inside the workspace, so the gate has
    // to see the store before we go there or she lands back on this wizard.
    await waitForStore(String(data?.slug || "") || undefined);
 
-   // Her whole shop was brought over before she ever signed up — every page of her site AND her
-   // inventory — and she's just been handed it. There is nothing left to import, so skip the scrape
+   // Her whole shop was brought over before she ever signed up. Every page of her site AND her
+   // inventory, and she's just been handed it. There is nothing left to import, so skip the scrape
    // and take her to the storefront that is already there.
    //
    // Only when it's genuinely complete: a seeded store whose site was NOT captured still needs the
@@ -225,17 +225,17 @@ export default function OnboardingWizard() {
    const cap = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: importUrl, replaceBlocks: true }) }).catch(() => null);
    const capData = cap ? await cap.json().catch(() => null) : null;
    if (!cap || !cap.ok) {
-    const msg = capData?.error || "We couldn’t bring that site over — try again or check the URL.";
+    const msg = capData?.error || "We couldn’t bring that site over. Try again or check the URL.";
     router.replace(`/admin/import?from=onboarding&err=${encodeURIComponent(msg)}&url=${encodeURIComponent(importUrl)}`);
     return;
    }
    router.replace("/admin/storefront?welcome=import");
   } catch {
-   setError("Network error — try again."); setBusy(false);
+   setError("Network error: try again."); setBusy(false);
   }
  }
 
- // The builder owns the screen from here — same component /admin/onboarding/build renders, so
+ // The builder owns the screen from here. Same component /admin/onboarding/build renders, so
  // there is one builder and one set of steps, not a second copy that drifts.
 
  if (checking) {
@@ -247,7 +247,7 @@ export default function OnboardingWizard() {
    <Suspense fallback={<div className="min-h-screen bg-[#f7f6f3]" />}>
     <div className="vya-panel-in fixed inset-0 z-[60]">
     <BuildWizardInner onBeforeFinish={createStore} />
-    {/* createStore sets `error` and returns false, which stops the builder finishing — but this
+    {/* createStore sets `error` and returns false, which stops the builder finishing, but this
         branch renders ONLY the builder, so that message had nowhere to appear. Pressing "Create my
         store" simply did nothing, with no way for the seller to find out why. Sits above the
         builder (z-[70]) because the builder is itself fixed and full-screen. */}
@@ -294,12 +294,12 @@ export default function OnboardingWizard() {
    <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet" />
 
-   {/* Only the import path has anything to wait for — building goes straight to the builder. */}
+   {/* Only the import path has anything to wait for. Building goes straight to the builder. */}
    {busy && (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f7f6f3] px-6 text-center">
      <Loader2 size={30} className="animate-spin" style={{ color: ACCENT }} />
      <h2 className="mt-6 text-[22px] leading-tight text-stone-900" style={{ fontFamily: "'Newsreader', Georgia, serif" }}>Bringing your site over</h2>
-     <p className="mt-2 max-w-sm text-[14px] text-stone-500">Importing your products, photos, and pages — this can take a moment.</p>
+     <p className="mt-2 max-w-sm text-[14px] text-stone-500">Importing your products, photos, and pages. This can take a moment.</p>
     </div>
    )}
 
@@ -319,7 +319,7 @@ export default function OnboardingWizard() {
       <p className="text-[13px] leading-relaxed text-stone-600">
        <span className="font-medium text-stone-900">Test run.</span> You already have a store, so this
        makes a separate one to try the flow on, and switches you into it. Your real store is untouched
-       — switch back any time from the shop name at the top of the sidebar.
+. Switch back any time from the shop name at the top of the sidebar.
       </p>
      </div>
     )}

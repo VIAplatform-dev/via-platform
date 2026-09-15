@@ -29,7 +29,7 @@ import {
 } from "./metrics";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — the metric job (Task 2).
+// Data Layer: the metric job (Task 2).
 //
 // Reads the unified `events` log (+ current product supply), computes the
 // sellable signals per brand / category / era for each window, and writes them
@@ -43,7 +43,7 @@ function db() {
  return neon(url);
 }
 
-// "brand_category" is the actionable composite ("Dior · bags") — the level sellers actually source at,
+// "brand_category" is the actionable composite ("Dior · bags"). The level sellers actually source at,
 // and a far tighter price than a whole house. segment_value is `${brand} · ${category}`.
 export type SegmentType = "brand" | "category" | "era" | "color" | "brand_category" | "brand_model";
 
@@ -155,12 +155,12 @@ export async function scanCatalogBySegment(): Promise<Record<SegmentType, Map<st
  bump(out.brand, pBrand, price, store);
  bump(out.category, pCat, price, store);
  bump(out.era, inferEra(`${p.title} ${p.description ?? ""}`, buckets), price, store);
- // Supply colour: prefer the vision image_color (accurate), fall back to the title — both
+ // Supply colour: prefer the vision image_color (accurate), fall back to the title. Both
  // normalized to the SAME palette so supply reconciles with the title-derived demand side.
  bump(out.color, normalizeColor(p.image_color) ?? normalizeColor(p.title), price, store);
- // The actionable composite — same `${brand} · ${category}` key as the demand side.
+ // The actionable composite: same `${brand} · ${category}` key as the demand side.
  if (pBrand && pCat) bump(out.brand_category, `${pBrand} · ${pCat}`, price, store);
- // The sharpest composite — `${brand} · ${model}` ("Dior · Saddle").
+ // The sharpest composite: `${brand} · ${model}` ("Dior · Saddle").
  const pModel = pBrand ? inferModel(p.title, pBrand) : null;
  if (pBrand && pModel) bump(out.brand_model, `${pBrand} · ${pModel}`, price, store);
  }
@@ -226,7 +226,7 @@ export async function computeMarketMetrics(opts: { asOf?: string } = {}): Promis
    rawDemand: demandCur[i],
    views: r.views_cur, saves: r.saves_cur, clicks: r.clicks_cur, orders: r.orders_cur,
    sellThroughPct: sellThroughPct(r.orders_cur, supplies[i]),
-   medianDaysToSale: null, // no per-item listing date yet — null, never faked (see METRICS.md)
+   medianDaysToSale: null, // no per-item listing date yet. Null, never faked (see METRICS.md)
    priceP25: bench.p25, priceMedian: bench.median, priceP75: bench.p75,
    priceMomentumPct: priceMomentumPct(prices.map(Number), (r.prices_prior ?? []).map(Number)),
    trajectory: classifyTrajectory(
@@ -244,7 +244,7 @@ export async function computeMarketMetrics(opts: { asOf?: string } = {}): Promis
  }
 
  // Upsert today's rows (no DELETE) so the table is never in a torn/empty state during a
- // rebuild, and two overlapping runs can't dup-key-fail — see insertMetrics' ON CONFLICT.
+ // rebuild, and two overlapping runs can't dup-key-fail. See insertMetrics' ON CONFLICT.
  const CHUNK = 500;
  for (let i = 0; i < allRows.length; i += CHUNK) await insertMetrics(asOf, allRows.slice(i, i + CHUNK));
 
@@ -257,7 +257,7 @@ export async function computeMarketMetrics(opts: { asOf?: string } = {}): Promis
 export type ColorTrend = { color: string; demandIndex: number; demandTrend: string; trajectory: string | null; priceMedian: number | null; priceMomentumPct: number | null };
 
 /**
- * Top colours by demand in the latest snapshot — the "colour of the season" signal (teal summer,
+ * Top colours by demand in the latest snapshot. The "colour of the season" signal (teal summer,
  * etc.). Cross-market by nature: what's hot in resale tracks what's hot in retail. Aggregated +
  * privacy-gated (≥ minStores), so it's market-level, never a single store.
  */
@@ -301,9 +301,9 @@ export type WhitespacePick = {
 
 /**
  * Per-store whitespace: market segments with real, non-cooling demand and a supply gap that THIS
- * store doesn't already carry — i.e. what to go source. Reads the latest market_metrics snapshot
+ * store doesn't already carry. I.e. what to go source. Reads the latest market_metrics snapshot
  * (aggregate + privacy-gated to ≥ minStores), subtracts the store's own inventory segments, and
- * ranks by supply gap then demand. Aggregated only — never another store's numbers.
+ * ranks by supply gap then demand. Aggregated only, never another store's numbers.
  */
 export async function getStoreWhitespace(slug: string, windowKey: MetricWindow = "30d", limit = 12): Promise<WhitespacePick[]> {
  await ensureMarketMetricsTable();
@@ -347,7 +347,7 @@ export async function getStoreWhitespace(slug: string, windowKey: MetricWindow =
  if (b && m) has.brand_model.add(`${b} · ${m}`.toLowerCase());
  }
 
- // Price from the LIVE catalog asking benchmark (populated) — realized sales are too thin to price on.
+ // Price from the LIVE catalog asking benchmark (populated). Realized sales are too thin to price on.
  const scan = await scanCatalogBySegment().catch(() => null);
  const askOf = (type: SegmentType, value: string) => {
  const seg = scan?.[type]?.get(value);
@@ -356,7 +356,7 @@ export async function getStoreWhitespace(slug: string, windowKey: MetricWindow =
  const money = (n: number | null) => (n == null ? null : `$${Math.round(n).toLocaleString()}`);
 
  // Surface at the NATURAL granularity: drop a bare brand/category when a more-specific child (its
- // model or brand×category) explains the demand — so we show "Dior · Saddle", not "Dior" + "Dior ·
+ // model or brand×category) explains the demand, so we show "Dior · Saddle", not "Dior" + "Dior ·
  // Saddle" + "Dior · bags" all at once. A bare segment survives only on a whole-house/whole-category
  // moment (its own demand clearly beats its best child).
  const carriedRows = rows.filter((r) => !has[r.segment_type]?.has((r.segment_value || "").toLowerCase()));
@@ -379,7 +379,7 @@ export async function getStoreWhitespace(slug: string, windowKey: MetricWindow =
   .slice(0, limit)
   .map((r) => {
   const trendNote = r.demand_trend === "rising" ? " and rising" : "";
-  const accel = r.trajectory === "accelerating" ? " Demand is accelerating — get in early." : r.trajectory === "peaking" ? " (Momentum may be peaking.)" : "";
+  const accel = r.trajectory === "accelerating" ? " Demand is accelerating. Get in early." : r.trajectory === "peaking" ? " (Momentum may be peaking.)" : "";
   const ask = askOf(r.segment_type, r.segment_value);
   const p25 = ask?.p25 ?? null;
   const p75 = ask?.p75 ?? null;

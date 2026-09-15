@@ -1,7 +1,7 @@
 // THE PRODUCT PAGE, AS THE VISUAL EDITOR GETS IT.
 //
 // The storefront editor offers "Product page (all N)": one captured product page, opened to change the
-// design of every product page (a save there is carried to the rest by old value — see
+// design of every product page (a save there is carried to the rest by old value. See
 // /api/store/capture/edit). Product pages are served by their own route, which never had an edit mode,
 // so that option opened a shopper's page with no editor on it at all.
 //
@@ -17,10 +17,10 @@
 //    corrected per request by applyCartState. None of the shopper's own state (her bag) is shown.
 //
 //  · THE PIECE'S OWN NAME, PRICE AND DESCRIPTION ARE INVENTORY'S. Typed over here they would change one
-//    page and disagree with the piece everywhere else — or, for the price, be rewritten on the next
+//    page and disagree with the piece everywhere else, or, for the price, be rewritten on the next
 //    load. So they carry no text number (the editor offers no box), and are stamped with the piece they
-//    belong to, so a click opens the piece in the panel instead. The words every product page shares —
-//    "Add to cart", a shipping line, a size-guide heading — stay editable, and those are what travel.
+//    belong to, so a click opens the piece in the panel instead. The words every product page shares,
+//    "Add to cart", a shipping line, a size-guide heading. Stay editable, and those are what travel.
 
 import * as cheerio from "cheerio";
 import type { Element as DomElement } from "domhandler";
@@ -39,7 +39,7 @@ export type EditPiece = {
  detailsHtml?: string;
 };
 
-/** The shared header, footer and nav — never the piece's, whatever they contain. */
+/** The shared header, footer and nav, never the piece's, whatever they contain. */
 const CHROME = "header, footer, nav";
 /** Where a theme prints the product's name. Whole class tokens only: `product__title-and-price` is a
  *  wrapper holding the vendor and the price as well, and must not take them with it. */
@@ -57,7 +57,7 @@ const norm = (s: string | null | undefined) => (s || "").replace(/\s+/g, " ").tr
  *
  * Those words have no text number, so the editor's own click handler selects the section around them
  * and stops. This follows it with the message the editor already sends for a live product card's name
- * (`textsel` carrying `item`) — with no text number, so the panel shows the piece rather than a box.
+ * (`textsel` carrying `item`), with no text number, so the panel shows the piece rather than a box.
  * Posted on the next tick, after the editor's handler has reported the section, so it is the last word.
  * Photos are left to the editor, which already reports the piece a photo belongs to.
  */
@@ -74,7 +74,7 @@ function textByEid(html: string): Map<string, string> {
 /**
  * The product page the editor opens, numbered as the save numbers it, before prepareEditMode.
  *
- * @param stored the page exactly as stored — the one the save will apply her edits to.
+ * @param stored the page exactly as stored. The one the save will apply her edits to.
  * @param piece  the inventory piece this page shows, or null when none matches (the page then opens
  *               as stored, every word editable, since nothing else owns them).
  */

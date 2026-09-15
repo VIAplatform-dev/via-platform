@@ -62,7 +62,7 @@ export default function ReferralBoardPage() {
  Referral Board
  </h1>
  <p style={{ fontSize: 15, color: "#71717a" }}>
- Waitlist members ranked by referrals — more referrals means a shorter wait.
+ Waitlist members ranked by referrals. More referrals means a shorter wait.
  </p>
  </div>
  </section>

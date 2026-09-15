@@ -5,7 +5,7 @@ import { seller, unauthorized, notFound, bad } from "../../_shared";
 export const dynamic = "force-dynamic";
 
 /**
- * The store's answer. Approving may quote a different price than the ladder —
+ * The store's answer. Approving may quote a different price than the ladder,
  * trade rates for a stylist are the whole reason a store runs this mode.
  *
  * Approval can still fail: if the store wasn't holding the dates, someone may

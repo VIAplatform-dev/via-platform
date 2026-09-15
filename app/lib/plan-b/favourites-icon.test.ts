@@ -68,7 +68,7 @@ test("a page with no favourites link is returned byte for byte", () => {
 });
 
 test("the heart is an outline, whatever her stylesheet says about that class", () => {
- // Keeping her class is what makes the icon the right size — and that class carried her own
+ // Keeping her class is what makes the icon the right size, and that class carried her own
  // `fill: currentColor`, which beats a fill="none" ATTRIBUTE and rendered the heart as a solid
  // black blob in a row of outlined icons. Only an inline style outranks her stylesheet.
  const html = `<html><body><a href="/favorites"><svg class="Icon Icon--account" viewBox="0 0 20 20"><circle cx="9" cy="6" r="4"/></svg></a></body></html>`;
@@ -86,7 +86,7 @@ test("her own inline style on the icon is kept", () => {
 
 test("a theme that names every icon the same still gets a heart on favourites", () => {
  // thenicheshop calls all of them `theme-icon`, and its favourites glyph is a person by drawing
- // rather than by name. We cannot read a path and tell — but a heart on a favourites link is
+ // rather than by name. We cannot read a path and tell, but a heart on a favourites link is
  // never wrong, so an unnamed glyph is replaced rather than left to be guessed at.
  const html = `<html><body><a href="/favorites"><svg class="theme-icon" viewBox="0 0 48 48"><path d="M24 4"/></svg></a></body></html>`;
  assert.equal(cheerio.load(retagFavourites(html))("svg[data-vya-heart]").length, 1);

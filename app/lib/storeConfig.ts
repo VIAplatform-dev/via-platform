@@ -2,9 +2,9 @@ export type SquarespaceStore = {
  type: "squarespace";
  name: string;
  slug: string;
- /** Single shop URL — used by stores where one page lists all products. */
+ /** Single shop URL: used by stores where one page lists all products. */
  shopUrl?: string;
- /** Multiple URLs to fetch & merge — for stores that split products across category pages. */
+ /** Multiple URLs to fetch & merge, for stores that split products across category pages. */
  shopUrls?: string[];
  rssUrl?: string;
 };
@@ -23,9 +23,9 @@ export type ShopifyStore = {
  collectionHandles?: string[];
  /** If true, fetch each product's page HTML during sync to extract metafield sections (condition, dimensions, etc.) */
  scrapeProductPage?: boolean;
- /** Collection handles to EXCLUDE from sync (blacklist — products in these collections are filtered out) */
+ /** Collection handles to EXCLUDE from sync (blacklist: products in these collections are filtered out) */
  excludeCollectionHandles?: string[];
- /** If true, skip all sold-out filtering — include everything the store lists regardless of inventory status */
+ /** If true, skip all sold-out filtering. Include everything the store lists regardless of inventory status */
  skipSoldOutFilter?: boolean;
 };
 
@@ -41,7 +41,7 @@ export type SquareStore = {
  type: "square";
  name: string;
  slug: string;
- /** Square Location ID (LXXXXXXXXXXXXXXXXX) — used for product catalog sync */
+ /** Square Location ID (LXXXXXXXXXXXXXXXXX): used for product catalog sync */
  locationId?: string;
  /** Name of the env var holding this store's Square access token e.g. SQUARE_ACCESS_TOKEN_HONEY_BEAR_VINTAGE */
  accessTokenEnvVar?: string;
@@ -53,7 +53,7 @@ export type StripeStore = {
  slug: string;
  /** Name of the env var holding this store's Stripe secret key */
  secretKeyEnvVar: string;
- /** Store's public website URL — used to construct product page links */
+ /** Store's public website URL. Used to construct product page links */
  websiteUrl: string;
 };
 
@@ -103,7 +103,7 @@ export const SQUARESPACE_STORES: SquarespaceStore[] = [
  type: "squarespace",
  name: "Keepin It Real Luxe",
  slug: "keepin-it-real-luxe",
- // Site has no "all products" page — categories must be fetched separately and merged.
+ // Site has no "all products" page. Categories must be fetched separately and merged.
  shopUrls: [
  "https://www.keepinitrealluxe.com/handbags",
  "https://www.keepinitrealluxe.com/accessories",
@@ -513,14 +513,14 @@ export const SHOPIFY_STORES: ShopifyStore[] = [
  },
 ];
 
-// Big Cartel stores (public JSON API — no token required)
+// Big Cartel stores (public JSON API, no token required)
 export const BIGCARTEL_STORES: BigCartelStore[] = [];
 
 // Square stores (webhook-based order tracking, no product catalog sync yet)
-// Honeybear Vintage moved to Shopify (Collabs) — see SHOPIFY_STORES below.
+// Honeybear Vintage moved to Shopify (Collabs): see SHOPIFY_STORES below.
 export const SQUARE_STORES: SquareStore[] = [];
 
-// Wix stores (REST Catalog API — api key + site ID)
+// Wix stores (REST Catalog API: api key + site ID)
 export const WIX_STORES: WixStore[] = [
  {
  type: "wix",
@@ -535,7 +535,7 @@ export const WIX_STORES: WixStore[] = [
 
 // Carroll Street Vintage uses a custom sync endpoint (/api/admin/sync-carroll-street)
 // that scrapes their JS bundle for products and Stripe for orders separately.
-// It must NOT be in STRIPE_STORES / ALL_STORES — the generic stripe cron fetches
+// It must NOT be in STRIPE_STORES / ALL_STORES. The generic stripe cron fetches
 // Stripe's product catalog (which Carroll Street doesn't use) and would delete
 // all scraped products each night.
 export const STRIPE_STORES: StripeStore[] = [];

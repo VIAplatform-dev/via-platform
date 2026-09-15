@@ -11,17 +11,17 @@ import { logError } from "@/app/lib/error-log";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // a shop can be hundreds of pieces
 
-// POST { items } — a seller's existing Depop shop, moved into VYA.
+// POST { items }: a seller's existing Depop shop, moved into VYA.
 //
 // THE ON-RAMP. A vintage seller arriving at VYA already has her whole shop on Depop: the photographs
 // taken, the descriptions written, the prices decided. Asking her to type it all again is asking her
-// not to move at all. The extension walks her own selling hub in her own browser — her session, her
-// pages, no scraping of anyone else — and posts what it found here.
+// not to move at all. The extension walks her own selling hub in her own browser. Her session, her
+// pages, no scraping of anyone else, and posts what it found here.
 //
 // THIS ROUTE DID NOT EXIST. The button was in VYA's cross-listing settings, the extension collected
 // everything correctly, and then vya.js POSTed it to /api/store/import/depop and got a 404. The
 // import kept the collection "to retry", so it retried into the same 404 for ever. Nothing about it
-// looked broken from the outside — which is why it is worth saying plainly here.
+// looked broken from the outside, which is why it is worth saying plainly here.
 //
 // Pieces land as DRAFTS (see depop-import.ts), and sold ones land sold, as history.
 export async function POST(request: NextRequest) {
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     priceCents: it.priceCents,
     currency: it.currency,
     // The rehost-images cron copies these to our own storage in the background, the same way the
-    // CSV importer leaves them — a seller's pictures must not depend on Depop continuing to serve
+    // CSV importer leaves them. A seller's pictures must not depend on Depop continuing to serve
     // them, least of all after she has stopped selling there.
     images: it.images,
     brand: it.brand,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
    });
    results.push({ sourceId: it.sourceId, status: it.status });
   } catch (e) {
-   // One bad piece must not lose the other 399 — and a silent skip is how a seller ends up short
+   // One bad piece must not lose the other 399, and a silent skip is how a seller ends up short
    // without knowing which.
    await logError("depop-import-item", e, { context: { slug, sourceId: it.sourceId, title: it.title } }).catch(() => {});
   }

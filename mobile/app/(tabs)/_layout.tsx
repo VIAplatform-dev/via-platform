@@ -4,12 +4,12 @@ import { colors } from "../../lib/theme";
 
 // Five icons, no labels.
 //
-// The bag is NOT here — it lives in the header, which is what makes five possible. Two of these
+// The bag is NOT here. It lives in the header, which is what makes five possible. Two of these
 // tabs are really two screens each (Obsessions holds Sold Out and Searches; Community holds
 // Messages), split by the underlined row inside them rather than by more tabs.
 //
 // Outline icons throughout; the active one is the same glyph at full strength against the muted
-// rest. No labels, because with five familiar shapes they only add clutter — and because a label
+// rest. No labels, because with five familiar shapes they only add clutter, and because a label
 // long enough to say "Obsessions" truncates to "Obsessi…" at this width.
 
 function icon(name: React.ComponentProps<typeof Feather>["name"]) {

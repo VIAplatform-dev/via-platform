@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 // POST { itemId, offer?, discountCode?, buyer:{email,name,phone}, ship:{…}, shippingCostCents }
 // SINGLE-ITEM equivalent of cart-intent: creates a PaymentIntent (direct charge on the seller's
-// account) so the buyer pays inline with the embedded Payment Element — no redirect to Stripe-hosted
+// account) so the buyer pays inline with the embedded Payment Element, no redirect to Stripe-hosted
 // Checkout. Same offer/discount/app-fee/metadata as /api/checkout, but the intent's metadata carries
 // `itemId` so the EXISTING webhook payment_intent.succeeded handler fulfills it identically.
 const RESERVE_REF = "checkout";
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
  if (discountCode) {
  const d = await validateDiscount(seller.slug, discountCode);
  if (d) {
- // Scope and audience decided HERE too, not only in the quote box — the payment is the price that
+ // Scope and audience decided HERE too, not only in the quote box. The payment is the price that
  // counts, and a code the buyer no longer qualifies for must not survive to it.
  const lastOrderAt = d.audience === "all" ? null : await lastOrderAtForBuyer(seller.slug, buyerEmail);
  const c = applyDiscountToOrder(d, [{ itemId, amountCents: effPriceCents }], { lastOrderAt, email: buyerEmail });
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
  try {
  const currency = (item.currency || "usd").toLowerCase();
  // Sales tax, on the path shoppers actually use. `automatic_tax` only exists on a hosted Checkout
- // Session — the route that had it has no callers — so this asks Stripe to calculate against the
+ // Session, the route that had it has no callers, so this asks Stripe to calculate against the
  // seller's own registrations and adds the result. Null when tax is off or Stripe can't work it out,
  // which charges exactly what it charged before. See app/lib/sales-tax.ts.
  const tax = await calculateSalesTax({
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
  const amount = salePriceCents + effShippingCents + taxCents;
  // Consignment: route the consignor's cut into VYA's balance ONLY when they're paid by Stripe
  // direct-deposit. Cash / store-credit stores keep the full proceeds and pay the consignor
- // themselves — VYA holds nothing (0 here).
+ // themselves. VYA holds nothing (0 here).
  const consignCents = await consignorCutToHold(itemId, salePriceCents).catch(() => 0);
  const appFee = applicationFeeCents(salePriceCents) + effShippingCents + consignCents;
 
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
  shipping_paid_cents: String(effShippingCents),
  sale_price_cents: String(salePriceCents),
  };
- // Carried so the webhook can file the Tax Transaction once the money is taken — collecting tax
+ // Carried so the webhook can file the Tax Transaction once the money is taken. Collecting tax
  // without reporting it is the half that matters at filing time.
  if (taxCents > 0) meta.tax_cents = String(taxCents);
  if (tax?.calculationId) meta.tax_calculation = tax.calculationId;
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
  shipping: { name: String(buyer.name || buyerEmail), phone: String(buyer.phone || ""), address: { line1: String(ship.line1), line2: String(ship.line2 || ""), city: String(ship.city), state: String(ship.state), postal_code: String(ship.zip), country: String(ship.country || "US") } },
  metadata: meta,
  });
- // If a store enabled a method its account hasn't activated, Stripe rejects the intent — fall back
+ // If a store enabled a method its account hasn't activated, Stripe rejects the intent. Fall back
  // to card-only (which always works) rather than breaking checkout.
  let intent;
  try {

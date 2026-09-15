@@ -47,15 +47,15 @@ test("a mismatch is only a mismatch when the tiers differ", () => {
  assert.deepEqual(m, {
   typedTier: "small",
   estimatedTier: "large",
-  // Her weight is what gets used — the note says so first, then flags the cost. It used to open
+  // Her weight is what gets used. The note says so first, then flags the cost. It used to open
   // with "You typed 8 oz, but…", which was read as a refusal rather than a warning.
-  message: "Using your 8 oz — buyers pay the small tier. Worth a check: from the photos this looks like a coat (large parcel), and if it is, you'd cover the difference on postage.",
+  message: "Using your 8 oz: buyers pay the small tier. Worth a check: from the photos this looks like a coat (large parcel), and if it is, you'd cover the difference on postage.",
  });
 });
 
 test("the mismatch message names the piece when it can, and the tier when it can't", () => {
  const m = parcelMismatch({ typedWeightOz: 60, estimate: { tier: "small", weightOz: 8, source: "ai" } });
- assert.equal(m?.message, "Using your 60 oz — buyers pay the large tier. From the photos this looks like a small parcel, so buyers may be paying more postage than it needs.");
+ assert.equal(m?.message, "Using your 60 oz: buyers pay the large tier. From the photos this looks like a small parcel, so buyers may be paying more postage than it needs.");
 });
 
 test("describeParcel reads as a label: tier, and the weight in pounds when it's over one", () => {
@@ -73,7 +73,7 @@ test("the AI's parcel becomes an estimate; junk becomes null", () => {
  assert.equal(parcelEstimateFrom({ weightOz: "heavy" }), null);
 });
 
-test("at publish: what she typed wins, then the AI, then the category — and the estimate is kept either way", () => {
+test("at publish: what she typed wins, then the AI, then the category, and the estimate is kept either way", () => {
  const ai = { weightOz: 44, lengthIn: 16, widthIn: 12, heightIn: 6 };
  // Typed weight stands.
  assert.deepEqual(resolveParcelAtPublish({ typed: { weightOz: 20 }, aiParcel: ai, category: "coats-jackets" }).parcel, { weightOz: 20, lengthIn: 16, widthIn: 12, heightIn: 6 });

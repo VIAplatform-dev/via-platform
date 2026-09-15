@@ -16,7 +16,7 @@ test("the suffix is normalised with or without a leading dot", () => {
  assert.equal(storeHostSuffix({}), "", "unset means Plan B is off");
 });
 
-test("Plan B is inert until configured — no host is a store origin", () => {
+test("Plan B is inert until configured, no host is a store origin", () => {
  assert.equal(storeSlugForHost("blummier.vyasites.test", {}), null);
 });
 
@@ -26,7 +26,7 @@ test("VYA's own hosts are never store origins", () => {
  assert.equal(storeSlugForHost("getvya.ai", env), null);
 });
 
-test("only a DIRECT child counts — a deeper name is not a store", () => {
+test("only a DIRECT child counts. A deeper name is not a store", () => {
  // A wildcard cert covers one label, and accepting deeper names would let a crafted hostname
  // masquerade as a store.
  assert.equal(storeSlugForHost("a.b.vyasites.test", env), null);
@@ -99,7 +99,7 @@ test("Squarespace's cart is mapped, and reachable on a store origin", () => {
  assert.equal(squarespaceThemeRoute("/api/commerce/shopping-cart"), "/api/plan-b/sqs/cart");
  assert.equal(squarespaceThemeRoute("/api/commerce/shopping-cart/"), "/api/plan-b/sqs/cart", "trailing slash");
  // Unlike Shopify's /cart/* routes these live under /api, where a store origin is refused by
- // default — so the allowlist has to let exactly these through, and nothing else.
+ // default, so the allowlist has to let exactly these through, and nothing else.
  assert.equal(isRefusedOnStoreHost("/api/commerce/shopping-cart/entries"), false);
  assert.equal(isAllowedStoreApi("/api/commerce/shopping-cart"), true);
  assert.equal(isRefusedOnStoreHost("/api/commerce/orders"), true, "the rest of their API stays refused");
@@ -133,7 +133,7 @@ test("checkout is served by VYA on a store origin, not looked up as a captured p
 
 // ── The cart FORM (POST /cart) ────────────────────────────────────────────────────────────────────
 // The theme's Checkout button is a submit of the /cart form, not a link. Unrouted, that POST fell
-// through to Next and answered "Server action not found" — the dead button a shopper meets at the
+// through to Next and answered "Server action not found". The dead button a shopper meets at the
 // exact moment of buying.
 
 test("POST /cart is the theme's cart form", () => {
@@ -144,7 +144,7 @@ test("POST /cart is the theme's cart form", () => {
 
 // GET /cart is the cart PAGE, which the captured site serves. Swallowing it here would replace the
 // shopper's cart page with a form handler.
-test("GET /cart is left alone — that is the cart page", () => {
+test("GET /cart is left alone. That is the cart page", () => {
  assert.equal(shopifyCartSubmitRoute("/cart", "GET"), null);
  assert.equal(shopifyCartSubmitRoute("/cart", "HEAD"), null);
  assert.equal(shopifyCartSubmitRoute("/cart", ""), null);
@@ -162,11 +162,11 @@ test("only /cart itself, never the routes beneath it", () => {
 
 test("the theme's recommendation fetch is allowed on a store origin", () => {
  // "You may also like" is fetched by the seller's own theme from the shopper's browser, so it is a
- // storefront surface — but it lives under /api/plan-b/, which the allowlist does not cover. Every
+ // storefront surface, but it lives under /api/plan-b/, which the allowlist does not cover. Every
  // request from a hosted store was refused before it reached the handler, and the strip rendered
  // empty for ever. The route's own comment describes exactly this symptom, from the last time it
  // happened for a different reason.
- // `pathname` is what the caller passes, and a pathname never carries a query string — asserting
+ // `pathname` is what the caller passes, and a pathname never carries a query string. Asserting
  // on "…?section_id=x" was testing a shape this function is never handed.
  assert.equal(isAllowedStoreApi("/api/plan-b/recommendations"), true);
  assert.equal(isAllowedStoreApi("/API/Plan-B/Recommendations"), true, "case is normalised");
@@ -183,7 +183,7 @@ test("the rest of the internal surface stays refused on a store origin", () => {
 
 test("a theme's section render for a variant is routed, not 404'd", () => {
  // bag-crush's theme asks for the in-store-pickup section on every product view. Unrouted it 404s
- // with plain text; the theme parses that, calls .querySelector() on nothing and THROWS — taking
+ // with plain text; the theme parses that, calls .querySelector() on nothing and THROWS. Taking
  // the rest of its own startup down with it, including the image loader. 29 of 32 images on her
  // product pages never load because of this one missing route.
  assert.equal(shopifyThemeRoute("/variants/55701352350001"), "/api/plan-b/section");
@@ -198,7 +198,7 @@ test("only a numeric variant id is routed there", () => {
 
 test("the section route is reachable on a store's own host", () => {
  // The same trap the recommendations route fell into: allowed by NAME, never by the /api/plan-b/
- // prefix — the rest of that namespace is internal and must stay refused on sellers' domains.
+ // prefix: the rest of that namespace is internal and must stay refused on sellers' domains.
  assert.equal(isAllowedStoreApi("/api/plan-b/section"), true);
  assert.equal(isAllowedStoreApi("/api/plan-b/cart/add"), false);
 });
@@ -210,7 +210,7 @@ test("a store's public address is the exact host the proxy will serve it on", ()
 });
 
 test("no address is advertised for a store the proxy would refuse to serve", () => {
- assert.equal(storePublicOrigin("blummier", {}), null, "Plan B off — caller falls back");
+ assert.equal(storePublicOrigin("blummier", {}), null, "Plan B off. Caller falls back");
  assert.equal(storePublicOrigin("", env), null);
  assert.equal(storePublicOrigin("a.b", env), null, "a dotted slug would not be a direct child");
  assert.equal(storePublicOrigin("-nope", env), null, "malformed slugs never become a URL");
@@ -222,7 +222,7 @@ test("no address is advertised for a store the proxy would refuse to serve", () 
 test("an emailed sign-in link points at the store's own canonical address in production", () => {
  const prod = { STORE_HOST_SUFFIX: "vyasites.com", NODE_ENV: "production" };
  assert.equal(storeEmailLinkOrigin("tess", "tess.vyasites.com", prod), "https://tess.vyasites.com");
- // The header is ignored in production — this is what stops a forged Host poisoning the email.
+ // The header is ignored in production. This is what stops a forged Host poisoning the email.
  assert.equal(storeEmailLinkOrigin("tess", "evil.example.com", prod), "https://tess.vyasites.com");
  assert.equal(storeEmailLinkOrigin("tess", "localhost:3000", prod), "https://tess.vyasites.com");
  assert.equal(storeEmailLinkOrigin("tess", null, prod), "https://tess.vyasites.com");
@@ -231,7 +231,7 @@ test("an emailed sign-in link points at the store's own canonical address in pro
 test("in development the link keeps the host and port the store is actually reachable on", () => {
  const dev = { STORE_HOST_SUFFIX: "vyasites.test", NODE_ENV: "development" };
  assert.equal(storeEmailLinkOrigin("tess", "tess.vyasites.test:3000", dev), "http://tess.vyasites.test:3000");
- // Still only this store's own host — anything else falls back to the canonical address.
+ // Still only this store's own host. Anything else falls back to the canonical address.
  assert.equal(storeEmailLinkOrigin("tess", "other.vyasites.test:3000", dev), "https://tess.vyasites.test");
  assert.equal(storeEmailLinkOrigin("tess", "localhost:3000", dev), "https://tess.vyasites.test");
 });
@@ -273,7 +273,7 @@ test("the rest of /api/store stays refused on a store's own origin", () => {
 });
 
 test("a built storefront's own pages are served on a store origin, not refused", () => {
- // /s/… must not be caught by the /store guard — they share three letters and nothing else.
+ // /s/… must not be caught by the /store guard. They share three letters and nothing else.
  for (const p of ["/s/gianna", "/s/gianna/shop", "/s/gianna/p/abc"]) {
   assert.equal(isRefusedOnStoreHost(p), false, p);
  }
@@ -298,7 +298,7 @@ const PLAN_B = { STORE_HOST_SUFFIX: ".vyasites.com" };
 
 test("an imported storefront on the marketplace host is sent to its own address", () => {
  // THE GAP THIS CLOSES. /s/ redirected and /site/ did not, and imported captures are most of the
- // shops — so most storefronts had a live duplicate served from vyaplatform.com's own origin.
+ // shops, so most storefronts had a live duplicate served from vyaplatform.com's own origin.
  const r = canonicalStoreRedirect("/site/blummier", {}, PLAN_B);
  assert.deepEqual(r, { origin: "https://blummier.vyasites.com", tail: "" });
  // The rest of the path comes with it, so a deep link lands where it was going.
@@ -316,7 +316,7 @@ test("a built storefront redirects the same way, as it already did", () => {
 });
 
 test("a preview redirect lands on the readable path, not the query string", () => {
- // One address for a draft — the same one the editor hands out, and the same one a seller can read
+ // One address for a draft. The same one the editor hands out, and the same one a seller can read
  // out to somebody. The caller drops the now-redundant ?preview= it arrived as.
  assert.deepEqual(canonicalStoreRedirect("/s/hanas-store", { previewing: true }, PLAN_B), {
   origin: "https://hanas-store.vyasites.com", tail: "/preview",
@@ -329,7 +329,7 @@ test("a preview redirect lands on the readable path, not the query string", () =
 
 test("a preview of a draft is still sent to her own address", () => {
  // THE BUG THIS CLOSES. ?preview= used to be exempt, so the studio's View button opened
- // `getvya.ai/s/hanas-store?preview=1` — a VYA address for a seller's own shop. The store origin
+ // `getvya.ai/s/hanas-store?preview=1`: a VYA address for a seller's own shop. The store origin
  // serves a draft perfectly well when asked; ?preview= lifts the publish gate, not the host.
  assert.deepEqual(canonicalStoreRedirect("/s/hanas-store", {}, PLAN_B), {
   origin: "https://hanas-store.vyasites.com", tail: "",
@@ -388,6 +388,6 @@ test("a VYA host typed into the custom-domain box is not an address", () => {
 test("a domain is normalised the way a seller might have typed it", () => {
  assert.equal(storeAddress("b", "https://Blummier.com/", PLAN_B), "https://blummier.com");
  assert.equal(storeAddress("b", "  blummier.com  ", PLAN_B), "https://blummier.com");
- // Not a domain at all — fall through rather than build https://nonsense.
+ // Not a domain at all. Fall through rather than build https://nonsense.
  assert.equal(storeAddress("blummier", "nonsense", PLAN_B), "https://blummier.vyasites.com");
 });

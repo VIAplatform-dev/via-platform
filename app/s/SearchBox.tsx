@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
 
-// Header search — expands to an input, submits to the shop's ?q= filter.
-// `base` is "" on the store's own origin and "/s/{handle}" on VYA's — passed in because a client
+// Header search: expands to an input, submits to the shop's ?q= filter.
+// `base` is "" on the store's own origin and "/s/{handle}" on VYA's. Passed in because a client
 // component can't see the Host the page was served from.
 export default function SearchBox({ handle, base, preview }: { handle: string; base?: string; preview?: boolean }) {
  const [open, setOpen] = useState(false);

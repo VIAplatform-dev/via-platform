@@ -7,7 +7,7 @@ test("an empty bag is called empty", () => {
  assert.equal(emptyBagMessage(0, ["Gucci Nylon Loop Shoulder Bag"]), "Your bag is empty.");
 });
 
-test("a bag whose piece SOLD says so — not 'your bag is empty'", () => {
+test("a bag whose piece SOLD says so, not 'your bag is empty'", () => {
  // The bug this fixes: the shopper remembers adding it, the page says the bag is empty, and the one
  // fact that explains it (someone else bought it) is the fact we were sitting on.
  const m = emptyBagMessage(1, ["Gucci Nylon Loop Shoulder Bag"]);
@@ -49,6 +49,6 @@ test("an unusable ?store= is ignored rather than trusted", () => {
  assert.equal(bagStoreSlug(null, null), null);
 });
 
-test("knowing nothing means the whole bag — exactly the behaviour before bags were per-store", () => {
+test("knowing nothing means the whole bag. Exactly the behaviour before bags were per-store", () => {
  assert.equal(bagStoreSlug(null, undefined), null);
 });

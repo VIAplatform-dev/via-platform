@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 // are namespaced under the store slug in Blob storage.
 //
 // Every upload is re-encoded to JPEG via sharp. This is essential: iPhone photos
-// are HEIC, which Anthropic (and most browsers) can't read — sending one to the AI
+// are HEIC, which Anthropic (and most browsers) can't read. Sending one to the AI
 // intake fails with "file format is invalid or unsupported". Normalizing also
 // honors EXIF rotation, strips metadata, and caps dimensions for speed/size.
 export async function POST(request: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
  const file = formData.get("file") as File | null;
  if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
  // Allow when the browser reports an image type, OR when it reports nothing
- // (HEIC often has an empty type) — sharp is the real validator below.
+ // (HEIC often has an empty type). Sharp is the real validator below.
  if (file.type && !file.type.startsWith("image/")) {
  return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 });
  }
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
  try {
  output = await toJpeg(input);
  } catch (e1) {
- // sharp can't decode it — almost always an iPhone HEIC/HEVC, which sharp's
+ // sharp can't decode it. Almost always an iPhone HEIC/HEVC, which sharp's
  // prebuilt libvips lacks the codec for. Decode via heic-convert (WASM libheif,
  // no system codec needed), then run it back through sharp to resize.
  try {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
  output = await toJpeg(jpeg);
  } catch (e2) {
  console.error("[upload] image decode failed:", e1, e2);
- return NextResponse.json({ error: "Couldn’t read that image — try a JPG or PNG." }, { status: 400 });
+ return NextResponse.json({ error: "Couldn’t read that image. Try a JPG or PNG." }, { status: 400 });
  }
  }
 

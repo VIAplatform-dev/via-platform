@@ -38,7 +38,7 @@ test("a piece with no photo still lays out, rather than collapsing the row", () 
 
 test("a store's brand comes through, and defaults hold when it doesn't", () => {
  // A bare family name, which is what the picker stores. A raw CSS stack ("Didot,serif") is
- // refused now — it would sit unquoted in a style attribute.
+ // refused now: it would sit unquoted in a style attribute.
  const h = storeEmailHtml({ ...base, brand: { accent: "#5D0F17", headingFont: "Prata" }, button: { label: "Shop the drop", url: "https://shop.example" } });
  assert.match(h, /#5D0F17/);
  assert.match(h, /'Prata',Georgia/);
@@ -56,7 +56,7 @@ test("only http(s) links are ever written into the email", () => {
 });
 
 test("markdown a store typed doesn't render literally", () => {
- // Campaign bodies are markdown, so stores write "# Just landed" — and the headline is already set
+ // Campaign bodies are markdown, so stores write "# Just landed", and the headline is already set
  // in the heading face, so the hash has nothing to do but show up.
  const h = storeEmailHtml({ storeName: "S", headline: "# Just landed", subhead: "**Really** just landed" });
  assert.doesNotMatch(h, /# Just landed/);
@@ -152,7 +152,7 @@ test("every design still carries the shop's logo and its unsubscribe link", () =
 });
 
 test("preheader text is hidden in the email but present for the inbox", () => {
- // The grey line after the subject. Unset, clients grab the first words of the email — usually the
+ // The grey line after the subject. Unset, clients grab the first words of the email. Usually the
  // shop's own name, wasting the second most valuable line in an inbox.
  const h = storeEmailHtml({ storeName: "S", headline: "Hi", preheader: "Four new pieces, one of each." });
  assert.match(h, /Four new pieces, one of each\./);

@@ -1,12 +1,12 @@
-// The size line on a listing: what the tag says, and what that means to a buyer. Pure — no I/O.
+// The size line on a listing: what the tag says, and what that means to a buyer. Pure, no I/O.
 //
 // A vintage tag is a fact, not a fit. "IT 44" on a 1980s label and a "12" on a British one tell a
 // buyer nothing she can order by. Two things the code already knows are surfaced here, in order of
 // trust:
-//   1. the seller's own fit note in the description ("runs true to a US 6") — size-parse.ts;
+//   1. the seller's own fit note in the description ("runs true to a US 6"). Size-parse.ts;
 //   2. the size table's conversion of the tag (IT/FR/DE/EU/UK → US, shoes on their own table,
-//      a UK store's bare shoe number read as UK) — sizeUtils.ts convertSizeToUS.
-// There is NO vintage→modern table in the codebase — the conversion is by region, not by decade —
+//      a UK store's bare shoe number read as UK). SizeUtils.ts convertSizeToUS.
+// There is NO vintage→modern table in the codebase, the conversion is by region, not by decade,
 // so the line labels its source and never claims more than it knows.
 
 import { extractFitSizeFromDescription } from "./size-parse.ts";
@@ -15,7 +15,7 @@ import { convertSizeToUS } from "./sizeUtils.ts";
 export type SizeLine = {
  /** The tag, as the seller entered it. */
  marked: string;
- /** What a buyer should order, when we can say. Always a US size — that is what the table speaks. */
+ /** What a buyer should order, when we can say. Always a US size. That is what the table speaks. */
  fits: string | null;
  /** Where `fits` came from. `tag` = nothing to add beyond the tag itself. */
  source: "seller" | "conversion" | "tag";

@@ -5,11 +5,11 @@ import { logActivity } from "@/app/lib/seller-activity-db";
 
 export const dynamic = "force-dynamic";
 
-// POST { path } — the seller opened a screen.
+// POST { path }: the seller opened a screen.
 //
 // Recorded server-side from a beacon rather than trusted from an analytics SDK: this is the log you
 // look at when one store is trying VYA and something went wrong, so it has to survive an ad blocker,
-// a locked-down browser and a dropped third-party script. Answers 204 always — a log that can fail
+// a locked-down browser and a dropped third-party script. Answers 204 always. A log that can fail
 // loudly is a log that interrupts the thing it's watching.
 export async function POST(request: NextRequest) {
  try {

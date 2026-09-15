@@ -15,7 +15,7 @@ import {
 import { blockDef } from "./storefront-blocks.ts";
 import { isKnownVariant } from "./storefront-variants.ts";
 
-// A template is hand-written data — eight of them, each naming section types, layout variants, page
+// A template is hand-written data. Eight of them, each naming section types, layout variants, page
 // slugs and font families that live in four other files. Every assertion below is a mistake that
 // would otherwise only show up as a silently wrong storefront on a real seller's store.
 
@@ -36,7 +36,7 @@ test("every section names a real block type", () => {
 });
 
 // The whole point of the rewrite: templates differ by LAYOUT, not just palette. A typo'd variant id
-// falls back to the default layout, which is exactly the same-y look this was meant to fix — and it
+// falls back to the default layout, which is exactly the same-y look this was meant to fix, and it
 // fails silently, because sanitizeBlocks deliberately keeps unrecognized ids.
 test("every layout variant exists for its block type", () => {
  every((t) => {
@@ -79,7 +79,7 @@ test("page slugs are unique per template and never shadow a built-in route", () 
 });
 
 // The placeholder-tile trap: a starter template that names designers the store doesn't carry sends a
-// shopper to an empty aisle on their first click. Tiles must be categories, eras or vibes — never a
+// shopper to an empty aisle on their first click. Tiles must be categories, eras or vibes, never a
 // fashion house we invented on the store's behalf.
 test("no template ships tiles naming a designer the store may not carry", () => {
  const houses = /gucci|prada|dior|chanel|versace|mugler|cavalli|blumarine|gaultier|tom ford|balenciaga|fendi|hermes|hermès|ysl|saint laurent|margiela|mcqueen|valentino/i;
@@ -87,7 +87,7 @@ test("no template ships tiles naming a designer the store may not carry", () => 
   const tileBlocks = [...t.layout, ...t.shop, ...t.pages.flatMap((p) => p.blocks)].filter((b) => b.type === "collections");
   for (const b of tileBlocks) {
    const items = b.props?.items ?? "";
-   assert.doesNotMatch(items, houses, `${t.id}: collections tiles name a designer — ${items.split("\n")[0]}`);
+   assert.doesNotMatch(items, houses, `${t.id}: collections tiles name a designer. ${items.split("\n")[0]}`);
   }
  });
 });
@@ -153,7 +153,7 @@ test("an unknown template id yields nothing rather than throwing", () => {
 test("placeholder copy follows the page it's on", () => {
  // A text block was headed "About us" on every page, because copy was keyed by block type alone.
  // On Shipping or Condition Scale that isn't a mild mismatch, it's simply wrong.
- // A field is only replaced where the template wrote something — an omitted subtext stays omitted.
+ // A field is only replaced where the template wrote something. An omitted subtext stays omitted.
  const shipping = placeholderProps("text", { heading: "x", body: "y" }, 0, "shipping");
  assert.match(String(shipping?.heading), /Shipping/i);
  assert.doesNotMatch(String(shipping?.heading), /About us/i);

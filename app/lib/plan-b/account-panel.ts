@@ -2,16 +2,16 @@
  * The sign-in panel, opened by the seller's own person icon.
  *
  * Deliberately small: an email box and a sentence. A shopper buying one vintage dress will not make
- * a password, and a password they reuse elsewhere is a liability we would rather not hold — so they
+ * a password, and a password they reuse elsewhere is a liability we would rather not hold, so they
  * type an email, we send a link, and clicking it signs them in.
  *
  * The sentence matters as much as the box. Signing in here makes someone THIS SELLER's customer and
  * nothing else; they join the marketplace only by signing in to VYA itself. Telling them so is both
- * the honest thing and the thing that makes the seller comfortable — these are her customers.
+ * the honest thing and the thing that makes the seller comfortable. These are her customers.
  *
  * Every store gets one, including the six whose themes have no account control at all. Where she has
  * an icon a shopper can reach, that icon opens the panel and her header is untouched. Where she has
- * none, the browser adds a small one beside her bag — a store whose shoppers cannot have an account
+ * none, the browser adds a small one beside her bag. A store whose shoppers cannot have an account
  * is worse than a header with one more icon in it.
  */
 import { bindAccountControls, ACCOUNT_SELECTORS, NOT_ACCOUNT_SOURCE } from "./account-control.ts";
@@ -37,7 +37,7 @@ const PANEL_CSS = `
 
 /**
  * @param opts.signedInAs the shopper's email when they have a session at this store, else null.
- * @param opts.shopName   the seller's own name — the panel is theirs, not VYA's.
+ * @param opts.shopName   the seller's own name. The panel is theirs, not VYA's.
  */
 export function injectAccountPanel(html: string, opts: { signedInAs: string | null; shopName: string }): string {
  if (!html) return html;
@@ -52,7 +52,7 @@ export function injectAccountPanel(html: string, opts: { signedInAs: string | nu
      <input id="vya-account-email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" aria-label="Email address">
      <button class="vya-primary" data-vya-signin="1">Email me a link</button>
      <p class="vya-note">No password. We'll email you a link that signs you in.
-     This is an account with ${shop} only — nowhere else.</p>
+     This is an account with ${shop} only: nowhere else.</p>
      <p class="vya-msg" id="vya-account-msg" role="status"></p>`;
 
  // Asked for only when there is somebody to ask about: a signed-out panel would fire this on every
@@ -93,7 +93,7 @@ export function injectAccountPanel(html: string, opts: { signedInAs: string | nu
  close:function(){document.getElementById("vya-account-panel").classList.remove("open");document.getElementById("vya-account-overlay").classList.remove("open");}};
 /* ON WINDOW, IN CAPTURE, AND ON pointerdown TOO. The seller's icon usually sits inside the theme's
    own disclosure widget, whose handler is bound on the element itself and often fires on
-   pointerdown — earlier than any click listener can ever run. Listening on window in the capture
+   pointerdown: earlier than any click listener can ever run. Listening on window in the capture
    phase puts us ahead of every handler in the page, and stopImmediatePropagation stops the theme's
    from running at all, so her account drawer never half-opens behind our panel. This is exactly
    how her cart is already handled. */
@@ -111,7 +111,7 @@ function vyaAccountClick(e){
  msg.textContent="Sending…";
  fetch("/api/storefront/account/signin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email})})
   .then(function(r){return r.json()})
-  /* The same answer whether or not we know the address — see the signin route. */
+  /* The same answer whether or not we know the address. See the signin route. */
   .then(function(){msg.textContent="Check your email for a link to sign in.";})
   .catch(function(){msg.textContent="That didn't send. Try again in a moment.";});
 }
@@ -123,7 +123,7 @@ window.addEventListener("pointerdown",function(e){
 },true);
 
 /* CAN A SHOPPER ACTUALLY REACH IT? On three stores the only account link lives in the mobile menu
-   drawer or the empty-cart panel — bound correctly and invisible to anyone on a desktop, which is
+   drawer or the empty-cart panel. Bound correctly and invisible to anyone on a desktop, which is
    the same as having no sign-in at all. Class names lie about this (themes hide by breakpoint, by
    parent, by transform), so the page measures instead, and adds our own entry beside the bag only
    when nothing of hers can be seen. Re-measured on resize: a phone-width page has hers. */
@@ -131,8 +131,8 @@ window.addEventListener("pointerdown",function(e){
  function seen(el){
   var r=el.getBoundingClientRect();
   if(r.width<4||r.height<4)return false;
-  /* Off-screen counts as unreachable. One theme parks its whole cart drawer — and the "Have an
-     account? Log in" line inside it — beyond the right edge with a transform, so the link keeps a
+  /* Off-screen counts as unreachable. One theme parks its whole cart drawer, and the "Have an
+     account? Log in" line inside it. Beyond the right edge with a transform, so the link keeps a
      perfectly ordinary size and computed style while being nowhere a shopper can click. */
   if(r.bottom<0||r.right<0||r.top>innerHeight||r.left>innerWidth)return false;
   var s=getComputedStyle(el);
@@ -145,8 +145,8 @@ window.addEventListener("pointerdown",function(e){
   return !!hit&&(hit===el||el.contains(hit)||hit.contains(el));
  }
  /* BIND HERS IN THE BROWSER TOO.
-    Three stores build their header in JavaScript after the page loads — Shopify's newer themes
-    create <button class="account-button" aria-label="Account"> at runtime — so the server never saw
+    Three stores build their header in JavaScript after the page loads. Shopify's newer themes
+    create <button class="account-button" aria-label="Account"> at runtime, so the server never saw
     it. Hers stayed unbound and pointing at a dead login page, our check found nothing reachable,
     and the shopper got her person icon AND our corner button. Same selector list as the server
     (imported, not retyped, so the two cannot drift). */
@@ -181,8 +181,8 @@ window.addEventListener("pointerdown",function(e){
   a.setAttribute("tabindex","0");
   /* ALWAYS THE SAME CORNER, never inside her header.
      Three rounds of trying to slot it beside her bag ended the same way: where it did land in a
-     header it landed next to a person-shaped icon she already had — we-thieves' points at
-     /favorites, thenicheshop's at something of its own — so a shopper saw two identical glyphs and
+     header it landed next to a person-shaped icon she already had. We-thieves' points at
+     /favorites, thenicheshop's at something of its own, so a shopper saw two identical glyphs and
      had to guess which was which. We cannot know what her other icons mean, and guessing wrong in
      her header is worse than sitting somewhere plain. Same place on every store, above the bag
      pill where there is one. */
@@ -194,7 +194,7 @@ window.addEventListener("pointerdown",function(e){
   place(a);
  }
 
- /* Stack above anything else of ours that is genuinely PINNED in that corner — today only the bag
+ /* Stack above anything else of ours that is genuinely PINNED in that corner. Today only the bag
     pill. Position is read rather than assumed: the powered-by line used to be pinned here too, and
     this sat straight on top of it; now it lives in the footer and must not push this up. */
  function place(a){
@@ -204,7 +204,7 @@ window.addEventListener("pointerdown",function(e){
   base=below.length?Math.max.apply(null,below):20;
   a.style.right="20px";a.style.left="auto";a.style.bottom=base+"px";
  }
- /* AND THEN GET OUT OF THE WAY. That corner belongs to whoever is already in it — one store runs
+ /* AND THEN GET OUT OF THE WAY. That corner belongs to whoever is already in it. One store runs
     a chat widget there, which loaded after us and covered our button completely. Ours is the
     newcomer, so ours is the one that moves: up the right edge first, then to the other side. */
  function clear(a){
@@ -226,14 +226,14 @@ window.addEventListener("pointerdown",function(e){
  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",refresh);
  else refresh();
  addEventListener("resize",refresh);
- /* The theme can finish rendering its header long after DOMContentLoaded — one store swaps its
-    whole header in on hydration — so ask once more when everything has settled. */
+ /* The theme can finish rendering its header long after DOMContentLoaded. One store swaps its
+    whole header in on hydration, so ask once more when everything has settled. */
  addEventListener("load",refresh);
  /* Chat widgets, cookie bars and consent banners arrive seconds after load. Measuring once at load
     is measuring the wrong page, so ask again after they have had their turn. */
  setTimeout(refresh,1500);setTimeout(refresh,4000);
  /* And watch, because a fixed schedule is still a guess. A theme that builds its header on
-    hydration, a menu that opens, a banner that closes — each changes the answer to "can a shopper
+    hydration, a menu that opens, a banner that closes. Each changes the answer to "can a shopper
     reach her account link", and each is a DOM change. Debounced, so a busy page costs one pass. */
  if(window.MutationObserver){
   var pending=0;

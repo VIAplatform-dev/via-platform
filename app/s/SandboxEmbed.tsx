@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 // Renders a fully self-contained interactive component (HTML + CSS + JS that VYA or the seller
 // authored) inside a SANDBOXED iframe. `sandbox="allow-scripts"` WITHOUT `allow-same-origin` means
 // the code runs in a unique opaque origin: it can run JavaScript but cannot read the storefront's
-// cookies, localStorage, DOM, or session, and can't navigate the parent — full isolation. This is
+// cookies, localStorage, DOM, or session, and can't navigate the parent. Full isolation. This is
 // what lets VYA build "anything" (countdowns, calculators, quizzes, filters, canvas animations)
 // without that code ever being able to attack the store or its shoppers.
 //

@@ -5,7 +5,7 @@ import { getSourceNow } from "@/app/lib/data-layer/source-now-db";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/store/source-now?window=7d|30d — the "what to source now" board: brands / categories /
+// GET /api/store/source-now?window=7d|30d: the "what to source now" board: brands / categories /
 // eras where the market's own buyers show rising demand and the shelves are thin. VYA Pro feature.
 export async function GET(request: NextRequest) {
  const storeSlug = await resolveStoreSlug(request);

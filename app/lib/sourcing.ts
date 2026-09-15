@@ -3,14 +3,14 @@ import { quantile } from "./data-layer/metrics";
 import { normalizeCategory } from "./market-data-db";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Sourcing — buy-side flip finder (Phase 1: eBay Browse only).
+// Sourcing: buy-side flip finder (Phase 1: eBay Browse only).
 //
 // Given a query ("Fendi Baguette"), pull active listings and use the market itself
 // as the resale benchmark: the median asking price is what the piece "goes for", so
 // a listing priced well BELOW the median is a candidate flip. Runs entirely on the
 // read-only Browse API (app token, no seller consent, no new approvals).
 //
-// Clustering: a broad query returns MIXED product types — a "Fendi Baguette" search
+// Clustering: a broad query returns MIXED product types. A "Fendi Baguette" search
 // pulls the bag, but also Baguette *sunglasses*, *watches*, and bag *charms*. Those
 // pollute the median AND masquerade as huge "discounts". So we bucket every listing by
 // product type and value WITHIN one cluster (apples-to-apples). We can't lean on the

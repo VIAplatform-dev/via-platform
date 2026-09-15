@@ -1,8 +1,8 @@
-// What the piece ships in — the web's question, on the phone.
+// What the piece ships in. The web's question, on the phone.
 //
 // The phone asked for four numbers: packed weight, box length, box width, box height. Nobody
-// measures a mailer. The web stopped asking years-of-UI ago and asks one question instead —
-// "Ships in" — because a seller knows what she is putting it in, and the dimensions follow from
+// measures a mailer. The web stopped asking years-of-UI ago and asks one question instead,
+// "Ships in", because a seller knows what she is putting it in, and the dimensions follow from
 // that. The phone kept the four boxes, so the same piece was described two different ways
 // depending on which device she happened to be holding.
 //
@@ -24,13 +24,13 @@ export type Packaging = {
 };
 
 export const PACKAGING: Packaging[] = [
-  { id: "mailer-s", label: "Poly mailer — small", hint: "A tee, a scarf, jewellery", lengthIn: 10, widthIn: 13, heightIn: 1, tareOz: 1 },
+  { id: "mailer-s", label: "Poly mailer: small", hint: "A tee, a scarf, jewellery", lengthIn: 10, widthIn: 13, heightIn: 1, tareOz: 1 },
   { id: "padded", label: "Padded mailer", hint: "A bag, shoes without their box", lengthIn: 9, widthIn: 12, heightIn: 2, tareOz: 2 },
-  { id: "mailer-l", label: "Poly mailer — large", hint: "A sweatshirt, jeans, a knit", lengthIn: 14, widthIn: 17, heightIn: 2, tareOz: 2 },
-  { id: "box-s", label: "Box — small", hint: "A dress, a blouse, most clothing", lengthIn: 12, widthIn: 10, heightIn: 4, tareOz: 5 },
-  { id: "box-m", label: "Box — medium", hint: "Shoes in their box, a heavy knit", lengthIn: 14, widthIn: 12, heightIn: 6, tareOz: 8 },
-  { id: "box-l", label: "Box — large", hint: "A coat, boots, a leather jacket", lengthIn: 20, widthIn: 16, heightIn: 10, tareOz: 12 },
-  { id: "box-xl", label: "Box — extra large", hint: "A fur, a puffer, several pieces", lengthIn: 24, widthIn: 18, heightIn: 12, tareOz: 18 },
+  { id: "mailer-l", label: "Poly mailer: large", hint: "A sweatshirt, jeans, a knit", lengthIn: 14, widthIn: 17, heightIn: 2, tareOz: 2 },
+  { id: "box-s", label: "Box: small", hint: "A dress, a blouse, most clothing", lengthIn: 12, widthIn: 10, heightIn: 4, tareOz: 5 },
+  { id: "box-m", label: "Box: medium", hint: "Shoes in their box, a heavy knit", lengthIn: 14, widthIn: 12, heightIn: 6, tareOz: 8 },
+  { id: "box-l", label: "Box: large", hint: "A coat, boots, a leather jacket", lengthIn: 20, widthIn: 16, heightIn: 10, tareOz: 12 },
+  { id: "box-xl", label: "Box: extra large", hint: "A fur, a puffer, several pieces", lengthIn: 24, widthIn: 18, heightIn: 12, tareOz: 18 },
 ];
 
 export const packagingById = (id: string | null | undefined): Packaging | null =>
@@ -44,7 +44,7 @@ export function packedWeightOz(pieceOz: number | null | undefined, packing: Pack
 }
 
 /**
- * The weight that goes WITH a box — the inverse of suggestPackaging.
+ * The weight that goes WITH a box. The inverse of suggestPackaging.
  *
  * Each answer is the TOP of that box's band, so suggestPackaging(weightForPackaging(id)) === id.
  * That exactness is what lets the box and the weight drive each other without fighting: pick a box
@@ -79,7 +79,7 @@ export function suggestPackaging(weightOz: number | null | undefined): string {
 /**
  * Which packaging a piece is ALREADY in, read back from its stored dimensions.
  *
- * There is no `packaging` column — the web writes the preset's L/W/H onto the item and that is all
+ * There is no `packaging` column. The web writes the preset's L/W/H onto the item and that is all
  * the database keeps. So opening a piece has to recognise its own box, or every edit would silently
  * reset a carefully chosen large box back to the suggestion.
  *

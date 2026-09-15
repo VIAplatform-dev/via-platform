@@ -18,7 +18,7 @@ export async function GET(request: Request) {
  const brands = snapshot.payload.brandHeat.brands.length;
  const stores = snapshot.payload.storeHeat.length;
  if (brands === 0 && stores === 0) {
- await sendOpsAlert("data-layer-snapshot is empty", `snapshot ${snapshot.date}: 0 brands and 0 stores — the market_metrics/events upstream likely produced nothing.`);
+ await sendOpsAlert("data-layer-snapshot is empty", `snapshot ${snapshot.date}: 0 brands and 0 stores. The market_metrics/events upstream likely produced nothing.`);
  }
  return NextResponse.json({
   ok: true,

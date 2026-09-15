@@ -24,7 +24,7 @@ test("reads each product's page and the name it is listed under", () => {
  ]);
 });
 
-test("a random source slug is found — the case slugifying a title can never solve", () => {
+test("a random source slug is found. The case slugifying a title can never solve", () => {
  const index: ProductIndex = { version: 2, entries: extractProductLinks(COLLECTION, "/site/montrose-edit") };
  assert.equal(
   pickIndexedPath(index, "Christian Louboutin So Kate – Pink Suede"),
@@ -37,7 +37,7 @@ test("the Plan A `/site/{slug}` prefix a capture baked into its links is strippe
  assert.ok(first.path.startsWith("/shop/p/"), first.path);
 });
 
-test("a REAL product card — a thousand characters of markup between the link and its close", () => {
+test("a REAL product card. A thousand characters of markup between the link and its close", () => {
  // The first version of this only matched an anchor it could see the `</a>` of within a few hundred
  // characters. Every real card is bigger than that, so it found nothing on an actual captured page
  // while passing on a small fixture.

@@ -25,7 +25,7 @@ export default function DiscountsPage() {
  const [newValue, setNewValue] = useState("");
  const [newEnds, setNewEnds] = useState("");
  const [busy, setBusy] = useState(false);
- // The row being edited. A code saved with the wrong number — WELCOME10 with no 10 — could only be
+ // The row being edited. A code saved with the wrong number, WELCOME10 with no 10. Could only be
  // deleted and made again; every part of it is editable here now.
  const [editId, setEditId] = useState<number | null>(null);
  const [draft, setDraft] = useState<{ code: string; kind: string; value: string; endsAt: string; itemIds: string[]; audience: "all" | "new" | "lapsed"; lapsedDays: string }>({ code: "", kind: "percent", value: "", endsAt: "", itemIds: [], audience: "all", lapsedDays: "180" });
@@ -101,7 +101,7 @@ export default function DiscountsPage() {
  who: (
  <>
  {/* WHO may use it. "First order" is what a WELCOME code has always meant; "lapsed" is the
-     comeback code — and someone who has never bought counts as lapsed, which is what a shop
+     comeback code, and someone who has never bought counts as lapsed, which is what a shop
      means when it says "haven't ordered in six months". */}
  <label className="block text-[11px] text-stone-400">Who</label>
  <select value={draft.audience} onChange={(e) => setDraft({ ...draft, audience: e.target.value as "all" | "new" | "lapsed" })} className={selectCls}>
@@ -134,7 +134,7 @@ export default function DiscountsPage() {
   ))}
   </div>
  )}
- <Input value={pieceQuery} onChange={(e) => setPieceQuery(e.target.value)} placeholder={draft.itemIds.length ? "add another…" : "whole order — or search a piece"} className="max-sm:h-11" />
+ <Input value={pieceQuery} onChange={(e) => setPieceQuery(e.target.value)} placeholder={draft.itemIds.length ? "add another…" : "whole order, or search a piece"} className="max-sm:h-11" />
  {pieceQuery.trim() && (
   <div className="mt-1 max-h-32 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">
   {pieces.filter((x) => x.title.toLowerCase().includes(pieceQuery.trim().toLowerCase()) && !draft.itemIds.includes(x.id)).slice(0, 6).map((x) => (
@@ -147,7 +147,7 @@ export default function DiscountsPage() {
  ),
  };
 
- // Status + scope + expiry — the same chips in the table and in the card.
+ // Status + scope + expiry. The same chips in the table and in the card.
  const statusChips = (d: Discount) => (
  <div className="flex flex-wrap items-center gap-1.5">
  <StatusPill tone={d.active ? "live" : "neutral"} dot={d.active}>{d.active ? "Active" : "Off"}</StatusPill>
@@ -248,10 +248,10 @@ export default function DiscountsPage() {
  <TD className="px-5 font-mono font-medium text-stone-900">{d.code}</TD>
  <TD className="px-5 text-stone-500">
  {kindLabel(d)}
- {/* A percentage nobody set is the bug that started this — say so where she'd look for it. */}
+ {/* A percentage nobody set is the bug that started this, say so where she'd look for it. */}
  {(d.kind === "percent" || d.kind === "fixed") && d.value == null && <span className="ml-1.5 text-[11px] text-amber-700">no amount set</span>}
  </TD>
- <TD className="px-5 tabular-nums text-stone-500">{d.used ? `${d.used}×` : "—"}</TD>
+ <TD className="px-5 tabular-nums text-stone-500">{d.used ? `${d.used}×` : "-"}</TD>
  <TD className="px-5">{statusChips(d)}</TD>
  <TD right className="px-5">
  <div className="flex items-center justify-end gap-2">
@@ -280,10 +280,10 @@ export default function DiscountsPage() {
  <option value="other">Other</option>
  </select>
  {(newKind === "percent" || newKind === "fixed") && <div className="sm:w-20"><Input value={newValue} onChange={(e) => setNewValue(e.target.value.replace(/[^0-9.]/g, ""))} placeholder={newKind === "percent" ? "10" : "25"} className="max-sm:h-11" /></div>}
- <label className="col-span-2 flex items-center gap-1.5 text-[12px] text-stone-400">ends<input type="datetime-local" value={newEnds} onChange={(e) => setNewEnds(e.target.value)} className={cn(selectCls, "max-sm:min-w-0 max-sm:flex-1")} title="Optional — the code stops working at this moment" /></label>
+ <label className="col-span-2 flex items-center gap-1.5 text-[12px] text-stone-400">ends<input type="datetime-local" value={newEnds} onChange={(e) => setNewEnds(e.target.value)} className={cn(selectCls, "max-sm:min-w-0 max-sm:flex-1")} title="Optional. The code stops working at this moment" /></label>
  <TechButton className="col-span-2 max-sm:py-3" disabled={busy || !newCode.trim()} onClick={add}>Add code</TechButton>
  </div>
- <p className="mt-2 text-[11px] text-stone-400">★ auto-applies the code when a shopper clicks through from VYA — only one can. Others are for campaigns + your store page.</p>
+ <p className="mt-2 text-[11px] text-stone-400">★ auto-applies the code when a shopper clicks through from VYA, only one can. Others are for campaigns + your store page.</p>
  </TechCard>
  </AdminPage>
  );

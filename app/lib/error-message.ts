@@ -7,7 +7,7 @@
  *     Failed query: insert into "orders" ("id", "item_id", … ) values (…)
  *     params: f53e2f43-…, c6bf8c67-…, , , , , 64300, 0, 0, USD, , paid, …
  *
- * — the query and its parameters, and not one word about what was wrong with it. The reason
+ * the query and its parameters, and not one word about what was wrong with it. The reason
  * (`column "tax_jurisdiction" of relation "orders" does not exist`) was sitting on the driver error
  * that the ORM had wrapped, in `cause`, and nothing ever read it. Two weeks of sales with no order
  * behind them, and the log that was supposed to explain it explained nothing.
@@ -20,7 +20,7 @@ type PgLike = { code?: unknown; detail?: unknown; hint?: unknown; constraint?: u
 
 const str = (v: unknown): string => (typeof v === "string" && v.trim() ? v.trim() : "");
 
-/** `code`, `detail`, `hint`, `constraint`, `column` — whichever the driver set. */
+/** `code`, `detail`, `hint`, `constraint`, `column`. Whichever the driver set. */
 function pgBits(e: unknown): string[] {
  if (!e || typeof e !== "object") return [];
  const p = e as PgLike;
@@ -37,7 +37,7 @@ function pgBits(e: unknown): string[] {
 
 /**
  * One line: the error's own message, then each wrapped cause beneath it, then whatever the database
- * driver attached. Repeats are dropped — an ORM often copies the driver's message onto its own, and
+ * driver attached. Repeats are dropped. An ORM often copies the driver's message onto its own, and
  * saying it twice helps nobody.
  *
  * `max` is the column width the log has for it, and the message is cut to fit.
@@ -68,6 +68,6 @@ export function describeError(err: unknown, max = 2000): string {
   break;
  }
 
- const line = parts.join(" — ") || "Unknown error";
+ const line = parts.join(" · ") || "Unknown error";
  return line.length > max ? line.slice(0, max - 1) + "…" : line;
 }

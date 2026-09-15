@@ -16,7 +16,7 @@ function isAuthorized(request: NextRequest): boolean {
 
 // Sourcing flip-finder (Phase 1, eBay Browse). Read-only: searches active listings for ?q= and
 // flags ones priced >= ?minMargin% below the market median. Uses the app OAuth token (no seller
-// consent) — nothing here creates or writes anything.
+// consent): nothing here creates or writes anything.
 //   /api/admin/sourcing?q=Fendi%20Baguette&minMargin=30&limit=100
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

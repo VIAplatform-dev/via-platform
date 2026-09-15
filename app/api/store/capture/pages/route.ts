@@ -11,7 +11,7 @@ import { deletePageRow, loadStoreBuilderRows, savePageRow, saveMenuRow, siteBuil
 
 export const dynamic = "force-dynamic";
 
-// HER PAGES — the Pages panel's one endpoint.
+// HER PAGES: the Pages panel's one endpoint.
 //
 //  GET    → the merged list: captured paths, her overrides, her menu (stored or read off the header)
 //           and which pages nothing links to. Read-only; it never writes a row.
@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 const NOT_MIGRATED = { error: "Page settings aren’t switched on for this site yet.", notMigrated: true };
 
-/** The two pages a site's own navigation lives on — what "nothing links to this" is judged against. */
+/** The two pages a site's own navigation lives on. What "nothing links to this" is judged against. */
 async function navSources(slug: string, paths: string[]): Promise<string[]> {
  const wanted = ["/", "/collections"].filter((p) => paths.includes(p));
  const html = await Promise.all(wanted.map((p) => getCapturePage(slug, p).catch(() => null))); /* allow-swallow: a page read only to label the list */
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
  const detected = home ? detectMenus(cheerio.load(home)) : null;
  const stored = rows.menus.get("main") ?? null;
  // Her header changed under her stored order (a re-crawl brought a different menu). Say so rather
- // than applying an order that names items her site no longer has — see menus.ts.
+ // than applying an order that names items her site no longer has. See menus.ts.
  const drifted = !!(stored && detected && stored.signature !== detected.signature);
  const menu = stored && !drifted ? stored : detected;
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
  const productTemplate = paths.find((p) => /^\/products\//.test(p)) ?? null;
 
  // How many links still point at each page, counted once over her navigation pages rather than once
- // per page — so the confirmation can warn BEFORE she hides something her footer links to.
+ // per page, so the confirmation can warn BEFORE she hides something her footer links to.
  const links = countLinksByPath(sources, origin);
  const pages = mergePageList({ paths, rows: rows.pages, menu, unlinked, productTemplate })
   .map((e) => ({ ...e, linkedFrom: links.get(normalizeMenuHref(e.path) ?? e.path) ?? 0 }));
@@ -81,7 +81,7 @@ export async function PATCH(request: NextRequest) {
  if (!paths.includes(path)) return NextResponse.json({ error: "That isn’t one of your pages." }, { status: 404 });
  const productTemplate = paths.find((p) => /^\/products\//.test(p)) ?? null;
 
- // Home and the cart are never hideable — hiding the cart takes out checkout. Showing one again is
+ // Home and the cart are never hideable. Hiding the cart takes out checkout. Showing one again is
  // always allowed, so the refusal is only checked on the way in.
  if (body?.hidden === true) {
   const refusal = removalRefusal(path, { productTemplate });
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
  // `source_url` stays empty: this page came from her, not from a crawl, and origin detection reads
  // that column (see getCaptureOrigin).
  await saveCapturePage(slug, path, buildBlankPage(template, { title }), "");
- // `kind: "added"` is what a re-import spares — see deleteCaptures.
+ // `kind: "added"` is what a re-import spares. See deleteCaptures.
  if (!(await savePageRow(slug, path, { title, kind: "added" }))) return NextResponse.json(NOT_MIGRATED, { status: 503 });
 
  // In her menu by default, at the end, because a page nobody can reach is not a page she has added.
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, path, title, inMenu });
 }
 
-// DELETE ?path= — the page, for good. Hiding is the reversible choice and lives on PATCH; this is the
+// DELETE ?path= the page, for good. Hiding is the reversible choice and lives on PATCH; this is the
 // second, confirmed one. A version is kept first (site-capture-db.ts), so a mistake is still
 // recoverable from the operator's history view.
 export async function DELETE(request: NextRequest) {

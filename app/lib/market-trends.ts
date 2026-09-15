@@ -5,7 +5,7 @@ import { recordSerp } from "./cost-tracker";
 // External market signal for the Trends tab, PERSISTED in Postgres:
 //   • a daily cron CAPTURES from SerpApi (Google Search interest + eBay sold listings) → snapshots
 //   • the Trends route READS the latest snapshots (no live API call on page view, full history)
-// Gated behind the same key + enable flag as comps (SERPAPI_ENABLED) — fully dormant, no spend,
+// Gated behind the same key + enable flag as comps (SERPAPI_ENABLED): fully dormant, no spend,
 // until on. Momentum comes from comparing snapshots over time, so it's all in the database.
 
 const SERPAPI_URL = "https://serpapi.com/search.json";
@@ -51,14 +51,14 @@ async function ensureTables(sql: ReturnType<typeof tdb>) {
  await sql`CREATE TABLE IF NOT EXISTS resale_market_snapshots (id BIGSERIAL PRIMARY KEY, brand TEXT NOT NULL, sold_count INT NOT NULL, median_price_cents INT, captured_at TIMESTAMPTZ NOT NULL DEFAULT now())`.catch(() => {});
  await sql`CREATE INDEX IF NOT EXISTS idx_resale_snap_brand_ts ON resale_market_snapshots (lower(brand), captured_at DESC)`.catch(() => {});
  // web_median_cents = median ASKING price across resale sites Google Shopping indexes (Vestiaire,
- // Grailed, RealReal, etc.) — added later, so ALTER for existing tables.
+ // Grailed, RealReal, etc.): added later, so ALTER for existing tables.
  await sql`ALTER TABLE resale_market_snapshots ADD COLUMN IF NOT EXISTS web_median_cents INT`.catch(() => {});
  _ready = true;
 }
 
 // ── CAPTURE: SerpApi → DB (called by the daily cron) ──
 
-// One Google Trends request PER BRAND — never batched. Google normalizes every query in a request
+// One Google Trends request PER BRAND, never batched. Google normalizes every query in a request
 // against the single highest-volume one, so a rising niche/archival label batched with Louis Vuitton
 // reads as ~0 (pure noise). Solo queries give each brand its own 0–100 range, so momentum is real.
 // momentum = last ~quarter of the 3-month series vs the prior quarter; breakout = a big recent surge.
@@ -88,11 +88,11 @@ async function ebaySoldStats(brand: string): Promise<{ soldCount: number; median
  return { soldCount, medianCents: median(rows.map((row) => priceToCents(row.price) ?? 0)) };
 }
 
-// Actual resale marketplaces — a bare-brand Google Shopping query otherwise returns cosmetics,
+// Actual resale marketplaces. A bare-brand Google Shopping query otherwise returns cosmetics,
 // perfume, new-retail and accessories (e.g. "Dior" → $66 lip balm), which is not a resale signal.
 const RESALE_SOURCES = ["vestiaire", "grailed", "realreal", "the real real", "poshmark", "depop", "ebay", "mercari", "rebag", "fashionphile", "thredup", "tradesy", "vinted", "1stdibs", "1st dibs"];
 
-// Median ASKING price for the brand across actual resale sites Google Shopping indexes — a broad
+// Median ASKING price for the brand across actual resale sites Google Shopping indexes. A broad
 // multi-site read to complement eBay's SOLD price. Filtered to resale sources so retail/beauty
 // listings don't poison the median.
 async function webAskingMedian(brand: string): Promise<number | null> {
@@ -105,7 +105,7 @@ async function webAskingMedian(brand: string): Promise<number | null> {
  return median(resale.map((row) => priceToCents(row.extracted_price ?? row.price) ?? 0));
 }
 
-// Run fn over items with bounded concurrency — SerpApi is the bottleneck, so parallelize the
+// Run fn over items with bounded concurrency. SerpApi is the bottleneck, so parallelize the
 // calls (sequentially, ~16 calls × 20s each could blow past the function's time limit).
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
  const out: R[] = new Array(items.length);
@@ -149,7 +149,7 @@ export async function captureMarketTrends(brands: string[]): Promise<{ google: n
  return { google, resale };
 }
 
-// ── READ: DB only (called by the Trends route — no SerpApi call on page view) ──
+// ── READ: DB only (called by the Trends route, no SerpApi call on page view) ──
 
 export async function getGoogleTrends(brands: string[]): Promise<BrandSearchTrend[]> {
  const list = [...new Set(brands.map((b) => b.trim().toLowerCase()).filter(Boolean))];
@@ -168,7 +168,7 @@ export async function getGoogleTrends(brands: string[]): Promise<BrandSearchTren
 }
 
 // On-demand Google trend for an ARBITRARY query (e.g. a store searching "Escada"), cache-through:
-// read a recent snapshot if we have one (free), else fetch live from SerpApi ONCE and SAVE it — so
+// read a recent snapshot if we have one (free), else fetch live from SerpApi ONCE and SAVE it, so
 // the next lookup of that term is free and the DB accrues a proprietary search-trend history for
 // every term stores look up. Returns null when we have nothing cached and SerpApi is off.
 export async function getOrFetchGoogleTrend(query: string, maxAgeDays = 14): Promise<BrandSearchTrend | null> {

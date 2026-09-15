@@ -13,17 +13,17 @@ import { filterItems } from "../../lib/seller/inventory";
 import { storefrontAddress, describeReach, describeServeMode, shopLine, NO_ADDRESS, type DomainState, type StorefrontState } from "../../lib/seller/storefront";
 import { imageUrl, IMG } from "../../lib/imageUrl";
 
-// The Store tab — her storefront, running inside the app.
+// The Store tab: her storefront, running inside the app.
 //
 // HER SITE, NOT OUR IDEA OF IT. Whatever she has is what shows here: the imported copy of the shop
 // she arrived with, or the storefront she built from sections. Both are served from the same one
 // address, because the proxy decides between them (a capture goes to /site/{slug}, a built
-// storefront to /s/{handle}) — so this screen needs the address and nothing else. Nothing below is
+// storefront to /s/{handle}), so this screen needs the address and nothing else. Nothing below is
 // VYA's design. VYA is the thin bar above it and the tab bar beneath it, and that is the point:
 // half of why a shop joins a platform at this end of the market is to stop looking like everyone
 // else on it.
 //
-// THE ADDRESS WAS THE BUG. It used to come from `me.website` — which is not her storefront. That
+// THE ADDRESS WAS THE BUG. It used to come from `me.website`, which is not her storefront. That
 // field is the shop's OWN EXTERNAL SITE, the Shopify or Squarespace address VYA syncs its catalogue
 // from. So the Store tab opened blummier.com, situationsvintage.com, and on the admin account the
 // VYA marketplace homepage. Her actual storefront was never what this tab showed.
@@ -33,13 +33,13 @@ import { imageUrl, IMG } from "../../lib/imageUrl";
 // lib/seller/storefront.ts for why the app must not build that address itself.
 //
 // AND WHEN THERE IS NOTHING THERE. A store with no capture and no storefront switched on has an
-// address that answers 404 — she saw Next.js's black-on-white "404 This page could not be found"
+// address that answers 404. She saw Next.js's black-on-white "404 This page could not be found"
 // sitting inside her own app. That is said in our words now, and rather than leaving her on a dead
 // screen the tab falls back to what IS in the window: her live pieces, drawn here, each one opening
-// its editor. It is not a storefront and does not pretend to be one — it is the honest remainder.
+// its editor. It is not a storefront and does not pretend to be one. It is the honest remainder.
 //
 // The ☰ stays, because the settings drawer has to be reachable from somewhere and this tab is where
-// it lives — her storefront has no chrome of ours to hang it on.
+// it lives. Her storefront has no chrome of ours to hang it on.
 
 type Me = { storeName?: string; location?: string | null; logo?: string | null; logoBg?: string | null; storeFollowers?: number };
 type Item = { id: string; title: string; priceCents: number; currency: string; images: string[]; status: string };
@@ -50,7 +50,7 @@ export default function StoreScreen() {
   const webRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
   // What the address said, as the WebView found out: undefined until it answers, 0 when it could not
-  // be reached at all, otherwise the HTTP status. No extra request — the load IS the check.
+  // be reached at all, otherwise the HTTP status. No extra request: the load IS the check.
   const [status, setStatus] = useState<number | undefined>(undefined);
 
   const me = useQuery({ queryKey: ["store", "me"], queryFn: () => apiGet<Me>("/api/store/me"), enabled: !!storeSlug });
@@ -61,7 +61,7 @@ export default function StoreScreen() {
     enabled: !!storeSlug,
   });
   // Her own domain when she has one that resolves. A store with none answers 404 here, which is the
-  // ordinary case rather than a failure — hence the catch.
+  // ordinary case rather than a failure. Hence the catch.
   const domain = useQuery({
     queryKey: ["store", "domain"],
     queryFn: () => apiGet<DomainState>("/api/store/domain").catch(() => null),
@@ -78,7 +78,7 @@ export default function StoreScreen() {
   //
   // This fetched the whole inventory on every visit to the tab, to have a grid ready in case the
   // storefront failed to load. For a shop with real stock that is 4.3 MB of JSON downloaded and
-  // parsed on a phone — measured, not guessed — to render something usually never shown. The
+  // parsed on a phone, measured, not guessed, to render something usually never shown. The
   // storefront draws her pieces itself; this list is the remainder for when it can't.
   const needFallback = !address || broken;
   const items = useQuery({
@@ -112,7 +112,7 @@ export default function StoreScreen() {
             style={{ flex: 1, backgroundColor: colors.bg }}
             onLoadEnd={() => { setLoading(false); setStatus((s) => s ?? 200); }}
             onError={() => { setLoading(false); setStatus(0); }}
-            // A 404 IS NOT AN onError. onError fires when the page cannot be fetched at all — no DNS,
+            // A 404 IS NOT AN onError. onError fires when the page cannot be fetched at all, no DNS,
             // no route, TLS refused. A server that answers 404 has answered, so the WebView renders
             // whatever came back, which is how a seller opening her own Store tab was shown Next.js's
             // 404 page inside her app.
@@ -124,7 +124,7 @@ export default function StoreScreen() {
               setLoading(false);
               setStatus(statusCode);
             }}
-            // Her storefront is a normal site — let it behave like one.
+            // Her storefront is a normal site. Let it behave like one.
             allowsBackForwardNavigationGestures
             decelerationRate="normal"
           />
@@ -166,7 +166,7 @@ export default function StoreScreen() {
         </ScrollView>
       )}
 
-      {/* Which storefront this is — her imported site, or the one she built. Only when it renders:
+      {/* Which storefront this is. Her imported site, or the one she built. Only when it renders:
           under a failure it would be a claim about a page that isn't there. */}
       {address && !broken && kind ? (
         <View style={{ paddingHorizontal: spacing.lg, paddingBottom: insets.bottom ? 0 : spacing.sm, paddingTop: spacing.xs, backgroundColor: colors.bg }}>
@@ -177,7 +177,7 @@ export default function StoreScreen() {
   );
 }
 
-/** Her live pieces, for when the storefront cannot be shown. Not a storefront — the remainder. */
+/** Her live pieces, for when the storefront cannot be shown. Not a storefront: the remainder. */
 function Window({ items, followers, loading }: { items: Item[]; followers?: number; loading: boolean }) {
   if (loading) return null;
   return (

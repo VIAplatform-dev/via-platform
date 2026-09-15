@@ -4,7 +4,7 @@ import { getCheckoutSettings, setCheckoutSettings } from "@/app/lib/store-checko
 
 export const dynamic = "force-dynamic";
 
-// GET — the store's checkout payment-method toggles (Cash App / Affirm / Klarna). Card + wallets
+// GET: the store's checkout payment-method toggles (Cash App / Affirm / Klarna). Card + wallets
 // (Apple Pay, Google Pay, Link) are always on and aren't part of this.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, settings: await getCheckoutSettings(slug) });
 }
 
-// POST { cashapp, affirm, klarna } — save which extra methods the store offers at checkout.
+// POST { cashapp, affirm, klarna }. Save which extra methods the store offers at checkout.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -15,7 +15,7 @@ function isAuthorized(request: NextRequest): boolean {
  return false;
 }
 
-// Tables with a direct store_slug column — deleted by WHERE store_slug = slug.
+// Tables with a direct store_slug column. Deleted by WHERE store_slug = slug.
 const STORE_SLUG_TABLES = [
  "products",
  "price_history",
@@ -47,11 +47,11 @@ async function countRows(sql: SqlClient, slug: string) {
 
  for (const table of STORE_SLUG_TABLES) {
  try {
- // Identifiers can't be parameterized in tagged templates — build per table.
+ // Identifiers can't be parameterized in tagged templates. Build per table.
  const rows = (await sql.query(`SELECT COUNT(*)::int AS n FROM ${table} WHERE store_slug = $1`, [slug])) as { n: number }[];
  counts[table] = rows[0]?.n ?? 0;
  } catch {
- counts[table] = -1; // table missing / schema mismatch — skip, don't abort
+ counts[table] = -1; // table missing / schema mismatch. Skip, don't abort
  }
  }
 
@@ -142,7 +142,7 @@ export async function DELETE(request: NextRequest) {
  const r = (await sql.query(`DELETE FROM ${table} WHERE store_slug = $1 RETURNING store_slug`, [slug])) as unknown[];
  deleted[table] = r.length;
  } catch {
- deleted[table] = -1; // table missing / no RETURNING-able col — skip
+ deleted[table] = -1; // table missing / no RETURNING-able col. Skip
  }
  }
 

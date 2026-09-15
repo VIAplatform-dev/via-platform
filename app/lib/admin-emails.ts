@@ -1,6 +1,6 @@
 // Who VYA's own people are.
 //
-// This is the list of humans who run VYA — not sellers, not staff at a seller's shop. It decides two
+// This is the list of humans who run VYA, not sellers, not staff at a seller's shop. It decides two
 // things: who may hold an admin account, and who is allowed to walk the seller onboarding flow more
 // than once (see app/api/store/onboarding/route.ts) so it can be tested and demoed without needing a
 // fresh email address every time.

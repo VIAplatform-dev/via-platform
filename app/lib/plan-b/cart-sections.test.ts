@@ -11,7 +11,7 @@ test("builds all three sections Dawn's cart-notification.js asks for", () => {
 
 test("cart-notification-product carries the id the theme's selector needs, plus the item's own data", () => {
  const out = buildKnownCartSections(["cart-notification-product"], LINE, "abc-123", 1);
- // getSectionsToRender()'s selector is `[id="cart-notification-product-${key}"]` — must be present verbatim.
+ // getSectionsToRender()'s selector is `[id="cart-notification-product-${key}"]`: must be present verbatim.
  assert.match(out["cart-notification-product"], /id="cart-notification-product-abc-123"/);
  assert.match(out["cart-notification-product"], /Chanel Flap Bag/);
  assert.match(out["cart-notification-product"], /\$5,500\.00/);
@@ -30,7 +30,7 @@ test("singular item count reads naturally", () => {
  assert.match(out["cart-icon-bubble"], /1 item</); // not "1 items"
 });
 
-test("cart-icon-bubble keeps the cart icon's own <svg> — this REPLACES the header link's entire innerHTML, so building the bubble alone throws the icon itself away, leaving a floating count next to nothing", () => {
+test("cart-icon-bubble keeps the cart icon's own <svg> this REPLACES the header link's entire innerHTML, so building the bubble alone throws the icon itself away, leaving a floating count next to nothing", () => {
  const icon = `<span class="svg-wrapper"><svg class="icon icon-cart-empty"></svg></span><span class="visually-hidden">Cart</span>`;
  const out = buildKnownCartSections(["cart-icon-bubble"], LINE, "k", 2, icon);
  assert.match(out["cart-icon-bubble"], /icon-cart-empty/);
@@ -54,7 +54,7 @@ test("a product with no image renders without a broken <img>", () => {
  assert.ok(!out["cart-notification-product"].includes("<img"));
 });
 
-test("title and price are HTML-escaped — a store could name an item anything", () => {
+test("title and price are HTML-escaped. A store could name an item anything", () => {
  const out = buildKnownCartSections(["cart-notification-product"], { ...LINE, title: `<script>alert(1)</script>` }, "k", 1);
  assert.ok(!out["cart-notification-product"].includes("<script>"));
  assert.match(out["cart-notification-product"], /&lt;script&gt;/);
@@ -65,7 +65,7 @@ test("an id this module doesn't specifically know is simply omitted, not guessed
  assert.equal(out["cart-drawer"], undefined);
 });
 
-test("the fallback wraps existing markup in the .shopify-section default selector expects — a no-op update, not a crash", () => {
+test("the fallback wraps existing markup in the .shopify-section default selector expects. A no-op update, not a crash", () => {
  const out = buildFallbackSection(`<span>already here</span>`);
  assert.match(out, /class="shopify-section"/);
  assert.match(out, /<span>already here<\/span>/);

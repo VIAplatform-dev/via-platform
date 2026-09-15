@@ -1,7 +1,7 @@
 // The diary, read the way a seller reads it: what is left TODAY, then the rest.
 //
 // Mirrors app/lib/appointments/appointments-db.ts. `day` is YYYY-MM-DD and `start`/`end` are HH:MM,
-// both plain strings the server stores as written — compared as strings here for the same reason
+// both plain strings the server stores as written. Compared as strings here for the same reason
 // rentals.ts does: they are wall-clock times in her shop, and a Date would invent a timezone.
 
 export type Appointment = {
@@ -38,7 +38,7 @@ export function daySchedule(all: Appointment[], day: string): Appointment[] {
 /**
  * The ones still ahead of her.
  *
- * An appointment is "still to come" until it ENDS, not until it starts — a fitting running right
+ * An appointment is "still to come" until it ENDS, not until it starts. A fitting running right
  * now is the most relevant thing on the screen, and dropping it the moment it begins is how a
  * seller looks at her phone mid-appointment and sees an empty afternoon.
  */
@@ -55,7 +55,7 @@ export function clock(hhmm: string): string {
 }
 
 /**
- * "2:30–3pm · Try-on · Marta" — one appointment, one line.
+ * "2:30–3pm · Try-on · Marta". One appointment, one line.
  *
  * The am/pm is dropped from the START when both ends share it: "9–9:30am" is how the time is said
  * out loud, and "9am–9:30am" is how a database says it.

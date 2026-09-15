@@ -12,7 +12,7 @@ import { pickBuyVariant, withoutRentalOptions, sizeFromOptionLabel, rentalTiersF
 
 /** JSON.parse that tolerates the raw control characters real storefronts embed in product
  *  descriptions (every Shopify feed profiled had them; strict parsing rejects the whole payload).
- *  Only the illegal C0 range is stripped — \t, \n and \r are left for JSON's own escaping. */
+ *  Only the illegal C0 range is stripped. \t, \n and \r are left for JSON's own escaping. */
 export function parseLooseJson(text: string): any { // eslint-disable-line @typescript-eslint/no-explicit-any
  try {
   return JSON.parse(text);
@@ -42,11 +42,11 @@ export type ShopifyProduct = {
  /** Source identity for the import engine: the product's stable handle, and its full size run. */
  handle?: string | null;
  variants?: { sourceVariantId?: string | null; size?: string | null; color?: string | null; priceCents?: number | null; available: boolean }[];
- /** Her shop only rents this piece — `price` is null because nothing can be bought. See variant-pricing.ts. */
+ /** Her shop only rents this piece. `price` is null because nothing can be bought. See variant-pricing.ts. */
  rentOnly?: boolean;
  /** The piece's rental price ladder (days → cents), when it has one. Empty when nothing rents. */
  rentalTiers?: { days: number; cents: number }[];
- // Captured from the product page (scrapeProductPage stores) — the seller's own words.
+ // Captured from the product page (scrapeProductPage stores). The seller's own words.
  condition?: string | null;
  materials?: string | null;
  measurements?: string | null;
@@ -57,7 +57,7 @@ export type ShopifyFetchResult = {
  skippedCount: number;
  /**
   * How the read finished. The import's sold-sweep is only allowed to run on a read that reached the
-  * END of the catalogue — see app/lib/feed-completeness.ts. Optional so the other reader in this
+  * END of the catalogue. See app/lib/feed-completeness.ts. Optional so the other reader in this
   * file (and any caller that does not sweep) need not supply it; absent is treated as "unknown",
   * which refuses the sweep.
   */
@@ -74,7 +74,7 @@ type FeedVariant = {
  *
  * Not simply the first option: a rental shop lists "3 Day Rental" first and leaves options it does not
  * offer at $0.00, and a piece it only rents has nothing to buy at all. See variant-pricing.ts. The
- * sold-in options keep their old mapping — including a one-option listing's "Default Title" size —
+ * sold-in options keep their old mapping, including a one-option listing's "Default Title" size,
  * except that rental options are dropped and a "Purchase" option is not a size.
  */
 export function feedProductPricing<V extends FeedVariant>(variants: V[]): {
@@ -519,7 +519,7 @@ export async function fetchShopifyProductsPublic(
  skipSoldOutFilter: boolean = false,
  /** The shop's HOME country (Shopify's `countryCode`). Sent as the `localization` cookie so Shopify
   *  Markets serves the seller's own market. Without it the feed is priced in whatever market the
-  *  request's geography suggests — a UK store imported from a US-looking crawler came back in USD at
+  *  request's geography suggests. A UK store imported from a US-looking crawler came back in USD at
   *  a converted rate, and every price on the hosted store disagreed with the seller's. Proven: the
   *  same request with `localization=GB` returns £290.00 GBP; without it, $401.00 USD. */
  homeCountry: string | null = null
@@ -532,12 +532,12 @@ export async function fetchShopifyProductsPublic(
  const outcome: ReadOutcome = { pagesRead: 0, lastPageFull: false, hitCap: false, failed: false };
  // The currency the FEED is actually priced in. Shopify Markets serves a storefront in different
  // presentment currencies depending on how it reads the request, and products.json carries bare
- // price strings with no currency at all — so the same URL can return "245.00" (GBP) or "341.00"
+ // price strings with no currency at all, so the same URL can return "245.00" (GBP) or "341.00"
  // (USD converted). It does tell us which, via the `cart_currency` cookie on that same response.
  // Reading it HERE keeps price and currency from the same response; taking currency from a
  // separately-fetched homepage can disagree with the feed and mislabel every price in the import.
  let feedCurrency: string | null = null;
- // Use 50 per page — some stores cap their public API at 50 regardless of the
+ // Use 50 per page. Some stores cap their public API at 50 regardless of the
  // limit param, so requesting 50 ensures correct page-based pagination.
  const limit = 50;
 
@@ -549,7 +549,7 @@ export async function fetchShopifyProductsPublic(
  // safeFetch, not bare fetch: `storeDomain` is user-supplied on the import path, so this call
  // has to go through the same SSRF guard (DNS resolution + private-IP rejection + per-hop
  // redirect revalidation) as every other outbound request. The timeout also means a hung store
- // can't pin the invocation open — the outer Promise.race can't cancel this work on its own.
+ // can't pin the invocation open. The outer Promise.race can't cancel this work on its own.
  response = await safeFetch(url, {
   headers: { Accept: "application/json", ...(homeCountry ? { Cookie: `localization=${homeCountry}` } : {}) },
   signal: AbortSignal.timeout(15000),
@@ -581,19 +581,19 @@ export async function fetchShopifyProductsPublic(
  }
 
  // Real storefronts ship raw control characters inside product descriptions, which strict
- // JSON.parse rejects outright — every one of the 13 Shopify feeds profiled did it. Strip the
+ // JSON.parse rejects outright: every one of the 13 Shopify feeds profiled did it. Strip the
  // C0 range (except the legal \t\n\r escapes) so one bad description can't fail a whole import.
  const data = parseLooseJson(await response!.text());
 
  if (!data.products || data.products.length === 0) {
- // A `200 {"products":[]}` is what a throttled Shopify returns mid-catalogue — and ALSO what the
+ // A `200 {"products":[]}` is what a throttled Shopify returns mid-catalogue, and ALSO what the
  // real end of the catalogue looks like when its size is an exact multiple of the page size
  // (shop-vintage-charm holds exactly 1,550 and we page by 50). The two are indistinguishable in
  // one request, so ask twice: a throttle clears, an ending does not.
  if (page > 1) {
  // Ask again, with room for a throttle to clear. One quick retry is not enough: a shop that is
  // busy enough to answer empty is often busy for more than two seconds, and a sustained throttle
- // that survives the retry would be read as the end of the catalogue — the exact mistake this is
+ // that survives the retry would be read as the end of the catalogue. The exact mistake this is
  // here to prevent, just harder to spot.
  let refilled: ReturnType<typeof parseLooseJson> | null = null;
  let reachable = false;
@@ -615,7 +615,7 @@ export async function fetchShopifyProductsPublic(
   console.log(`[Shopify] ${storeName}: page ${page} came back empty and refilled on retry (throttle)`);
   data.products = refilled.products;
  } else if (!reachable) {
-  outcome.failed = true; // never got an answer — cannot tell an ending from an outage
+  outcome.failed = true; // never got an answer. Cannot tell an ending from an outage
   break;
  } else {
   outcome.lastPageFull = false; // answered, and empty every time: the catalogue really does end here
@@ -634,7 +634,7 @@ export async function fetchShopifyProductsPublic(
  let isSoldOut = false;
 
  if (skipSoldOutFilter) {
- // Store opted out of sold-out filtering — include everything listed
+ // Store opted out of sold-out filtering. Include everything listed
  } else if (product.available === false) {
  isSoldOut = true;
  console.log(`[Shopify] Skipping "${product.title}" - product.available is false`);
@@ -645,7 +645,7 @@ export async function fetchShopifyProductsPublic(
  (v: { available?: boolean }) => v.available === false
  );
  // Only infer sold-out from zero inventory when Shopify itself doesn't say the
- // product is available — if product.available === true the store has overselling
+ // product is available, if product.available === true the store has overselling
  // enabled and the item can genuinely be purchased, so we trust that signal.
  const allVariantsZeroInventory = product.available !== true && hasVariants && variants.every(
  (v: { inventory_management?: string | null; inventory_quantity?: number }) =>
@@ -760,13 +760,13 @@ export async function fetchShopifyProductsPublic(
 
  // The while-condition itself: we stopped because our own ceiling was reached, not the shop's end.
  if (products.length >= maxProducts) outcome.hitCap = true;
- console.log(`[Shopify] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)${outcome.hitCap ? " — STOPPED AT OUR LIMIT, not the end of the catalogue" : ""}`);
+ console.log(`[Shopify] ${storeName}: ${products.length} synced, ${skippedCount} skipped (sold out)${outcome.hitCap ? ": STOPPED AT OUR LIMIT, not the end of the catalogue" : ""}`);
  return { products, skippedCount, outcome };
 }
 
 /**
  * Returns a Set of Shopify product IDs (as strings) for all products in the given collection handles.
- * Used to build an exclusion set before syncing — products whose ID appears here are filtered out.
+ * Used to build an exclusion set before syncing. Products whose ID appears here are filtered out.
  */
 export async function fetchProductIdsByCollections(
  storeDomain: string,
@@ -932,13 +932,13 @@ export async function fetchShopifyProductsByCollections(
  * Returns appended HTML in a format compatible with splitDescription parsing.
  *
  * When extractFallbackDescription=true, also tries to extract the main product
- * description from a "Details" or "Description" section on the page — useful
+ * description from a "Details" or "Description" section on the page. Useful
  * for stores where body_html is empty but the description renders in a page tab.
  */
 export type ScrapedPageSections = {
  /** Combined HTML of the extracted sections, appended to the product description. */
  html: string;
- /** Structured values the seller already wrote — captured so intake/pricing/training
+ /** Structured values the seller already wrote. Captured so intake/pricing/training
   * don't have to re-guess them. Null when the page doesn't state them. */
  condition: string | null;
  measurements: string | null;
@@ -948,7 +948,7 @@ export type ScrapedPageSections = {
 const EMPTY_SECTIONS: ScrapedPageSections = { html: "", condition: null, measurements: null, materials: null };
 
 // Site chrome (nav / menu / footer) that leaks into whole-page scraped text. A captured field value
-// containing several of these isn't a real value — it's the menu (e.g. a "Condition Guide" nav link
+// containing several of these isn't a real value. It's the menu (e.g. a "Condition Guide" nav link
 // matched as a "Condition" field and swallowed the whole nav). Used to reject such captures.
 const NAV_JUNK_RE = /\b(?:Contact\s+Us|Search|Cart|Log\s?in|Sign\s?(?:in|up)|Shop\s+All|Collections?|Close|Menu|Newsletter|About\s+Us|My\s+Account|Wishlist|Private\s+Sourcing|Sourcing\s+Requests?|Summer\s+Arrivals|Events|Follow\s+us|Subscribe|Home\b|Rarities)\b/gi;
 function looksLikeNav(v: string): boolean {
@@ -972,7 +972,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  .trim();
 
  const sections: string[] = [];
- // Structured captures — the seller's own words, kept alongside the HTML so downstream
+ // Structured captures. The seller's own words, kept alongside the HTML so downstream
  // (product display, training labels, pricing condition multiplier) uses truth, not a guess.
  let condition: string | null = null;
  let measurements: string | null = null;
@@ -980,7 +980,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
 
  // Regex to strip Shopify storefront UI text that leaks into scraped content.
  // These strings appear in the raw page text when themes render price/cart UI
- // between product description sections — they must never end up in our data.
+ // between product description sections. They must never end up in our data.
  const ECOM_JUNK_RE = /\s+(?:THIS\s+ITEM\s+IS\b|Regular\s+price\b|Sale\s+price\b|Unit\s+price\b|Sold\s+out\b|In\s+stock\b|Out\s+of\s+stock\b|Product\s+variant[s]?\b|Quantity\b|Decrease\s+quantity\b|Increase\s+quantity\b|Add\s+to\s+(?:cart|bag|wishlist)\b|Pick\s+up\s+available\b|Tax\s+included\b|Free\s+(?:shipping|returns?)\b|Ships?\s+(?:from|in|within)\b|Checkout\b|\$\s*\d[\d,.]*)[\s\S]*/i;
 
  // Stop at recognized page sections AND common Shopify footer/nav markers so
@@ -1019,7 +1019,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  }
  }
 
- // Materials / fabric / composition — sellers state this explicitly; capture it structured
+ // Materials / fabric / composition. Sellers state this explicitly; capture it structured
  // so intake/training use the real fibre content instead of guessing from the photo.
  const matResult = new RegExp(`\\b(?:Materials?|Fabric|Composition|Made\\s+of)\\b\\s*:\\s*(.+?)(?=${nextSection})`, "i").exec(text);
  if (matResult) {
@@ -1034,7 +1034,7 @@ export async function scrapeProductPageSections(url: string, extractFallbackDesc
  }
  }
 
- // Size — some themes render the size as a "Size:" field driven by a Shopify metafield
+ // Size: some themes render the size as a "Size:" field driven by a Shopify metafield
  // (e.g. "Size: IT 37.5 UK 4.5"), which never appears in body_html or the public
  // products.json variant options. Pull it off the rendered page so deriveSize can surface
  // it. Require a colon (so we skip "Size guide"/"Size chart"/variant-picker labels) and

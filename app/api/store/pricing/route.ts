@@ -4,7 +4,7 @@ import { getMinMarkupBps, setMinMarkupBps } from "@/app/lib/store-pricing-db";
 
 export const dynamic = "force-dynamic";
 
-// GET — this store's minimum markup over cost (the pricing floor).
+// GET: this store's minimum markup over cost (the pricing floor).
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ minMarkupBps: bps, minMarkupPct: Math.round(bps / 100) });
 }
 
-// POST { minMarkupPct } — set this store's minimum markup (each store sets its own).
+// POST { minMarkupPct }: set this store's minimum markup (each store sets its own).
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

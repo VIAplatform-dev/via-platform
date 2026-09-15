@@ -2,7 +2,7 @@
 // captured on page load (utm_source / referrer / in-app-browser inference).
 //
 // Waitlist + giveaway signups have no `users` row yet, so there's no utm_visits
-// row to join on — the channel we record at signup time is the ONLY acquisition
+// row to join on. The channel we record at signup time is the ONLY acquisition
 // signal we get for them. Without this they all defaulted to the form name
 // ("waitlist" / "giveaway_modal"), which reads as "unknown" on the customer page.
 
@@ -10,7 +10,7 @@ function readSource(): string | null {
  if (typeof window === "undefined") return null;
  // Primary: the in-session window global the tracker sets. This is the ONLY
  // channel that survives Instagram/TikTok in-app browsers, which block
- // session/localStorage — exactly the /IG and /TT bio-link traffic we most need
+ // session/localStorage: exactly the /IG and /TT bio-link traffic we most need
  // to attribute. Without this they all fell back to the form name ("waitlist").
  try {
   const w = (window as unknown as { __viaUtmSource?: string }).__viaUtmSource;

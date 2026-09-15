@@ -15,14 +15,14 @@ const RACK: RackItem[] = [
   it({ id: "5", title: "Ankle boot", brand: "Prada", size: "38", category: "boots", status: "reserved" }),
 ];
 
-test("typing finds a piece — the thing the camera was the only way to do", () => {
+test("typing finds a piece. The thing the camera was the only way to do", () => {
   assert.deepEqual(filterRack(RACK, "fendi").map((i) => i.id), ["2", "3"]);
   assert.deepEqual(filterRack(RACK, "scarf").map((i) => i.id), ["4"]);
 });
 
-test("every word, anywhere — not the whole phrase in one field", () => {
+test("every word, anywhere, not the whole phrase in one field", () => {
   // "fendi bag": the brand is on one field, "bag" on the title of one and the CATEGORY ("bags")
-  // of both — so both Fendis match, which is right. This is the exact failure the server-side
+  // of both, so both Fendis match, which is right. This is the exact failure the server-side
   // search had, and the client half must not reintroduce it.
   assert.deepEqual(filterRack(RACK, "fendi bag").map((i) => i.id), ["2", "3"]);
   // Narrowing further still works.

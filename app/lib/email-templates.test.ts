@@ -73,16 +73,16 @@ test("a design that needs a photo is only given to a template that carries piece
 });
 
 
-test("the copy stays plain — a starting point isn't a piece of writing", () => {
+test("the copy stays plain. A starting point isn't a piece of writing", () => {
  // Anything clever is something the shop owner has to delete before she can use it. Two short
  // lines is the whole budget.
  for (const t of TEMPLATES) {
   const lines = t.body.split("\n").filter(Boolean);
-  assert.ok(lines.length <= 3, `${t.id} has ${lines.length} lines — too much to read past`);
+  assert.ok(lines.length <= 3, `${t.id} has ${lines.length} lines. Too much to read past`);
   for (const l of lines) {
    assert.ok(l.length <= 95, `${t.id} has a ${l.length}-character line: "${l}"`);
   }
-  assert.ok(t.subject.length <= 60, `${t.id}'s subject is ${t.subject.length} characters — it'll be cut off`);
+  assert.ok(t.subject.length <= 60, `${t.id}'s subject is ${t.subject.length} characters. It'll be cut off`);
  }
 });
 

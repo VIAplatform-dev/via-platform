@@ -10,14 +10,14 @@ function isAuthorized(request: NextRequest): boolean {
  return token === crypto.createHash("sha256").update(adminPassword).digest("hex");
 }
 
-// GET — list everything currently blocked
+// GET: list everything currently blocked
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const blocked = await listBlockedProducts();
  return NextResponse.json({ blocked });
 }
 
-// POST { storeSlug, title, reason? } — permanently remove a product (delete now + block re-import)
+// POST { storeSlug, title, reason? }: permanently remove a product (delete now + block re-import)
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const body = await request.json().catch(() => ({}));
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, deleted });
 }
 
-// DELETE ?store=&title= — restore (stop blocking)
+// DELETE ?store=&title= restore (stop blocking)
 export async function DELETE(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const storeSlug = request.nextUrl.searchParams.get("store");

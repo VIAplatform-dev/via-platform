@@ -3,17 +3,17 @@ import { ensureAnalyticsViews } from "./views";
 import { deltaPct, type ResolvedPeriod, type Window } from "./period";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — customers & retention.
+// Analytics: customers & retention.
 //
 // The buyer identity here is the lowercased order email: it's the only key that
-// survives guest checkout, which is most of secondhand. Sales without an email —
-// including every piece simply marked sold in the admin — still count toward GMV
+// survives guest checkout, which is most of secondhand. Sales without an email,
+// including every piece simply marked sold in the admin. Still count toward GMV
 // (see sales.ts) but can't be attributed to a person, so `identifiedRevenuePct`
 // tells the seller how much of the picture is people-shaped. On a store that
 // records sales by hand that number is near zero, and saying so is the point.
 //
 // "New" vs "returning" is decided by FIRST-EVER order, not first order in the
-// window — someone who bought in 2024 and again today is returning, always.
+// window: someone who bought in 2024 and again today is returning, always.
 // ───────────────────────────────────────────────────────────────────────────
 
 export type TopCustomer = {
@@ -89,7 +89,7 @@ export async function getCustomerMetrics(sellerId: string, slug: string, period:
   const [cur, pri, lifetime, contacts, topRows, cohortRows, coverage] = await Promise.all([
    windowBuyers(sellerId, current),
    prior ? windowBuyers(sellerId, prior) : Promise.resolve(null),
-   // Lifetime shape of the buyer base — the denominator for repeat rate and LTV.
+   // Lifetime shape of the buyer base. The denominator for repeat rate and LTV.
    sql`
     WITH per_buyer AS (
      SELECT s.buyer_email AS email, COUNT(*)::int AS orders, SUM(s.amount_cents)::bigint AS spent

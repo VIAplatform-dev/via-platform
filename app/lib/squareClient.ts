@@ -44,7 +44,7 @@ async function fetchSoldOutVariantIds(
  });
 
  if (!res.ok) {
- console.warn(`[square-inventory] error ${res.status} — skipping inventory filter`);
+ console.warn(`[square-inventory] error ${res.status}: skipping inventory filter`);
  continue;
  }
 
@@ -79,7 +79,7 @@ export async function fetchSquareProducts(
  let cursor: string | undefined;
 
  do {
- // Omit location_ids from catalog search — it can exclude newly-added items
+ // Omit location_ids from catalog search. It can exclude newly-added items
  // that haven't been explicitly linked to a location yet. We rely on ecom_uri
  // to confirm the item exists on the online store, and inventory counts (below)
  // to filter sold-out items per location.
@@ -183,7 +183,7 @@ export async function fetchSquareProducts(
  const size = sizeFromOptions ?? sizeFromName;
 
  const fullTitle = !isGenericVariantName
- ? `${title} — ${variantName}`
+ ? `${title}: ${variantName}`
  : title;
 
  candidates.push({
@@ -212,7 +212,7 @@ export async function fetchSquareProducts(
  skippedCount += inventorySoldOut;
  if (inventorySoldOut > 0) skipReasons["inventory_sold_out"] = inventorySoldOut;
 
- console.log(`[square-sync] ${storeName}: ${products.length} available, ${skippedCount} skipped — reasons: ${JSON.stringify(skipReasons)}`);
+ console.log(`[square-sync] ${storeName}: ${products.length} available, ${skippedCount} skipped. Reasons: ${JSON.stringify(skipReasons)}`);
 
  return { products, skippedCount, skipReasons };
 }

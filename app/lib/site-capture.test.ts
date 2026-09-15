@@ -32,7 +32,7 @@ test("injectCollectionItems reuses the theme's own card so the live grid matches
  // card's children to the card by `data-aos-anchor="#<card id>"`, so stripping ids left every
  // media wrapper at opacity 0.001. "No duplicates" is the invariant; "no ids" was never the point.
  const ids = $grid.find("[id]").toArray().map((el) => $(el).attr("id"));
- assert.equal(new Set(ids).size, ids.length, "cloned ids are unique — never duplicated across cards");
+ assert.equal(new Set(ids).size, ids.length, "cloned ids are unique, never duplicated across cards");
  assert.ok(ids.every((id) => !/^\d/.test(id || "")), "every id is selector-safe (the theme resolves anchors with querySelector)");
  // Price mirrors the theme's own formatting, which showed 2 decimals and a currency code.
  assert.match($grid.find(".price-item").first().text(), /\$180\.00 USD/);
@@ -43,7 +43,7 @@ test("injectCollectionItems reuses the theme's own card so the live grid matches
 // Grid/card detection must be STRUCTURAL, not Shopify/Dawn class names. An earlier class-name
 // version found a grid on only 6 of 20 real storefronts; every other theme fell through to a
 // generic substitute that looked nothing like the store. These fixtures are deliberately shaped
-// like different theme families — no shared class vocabulary between them.
+// like different theme families, no shared class vocabulary between them.
 
 const THEME_SHAPES: [string, string][] = [
  ["dawn-like", `<ul class="grid product-grid grid--4-col-desktop">
@@ -81,8 +81,8 @@ test("live grids reuse the theme's own card across DIFFERENT theme families", ()
   assert.ok(!out.includes("Old One") && !out.includes(">Old<"), `${name}: stale content replaced`);
   assert.ok(out.includes("/p/a1"), `${name}: links to the live product`);
   // The PHOTO has to survive the title substitution. Themes that wrap the image and the product
-  // name in the same link (Prestige) — or repeat the name inside the image link for screen readers
-  // (Palo Alto) — used to have cardTitleEl() return that link, and writing the title into it with
+  // name in the same link (Prestige), or repeat the name inside the image link for screen readers
+  // (Palo Alto): used to have cardTitleEl() return that link, and writing the title into it with
   // .text() deleted the <img>. Every card on every collection page then rendered as a bare text
   // link. Titles alone can't catch it: they were all correct while the grid had no pictures in it.
   const withPhotos = COLL_ITEMS.filter((i) => i.images.length).length; // a2 deliberately has none
@@ -105,7 +105,7 @@ test("navigation and pagination are never mistaken for product grids", () => {
 });
 
 test("price substitution finds money by its shape, not by a class name", () => {
- // A theme with no "price" class anywhere — the amount is just text in a span.
+ // A theme with no "price" class anywhere. The amount is just text in a span.
  const grid = `<div class="listing">
   <div class="tile"><a href="/x"><img src="a.jpg"><span class="t">Old</span><span class="amt">$10.00</span></a></div>
   <div class="tile"><a href="/y"><img src="b.jpg"><span class="t">Old</span><span class="amt">$20.00</span></a></div>
@@ -118,9 +118,9 @@ test("price substitution finds money by its shape, not by a class name", () => {
 
 test("injectCollectionItems renders a real <img>, not an empty background div", () => {
  // Dawn ships `a:empty,div:empty,section:empty,…{display:none}`. Rendering the photo as a
- // childless <div style="background:url(...)"> meant the theme hid it outright — live cards
+ // childless <div style="background:url(...)"> meant the theme hid it outright. Live cards
  // showed a title and price above a blank gap. Real <img> elements are never :empty.
- // No theme grid here, so the FALLBACK renderer runs — that's the one that used to emit an
+ // No theme grid here, so the FALLBACK renderer runs. That's the one that used to emit an
  // empty background div.
  const out = injectCollectionItems(`<html><body><main><h2>Shop</h2></main></body></html>`, COLL_ITEMS);
  const $ = cheerio.load(out);
@@ -129,7 +129,7 @@ test("injectCollectionItems renders a real <img>, not an empty background div", 
  assert.equal(img.attr("src"), "https://x/img1.jpg");
  assert.equal(img.attr("alt"), "1990s Silk Slip", "alt text for accessibility");
  assert.match(img.attr("style") || "", /object-fit:cover/);
- // Nothing in the injected grid may be childless — that is the exact shape the theme hides.
+ // Nothing in the injected grid may be childless. That is the exact shape the theme hides.
  // (CSS :empty counts ANY child node, so the no-image placeholder carries a non-breaking space:
  // U+00A0 is not ASCII whitespace, so it defeats :empty where a plain space would not.)
  $("[data-vya-collection] *").each((_, el) => {
@@ -137,7 +137,7 @@ test("injectCollectionItems renders a real <img>, not an empty background div", 
   if ($el.is("img")) return; // void element, legitimately childless
   assert.ok($el.contents().length > 0, `childless ${(el as { tagName?: string }).tagName} would be hidden by the theme`);
  });
- // The second fixture item has no images — it must still render a visible placeholder.
+ // The second fixture item has no images. It must still render a visible placeholder.
  const placeholder = $("[data-vya-collection] > div").eq(1).children().first();
  assert.ok(placeholder.text().includes("\u00a0"), "no-image placeholder uses a non-breaking space");
 });
@@ -153,10 +153,10 @@ test("injectCollectionItems falls back to after the heading when no grid is foun
 
 test("injectCollectionItems skips a visually-hidden or dialog heading when choosing where to anchor", () => {
  // Venus Vintage's "girls night out" collection: the real page title isn't marked up as a heading at
- // all, but the page DOES have h2s — a visually-hidden accessibility label inside a country picker,
- // and a "Filter" dialog's own title — both sitting near the very top of <main>, well before the real
+ // all, but the page DOES have h2s. A visually-hidden accessibility label inside a country picker,
+ // and a "Filter" dialog's own title. Both sitting near the very top of <main>, well before the real
  // content. Picking the FIRST h1/h2 in document order landed the live grid inside/right after one of
- // those — rendering before literally everything else on the page, which read as the site "crashed."
+ // those: rendering before literally everything else on the page, which read as the site "crashed."
  const html = `<html><body><main>
   <h2 class="visually-hidden">Country/Region</h2>
   <div class="hero"><span class="hero-title">girls night out</span></div>
@@ -172,7 +172,7 @@ test("injectCollectionItems skips a visually-hidden or dialog heading when choos
 
 test("injectCollectionItems appends after the page's own content, never prepends before everything, when no usable heading exists", () => {
  // Even with the hidden/dialog headings excluded, this page has no REAL heading to anchor on at
- // all — the safe default changed from "before everything" to "after everything", because a shopper
+ // all: the safe default changed from "before everything" to "after everything", because a shopper
  // sees a broken-looking page either way, but only one of them hides the header, nav and hero too.
  const html = `<html><body><main>
   <h2 class="visually-hidden">Country/Region</h2>
@@ -193,7 +193,7 @@ test("injectCollectionItems is a no-op when the collection has no items", () => 
 });
 
 // ── injectShim: recovers slideshow/slider/mega-menu interactivity lost when we strip the
-// source's JS (site-capture.ts strips ALL <script> — see its top-of-file comment on why).
+// source's JS (site-capture.ts strips ALL <script> see its top-of-file comment on why).
 // These are structural checks (no browser in node --test), so they assert the shim TARGETS
 // the real theme markup profiled from live stores, is injected exactly once, and never
 // clobbers other injected chrome (the cart drawer's own idempotency guard).
@@ -222,7 +222,7 @@ test("injectShim targets Dawn's real slideshow-component / slider markup", () =>
  assert.match(out, /slideshow-component:not\(\.announcement-bar\)/);
  assert.match(out, /slider-button--prev/);
  assert.match(out, /slider-button--next/);
- // Wires the prev/next controls Dawn already renders (on:click="/previous" / "/next") —
+ // Wires the prev/next controls Dawn already renders (on:click="/previous" / "/next"),
  // the querySelector escapes the colon, so the actual output carries two backslashes here.
  assert.match(out, /on\\\\:click="\/previous"/);
  assert.match(out, /on\\\\:click="\/next"/);
@@ -278,7 +278,7 @@ test("injectShim gives library carousels spacing but never restyles the theme's 
  assert.match(out, /\.swiper-wrapper[^{]*\{[^}]*gap:20px/);
  assert.match(out, /calc\(33\.333% - 14px\)/, "slide width accounts for the gap");
  // But Dawn lays out its OWN rows/grids (.grid--4-col-desktop = 25% items, .slider--* = scroll
- // snap). Overriding those flattened the 4-up product grid to 3-up — never do it again.
+ // snap). Overriding those flattened the 4-up product grid to 3-up, never do it again.
  assert.doesNotMatch(out, /ul\.slider,\.grid\.slider\{/, "no blanket .slider layout override");
  assert.doesNotMatch(out, /\.slider \.slider__slide/, "no override of Dawn slide widths");
  assert.doesNotMatch(out, /slideshow-component[^{]*\{[^}]*display:flex/, "no override of Dawn slideshows");
@@ -321,7 +321,7 @@ test("injectShim and injectCart use distinct idempotency markers and coexist", (
  assert.match(out, /data-vya-shim="1"/, "shim added alongside it");
 });
 
-// A theme that uses NEITHER .shopify-section NOR <section> — the fallback path.
+// A theme that uses NEITHER .shopify-section NOR <section> the fallback path.
 const PLAIN = `<!doctype html><html><head></head><body>
 <header><nav>nav</nav></header>
 <main>
@@ -466,7 +466,7 @@ test("shopify-section wrappers are used as sections and reorder correctly", () =
 // NOTE: these two originally asserted a "Powered by Shopify → Powered by VYA" text SWAP. That was
 // the old behavior; deShopify now REMOVES the credit outright and the badge is added at serve time
 // by injectPoweredBy (see its own guard + the comment in deShopify). Updated to the current
-// contract — they were previously invisible because this file failed to import under `node --test`.
+// contract: they were previously invisible because this file failed to import under `node --test`.
 test("deShopify removes the Powered by Shopify credit and Shop-Pay chrome", () => {
  const html = `<html><body><footer>
   <ul class="list-payment"><li><svg>visa</svg></li><li><svg>amex</svg></li></ul>
@@ -490,7 +490,7 @@ test("deShopify removes an unlinked 'Powered by Shopify' text node", () => {
 });
 
 // ── Regression: a captured Dawn store lost its ENTIRE nav row. Root cause was a substring
-// selector — [class*="localization"], meant for the small country/currency picker — matching
+// selector, [class*="localization"], meant for the small country/currency picker. Matching
 // Dawn's MODIFIER flag `header--has-localization`, which sits on the <header> itself. cheerio
 // removed the whole header (nav + logo). Real bug, seen on blummier.com.
 
@@ -529,7 +529,7 @@ test("deShopify still strips localization widgets that are NOT landmarks", () =>
 });
 
 test("deShopify keeps the header icon bar when localization shares its container", () => {
- // Blummier hangs `header-localization` on the SAME div that holds search/account/wishlist/cart —
+ // Blummier hangs `header-localization` on the SAME div that holds search/account/wishlist/cart,
  // removing the container took the whole icon bar with it. Only the picker itself should go.
  const $ = cheerio.load(`<html><body><header class="header header--has-localizations">
   <div class="header__icons header__icons--localization header-localization">
@@ -584,12 +584,12 @@ test("deLazy unwraps a bg <noscript> fallback but dedupes a product one", () => 
  assert.equal($("img.p").length, 1, "product image not duplicated (noscript dropped)");
 });
 
-test("deLazy leaves a <noscript> fallback wrapped under Plan B (keepScripts) — theme JS resolves it", () => {
+test("deLazy leaves a <noscript> fallback wrapped under Plan B (keepScripts). Theme JS resolves it", () => {
  // A Plan B page keeps the theme's own script running; it resolves the sibling `[data-rimg=lazy]`
  // image itself, exactly like the real site. Unwrapping the noscript tag here would turn its inert
- // fallback into a second, permanently visible copy stacked next to the one the theme's JS loads —
+ // fallback into a second, permanently visible copy stacked next to the one the theme's JS loads,
  // every hero/promo image on the page rendering twice. Left wrapped, its content stays plain text to
- // any selector (a real browser with scripting enabled treats <noscript> content the same way) —
+ // any selector (a real browser with scripting enabled treats <noscript> content the same way),
  // the standalone lazy sibling is the only queryable, live `<img>`.
  const $ = cheerio.load(
   `<noscript data-rimg-noscript><img class="hero" data-rimg="noscript" src="//cdn/hero_1800x.jpg"></noscript>` +
@@ -597,23 +597,23 @@ test("deLazy leaves a <noscript> fallback wrapped under Plan B (keepScripts) —
  );
  deLazy($, "https://store.com/", true);
  assert.equal($("noscript").length, 1, "noscript wrapper left intact under Plan B");
- assert.equal($("img.hero").length, 1, "only the standalone lazy image is live/queryable — the noscript one stays inert");
+ assert.equal($("img.hero").length, 1, "only the standalone lazy image is live/queryable. The noscript one stays inert");
  assert.match($.html(), /<noscript[^>]*><img class="hero" data-rimg="noscript"/, "noscript's own content untouched");
 });
 
 test("stripScripts surfaces a <noscript> fallback so a script-free render still shows a photo", () => {
  // Whatever mode a page was originally captured in, a script-free render (Plan A, or Plan B viewed
- // as a fallback) has no JS to resolve the theme's own lazy sibling — so without this, the shopper
+ // as a fallback) has no JS to resolve the theme's own lazy sibling, so without this, the shopper
  // would see neither image at all. The lazy sibling is left as-is (still `data-rimg="lazy"`): the
  // theme's OWN CSS keeps it opacity:0 forever with no script to flip it to "loaded", so it stays
- // safely invisible without deleting it — it isn't a duplicate to clean up here, just inert markup.
+ // safely invisible without deleting it. It isn't a duplicate to clean up here, just inert markup.
  const html = `<noscript data-rimg-noscript><img class="hero" data-rimg="noscript" src="https://cdn/hero_1800x.jpg"></noscript>` +
   `<img class="hero" data-rimg="lazy" src="https://cdn/hero_1800x.jpg">`;
  const out = stripScripts(html);
  const $ = cheerio.load(out);
  assert.equal($("noscript").length, 0, "noscript unwrapped");
  assert.equal($("img.hero[data-rimg=noscript]").length, 1, "fallback surfaced, visible by default");
- assert.equal($("img.hero[data-rimg=lazy]").length, 1, "lazy sibling untouched — CSS keeps it opacity:0 with no JS to load it");
+ assert.equal($("img.hero[data-rimg=lazy]").length, 1, "lazy sibling untouched. CSS keeps it opacity:0 with no JS to load it");
 });
 
 test("deLazy applies a data-bgset background when there is no noscript fallback", () => {
@@ -626,7 +626,7 @@ test("deLazy applies a data-bgset background when there is no noscript fallback"
 // ── Lazy-loaded hero videos ─────────────────────────────────────────────────────────────────────
 // A theme lazy-loads its hero video exactly like an image: the real URL sits in `data-src` with
 // `preload="none"`, and theme JS promotes it. deLazy handled <img> but not <video>, so the hero
-// rendered as an empty box — the source store showed a video, the VYA copy showed nothing.
+// rendered as an empty box. The source store showed a video, the VYA copy showed nothing.
 
 test("deLazy promotes a lazy video's data-src to a real, absolute src", () => {
  const $ = cheerio.load(`<video data-src="//store.com/cdn/shop/videos/hero.mp4?v=0" muted autoplay playsinline preload="none" loop class="lazy"></video>`);
@@ -654,7 +654,7 @@ test("deLazy leaves a video that already has a real src alone", () => {
 // ── Plan B keeps the theme's own buy button ─────────────────────────────────────────────────────
 
 test("Plan B keeps the theme's own add-to-cart but still strips Shopify checkout", () => {
- // Their button posts to the RELATIVE /cart/add.js, which on a VYA-served origin is our route —
+ // Their button posts to the RELATIVE /cart/add.js, which on a VYA-served origin is our route,
  // so the seller's real button drives VYA's cart. Replacing it would discard the fidelity we're here for.
  const html = `<form action="/cart/add" method="post">
    <button name="add" class="product-form__submit">Add to cart</button>
@@ -663,7 +663,7 @@ test("Plan B keeps the theme's own add-to-cart but still strips Shopify checkout
  const out = rewireCommerce(html, "/checkout?item=abc", { keepThemeButtons: true });
  assert.match(out, /name="add"/, "the theme's own button survives");
  assert.match(out, /Add to cart<\/button>/, "and keeps its own label");
- assert.ok(!/shopify-payment-button">/.test(out), "Shop Pay is still stripped — it takes the order away");
+ assert.ok(!/shopify-payment-button">/.test(out), "Shop Pay is still stripped. It takes the order away");
  assert.ok(!/data-vya-add/.test(out), "no VYA button is injected over the top");
 });
 
@@ -674,7 +674,7 @@ test("Plan A still replaces the buy button with VYA's own", () => {
 });
 
 // ── Cloned theme cards must not keep the template product's name ────────────────────────────────
-// Theme cards routinely carry the product name TWICE — a visible heading plus a visually-hidden or
+// Theme cards routinely carry the product name TWICE. A visible heading plus a visually-hidden or
 // hover-overlay copy. Replacing only the first left every card in a live grid showing the right
 // product alongside the template product's name, which read as "every product has the same name".
 
@@ -724,7 +724,7 @@ test("a second price block elsewhere in the card (a quick-view panel) also gets 
  // quick-view panel with its OWN <product-price> block, a full duplicate of the card's title+price.
  // The title duplicate already gets swept (replaceLeftoverTitle covers "every remaining text node
  // equal to the template's name"), but price substitution only ever touched the ONE element
- // findPriceEl found — so every card's quick-view panel kept showing the template product's price,
+ // findPriceEl found, so every card's quick-view panel kept showing the template product's price,
  // $375, regardless of which of the 105 real products the card was actually showing.
  const grid = `<ul class="product-grid">
   <li class="card-wrapper">
@@ -762,10 +762,10 @@ test("a second price block elsewhere in the card (a quick-view panel) also gets 
 
 test("a title that isn't a heading and isn't link text still gets replaced", () => {
  // Seen live on a real Tailwind/Alpine theme (hachi-archive): the title lives in a bare
- // `aria-hidden="true"` div (visually shown, hidden from screen readers — the accessible name comes
+ // `aria-hidden="true"` div (visually shown, hidden from screen readers. The accessible name comes
  // from an aria-labelledby elsewhere), and the click-through <a> is empty. cardTitleEl's old
  // selector list (card__heading/card-title/product-title/h2-h4) matched none of that, so it fell
- // through to "longest link text" — which found nothing either, since every link is empty. Result:
+ // through to "longest link text", which found nothing either, since every link is empty. Result:
  // the template's own name survived, verbatim, on every cloned card, because nothing ever
  // identified it as stale in the first place.
  const grid = `<ul class="product-grid">
@@ -802,7 +802,7 @@ test("a title that isn't a heading and isn't link text still gets replaced", () 
 // A cart captured while EMPTY renders no line-item markup, so there is nothing to reuse and any
 // hand-built substitute looks foreign (wrong fonts, wrong columns, a bright blue button on a
 // burgundy storefront). The importer now captures the cart with an item in it, and this clones the
-// theme's own row — the same principle the product grids use.
+// theme's own row: the same principle the product grids use.
 
 const CART_HTML = `<html><body>
  <div class="shopify-section-group-header-group"><a href="/">Store</a></div>
@@ -863,7 +863,7 @@ test("totals are restated in the theme's own elements", () => {
 
 test("a one-of-one line cannot ask for a second copy", () => {
  const $ = cheerio.load(injectCartPage(CART_HTML, [{ id: "i1", title: "X", priceCents: 100, currency: "USD", image: null, href: "/p" }], "/c"));
- assert.equal($("[name='minus'], [name='plus']").length, 0, "steppers removed — stock is one-of-one");
+ assert.equal($("[name='minus'], [name='plus']").length, 0, "steppers removed. Stock is one-of-one");
  assert.equal($("quantity-input input").attr("readonly"), "readonly");
 });
 
@@ -933,7 +933,7 @@ test("a sold piece stays on the shelf, badged, rather than vanishing", () => {
  ];
  const $ = cheerio.load(injectCollectionItems(grid, items, (it) => `/p/${it.id}`));
  const cards = $("[data-vya-collection]").children();
- assert.equal(cards.length, 2, "both render — the sold one is not dropped");
+ assert.equal(cards.length, 2, "both render. The sold one is not dropped");
  assert.equal($(cards[0]).find(".badge").length, 0, "an available piece drops the template's badge entirely");
  const soldBadge = $(cards[1]).find(".badge");
  assert.equal(soldBadge.text(), "Sold out");
@@ -1015,13 +1015,13 @@ test("a collection the store shows on one scroll is not chopped into pages", () 
    <h3 class="card__heading"><a href="/products/b">B</a></h3><span class="price">$20.00</span></li>
  </ul></main></body></html>`;
  const $ = cheerio.load(injectCollectionItems(noPager, many(9), (it) => `/p/${it.id}`, { page: 1, path: "/c" }));
- assert.equal($("[data-vya-collection]").children().length, 9, "all nine render — the source has no pager");
+ assert.equal($("[data-vya-collection]").children().length, 9, "all nine render. The source has no pager");
 });
 
 test("the sold badge keeps the theme's styled pill, not just its wrapper", () => {
  // Themes nest a styled pill inside a positioning wrapper. Both match [class*='badge'], and writing
- // text into the OUTER one destroys the inner span — where the rounded corners, padding and colour
- // scheme live — leaving bare text floating on the photo.
+ // text into the OUTER one destroys the inner span, where the rounded corners, padding and colour
+ // scheme live: leaving bare text floating on the photo.
  const grid = `<ul class="product-grid">
   <li class="card-wrapper"><a href="/products/t"><img src="/t.jpg" alt="T"></a>
    <div class="card__badge bottom left"><span class="badge badge--bottom-left color-scheme-3">Sold out</span></div>
@@ -1044,7 +1044,7 @@ test("the sold badge keeps the theme's styled pill, not just its wrapper", () =>
 // ── A listing created in the portal ─────────────────────────────────────────────────────────────
 // Imported products have a page on the source store to capture. A listing the seller adds in the
 // portal has none, so the route was fetching {source}/products/{vya-uuid}, getting a 404, and
-// telling the shopper "Couldn't load that product" — the seller's newest piece was unreachable.
+// telling the shopper "Couldn't load that product". The seller's newest piece was unreachable.
 
 const PDP_TEMPLATE = `<html><head><title>Old Boots</title>
  <meta property="og:description" content="Old boots description">
@@ -1097,7 +1097,7 @@ test("the gallery shows only the images this listing actually has", () => {
  assert.equal($(".thumbnail-list").length, 0, "one image needs no thumbnail rail");
 });
 
-test("nothing of the template product survives — page, meta or payload", () => {
+test("nothing of the template product survives. Page, meta or payload", () => {
  const html = renderNativeProduct(PDP_TEMPLATE, NATIVE);
  assert.ok(!html.includes("Old Boots"), "including inline analytics payloads");
  const $ = cheerio.load(html);
@@ -1111,11 +1111,11 @@ test("nothing of the template product survives — page, meta or payload", () =>
 
 // ── Layouts that style each slot individually ─────────────────────────────────────────────────
 // Squarespace's Fluid Engine gives every block its own id, its own wrapper class and its own
-// <style> — grid-area (where the block sits) and --product-block-display-* (which of the product's
+// <style> grid-area (where the block sits) and --product-block-display-* (which of the product's
 // fields it shows). Refilling such a section by emptying it and cloning one card three times threw
 // all of that away: the three clones carried the SAME wrapper class, so all three landed in the
 // same grid cell, and with their ids stripped the rules hiding title/price/description no longer
-// matched — the seller's homepage rendered three full product pages stacked on top of each other.
+// matched. The seller's homepage rendered three full product pages stacked on top of each other.
 const FLUID_ENGINE = `<html><body><section><div class="fluid-engine fe-1">
  <div class="fe-block fe-block-a"><style>.fe-block-a{grid-area:1/2/7/6}#block-a{--product-block-display-title:none}</style>
   <div class="sqs-block product-block" id="block-a"><a href="/shop/p/one"><img src="/a.jpg" alt="Old A"></a>
@@ -1159,7 +1159,7 @@ test("a live grid keeps each slot's own identity and styles", () => {
 
 test("a live grid with more pieces than slots clones for the extras only", () => {
  // A collection page shows the whole collection, so it can outgrow the slots the capture had.
- // (A homepage strip is capped at the slot count instead — see the "as many pieces as the theme
+ // (A homepage strip is capped at the slot count instead. See the "as many pieces as the theme
  // showed there" test.)
  const many = [...THREE, { id: "i4", title: "Live Piece Four", priceCents: 10000, currency: "USD", images: ["https://x/4.jpg"] }];
  const $ = cheerio.load(injectCollectionItems(FLUID_ENGINE, many, (it) => `/p/${it.id}`));
@@ -1189,7 +1189,7 @@ test("a live grid with fewer pieces than slots drops the slots it doesn't fill",
 test("a homepage strip shows as many pieces as the theme showed there", () => {
  // A "featured" rail is designed for a handful. Handing it the whole catalogue turned a 3-product
  // strip into 251 cards, blew the page past a megabyte, and left a carousel with 251 slides unable
- // to render — the page looked empty below the hero.
+ // to render: the page looked empty below the hero.
  const page = `<html><body><main>
   <ul class="product-grid featured"><li class="card-wrapper"><a href="/products/a"><img src="/a.jpg" alt="A"></a>
     <h3 class="card__heading"><a href="/products/a">A</a></h3><span class="price">$1.00</span></li>
@@ -1208,14 +1208,14 @@ test("a homepage strip shows as many pieces as the theme showed there", () => {
 
 test("a localization form that wraps a whole region loses only its picker", () => {
  // One theme puts its ENTIRE footer inside <form class="shopify-localization-form">, so removing the
- // currency widget deleted 3,400 characters of footer — links, policies, newsletter and all. Same
+ // currency widget deleted 3,400 characters of footer. Links, policies, newsletter and all. Same
  // family of bug as the [class*="localization"] selector that once ate whole headers.
  const $ = cheerio.load(`<footer><form class="shopify-localization-form" action="/localization">
    <select name="country_code"><option>US</option></select>
    <div class="footer-blocks">
     <a href="/pages/about">About</a><a href="/policies/refund-policy">Returns</a>
     <a href="/policies/privacy-policy">Privacy</a><a href="/pages/contact">Contact</a>
-    <p>Join the crush list — stay in the know about new arrivals.</p>
+    <p>Join the crush list. Stay in the know about new arrivals.</p>
    </div>
   </form></footer>`);
  deShopify($);
@@ -1236,13 +1236,13 @@ test("a bare localization widget is still removed outright", () => {
 
 test("guarding a container must not gut it either", () => {
  // The first attempt at the guard preserved the localization <form> and then removed
- // [class*="disclosure-list"] inside it — which is how this theme builds its footer link lists. It
+ // [class*="disclosure-list"] inside it, which is how this theme builds its footer link lists. It
  // deleted 180 footer links while carefully keeping the wrapper. Only form CONTROLS may go.
  const $ = cheerio.load(`<footer><form class="shopify-localization-form" action="/localization">
    <select name="country_code"><option>US</option></select>
    <ul class="disclosure-list"><li><a href="/a">A</a></li><li><a href="/b">B</a></li>
      <li><a href="/c">C</a></li><li><a href="/d">D</a></li><li><a href="/e">E</a></li></ul>
-   <p>Join the crush list — stay in the know.</p>
+   <p>Join the crush list. Stay in the know.</p>
   </form></footer>`);
  deShopify($);
  assert.equal($("select[name='country_code']").length, 0, "the control goes");
@@ -1251,7 +1251,7 @@ test("guarding a container must not gut it either", () => {
 });
 
 test("a 'shop by collection' row is not mistaken for a product grid", () => {
- // Structurally identical to a product grid — tiles with an image, a link and a caption — but the
+ // Structurally identical to a product grid, tiles with an image, a link and a caption, but the
  // links point at /collections/. Without the distinction, a homepage collection row was replaced
  // with individual items and the shopper saw products where the seller had put category tiles.
  const page = `<html><body><main>
@@ -1284,7 +1284,7 @@ test("a 'shop by collection' row is not mistaken for a product grid", () => {
 
 test("a sold badge must not displace the card's image", () => {
  // Prepending the badge inside the image link made themes that manage their own responsive images
- // (Editions marks them data-rimg) drop the photo — every sold card rendered as an empty tile.
+ // (Editions marks them data-rimg) drop the photo. Every sold card rendered as an empty tile.
  const grid = `<ul class="product-grid">
   <li class="card-wrapper"><div class="product-item__image">
     <a class="product-item__image-link" href="/products/t"><img src="/t.jpg" data-rimg alt="T"></a></div>
@@ -1310,7 +1310,7 @@ test("a sold badge must not re-position the theme's image link", () => {
  // and fills it with `.product-item__image-link{position:absolute;…;height:100%}`. Stamping an
  // inline `position:relative` on that link (to anchor our badge) beat the theme's rule, the link
  // fell back into normal flow at 0px tall, and the absolutely-positioned <img> inside it inherited
- // that 0px — every sold tile rendered blank while the image itself loaded fine. Seen live in
+ // that 0px: every sold tile rendered blank while the image itself loaded fine. Seen live in
  // DevTools: link height 0, img naturalWidth 3024, opacity 1.
  const grid = `<ul class="product-grid">
   <li class="card-wrapper"><div class="product-item__image product-item__image--square">
@@ -1406,7 +1406,7 @@ test("a listing with 2 real photos fills the theme's own hover-swap slot", () =>
  // The real site's grid swaps to a second angle on hover via a native class/CSS pair
  // (`.product-item__image-alternate`, revealed by the theme's own stylesheet on :hover). Earlier
  // this got collapsed to one image unconditionally on the theory that a second photo had "no live
- // equivalent" — wrong when the listing actually has one; the theme's own slot IS the live
+ // equivalent": wrong when the listing actually has one; the theme's own slot IS the live
  // equivalent, just needs this item's own second photo instead of the template's.
  const grid = `<ul class="product-grid">
   <li class="card-wrapper">
@@ -1430,7 +1430,7 @@ test("a listing with 2 real photos fills the theme's own hover-swap slot", () =>
 
 test("the FIRST card in the grid isn't blindly used as template when a later one has the hover slot", () => {
  // The card chosen to clone determines whether ANY card on the page can ever show a hover-swap
- // image — the first card in the grid just happens to belong to whichever product was captured
+ // image: the first card in the grid just happens to belong to whichever product was captured
  // there. If that one product only has a single photo, picking it blindly would mean no card could
  // ever show a second image on hover, even for items that have one.
  const grid = `<ul class="product-grid">
@@ -1451,7 +1451,7 @@ test("the FIRST card in the grid isn't blindly used as template when a later one
 });
 
 test("a listing with only 1 photo still collapses to a single image", () => {
- // No live equivalent for the hover slot when there's nothing to put in it — same as before this
+ // No live equivalent for the hover slot when there's nothing to put in it. Same as before this
  // feature existed. Hovering must not reveal a blank or a stale template photo.
  const grid = `<ul class="product-grid">
   <li class="card-wrapper">
@@ -1467,20 +1467,20 @@ test("a listing with only 1 photo still collapses to a single image", () => {
   { id: "i1", title: "Celine Triomphe", priceCents: 52000, currency: "USD", images: ["https://x/1.jpg"] },
  ], (it) => `/p/${it.id}`));
  const card = $("[data-vya-collection]");
- assert.equal(card.find("img").length, 1, "alternate slot dropped — nothing to show on hover");
+ assert.equal(card.find("img").length, 1, "alternate slot dropped. Nothing to show on hover");
  assert.equal(card.find("img").attr("src"), "https://x/1.jpg");
 });
 
 // Bag Crush's collection template wraps the whole page in `<section class="collection-page
 // has-pagination">`. That matched the pagination selector, came first in document order, and
-// contained the grid — so a collection with one page of items had the entire section removed and
+// contained the grid, so a collection with one page of items had the entire section removed and
 // served as a blank page. Real markup, reduced.
 test("a section merely CLASSED 'has-pagination' is not the pager, and is never removed", () => {
  const html = `<html><body><main><section id="content" class="collection-page has-pagination infinite_scroll">
   <div class="collection-page__product-list collection-page__product-list--4-columns"><article class="product-item"><a href="/products/a"><img src="a.jpg"><span class="price">$10.00</span><h3>A</h3></a></article><article class="product-item"><a href="/products/b"><img src="b.jpg"><span class="price">$20.00</span><h3>B</h3></a></article><article class="product-item"><a href="/products/c"><img src="c.jpg"><span class="price">$30.00</span><h3>C</h3></a></article></div>
   <div class="pagination"><ul class="pagination__page-list"><li class="pagination__page pagination__page--current">1</li><li class="pagination__page"><a href="/collections/all?page=2">2</a></li></ul></div>
  </section></main></body></html>`;
- // The theme rendered three cards, so its page size is three: these three items are one page —
+ // The theme rendered three cards, so its page size is three: these three items are one page,
  // exactly the case that used to blank the page. The grid is named `collection-page__product-list`,
  // which GRID_SELECTORS does NOT match, so this also pins the productGrids-based exclusion.
  const out = injectCollectionItems(html, [
@@ -1528,7 +1528,7 @@ test("capturedGridProductHandles returns nothing for a page with no real product
 // Unique Vintage's homepage nests its products as
 //   slideshow-container > slideshow-slides > slideshow-slide > product-card
 // Scanning only ul/ol/div/section never reached <slideshow-slides>, so detection returned ZERO
-// grids and the store rendered frozen stock from the capture instead of live inventory — sold
+// grids and the store rendered frozen stock from the capture instead of live inventory. Sold
 // pieces still on sale, portal additions invisible. Measured across 88 captured pages, adding
 // custom elements to the scan gained 5 grids and lost none.
 test("a grid built from custom elements is detected", () => {
@@ -1581,7 +1581,7 @@ test("injectSqsCartPage shows a real empty-cart message, not a blank page, for a
 
 // ── The add button's two states ─────────────────────────────────────────────────────────────────
 // Every clone is made from ONE captured card, so that card's product decides what the button says
-// unless we rewrite it. On Love Again Vintage — 106 of 109 pieces sold — the card cloned was a sold
+// unless we rewrite it. On Love Again Vintage, 106 of 109 pieces sold. The card cloned was a sold
 // one, so every buyable bag on the mirrored homepage offered a dead "Sold out" button while the sold
 // ones lost their button altogether. The theme prints both words itself, in the same grid; these are
 // read off it rather than invented, so a store in another language keeps its own.
@@ -1652,7 +1652,7 @@ test("with quick-add off (a VYA origin, no cart bridge) no card carries a form a
 // ── A sold piece must not be buyable ────────────────────────────────────────────────────────────
 // rewireCommerce swaps the theme's <button> for an <a>, so applyCartState's `disabled` (which only
 // ever matched a button) silently did nothing: sold pieces kept a live "Add to cart" and a working
-// /checkout link. Verified on a real store — 44 of 48 pieces in one collection were sold.
+// /checkout link. Verified on a real store. 44 of 48 pieces in one collection were sold.
 
 test("applyCartState neutralises VYA's own buy controls on a sold piece", () => {
  const live = rewireCommerce(
@@ -1669,7 +1669,7 @@ test("applyCartState neutralises VYA's own buy controls on a sold piece", () => 
  assert.match(sold, /pointer-events:\s*none/, "and can't be clicked");
 });
 
-test("an available piece keeps both buy controls — the sold path must not leak", () => {
+test("an available piece keeps both buy controls. The sold path must not leak", () => {
  const live = rewireCommerce(
   `<html><body><form action="/cart/add"><button name="add" class="product-form__submit">Add to cart</button></form></body></html>`,
   "/checkout?item=abc123",
@@ -1689,7 +1689,7 @@ test("rewireCommerce with no buy href renders the theme-shaped sold control", ()
  assert.doesNotMatch(out, /\/checkout\?item=/, "and nowhere to check out");
 });
 
-test("the fallback grid badges sold pieces too — not just the theme-card path", () => {
+test("the fallback grid badges sold pieces too, not just the theme-card path", () => {
  // liveGridHtml renders wherever a theme's own card can't be matched. It ignored `available`, so
  // those stores showed a sold-out archive as fully buyable.
  const html = liveGridHtml(
@@ -1709,7 +1709,7 @@ test("the fallback grid badges sold pieces too — not just the theme-card path"
  assert.doesNotMatch(avail, /data-vya-sold/, "and not on the available one");
 });
 
-test("the theme-card path never shows '$0' either — same convention, same fix", () => {
+test("the theme-card path never shows '$0' either. Same convention, same fix", () => {
  const html = `<html><body><main><h1>Archive</h1><ul id="product-grid" class="grid">
   <li class="grid__item"><a href="/products/old"><img src="old.jpg"></a>
    <h3 class="card__heading">STALE product</h3>
@@ -1720,9 +1720,9 @@ test("the theme-card path never shows '$0' either — same convention, same fix"
  assert.doesNotMatch(out, /\$0\b/);
 });
 
-test("the fallback grid never shows '$0' — priceCents 0 means no price on record, not a free piece", () => {
+test("the fallback grid never shows '$0'. PriceCents 0 means no price on record, not a free piece", () => {
  // A vintage seller zeroes the price when a piece SELLS and keeps it published as her archive (see
- // worthImporting in capture-commerce-core.ts) — 0 is this codebase's own convention for "no real
+ // worthImporting in capture-commerce-core.ts). 0 is this codebase's own convention for "no real
  // price", the same as null, everywhere else. The fallback grid formatted it as real money anyway:
  // Venus Vintage's sold-out Jimmy Choo heels showed "Sold out" right next to "$0", implying $0 was
  // once a genuine sale price. It never is.
@@ -1736,7 +1736,7 @@ test("the fallback grid never shows '$0' — priceCents 0 means no price on reco
 test("a cloned card never keeps a reference to an id it just dropped", () => {
  // AOS gates visibility (`[data-aos]{opacity:.000001}` until its JS adds `.aos-animate`), and an
  // element anchored to a MISSING id never animates. Cloned cards kept `data-aos-anchor="#…"`
- // pointing at the template card's id, which the clone strips — so on a store origin, where the
+ // pointing at the template card's id, which the clone strips, so on a store origin, where the
  // theme's own AOS runs, every product grid rendered permanently invisible. Correct markup,
  // correct photos, opacity zero. Plan A masked it: its shim force-overrides that opacity.
  const html = `<html><body><div class="product-grid">
@@ -1762,7 +1762,7 @@ test("a collection page states how many pieces it is showing, so a check never h
  // The theme's own "N products" label is not reliable ground truth: we rewrite it, some themes
  // (shop-vintage-charm) print no label at all, and one that reads 401 on a 94-piece rail is telling
  // the truth about a page that is wrong. A machine-readable stamp is what a checker compares
- // against the seller's own site — see scripts/parity-check.mts.
+ // against the seller's own site. See scripts/parity-check.mts.
  const html = `<html><head><title>t</title></head><body><main><h1>Dresses</h1><ul id="product-grid">
   <li class="grid__item"><a href="/products/old"><img src="old.jpg"></a><h3><a href="/products/old">STALE</a></h3><span class="price-item">$9.00</span></li>
  </ul></main></body></html>`;
@@ -1800,7 +1800,7 @@ test("a rail rendered in our own cards is stamped too, not just one built from t
 
 test("deciding a collection is empty is stamped even when there was no grid to clear", () => {
  // blummier's "Alaïa" page was captured with no product grid at all (it is empty on her site too),
- // so there is nothing to empty — but we HAVE decided the page shows nothing, and a check must be
+ // so there is nothing to empty, but we HAVE decided the page shows nothing, and a check must be
  // able to read that decision. Silence here made the pages we had just fixed unverifiable.
  const html = `<html><head></head><body><main><h1>Alaïa</h1><p>Nothing here yet.</p></main></body></html>`;
  const $ = cheerio.load(injectCollectionItems(html, [], undefined, { renderEmpty: true }));
@@ -1809,7 +1809,7 @@ test("deciding a collection is empty is stamped even when there was no grid to c
 
 test("an empty collection states that it is showing nothing", () => {
  // The stamp is how a check knows what a page served (see stampCollectionSize). Without it on this
- // branch, every collection we correctly emptied would report "we couldn't check" — blind on
+ // branch, every collection we correctly emptied would report "we couldn't check". Blind on
  // exactly the pages the empty-collection fix just changed.
  const html = `<html><head></head><body><main><h1>Alaïa</h1><ul id="product-grid">
   <li class="grid__item"><a href="/products/old"><img src="a.jpg"></a><h3><a href="/products/old">STALE</a></h3><span class="price-item">$9.00</span></li>
@@ -1821,7 +1821,7 @@ test("an empty collection states that it is showing nothing", () => {
 
 test("a piece on sale shows its markdown in the grid, not just on its own page", () => {
  // The seller's own grid shows "$645" struck from "$675". Ours showed a flat $645, so the shopper
- // never saw the markdown — the selling tool it exists to be. bag-crush has 73 pieces on sale, and
+ // never saw the markdown. The selling tool it exists to be. bag-crush has 73 pieces on sale, and
  // this was the biggest growing line in the census: prices reported as differing on 7 stores.
  const html = `<html><body><main><ul id="product-grid">
   <li class="grid__item"><a href="/products/old"><img src="a.jpg"></a><h3><a href="/products/old">STALE</a></h3><span class="price-item">$999.00</span></li>
@@ -1861,7 +1861,7 @@ test("an original that is not higher than the price is not shown", () => {
 test("the fallback grid escapes the heading's column instead of inheriting it", () => {
  // hachi-archive's /collections/prada rendered ONE product per row, full width, 36,000px tall.
  // Its captured page had no grid to reuse, so the fallback dropped our grid straight after the
- // <h2> — and on that theme the heading sits in a narrow section-title column, so a grid asking
+ // <h2> and on that theme the heading sits in a narrow section-title column, so a grid asking
  // for `auto-fill minmax(240px,1fr)` got exactly one column. The heading is a position, not a
  // parent: the grid belongs after the block the heading sits in, at the page's own width.
  const html = `<html><body><main>
@@ -1893,7 +1893,7 @@ test("a page whose heading has no section still gets its grid", () => {
 
 test("every script VYA injects into a captured page actually PARSES", () => {
  // A backslash written into the JS below survives TypeScript's template literal only if it is
- // doubled. One that wasn't turned `/^\/site\/([^/?#]+)/` into `/^/site/([^/?#]+)/` — an invalid
+ // doubled. One that wasn't turned `/^\/site\/([^/?#]+)/` into `/^/site/([^/?#]+)/`: an invalid
  // regex, which killed the whole VYACart object, which meant every "Add to cart" on every captured
  // page silently did nothing. The HTML still contained the word VYACart, so nothing looked wrong.
  const html = injectCart("<html><head></head><body><p>x</p></body></html>");
@@ -1916,7 +1916,7 @@ test("a discount the piece cannot back up is removed", () => {
  // chill-boutique's homepage carried EIGHT "50% OFF" badges on our copy. Her sale rail is a
  // filtered view of genuinely half-price pieces; we fill the same template with OUR items and left
  // her badge sitting on top of them. One card read "50% OFF · Derek Lam Navy Shirt · $100 · $495"
- // — eighty percent off. We were inventing a price claim on somebody else's storefront.
+ // eighty percent off. We were inventing a price claim on somebody else's storefront.
  const { $, $card } = badgeCard("50% OFF");
  restateDiscountClaims($, $card, { id: "1", title: "Derek", priceCents: 10000, currency: "usd", image: "b.jpg" } as never);
  assert.doesNotMatch($.html(), /50%/);
@@ -1953,7 +1953,7 @@ test("'Save $40' becomes the amount actually saved", () => {
 test("the bag pill comes back when her own cart icon cannot be reached", () => {
  // ange-archive: the server found a cart control, bound it, and set the marker that hides our
  // floating pill. Then the theme rebuilt its header in JavaScript and the bound control ended up
- // 0×0. A shopper could put a piece in the bag and had NO way to open it — no reachable icon of
+ // 0×0. A shopper could put a piece in the bag and had NO way to open it, no reachable icon of
  // hers, and no pill of ours, because the marker said she had one.
  //
  // Same shape as the account icon, one layer down: what the SERVER found is not what the SHOPPER
@@ -1972,7 +1972,7 @@ test("the pill re-check keeps watching, because a header can arrive late", () =>
 test("a collection's own grid grows past the number of cards captured on crawl day", () => {
  // The grid was capped at however many cards the crawl happened to photograph. awoke-vintage's
  // denim page was captured with 36 cards; she has since filed 41 pieces into it, and the five
- // newest — all active, all $65, all photographed — were invisible on our copy for ever. A hosted
+ // newest, all active, all $65, all photographed. Were invisible on our copy for ever. A hosted
  // store that cannot show a piece the seller added after crawl day is not tracking live inventory.
  //
  // The cap is still right for a RAIL: a "featured" strip designed for three products, handed the
@@ -1991,10 +1991,10 @@ test("a collection's own grid grows past the number of cards captured on crawl d
 
 test("relative URLs resolve against <base href>, not the page's own path", () => {
  // 2ndstreetusa.com (a custom CMS, not Shopify) sets <base href="https://2ndstreetusa.com/"> in the
- // head of EVERY page and writes every stylesheet, sprite and nav link relative to it — `href="about"`,
+ // head of EVERY page and writes every stylesheet, sprite and nav link relative to it. `href="about"`,
  // `href="assets/styles/main.css"`. Resolved against the PAGE's url instead, an article four levels
  // deep asked for /article/26/07/07/assets/styles/main.css: a 404, so the page was stored with no
- // stylesheet at all (inlinedSheets 0), no logo, and 41 nav links pointing at paths that don't exist —
+ // stylesheet at all (inlinedSheets 0), no logo, and 41 nav links pointing at paths that don't exist,
  // which then went into the crawl queue as real pages to visit. 138 of that store's 139 pages are
  // below the root, so this is not an edge case there; it is every page but the homepage.
  const page = `<html><head><base href="https://shop.com/">
@@ -2008,7 +2008,7 @@ test("relative URLs resolve against <base href>, not the page's own path", () =>
 
 test("documentBase falls back to the page URL, and tolerates a relative or broken <base>", () => {
  const at = (head: string) => documentBase(cheerio.load(`<html><head>${head}</head></html>`), "https://shop.com/a/b/c");
- assert.equal(at(""), "https://shop.com/a/b/c", "no <base> — the page's own URL is the base");
+ assert.equal(at(""), "https://shop.com/a/b/c", "no <base>, the page's own URL is the base");
  assert.equal(at("<base>"), "https://shop.com/a/b/c", "a <base> with no href sets nothing");
  assert.equal(at('<base href="">'), "https://shop.com/a/b/c", "an empty href sets nothing");
  // A relative <base href> is itself resolved against the page URL (HTML spec), which is how
@@ -2023,7 +2023,7 @@ test("a cache-busted sprite is still recognised as a sprite", () => {
  // 2ndstreetusa.com draws its wordmark with
  //   <use xlink:href="assets/images/sprite.svg?v=1785931200855#logo-type">
  // The extension test was tail-anchored on the RAW reference, so the `?v=` cache-buster made it
- // fail /\.svg$/ and the <use> was skipped entirely — left relative. Served from a VYA origin that
+ // fail /\.svg$/ and the <use> was skipped entirely. Left relative. Served from a VYA origin that
  // resolves against OURS, 404s, and the store's logo renders as blank space: precisely the failure
  // this inlining exists to prevent. The extension belongs to the path, not to the query string.
  // Resolved against the base the document declares (see documentBase), which on that store is the
@@ -2039,7 +2039,7 @@ test("a cache-busted sprite is still recognised as a sprite", () => {
   { url: "https://shop.com/universal/svg/social-accounts.svg", id: "instagram-unauth-icon" },
  );
  assert.equal(spriteRef("#cross", "https://shop.com/"), null, "an already-local ref needs nothing");
- assert.equal(spriteRef("sprite.svg", "https://shop.com/"), null, "no fragment — nothing to inline");
+ assert.equal(spriteRef("sprite.svg", "https://shop.com/"), null, "no fragment. Nothing to inline");
  assert.equal(spriteRef("/img/photo.png#hero", "https://shop.com/"), null, "not a sprite");
  assert.equal(spriteRef("/s.svg#a b", "https://shop.com/"), null, "an id that isn't a plain token");
 });
@@ -2048,7 +2048,7 @@ test("deLazy promotes the lazy-src attribute whatever the theme's loader calls i
  // 2ndstreetusa.com's loader (Locomotive) writes `data-load-src` and parks a 1x1 transparent GIF in
  // `src`. We knew only `data-src`, so BOTH halves failed at once: under Plan A the src stayed the
  // 1x1 and every photograph on the page was a blank pixel; under Plan B the theme's own loader ran,
- // read a still-RELATIVE `data-load-src`, and — because capture strips <base> — resolved it against
+ // read a still-RELATIVE `data-load-src`, and, because capture strips <base> resolved it against
  // the page path, asking for /article/26/07/07/uploads/… (404, all five photographs). The asset
  // re-hosting pass never saw the URLs either, so none of her pictures were copied to our storage.
  //
@@ -2061,7 +2061,7 @@ test("deLazy promotes the lazy-src attribute whatever the theme's loader calls i
  assert.equal($("img").attr("data-load-src"), undefined, "the lazy attribute is consumed, not left to re-resolve");
 
  // The same shape under every loader that ships it. data-original is jQuery.lazyload, data-lazy-src
- // is Slick/WP Rocket, data-echo is echo.js — all still widely deployed on older themes.
+ // is Slick/WP Rocket, data-echo is echo.js. All still widely deployed on older themes.
  for (const attr of ["data-src", "data-lazy-src", "data-original", "data-echo", "data-load-src"]) {
   const $$ = cheerio.load(`<img src="/img/blank.gif" ${attr}="pics/one.jpg">`);
   deLazy($$, "https://shop.com/collections/all");
@@ -2075,7 +2075,7 @@ test("deLazy promotes the lazy-src attribute whatever the theme's loader calls i
 
 test("a page hidden until its JavaScript reveals it does not render blank", () => {
  // 2ndstreetusa.com ships <body style="opacity: 0;"> and raises it in JS on load. A script-free
- // render never runs that, so all 127 captured pages were a blank white screen — while every metric
+ // render never runs that, so all 127 captured pages were a blank white screen, while every metric
  // read healthy: 4 stylesheets, 1,426 CSS rules, 3,685px of content. Only the screenshot showed it.
  // A body at zero opacity is never a design; it is always a loading state.
  const shown = stripScripts(`<html><body style="opacity: 0;"><h1>Hello</h1></body></html>`);
@@ -2089,12 +2089,12 @@ test("a page hidden until its JavaScript reveals it does not render blank", () =
  // visibility:hidden and display:none on the page root are the same loading trick.
  assert.ok(!/visibility:\s*hidden/i.test(stripScripts(`<html><body style="visibility:hidden"><p>hi</p></body></html>`)));
  assert.ok(!/display:\s*none/i.test(stripScripts(`<html><body style="display:none"><p>hi</p></body></html>`)));
- // Anything BELOW the page root keeps its own opacity — inactive carousel slides are legitimately 0.
+ // Anything BELOW the page root keeps its own opacity. Inactive carousel slides are legitimately 0.
  assert.match(stripScripts(`<html><body><div class="slide" style="opacity:0">2</div></body></html>`), /opacity:\s*0/);
 });
 
 test("relative url()s are absolutized in style-bearing attributes, not just <style> blocks", () => {
- // Capture absolutized <style> elements and stripped <base> — but never looked at CSS held in an
+ // Capture absolutized <style> elements and stripped <base> but never looked at CSS held in an
  // ATTRIBUTE. 2ndstreetusa.com paints its article images from
  //   data-load-style="background-image: url('uploads/articles/…jpg')"
  // and the theme's loader copies that onto the element after load. Left relative, and with <base>
@@ -2104,7 +2104,7 @@ test("relative url()s are absolutized in style-bearing attributes, not just <sty
   <div data-load-style="background-image: url('uploads/a/hero.jpg');"></div>
   <div style="background:#eee url(img/tile.png) repeat"></div>
   <div data-load-style="background-image: url(data:image/gif;base64,R0lGOD)"></div>`);
- // captureSite hands deLazy the document's base (see documentBase) — the site root on that store.
+ // captureSite hands deLazy the document's base (see documentBase): the site root on that store.
  deLazy($, "https://shop.com/");
  assert.match($("[data-load-style]").first().attr("data-load-style")!, /url\('https:\/\/shop\.com\/uploads\/a\/hero\.jpg'\)/);
  assert.match($("[style]").first().attr("style")!, /url\(https:\/\/shop\.com\/img\/tile\.png\)/);
@@ -2113,8 +2113,8 @@ test("relative url()s are absolutized in style-bearing attributes, not just <sty
 
 // A THEME MAY PUT THE WORD "badge" ON SOMETHING THAT IS NOT A BADGE.
 //
-// Tess Elizabeth Vintage's theme marks a card's image gallery as badge-bearing —
-// `card-gallery--badge-top-right` — so the substring selector that strips the template's badge
+// Tess Elizabeth Vintage's theme marks a card's image gallery as badge-bearing,
+// `card-gallery--badge-top-right`, so the substring selector that strips the template's badge
 // matched the wrapper holding every photograph and deleted the lot. 15 of 37 pieces on her
 // Accessories page rendered as a title and a price over blank space, and only the pieces her own
 // theme badges were affected, which is what made it look like a pricing bug.
@@ -2141,13 +2141,13 @@ test("stripping the template's badge never takes the card's photographs with it"
   assert.equal($(card).find("img").length, 1, `card ${i} kept its photograph`);
  }
  assert.equal($("img").first().attr("src"), "/live1.jpg", "and it points at the live piece");
- // The badge itself — the thing with no picture in it — is still removed for an available piece.
+ // The badge itself, the thing with no picture in it. Is still removed for an available piece.
  assert.equal($(".product-badges__badge").length, 0, "the template's Sold out badge is gone");
 });
 
 // THE THEME KEEPS ITS OWN NAME FOR THE BUTTON WE REPLACE.
 // Horizon-family components resolve their children through `ref`, and throw on connectedCallback
-// when one is missing — so swapping the button without carrying `ref` across killed the startup of
+// when one is missing, so swapping the button without carrying `ref` across killed the startup of
 // add-to-cart-component and sticky-add-to-cart on every product page of every hosted store.
 test("replacing the add-to-cart button keeps the ref the theme's own component looks for", () => {
  const html = `<form action="/cart/add">
@@ -2157,7 +2157,7 @@ test("replacing the add-to-cart button keeps the ref the theme's own component l
  const primary = $("[data-vya-add]");
  assert.equal(primary.length, 1);
  assert.equal(primary.attr("ref"), "addToCartButton", "the theme can still find its button");
- // Exactly one element answers to that ref — the Buy now control must not also claim it.
+ // Exactly one element answers to that ref. The Buy now control must not also claim it.
  assert.equal($('[ref="addToCartButton"]').length, 1);
 });
 
@@ -2167,7 +2167,7 @@ test("a theme that names no ref gets no invented one", () => {
  assert.equal($("[data-vya-add]").attr("ref"), undefined);
 });
 
-// The refs a theme's component needs are not all ON the button — some are INSIDE it.
+// The refs a theme's component needs are not all ON the button. Some are INSIDE it.
 // sticky-add-to-cart keeps its quantity readout in the button's own label, so replacing the button
 // discarded them and the component threw on connect even once the button's own ref was preserved.
 test("replacing the add-to-cart button keeps the refs living inside it", () => {
@@ -2182,7 +2182,7 @@ test("replacing the add-to-cart button keeps the refs living inside it", () => {
  assert.equal($('[ref="quantityNumber"]').length, 1, "including the one nested inside it");
  // Carried, not shown: the shopper must not read the theme's leftover label twice.
  assert.ok($("[data-vya-theme-refs]").is("[hidden]"), "carried markup is not painted");
- // And never duplicated — two elements answering to one ref is the same bug in mirror image.
+ // And never duplicated. Two elements answering to one ref is the same bug in mirror image.
  for (const r of ["addToCartButton", "quantityDisplay", "quantityNumber"]) {
   assert.equal($(`[ref="${r}"]`).length, 1, r);
  }

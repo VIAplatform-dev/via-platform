@@ -35,7 +35,7 @@ test("the most recent crawl survives even when it falls outside the cap", () => 
 });
 
 test("an older crawl is still dropped once a newer crawl exists", () => {
- // Only the MOST RECENT crawl is protected — otherwise crawls accumulate for ever.
+ // Only the MOST RECENT crawl is protected. Otherwise crawls accumulate for ever.
  const rows = [
   { id: "old-crawl", reason: "crawl" as const, createdAt: at(1) },
   { id: "new-crawl", reason: "crawl" as const, createdAt: at(2) },

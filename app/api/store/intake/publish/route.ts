@@ -16,10 +16,11 @@ import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 import { normalizeFlaws } from "@/app/lib/flaws-core";
 import { resolveParcelAtPublish } from "@/app/lib/parcel-core";
 import { normalizeMeasurements, unitFor } from "@/app/lib/measurements-core";
+import { storeCurrency } from "@/app/lib/store-currency-db";
 
 export const dynamic = "force-dynamic";
 
-// POST — publish a reviewed intake draft as a live one-of-one item.
+// POST: publish a reviewed intake draft as a live one-of-one item.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
  const scheduled = !!publishAt;
  const goLiveNow = body.status !== "draft" && !scheduled;
 
- // Anything that will be publicly live — now OR on a schedule — must be shippable: without a
+ // Anything that will be publicly live, now OR on a schedule. Must be shippable: without a
  // ship-from we can't floor the buyer's shipping (VYA could lose money) or buy the label. A plain
  // draft is fine (stage now, add the address before it goes live).
  const shipping = await getShippingSettings(slug);
@@ -53,13 +54,13 @@ export async function POST(request: NextRequest) {
 
  const store = stores.find((s) => s.slug === slug);
  const seller = await getOrCreateSeller(slug, store?.name || slug, storeContactEmails[slug] || "");
- await ensurePublishAtColumn(); // createItem writes publish_at — make sure the column exists
+ await ensurePublishAtColumn(); // createItem writes publish_at: make sure the column exists
 
  const str = (v: unknown, n: number) => {
  const s = (typeof v === "string" ? v : "").trim();
  return s ? s.slice(0, n) : null;
  };
- // The parcel: what she typed, else the AI's estimate, else the category default — never the old
+ // The parcel: what she typed, else the AI's estimate, else the category default, never the old
  // "16 oz mailer" fallback that quoted every unweighed coat as a small parcel (parcel-core.ts).
  // Dims round UP (never down): a declared parcel smaller than reality risks a carrier re-weigh charge.
  const aiParcel = body.parcel ?? (body.aiDraft && typeof body.aiDraft === "object" ? (body.aiDraft as { parcel?: unknown }).parcel : null) ?? null;
@@ -78,7 +79,9 @@ export async function POST(request: NextRequest) {
  description: str(body.description, 2000),
  priceCents: Math.round(price * 100),
  costCents: hasCost ? Math.round(cost * 100) : null,
- currency: store?.currency || "USD",
+ // Her currency, not the partner array's. A listing created by a store absent from that array was
+ // stamped USD for ever, and the price on it is the one thing that cannot be re-guessed later.
+ currency: await storeCurrency(slug),
  images,
  brand: str(body.brand, 80),
  era: str(body.era, 40),
@@ -100,7 +103,7 @@ export async function POST(request: NextRequest) {
  parcelEstimate,
  source: "ai" as const,
  // Stores doing a drop stage pieces as drafts, then publish the batch at once. A scheduled
- // listing stays a draft (invisible) with publish_at set — the cron flips it live at that time.
+ // listing stays a draft (invisible) with publish_at set. The cron flips it live at that time.
  status: (goLiveNow ? "active" : "draft") as "active" | "draft",
  publishAt,
  };
@@ -157,7 +160,7 @@ export async function POST(request: NextRequest) {
  ? body.channels.filter((c: unknown): c is string => typeof c === "string")
  : null;
  // Store the choice on the item first. A scheduled piece publishes hours later via
- // the cron, which has no access to this request — without this the seller's picks
+ // the cron, which has no access to this request, without this the seller's picks
  // would quietly fall back to the account defaults.
  if (channels) await setCrossListChannels(item.id, channels).catch(() => {});
  if (item.status === "active") {
@@ -173,7 +176,7 @@ export async function POST(request: NextRequest) {
  url: r.externalUrl,
  }));
  // If the store connected Instagram with auto-post on, post the new piece to their
- // Story (a card that drives to their own storefront). Best-effort — never blocks publish.
+ // Story (a card that drives to their own storefront). Best-effort, never blocks publish.
  maybeAutoPostStory(slug, item.id).catch(() => {});
  }
 

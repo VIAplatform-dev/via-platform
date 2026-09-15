@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
  status = await getPilotStatus(email);
 
  if (status === null) {
- // Everyone starts as pending — approved via cron after 7 days or manual approval
+ // Everyone starts as pending. Approved via cron after 7 days or manual approval
  status = "pending";
 
  // Pick up referral code set by Google OAuth flow (short-lived client cookie)

@@ -5,7 +5,7 @@ import { getPinterestTrends, isPinterestConfigured } from "@/app/lib/pinterest-t
 
 export const dynamic = "force-dynamic";
 
-// GET /api/store/culture-trends — "Rising in culture": the fastest-growing fashion searches on
+// GET /api/store/culture-trends. "Rising in culture": the fastest-growing fashion searches on
 // Pinterest right now, a LEADING outside-VYA discovery signal (taste forms here before resale demand
 // moves). VYA Pro. Stays empty until Pinterest is configured and the daily snapshot has run.
 export async function GET(request: NextRequest) {

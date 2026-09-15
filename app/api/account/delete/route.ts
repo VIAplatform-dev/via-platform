@@ -28,7 +28,7 @@ export async function DELETE() {
  await fetch(`https://api.stripe.com/v1/subscriptions/${stripeSubscriptionId}`, {
  method: "DELETE",
  headers: { Authorization: `Bearer ${stripeKey}` },
- }).catch(() => {}); // best-effort — don't block account deletion if Stripe fails
+ }).catch(() => {}); // best-effort: don't block account deletion if Stripe fails
  }
  }
 

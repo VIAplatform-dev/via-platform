@@ -15,7 +15,7 @@ export default function HomePage() {
  <main className="w-full">
  <HomepageScrollTracker />
 
- {/* ================= HERO — MOBILE ================= */}
+ {/* ================= HERO: MOBILE ================= */}
  <div data-section="hero" className="md:hidden">
  <section className="relative overflow-hidden" style={{ height: "85vh" }}>
  <Image
@@ -56,7 +56,7 @@ export default function HomePage() {
  </section>
  </div>
 
- {/* ================= HERO — DESKTOP ================= */}
+ {/* ================= HERO: DESKTOP ================= */}
  <section
  className="hidden md:block relative overflow-x-hidden"
  style={{ backgroundColor: "#D8C8BC", minHeight: "100vh" }}

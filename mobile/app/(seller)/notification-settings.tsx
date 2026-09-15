@@ -10,8 +10,8 @@ import { registerForPush, lastPushStatus, type PushStatus } from "../../lib/push
 
 // Sales and messages default ON; everything else opts in.
 //
-// A phone that buzzes for nothing gets silenced, and then the two that matter — a piece sold, a
-// buyer replied — are lost with it.
+// A phone that buzzes for nothing gets silenced, and then the two that matter. A piece sold, a
+// buyer replied. Are lost with it.
 //
 // Preferences live on the server (/api/store/notification-prefs), one row per store, so every
 // device and the web agree. A toggle flips at once and sends a patch naming only that key; if the
@@ -26,7 +26,7 @@ export default function NotificationsScreen() {
     enabled: !!storeSlug,
   });
   // Local wins once she has touched something; until then the server's answer, and before that
-  // the defaults — which are also what the server would say for a store with no row.
+  // the defaults, which are also what the server would say for a store with no row.
   const [local, setLocal] = useState<Prefs | null>(null);
   const prefs = local ?? (q.data ? normalizePrefs(q.data.prefs) : DEFAULT_PREFS);
   const [saveErr, setSaveErr] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export default function NotificationsScreen() {
       setLocal(normalizePrefs(r.prefs));
     } catch {
       setLocal(before);
-      setSaveErr("Couldn't save — try again");
+      setSaveErr("Couldn't save: try again");
     }
   }
 
@@ -103,7 +103,7 @@ export default function NotificationsScreen() {
       ))}
 
       <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
-        Sales and messages are on by default. Everything else you opt into — a phone that buzzes for
+        Sales and messages are on by default. Everything else you opt into. A phone that buzzes for
         nothing gets silenced.
       </Text>
     </SellerScreen>

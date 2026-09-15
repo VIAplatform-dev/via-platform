@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 // ───────────────────────────────────────────────────────────────────────────
 // Vestiaire Collective payload for the browser extension.
 //
-// Same contract as the Depop payload — given a VYA item id, return the fields already mapped onto
+// Same contract as the Depop payload. Given a VYA item id, return the fields already mapped onto
 // what Vestiaire's form expects, so the extension only types. The mapping lives here rather than in
 // the extension because Vestiaire's vocabularies are business logic that should version with the
 // app, not sit frozen in something the seller has to reinstall.
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
  //
  // Not just eligibility any more: their manual flow gates each of five steps, so a piece with one
  // photo or no material can't be finished either. Everything that would stop her is returned at
- // once — finding out one problem per attempt is its own kind of awful.
+ // once: finding out one problem per attempt is its own kind of awful.
  const check = vestiaireReadiness({
   title: item.title, brand: item.brand, category: item.category, condition: item.condition,
   material: (item as { material?: string | null }).material ?? null,
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
   ok: true,
   item: {
    itemId,
-   // Vestiaire's title box is short — 50, from PLATFORMS — so trim on a word rather than mid-word.
+   // Vestiaire's title box is short, 50, from PLATFORMS, so trim on a word rather than mid-word.
    title: vestiaireTitle(item.title, 50),
    description: content.body,
    price: String(Math.round(item.priceCents / 100)),
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
    subcategory,
    condition: vestiaireCondition(item.condition),
    colour: vestiaireColour(item.title, item.description, (item as { colour?: string | null }).colour ?? null),
-   // Required by Vestiaire, and deliberately blank when nothing names it — the extension surfaces
+   // Required by Vestiaire, and deliberately blank when nothing names it. The extension surfaces
    // that as one field for the seller rather than posting a guessed fibre.
    material,
    materialMissing: material === "",
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
    // in the extension so they're testable and the same on every marketplace path.
    pattern: vestiairePattern(item.title, item.description, (item as { colour?: string | null }).colour ?? null),
    length: vestiaireLength(item.category, item.title, item.description),
-   // Whether this KIND of piece is even asked for a length — so the extension can tell "we don't
+   // Whether this KIND of piece is even asked for a length, so the extension can tell "we don't
    // know it" apart from "it doesn't have one". A bag needs no length; a dress does.
    needsLength: /dress|skirt|gown/i.test(String(item.category || "")),
    sizeSystem: vestiaireSize(item.size).system,

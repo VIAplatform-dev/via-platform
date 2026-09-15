@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 //   • it becomes able to promise "duties covered". Duty is invoiced by the courier WEEKS after the
 //     label, in an amount nobody knew at purchase, so VYA will not carry it for a third party (see
 //     resolveDutyMode). On the store's own account the courier bills the store and VYA is never in
-//     the middle — so DDP is unlocked by connecting an account, not by ticking a box.
+//     the middle, so DDP is unlocked by connecting an account, not by ticking a box.
 //
 // The credentials go straight to EasyPost and are NEVER stored here. All VYA keeps is the returned
 // carrier-account id, which is a reference, not a secret.
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
  });
 }
 
-/** POST { type, credentials } — hand them to EasyPost, keep only the id it gives back. */
+/** POST { type, credentials }: hand them to EasyPost, keep only the id it gives back. */
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -90,15 +90,15 @@ export async function POST(request: NextRequest) {
     Authorization: `Basic ${Buffer.from(`${key}:`).toString("base64")}`,
     "Content-Type": "application/json",
    },
-   body: JSON.stringify({ carrier_account: { type: carrier.type, description: `VYA — ${slug}`, credentials } }),
+   body: JSON.stringify({ carrier_account: { type: carrier.type, description: `VYA: ${slug}`, credentials } }),
   });
  } catch {
-  return NextResponse.json({ error: "Couldn’t reach the courier — try again." }, { status: 502 });
+  return NextResponse.json({ error: "Couldn’t reach the courier. Try again." }, { status: 502 });
  }
 
  const data = (await res.json().catch(() => null)) as { id?: string; error?: { message?: string } } | null;
  if (!res.ok || !data?.id) {
-  // EasyPost's own words are more useful than ours here — it names the field the courier rejected.
+  // EasyPost's own words are more useful than ours here. It names the field the courier rejected.
   const detail = data?.error?.message;
   return NextResponse.json({ error: detail ? `The courier rejected that: ${detail}` : "The courier rejected those details. Check the account number and try again." }, { status: 400 });
  }

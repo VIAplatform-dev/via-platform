@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { inferBrandFromTitle, normalizeCategory } from "./market-data-db";
 import { PRIVACY } from "./data-layer/config";
 
-// Brand Heat Index — a cross-store brand-momentum ranking (the Lyst-Index / StockX
+// Brand Heat Index: a cross-store brand-momentum ranking (the Lyst-Index / StockX
 // Current-Culture-Index model). Aggregates VYA's demand signals across ALL stores
 // for a period, compares to the prior period, and ranks brands by "heat" with
 // momentum and rank movement. This is the headline, monetizable data product:
@@ -14,10 +14,10 @@ function db() {
  return neon(url);
 }
 
-// Signal weights — purchases/sales and favorites are stronger intent than a view.
+// Signal weights. Purchases/sales and favorites are stronger intent than a view.
 const W = { view: 1, favorite: 3, search: 2, sold: 5 };
 
-// Don't report a momentum % off a tiny prior-period base — it produces misleading
+// Don't report a momentum % off a tiny prior-period base. It produces misleading
 // swings (e.g. +5600% from a base of 1). Below this, the brand is flagged "new"
 // (isBreakout) instead of given a percentage.
 const MIN_PRIOR_HEAT_FOR_MOMENTUM = 25;
@@ -29,7 +29,7 @@ export type BrandHeat = {
  rankDelta: number | null; // + = climbing
  heat: number; // weighted demand score, current period
  momentumPct: number | null; // % change vs prior period (null if prior base too small)
- isBreakout: boolean; // little/no prior signal — rising from a small base
+ isBreakout: boolean; // little/no prior signal: rising from a small base
  views: number;
  favorites: number;
  searches: number;
@@ -44,7 +44,7 @@ export type BrandHeatIndex = {
 };
 
 // A brand's live demand trend on VYA, for the pricing engine. The Heat Index is a
-// cross-store aggregate that's expensive to compute, so cache it for an hour — the
+// cross-store aggregate that's expensive to compute, so cache it for an hour. The
 // intake path hits this per listing.
 export type BrandTrend = { brand: string; rank: number; momentumPct: number | null; trending: boolean; note: string };
 let _heatCache: { at: number; index: BrandHeatIndex } | null = null;
@@ -85,7 +85,7 @@ export async function getBrandHeatIndex(periodDays = 30, limit = 50): Promise<Br
  };
 
  // 1. Views + favorites per product, split current vs prior period.
- // Track distinct stores per brand so we can enforce the N≥5 privacy floor — a brand
+ // Track distinct stores per brand so we can enforce the N≥5 privacy floor. A brand
  // carried by fewer than PRIVACY.minStores stores would leak an individual store's numbers.
  const brandStores = new Map<string, Set<string>>();
  const eng = (await sql`
@@ -128,11 +128,11 @@ export async function getBrandHeatIndex(periodDays = 30, limit = 50): Promise<Br
  }
 
  // 3. Real sales + GMV per brand from CONVERSIONS (actual tracked orders). We read
- // each order's line items and infer the brand from the product name — far better
+ // each order's line items and infer the brand from the product name. Far better
  // coverage than the via_click_id→product join (whose click product_ids rarely
  // match current products). Items named generically ("Item via Shopify Collabs",
  // from the Collabs revenue sync) carry no brand, so they count toward store GMV
- // but not brand GMV. (sold_items is a near-empty sync artifact — not used.)
+ // but not brand GMV. (sold_items is a near-empty sync artifact, not used.)
  const sold = (await sql`
  SELECT item->>'productName' AS pname, (item->>'price')::numeric AS price,
   COALESCE((item->>'quantity')::int, 1) AS qty, c.timestamp AS ts
@@ -195,7 +195,7 @@ export async function getBrandHeatIndex(periodDays = 30, limit = 50): Promise<Br
  return { generatedAt: new Date().toISOString(), periodDays, brands };
 }
 
-// ── Category & Store heat — same momentum model, grouped differently ──
+// ── Category & Store heat. Same momentum model, grouped differently ──
 export type GroupHeat = {
  key: string;
  rank: number;
@@ -263,7 +263,7 @@ async function groupEngagement(periodDays: number, field: "category" | "store"):
  const g = get(key);
  g.vC += r.v_cur; g.vP += r.v_prior; g.fC += r.f_cur; g.fP += r.f_prior;
  }
- // PRIVACY FLOOR on seller-facing CATEGORY buckets — drop any category carried by fewer than
+ // PRIVACY FLOOR on seller-facing CATEGORY buckets. Drop any category carried by fewer than
  // minStores stores so it can't expose one store. Store buckets are admin-only, so not gated.
  if (field === "category") {
  for (const [k] of map) if ((groupStores.get(k)?.size ?? 0) < PRIVACY.minStores) map.delete(k);

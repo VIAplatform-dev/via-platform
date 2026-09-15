@@ -67,7 +67,7 @@ export default function CustomersPage() {
  type Filter = "all" | "buyers" | "imported";
  const pathname = usePathname();
  const [filter, setFilter] = useState<Filter>(pathname.endsWith("/buyers") ? "buyers" : "all");
- // Tag (any of), spent over, bought in a category — the same filter the campaign sender runs, so
+ // Tag (any of), spent over, bought in a category. The same filter the campaign sender runs, so
  // what this page counts is what an email reaches. ?tag=a,b&spentOver=50&category=bags deep-links.
  const [audience, setAudience] = useState<AudienceFilter>({ tags: [], spentOverCents: null, category: null });
  const [spentOverText, setSpentOverText] = useState("");
@@ -101,7 +101,7 @@ export default function CustomersPage() {
  const f = e.target.files?.[0];
  if (!f) return;
  const text = await f.text();
- // An Excel workbook read as text is zip bytes — the parser would report "no email addresses"
+ // An Excel workbook read as text is zip bytes. The parser would report "no email addresses"
  // and the seller would blame her list. Name the real problem and the way out instead.
  const refusal = customerFileRefusal({ name: f.name, text });
  if (refusal) { setErr(refusal); setFileName(null); setCsv(""); e.target.value = ""; return; }
@@ -149,7 +149,7 @@ export default function CustomersPage() {
  }
 
  function exportCsv() {
- // Her tags and her note travel with the list — the memory is the point of the export.
+ // Her tags and her note travel with the list. The memory is the point of the export.
  const head = "email,name,phone,location,orders,amount_spent,subscribed,source,tags,notes";
  const lines = customers.map((c) =>
  [c.email, c.name || "", c.phone || "", c.location || "", c.orders, (c.spentCents / 100).toFixed(2), c.subscribed ? "subscribed" : "unsubscribed", c.source, (c.tags || []).join(" | "), c.notes || ""].map(csvCell).join(","),
@@ -180,7 +180,7 @@ export default function CustomersPage() {
  }
  />
 
- {/* Import panel — toggled from the header. */}
+ {/* Import panel: toggled from the header. */}
  {showImport && (
  <TechCard className="mb-6 p-6">
  {result ? (
@@ -194,7 +194,7 @@ export default function CustomersPage() {
  ) : (
  <>
  <p className="mb-2 text-[13px] font-medium text-stone-700">Bring your audience with you</p>
- <p className="mb-4 text-[13px] text-stone-500">Upload a CSV export from Shopify, Square, Mailchimp, or any list of emails. We skip anything that isn’t an email and never add duplicates.</p>
+ <p className="mb-4 text-[13px] text-stone-500">Upload a CSV from Shopify, Square, Mailchimp or any list of emails. Duplicates and non-emails are skipped.</p>
  <p className="mb-2 text-[12px] font-medium text-stone-600">CSV file <span className="font-normal text-stone-400">({CUSTOMER_FILE_TYPES_LABEL}). From Excel or Numbers, use File › Save as › CSV first.</span></p>
  <input type="file" accept={CUSTOMER_FILE_TYPES.join(",")} onChange={onFile} className="block w-full text-[13px] text-stone-500 file:mr-3 file:rounded-md file:border file:border-stone-300 file:bg-white file:px-4 file:py-2 file:text-[13px] file:font-medium file:text-stone-700 hover:file:bg-stone-50" />
  <p className="my-4 text-center text-[11px] uppercase tracking-[0.16em] text-stone-300">or paste it</p>
@@ -334,7 +334,7 @@ export default function CustomersPage() {
  ? <StatusPill tone="live" dot>Subscribed</StatusPill>
  : <StatusPill tone="neutral">Not subscribed</StatusPill>}
  </TD>
- <TD className="hidden px-5 text-stone-500 md:table-cell">{c.location || "—"}</TD>
+ <TD className="hidden px-5 text-stone-500 md:table-cell">{c.location || "-"}</TD>
  <TD right className="px-5 text-stone-600">{c.orders}</TD>
  <TD right className="px-5 text-stone-900">{money(c.spentCents)}</TD>
  </tr>

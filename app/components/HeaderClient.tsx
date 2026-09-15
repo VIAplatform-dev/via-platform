@@ -75,7 +75,7 @@ export default function HeaderClient({
  return () => window.removeEventListener("scroll", onScroll);
  }, [isHome]);
  // Transparent (white text) only over the hero. When a nav drawer is open, the white drawer
- // slides over the header — so drop to the solid state (maroon text) or the white nav labels
+ // slides over the header, so drop to the solid state (maroon text) or the white nav labels
  // would sit on the white panel and vanish.
  const transparent = isHome && !scrolled && activeNavDrawer === null;
  const navItemClass = `text-[14px] tracking-[0.02em] transition-colors duration-200 whitespace-nowrap ${transparent ? "text-[#FFFDF8] hover:text-[#FFFDF8]/60" : "text-[#5D0F17] hover:text-[#5D0F17]/50"}`;
@@ -88,7 +88,7 @@ export default function HeaderClient({
 
  // Escape closes whatever is open. There WAS an Escape handler, but it lived inside the search
  // effect behind `if (activeDrawer !== "search") return`, so it only ever fired for the search
- // drawer — the mobile menu, the cart and the account panels trapped a keyboard user with no way
+ // drawer: the mobile menu, the cart and the account panels trapped a keyboard user with no way
  // out but the mouse. Registered once, for all of them.
  useEffect(() => {
  if (!mobileMenuOpen && activeDrawer === null) return;
@@ -144,7 +144,7 @@ export default function HeaderClient({
  };
 
  // Every keystroke starts a request, and they do NOT come back in order. Typing "bag"
- // fires "b" (which the API answers with nothing — it needs 2 characters), then "ba",
+ // fires "b" (which the API answers with nothing. It needs 2 characters), then "ba",
  // then "bag"; whichever settles LAST used to win, so a late "b" would wipe good results
  // and the drawer said "No results found" for a query that had hundreds. The sequence
  // number makes a response that is no longer the newest request a no-op.
@@ -233,11 +233,11 @@ export default function HeaderClient({
  >
  {/* px-4/gap-3 below `sm`: at 320px the logo (78) + gap (24) + the four 44px icon buttons (200)
   came to 302 inside a 272px content box, so the row ran 30px past the viewport and the hamburger
-  was sliced in half — invisible in testing only because <body> clips overflow-x. The chrome gives
+  was sliced in half. Invisible in testing only because <body> clips overflow-x. The chrome gives
   up the space, never the tap targets. */}
  <div className="max-w-7xl mx-auto px-4 sm:px-6 h-full flex items-center gap-3 sm:gap-6 relative">
 
- {/* Logo — always left on all screen sizes */}
+ {/* Logo: always left on all screen sizes */}
  <Link href="/" onClick={() => setMobileMenuOpen(false)} className="flex-shrink-0 flex items-start gap-1.5">
  <svg
  viewBox="0 0 228 132"
@@ -279,7 +279,7 @@ export default function HeaderClient({
  {/* Right actions */}
  <div className="flex items-center gap-0.5 sm:gap-2 ml-auto">
 
- {/* Inline search — desktop */}
+ {/* Inline search: desktop */}
  <button
  aria-label="Search"
  onClick={() => setActiveDrawer("search")}
@@ -290,7 +290,7 @@ export default function HeaderClient({
  <span className={`border-b border-transparent transition-colors duration-200 ${transparent ? "group-hover:border-[#FFFDF8]/40" : "group-hover:border-[#5D0F17]/40"}`}>Search</span>
  </button>
 
- {/* Search icon — mobile */}
+ {/* Search icon: mobile */}
  <button
  aria-label="Search"
  onClick={() => setActiveDrawer("search")}
@@ -313,7 +313,7 @@ export default function HeaderClient({
  )}
  </button>
 
- {/* Sign In / Account — desktop */}
+ {/* Sign In / Account. Desktop */}
  <button
  aria-label={session ? "Account" : "Sign in"}
  onClick={() => setActiveDrawer("account")}
@@ -327,11 +327,11 @@ export default function HeaderClient({
  {pendingCount > 0 && <span className="w-1.5 h-1.5 bg-[#5D0F17] rounded-full flex-shrink-0" />}
  </button>
 
- {/* Account icon — mobile */}
+ {/* Account icon: mobile */}
  <Link
  href={session ? "/account" : "/login"}
  // Icon-only, so it needs its own name: the desktop twin has one, this one didn't, and it is on
- // every page — a screen reader announced the header's last control as just "link".
+ // every page: a screen reader announced the header's last control as just "link".
  aria-label={session ? "Account" : "Sign in"}
  className={`md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors duration-300 ${icon}`}
  >
@@ -464,7 +464,7 @@ export default function HeaderClient({
  </nav>
  </div>
 
- {/* ── Desktop hover Nav Drawer — slides in from the RIGHT, full-height takeover ──
+ {/* ── Desktop hover Nav Drawer. Slides in from the RIGHT, full-height takeover ──
       It follows its trigger. The nav labels moved to the right of the bar, and a panel that
       still flew in from the far side of a wide screen read as a different, unrelated thing
       opening. The search and cart drawers were already right-anchored; this is now the same. ── */}

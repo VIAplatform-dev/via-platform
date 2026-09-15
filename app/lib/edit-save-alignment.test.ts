@@ -5,7 +5,7 @@ import { applyEdits, applyEditsWithReport, extractChromeEdits, injectLiveGrids, 
 
 // "Element #N" has to mean the same thing in the editor and in the save. The editor used to number the
 // page AFTER the cleanup pass and the live product grids had changed it, while the save numbered the
-// stored page — so on a real store (tesselizabethvintage) 228 of 255 pieces of text pointed at
+// stored page, so on a real store (tesselizabethvintage) 228 of 255 pieces of text pointed at
 // something else, and typing into a heading wrote into a product title or into nothing at all.
 
 const card = (h: string, t: string, p: string) => `<li class="card"><a href="/products/${h}"><img src="${h}.jpg"><span class="card__title">${t}</span><span class="price">${p}</span></a></li>`;
@@ -66,7 +66,7 @@ test("a text edit whose old text is nowhere on the page writes nothing, and says
 
 test("old text that appears twice is not guessed at", () => {
  const stored = page().replace("<p>We source by hand.</p>", "<p>Shop</p>");
- // Aimed at "New in" (1), which doesn't hold "Shop" — and "Shop" is both the header link and the paragraph.
+ // Aimed at "New in" (1), which doesn't hold "Shop", and "Shop" is both the header link and the paragraph.
  const r = applyEditsWithReport(stored, { edits: [{ eid: 1, text: "Our story", was: "Shop" }] });
  const $ = cheerio.load(r.html);
  assert.equal($("header a").text(), "Shop");

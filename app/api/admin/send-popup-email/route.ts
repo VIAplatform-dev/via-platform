@@ -206,9 +206,9 @@ async function getUnsentEmails(campaign: string): Promise<string[]> {
 /**
  * POST /api/admin/send-popup-email
  *
- * { testEmail: "you@example.com" } — test send only, not tracked
- * { send: true } — sends only to people who haven't received this campaign yet
- * { preview: true } — returns counts without sending
+ * { testEmail: "you@example.com" }: test send only, not tracked
+ * { send: true }: sends only to people who haven't received this campaign yet
+ * { preview: true }: returns counts without sending
  */
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) {
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
  );
  }
 
- // Test send — not tracked so it won't block the real send later
+ // Test send, not tracked so it won't block the real send later
  if (testEmail) {
  const { sent, failed } = await sendPopupThankYouEmail([testEmail]);
  return NextResponse.json({ success: true, test: true, testEmail, sent, failed });
@@ -248,14 +248,14 @@ export async function POST(request: NextRequest) {
  });
  }
 
- // Real send — only to people who haven't received this campaign
+ // Real send, only to people who haven't received this campaign
  if (unsent.length === 0) {
  return NextResponse.json({ success: true, message: "Everyone has already been sent this email.", sent: 0 });
  }
 
  const { sent, failed } = await sendPopupThankYouEmail(unsent);
 
- // Mark successfully sent emails (approximate — mark all unsent since we don't get per-email status back)
+ // Mark successfully sent emails (approximate: mark all unsent since we don't get per-email status back)
  await markEmailsAsSent(CAMPAIGN, unsent);
 
  return NextResponse.json({ success: true, campaign: CAMPAIGN, toSend: unsent.length, sent, failed });

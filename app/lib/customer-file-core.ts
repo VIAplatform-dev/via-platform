@@ -1,6 +1,6 @@
 // What the customer importer can actually read, and the message when it's handed something else.
 //
-// The panel used to say "we read any format" while the parser only ever read text — an Excel
+// The panel used to say "we read any format" while the parser only ever read text. An Excel
 // workbook picked through "All files" (or dropped in) turned into "Couldn't find any email
 // addresses", which blamed the list instead of the file type. Gianna's review: "if only a csv is
 // allowed for upload, let's make sure that's clear." So one place says which types, the panel and

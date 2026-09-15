@@ -1,18 +1,18 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — single source of configuration.
+// Data Layer: single source of configuration.
 //
 // Everything tunable about the B2B sourcing-intelligence product lives here:
 // the privacy guardrail, the era buckets (seed for the era_buckets reference
 // table), and the condition taxonomy. Pricing tiers + feature→tier mapping will
 // be ADDED to this same file in Task 6. Never hardcode any of these values
-// elsewhere — import from here (or, for eras, read the reference table that is
+// elsewhere: import from here (or, for eras, read the reference table that is
 // seeded from here so buckets can be retuned without a code deploy).
 // ───────────────────────────────────────────────────────────────────────────
 
 // ── Privacy guardrail (Task 7) ──
 // A metric may never be shown to sellers unless it aggregates at least this many
 // distinct stores AND this many transactions/events. Sellers see market-level
-// signal only — never another individual store's numbers.
+// signal only, never another individual store's numbers.
 export const PRIVACY = {
  minStores: 5,
  minTransactions: 5,
@@ -32,7 +32,7 @@ export const DEMAND_WEIGHTS = {
 // fraction either way (±10%). Outside the band → rising / falling.
 export const TREND_FLAT_BAND = 0.1;
 
-// Trajectory bands — leading intent (saves+clicks) vs lagging sales (orders) growth.
+// Trajectory bands. Leading intent (saves+clicks) vs lagging sales (orders) growth.
 // `accel`: leading growth ≥ +15% AND ≥15pts above sales growth → "accelerating".
 // `cool`: both leading and sales below −10% → "cooling".
 export const TRAJECTORY_BANDS = { accel: 0.15, cool: -0.1 } as const;
@@ -56,7 +56,7 @@ export const SOURCING = {
 
 // ── External comps blend (eBay) ──
 // Thresholds for folding eBay signal into the verdict when VYA data is thin.
-// Placeholders to CALIBRATE once real comps flow — kept here so tuning is a
+// Placeholders to CALIBRATE once real comps flow. Kept here so tuning is a
 // one-line change, never buried in logic.
 export const BLEND = {
  ebaySaturatedListings: 300, // active eBay listings ≥ this = heavily competed
@@ -87,7 +87,7 @@ export const ERA_BUCKETS_SEED: EraBucket[] = [
 
 // ── Condition taxonomy ──
 // Ordered best→worst. inferCondition returns one of these labels ONLY when the
-// seller's description states it clearly — otherwise null (never a guess).
+// seller's description states it clearly. Otherwise null (never a guess).
 export const CONDITIONS = [
  "Deadstock/NWT",
  "Excellent",
@@ -101,7 +101,7 @@ export type Condition = (typeof CONDITIONS)[number];
 // Resale comps are typically listed at "very good", so that's the baseline (1.0). The valuation
 // prices the piece at this standard condition; then we scale EXPLICITLY to the item's real grade,
 // so wear/newness moves the price transparently instead of the model self-discounting invisibly.
-// Tunable here — never hardcode a condition discount in the pricing logic.
+// Tunable here, never hardcode a condition discount in the pricing logic.
 export const CONDITION_REFERENCE: Condition = "Very Good";
 export const CONDITION_MULTIPLIERS: Record<Condition, number> = {
  "Deadstock/NWT": 1.1,
@@ -111,7 +111,7 @@ export const CONDITION_MULTIPLIERS: Record<Condition, number> = {
  "Fair": 0.9,
 };
 
-// Map a freeform condition string (seller-typed or AI) to a canonical grade — else null (no guess).
+// Map a freeform condition string (seller-typed or AI) to a canonical grade. Else null (no guess).
 // "very good" is checked before "good" so it wins; nothing recognizable → null (no adjustment).
 export function normalizeConditionGrade(text: string | null | undefined): Condition | null {
  const s = (text || "").toLowerCase().trim();
@@ -127,7 +127,7 @@ export function normalizeConditionGrade(text: string | null | undefined): Condit
 // ── Event-quality filters (events ETL) ──
 // Junk traffic inflates the Demand Index. The events ETL drops it BEFORE building
 // the unified log (the legacy capture tables are never touched). Every threshold
-// lives here — never hardcode in the ETL.
+// lives here, never hardcode in the ETL.
 export const EVENT_FILTERS = {
  // Automated traffic, matched as case-insensitive substrings of the captured
  // user-agent (only `clicks` stores a UA today, so this applies there).
@@ -141,7 +141,7 @@ export const EVENT_FILTERS = {
  "yandex", "baiduspider", "duckduckbot", "applebot", "google-inspectiontool",
  "vercel-screenshot",
  ],
- // Our own / test traffic — never consumer demand. Emails matched case-insensitively;
+ // Our own / test traffic, never consumer demand. Emails matched case-insensitively;
  // any address at an internal domain is excluded too. Seller accounts are excluded
  // separately by the ETL using the live storeContactEmails (single source of truth,
  // so it's not duplicated here).
@@ -150,7 +150,7 @@ export const EVENT_FILTERS = {
  "hana@vyaplatform.com",
  ],
  internalEmailDomains: ["vyaplatform.com"],
- // Burst guard — the SAME user hammering the SAME product with the SAME event
+ // Burst guard: the SAME user hammering the SAME product with the SAME event
  // type. Debounce rapid repeats, then cap per UTC day. Anonymous events (no
  // user id) can't be attributed and are left as-is.
  burst: {

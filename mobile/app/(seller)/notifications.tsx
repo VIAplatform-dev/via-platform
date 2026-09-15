@@ -9,7 +9,7 @@ import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Loading } from "../../components/seller/Form";
 import { needsYouRows, type AttentionRow } from "../../lib/seller/attention";
 
-// What is actually outstanding — not what she'd like to be told about.
+// What is actually outstanding, not what she'd like to be told about.
 //
 // This screen used to be the PREFERENCES: a list of push and email switches. That is a settings
 // page wearing a bell, and a seller who taps a bell expecting "what needs me" and gets a column of
@@ -17,7 +17,7 @@ import { needsYouRows, type AttentionRow } from "../../lib/seller/attention";
 // notification-settings.tsx, reached from Settings → Notifications, which is where she went looking
 // for them anyway.
 //
-// The feed is /api/store/attention — the same rows Home draws under "Needs you", except Home hides
+// The feed is /api/store/attention. The same rows Home draws under "Needs you", except Home hides
 // the two it already shows in more detail (holds by name, the payouts line) and this does not. Here
 // the whole list is the point.
 
@@ -29,7 +29,7 @@ export default function NotificationsScreen() {
     enabled: !!storeSlug,
   });
 
-  // Nothing is hidden here, unlike Home — this IS the list.
+  // Nothing is hidden here, unlike Home. This IS the list.
   const rows = needsYouRows(q.data?.rows ?? [], { holdsShown: false, payoutsShown: false });
   const urgent = rows.filter((r) => r.urgent);
   const rest = rows.filter((r) => !r.urgent);

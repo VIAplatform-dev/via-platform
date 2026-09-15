@@ -37,7 +37,7 @@ export async function saveEtsyTokens(storeSlug: string, t: { accessToken: string
  `.catch(() => {});
 }
 
-// Refresh rotates BOTH tokens on Etsy — save the new refresh token too.
+// Refresh rotates BOTH tokens on Etsy. Save the new refresh token too.
 export async function updateEtsyTokens(storeSlug: string, accessToken: string, refreshToken: string, expiresInSec: number): Promise<void> {
  await ensureTable();
  const expiresAt = new Date(Date.now() + (expiresInSec - 120) * 1000).toISOString();

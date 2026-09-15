@@ -8,12 +8,12 @@ import { colors, fonts, spacing } from "../lib/theme";
 // The seller's front door, reached from "Get started as a store" on the sign-in screen.
 //
 // WHY THIS EXISTS AS A SCREEN rather than opening the website immediately. Creating a store is a
-// long form — shipping, tax, policies, a domain — and it genuinely belongs on a desktop. But
+// long form, shipping, tax, policies, a domain, and it genuinely belongs on a desktop. But
 // sending someone straight from a sign-in screen into a browser gives them no idea what they are
 // signing up for, and it strands the people who ALREADY have a store and just want into the app.
 // So this screen does two jobs: it says what a VYA store gets, and it splits those two audiences.
 //
-// The claims below are the seller product as it actually exists in the web app today — camera
+// The claims below are the seller product as it actually exists in the web app today. Camera
 // listing with comparable-sales pricing, cross-listing to Depop/eBay/Vestiaire, Market Mode on
 // Stripe Connect, and Friday consignor payouts. Nothing here is aspirational; if a line stops
 // being true, delete it rather than softening it.
@@ -38,7 +38,7 @@ const CAPABILITIES: Capability[] = [
  {
   icon: "credit-card",
   title: "Take payment at a market",
-  body: "Market Mode turns the phone into a till — card or cash, straight into your own Stripe account.",
+  body: "Market Mode turns the phone into a till. Card or cash, straight into your own Stripe account.",
  },
  {
   icon: "users",
@@ -58,7 +58,7 @@ export default function BecomeAStoreScreen() {
 
  // NEITHER OF THESE OPENS A BROWSER ANY MORE.
  //
- // The workspace is in this app — that is the whole seller half of it — and creating a store is
+ // The workspace is in this app, that is the whole seller half of it, and creating a store is
  // now a screen here too. Sending someone to Safari left their session in Safari, so they came back
  // to an app that still didn't know who they were.
  const openWorkspace = () => router.push("/(seller)");
@@ -109,7 +109,7 @@ export default function BecomeAStoreScreen() {
      }}
     >
      Forty-five independent vintage and archive stores sell on VYA. You keep your own storefront,
-     your own customers and your own payment account — we handle everything around it.
+     your own customers and your own payment account. We handle everything around it.
     </Text>
 
     <View style={{ marginTop: spacing.xxl, gap: spacing.xl }}>
@@ -138,7 +138,7 @@ export default function BecomeAStoreScreen() {
 
     <View style={{ marginTop: spacing.xxl + spacing.md, gap: spacing.sm }}>
      {storeSlug ? (
-      // Already a store on this account — no pitch, just the way in.
+      // Already a store on this account, no pitch, just the way in.
       <Pressable
        onPress={openWorkspace}
        accessibilityRole="button"
@@ -156,7 +156,7 @@ export default function BecomeAStoreScreen() {
       // this did before: opening Safari (where the sign-in then stranded itself) or offering a
       // phone-sized version of a wizard that wants a catalogue, photographs and a bank account.
       //
-      // No button, because there is nothing here to press — the address is the instruction, and a
+      // No button, because there is nothing here to press. The address is the instruction, and a
       // seller reading this on her phone will do it later at a desk. Signing IN to a shop she
       // already has is on the sign-in screen and needs no laptop.
       <View style={{ backgroundColor: colors.bgCard, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: spacing.lg }}>
@@ -164,7 +164,7 @@ export default function BecomeAStoreScreen() {
         Setting up a shop is done on a computer.
        </Text>
        <Text style={{ fontSize: 14, color: colors.textMuted, lineHeight: 20, marginTop: spacing.xs }}>
-        Go to getvya.ai on a laptop — it takes about ten minutes, and you&apos;ll want your photographs
+        Go to getvya.ai on a laptop. It takes about ten minutes, and you&apos;ll want your photographs
         and bank details to hand. Once it&apos;s set up, sign in here and your shop is in your pocket.
        </Text>
       </View>
@@ -193,7 +193,7 @@ export default function BecomeAStoreScreen() {
       color: colors.textDim, textAlign: "center",
      }}
     >
-     Setting up takes about ten minutes on a computer — shipping, tax and your domain are easier
+     Setting up takes about ten minutes on a computer. Shipping, tax and your domain are easier
      with a keyboard. Everything after that lives here.
     </Text>
    </ScrollView>

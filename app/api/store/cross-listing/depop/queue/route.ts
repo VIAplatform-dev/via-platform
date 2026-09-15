@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // Queue an item for Depop from the cross-listing board.
 //
 // Depop is an extension-mode platform: the actual listing happens in the seller's own browser via the
-// Chrome extension. This endpoint just records intent — it flips the item's Depop row to "pending" so
+// Chrome extension. This endpoint just records intent. It flips the item's Depop row to "pending" so
 // the board shows "Depop: Queued". The page ALSO messages the extension (window.postMessage) to stage
 // the payload into the extension's queue; when the seller posts it on Depop, mark-listed flips this to
 // "listed". Marking pending here is idempotent and safe to re-call.

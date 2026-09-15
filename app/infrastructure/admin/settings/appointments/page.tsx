@@ -15,7 +15,7 @@ import { bookingEmbed } from "@/app/lib/appointments/embed-core";
 type Warning = "no-hours" | "deposit-without-payments" | "external-link-hides-diary";
 const WARNING_TEXT: Record<Warning, string> = {
  "no-hours": "You haven't set any opening hours, so there are no times for anyone to book.",
- "deposit-without-payments": "A deposit needs card payments switched on — finish Stripe setup in Payments, or set the deposit to zero.",
+ "deposit-without-payments": "A deposit needs card payments switched on. Finish Stripe setup in Payments, or set the deposit to zero.",
  "external-link-hides-diary": "You've set an external booking link, so your own opening hours below are ignored. Clear the link to use them.",
 };
 
@@ -41,13 +41,13 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 function Num({ value, onChange, suffix, width = "w-20" }: { value: number | string; onChange: (v: string) => void; suffix?: string; width?: string }) {
  // A BOX YOU CAN EMPTY.
  //
- // Every caller clamps on the way in — Math.max(1, …) for "how many at once", Math.max(5, …) for
+ // Every caller clamps on the way in. Math.max(1, …) for "how many at once", Math.max(5, …) for
  // the slot length. With the input fully controlled, that clamp ran on each keystroke, so pressing
  // backspace turned "" into the minimum and the box refilled itself instantly. The seller could see
  // the 1, could not delete the 1, and had no way to type a 2 except in front of it.
  //
  // While the box has focus it shows what she typed, empty included; the clamped value is what she
- // gets back the moment she leaves. The clamp still happens on every keystroke — it just isn't what
+ // gets back the moment she leaves. The clamp still happens on every keystroke. It just isn't what
  // is on screen while she is mid-edit.
  const [draft, setDraft] = useState<string | null>(null);
  return (
@@ -91,7 +91,7 @@ function TypeChips({ values, onChange }: { values: string[]; onChange: (v: strin
  };
  return (
   // The input used to take `flex-1`, so with a few chips it wrapped onto a line of its own and left
-  // an empty band under them — the box read as broken rather than as somewhere to type. It now sits
+  // an empty band under them. The box read as broken rather than as somewhere to type. It now sits
   // beside the chips at its own size, and says what it wants.
   <div className="flex w-72 max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-stone-200 p-1.5 focus-within:border-stone-400">
    {values.map((t) => (
@@ -119,7 +119,7 @@ function TypeChips({ values, onChange }: { values: string[]; onChange: (v: strin
 export default function AppointmentSettingsPage() {
  const [s, setS] = useState<AppointmentSettings | null>(null);
  const [warnings, setWarnings] = useState<Warning[]>([]);
- // Resolved server-side — a store's reply-to, or the address it overrode it with.
+ // Resolved server-side: a store's reply-to, or the address it overrode it with.
  const [notifyTo, setNotifyTo] = useState<string | null>(null);
  const [busy, setBusy] = useState(false);
  const [saved, setSaved] = useState(false);
@@ -227,7 +227,7 @@ export default function AppointmentSettingsPage() {
      </Row>
      {s.bookingUrl && !s.enabled && (
       <p className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] text-stone-600">
-       Appointments are off, so this link isn&rsquo;t live yet — turn them on above.
+       Appointments are off, so this link isn&rsquo;t live yet. Turn them on above.
       </p>
      )}
      {s.bookingUrl && (
@@ -277,7 +277,7 @@ export default function AppointmentSettingsPage() {
       </Row>
       <Row
        label="Gap after each one"
-       hint="Quiet time before the next appointment can start — for putting the rail back and steaming what was tried on. 0 books them back to back. The appointment itself stays the length above."
+       hint="Gap between appointments, on top of the length above. 0 books them back to back."
       >
        <Num value={s.bufferMinutes} onChange={(v) => set("bufferMinutes", Math.max(0, Math.round(Number(v) || 0)))} suffix="minutes" />
       </Row>
@@ -308,11 +308,11 @@ export default function AppointmentSettingsPage() {
       >
        <Toggle on={s.requireApproval} onClick={() => set("requireApproval", !s.requireApproval)} />
       </Row>
-      <Row label="Note shown above the times" hint="Anything they should know before coming — where to find you, what the buzzer says, whether to bring anything. Optional.">
+      <Row label="Note shown above the times" hint="Anything they should know before coming, where to find you, what the buzzer says, whether to bring anything. Optional.">
        <input
         value={s.intro ?? ""}
         onChange={(e) => set("intro", e.target.value || null)}
-        placeholder="Come and see the archive — 45 minutes, one on one."
+        placeholder="Come and see the archive. 45 minutes, one on one."
         className="w-72 max-w-full rounded-lg border border-stone-200 px-3 py-1.5 text-[13.5px] outline-none focus:border-stone-400"
        />
       </Row>
@@ -336,7 +336,7 @@ export default function AppointmentSettingsPage() {
       {s.depositCents > 0 && (
        <p className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] leading-relaxed text-stone-600">
         A slot isn&rsquo;t held until the deposit is paid, so an abandoned payment can&rsquo;t block your schedule.
-        {s.depositCredits && " Credit against a purchase is applied by you at checkout — it isn't automatic yet."}
+        {s.depositCredits && " Credit against a purchase is applied by you at checkout. It isn't automatic yet."}
        </p>
       )}
      </Card>
@@ -361,7 +361,7 @@ export default function AppointmentSettingsPage() {
       <p className="mt-3 rounded-xl bg-stone-50 px-4 py-3 text-[12.5px] leading-relaxed text-stone-600">
        Want to say more than that? Write your own in{" "}
        <a href="/infrastructure/admin/marketing/emails" className="underline underline-offset-2">Marketing &rsaquo; Your emails</a>
-       {" "}— there are triggers for a booking, a confirmation, a cancellation and this reminder, and you can
+       {" "}: there are triggers for a booking, a confirmation, a cancellation and this reminder, and you can
        use <code className="rounded bg-white px-1 py-0.5 text-[11.5px]">{"{{name}}"}</code>,{" "}
        <code className="rounded bg-white px-1 py-0.5 text-[11.5px]">{"{{when}}"}</code>,{" "}
        <code className="rounded bg-white px-1 py-0.5 text-[11.5px]">{"{{date}}"}</code>,{" "}

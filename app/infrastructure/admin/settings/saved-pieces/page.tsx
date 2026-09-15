@@ -5,7 +5,7 @@ import { Heart } from "lucide-react";
 import { AdminHeader, TechCard, StatusPill, Toggle, cn } from "../../ui";
 import { withStore } from "@/app/infrastructure/admin/market/ui";
 
-// Saved pieces — whether a shopper can keep a list on this store's own storefront.
+// Saved pieces. Whether a shopper can keep a list on this store's own storefront.
 //
 // A SWITCH AND NOT A DEFAULT. A heart says "come back for this", and on one-of-one vintage the shop
 // cannot always keep that promise: the piece a shopper saved on Tuesday may be somebody else's by
@@ -110,14 +110,14 @@ export default function SavedPiecesSettingsPage() {
     <TechCard className="p-5">
      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-400">What your shoppers get</p>
      <ul className="mt-3 flex flex-col gap-2 text-[13px] leading-relaxed text-stone-600">
-      <li>• They sign in to your shop to save — no password, just a link you email them.</li>
+      <li>• They sign in to your shop to save, no password, just a link you email them.</li>
       <li>• Browsing stays anonymous. Only saving asks who they are.</li>
       <li>• Their list is on every device they sign in on, not stuck in one browser.</li>
       <li>• A piece that sells stays on their list, marked sold, rather than quietly disappearing.</li>
-      <li>• They become your customer, not the marketplace's — the sign-in is to your shop alone.</li>
+      <li>• They become your customer, not the marketplace's. The sign-in is to your shop alone.</li>
      </ul>
      <p className="mt-4 max-w-[62ch] text-[12.5px] leading-relaxed text-stone-500">
-      You can see how many people have saved a piece on the piece itself, next to its views — and
+      You can see how many people have saved a piece on the piece itself, next to its views, and
       because they are signed in, those people are in your customer list.
      </p>
     </TechCard>

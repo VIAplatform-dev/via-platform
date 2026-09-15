@@ -4,7 +4,7 @@ import { getCart, saveCartLines, closeCart, type StoredCartLine } from "@/app/li
 
 export const dynamic = "force-dynamic";
 
-// GET — one cart, so a second device can pick up exactly where the first left off.
+// GET: one cart, so a second device can pick up exactly where the first left off.
 export async function GET(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
  return NextResponse.json({ cart });
 }
 
-// PATCH — replace this cart's lines. The client owns the whole list; last write wins.
+// PATCH: replace this cart's lines. The client owns the whole list; last write wins.
 export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
  return NextResponse.json({ cart });
 }
 
-// DELETE — the seller cleared this cart; keep the row for the record, just stop showing it.
+// DELETE: the seller cleared this cart; keep the row for the record, just stop showing it.
 export async function DELETE(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

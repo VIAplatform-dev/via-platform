@@ -16,7 +16,7 @@ test("a query matches title, brand and description", () => {
  assert.equal(hits[0].title, "Prada Sporty Kitten Heels", "the piece actually called Prada ranks above the one that mentions it");
 });
 
-test("every term must hit — a two-word search is not an OR", () => {
+test("every term must hit. A two-word search is not an OR", () => {
  assert.deepEqual(searchItems(ITEMS, "prada heels").map((i) => i.title), ["Prada Sporty Kitten Heels"]);
  assert.deepEqual(searchItems(ITEMS, "prada saddlebag"), [], "one unmatched term disqualifies the item");
 });
@@ -107,7 +107,7 @@ test("a single enormous term is bounded before it reaches a regex", () => {
  assert.deepEqual(searchItems(ITEMS, huge), []);
 });
 
-// Bag Crush's only <h1> is its logo, which must never be renamed — so the page had no heading at all.
+// Bag Crush's only <h1> is its logo, which must never be renamed, so the page had no heading at all.
 const LOGO_ONLY = `<html><head><title>All products – Bag Crush</title></head><body><div class="site-header"><h1 class="site-header__heading"><a href="/"><img src="logo.png" alt="Bag Crush"></a></h1></div><main><div class="grid"></div></main></body></html>`;
 
 test("a theme with no page heading to borrow gets one, and keeps its logo", () => {
@@ -131,7 +131,7 @@ test("the inserted heading is escaped", () => {
  assert.match(out, /&lt;img src=x onerror=1&gt;/);
 });
 
-test("a term never matches mid-word — the 'zz' / 'dazzling' bug", () => {
+test("a term never matches mid-word. The 'zz' / 'dazzling' bug", () => {
  // Real: searching "zz" on Vintage Archives LA returned a sold-out Prada heel whose description
  // says "dazzling", while the predictive drawer (title/brand only) correctly found nothing.
  const dazzling = [{ title: "Prada Burlap Canvas Snakeskin Heels", brand: "Prada", category: "shoes", description: "a dazzling pair" }];

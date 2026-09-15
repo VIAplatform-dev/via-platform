@@ -21,7 +21,7 @@ test("real crawlers are still excluded", () => {
  }
 });
 
-test("link unfurlers are excluded — they fetch the page, nobody looked at it", () => {
+test("link unfurlers are excluded. They fetch the page, nobody looked at it", () => {
  // Someone pasting the flyer URL into a chat makes these fire without a human ever arriving.
  for (const ua of ["WhatsApp/2.23", "TelegramBot (like TwitterBot)", "facebookexternalhit/1.1", "Slackbot-LinkExpanding"]) {
   assert.equal(isBotScanningAFlyer(ua), true, ua);

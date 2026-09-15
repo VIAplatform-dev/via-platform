@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 // Opt a store's eBay account into Business Policies + create default payment/shipping/return
 // policies (idempotent). This is what removes eBay's "User is not eligible for Business Policy"
-// wall — it runs automatically on connect, but this lets you trigger/re-run it and see the result.
+// wall: it runs automatically on connect, but this lets you trigger/re-run it and see the result.
 // Requires the account to have been connected under the `sell.account` write scope (reconnect if not).
 // GET|POST ?store=<slug>
 async function run(request: NextRequest) {

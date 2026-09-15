@@ -61,7 +61,7 @@ function FindInner() {
  setMatching("Comparing to your inventory…");
  const r = await api<MatchResp>("/api/store/market/match", { method: "POST", body: JSON.stringify({ image: dataUrl }) });
  setMatching(null);
- if (!r.ok) { setErr(r.data.error || "Match failed — search instead."); return; }
+ if (!r.ok) { setErr(r.data.error || "Match failed. Search instead."); return; }
  setMatch(r.data);
  }
 
@@ -83,7 +83,7 @@ function FindInner() {
 
  {err && <div className="mt-3"><Notice tone="danger">{err}</Notice></div>}
 
- {/* Photo result states — the seller always confirms on the next screen; nothing auto-selects. */}
+ {/* Photo result states. The seller always confirms on the next screen; nothing auto-selects. */}
  {match && !q.trim() && (
  <div className="mt-5 space-y-3">
 
@@ -153,7 +153,7 @@ function FindInner() {
  )}
 
  <div className="mt-5 space-y-2">
- {/* Nothing typed and no photo result — the whole rack is right here, no search needed. */}
+ {/* Nothing typed and no photo result. The whole rack is right here, no search needed. */}
  {!q.trim() && !match && (
  <>
  {all === null && <p className="text-center text-[13px] text-stone-400">Loading…</p>}

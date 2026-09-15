@@ -29,7 +29,7 @@ test("quotes are whole units, always rounded up", () => {
 });
 
 test("the floor carries cheap postage, where a percentage earns nothing", () => {
-  // 15% of $6.00 is 90c — less than the card fee on the same $6.
+  // 15% of $6.00 is 90c. Less than the card fee on the same $6.
   assert.equal(bindingRule(600), "floor");
   assert.ok(markupMarginCents(600) >= DEFAULT_MARKUP.minMarginCents);
   // On expensive postage the percentage takes over.

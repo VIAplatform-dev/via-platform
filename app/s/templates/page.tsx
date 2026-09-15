@@ -1,12 +1,12 @@
 /* eslint-disable @next/next/no-img-element */
 // ─────────────────────────────────────────────────────────────────────────────
-// Template gallery — every storefront template, every page, rendered through the
+// Template gallery: every storefront template, every page, rendered through the
 // REAL Blocks renderer at the template's real palette, type, corners and grid.
 //
 // No database: sample products stand in for a catalogue, so this shows the
 // LAYOUT decisions (which sections, in which variant, at what density) without
 // touching a store. That's the thing the studio's picker can't show and the
-// mockups can't keep in sync — this is generated from storefront-templates.ts,
+// mockups can't keep in sync. This is generated from storefront-templates.ts,
 // so it can never drift from what a seller actually gets.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { CSSProperties } from "react";
@@ -25,14 +25,14 @@ import type { Block } from "@/app/lib/storefront-blocks";
 
 export const dynamic = "force-dynamic";
 
-// Placeholder imagery. Served from ./img as a plain URL rather than a data: URI — several block
+// Placeholder imagery. Served from ./img as a plain URL rather than a data: URI: several block
 // types split their image list on commas as well as newlines (ITEM_SCHEMAS `loose`), and every data
 // URI contains a comma, so each one arrived as two broken fragments.
 const placeholder = (ink: string, bg: string, i: number) =>
  `/s/templates/img?ink=${ink.replace("#", "")}&bg=${bg.replace("#", "")}&i=${i}`;
 
-// Titles follow the formula the copy study found on every store worth copying — brand, era,
-// material, garment, size — because card anatomy is part of what's being reviewed: how a long title
+// Titles follow the formula the copy study found on every store worth copying. Brand, era,
+// material, garment, size, because card anatomy is part of what's being reviewed: how a long title
 // wraps at 5-up versus 2-up is a real difference between these templates.
 const TITLES = [
  "Christian Dior F/W 1998 Croc-Embossed Pump, US 8",
@@ -53,14 +53,14 @@ const PRICES = ["$460", "$2,000", "$650", "$510", "$4,000", "$425", "$590", "$1,
 const sampleProducts = (ink: string, bg: string): BlockProduct[] =>
  TITLES.map((title, i) => ({ key: String(i + 1), title, price: PRICES[i], image: placeholder(ink, bg, i) }));
 
-// Templates ship every image field EMPTY on purpose — a starter store must never arrive carrying
+// Templates ship every image field EMPTY on purpose. A starter store must never arrive carrying
 // stock photography a seller has to hunt down and delete. For a gallery that hides the composition,
 // so fill the blanks here and only here.
 //
 // Multi-image sections get FOUR photos, not eight. A seller fills a gallery with a considered set;
 // eight identical blanks stacked under six product blanks is what turned a lookbook section into
 // "rows of grey boxes" and made the whole page unreadable as a design.
-// Hero layouts that are BUILT around a photograph. The others — `stack` above all — are type-first
+// Hero layouts that are BUILT around a photograph. The others, `stack` above all. Are type-first
 // by design: Heirloom opens on words on paper and Vitrine on a single centred line, and both ship
 // with no hero image on purpose. Filling those in put a full-bleed photo directly above the
 // full-bleed image band that follows, which is why the top of the page read as two giant pictures
@@ -75,7 +75,7 @@ function withPlaceholders(blocks: Block[], ink: string, bg: string): Block[] {
   const skipHero = b.type === "hero" && !PHOTO_HEROES.has(b.variant || "");
   if ("image" in props && !props.image && !skipHero) props.image = next();
   // Six, not four. The galleries are three- and four-column grids, so four photos leave exactly one
- // stranded on its own row — which reads as a broken layout rather than a lookbook, especially when
+ // stranded on its own row, which reads as a broken layout rather than a lookbook, especially when
  // every tile is an identical grey blank. Six fills two clean rows of three, and fills the
  // four-column `loose` variant's row-spanning composition completely.
  if ("images" in props && !props.images) props.images = Array.from({ length: 6 }, next).join("\n");
@@ -83,7 +83,7 @@ function withPlaceholders(blocks: Block[], ink: string, bg: string): Block[] {
  });
 }
 
-// The same maps the live Shop page uses (app/s/StorefrontView.tsx) — kept identical so this preview
+// The same maps the live Shop page uses (app/s/StorefrontView.tsx): kept identical so this preview
 // shows the real density rather than an approximation of it.
 const SHOP_COLS: Record<number, string> = {
  2: "sm:grid-cols-2",
@@ -127,7 +127,7 @@ export default async function TemplateGallery({ searchParams }: Props) {
  );
 
  // The announcement block is a full-width strip the template puts above its own header, so it has to
- // render before the chrome rather than inside the page body — same as the live storefront.
+ // render before the chrome rather than inside the page body. Same as the live storefront.
  const strip = blocks.find((b) => b.type === "announcement");
  const body = blocks.filter((b) => b !== strip);
 

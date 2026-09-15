@@ -4,7 +4,7 @@ import { isShopifyOAuthConfigured, normalizeShop, signState, buildAuthUrl } from
 
 export const dynamic = "force-dynamic";
 
-// GET ?shop=… — kick off the one-click connect. The acting seller is identified
+// GET ?shop=… kick off the one-click connect. The acting seller is identified
 // from their VYA session and stamped into a signed `state`, so the callback knows
 // which VYA store to attach the connection to.
 export async function GET(request: NextRequest) {

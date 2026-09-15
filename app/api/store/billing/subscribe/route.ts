@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 // Start a subscription from the PHONE, with the card entered in Stripe's native sheet.
 //
-// The web starts one through Stripe Checkout, which is a hosted web page — fine in a browser, wrong
+// The web starts one through Stripe Checkout, which is a hosted web page. Fine in a browser, wrong
 // in an app. This route returns the pieces the mobile PaymentSheet needs instead, so the seller
 // types her card into a native sheet over VYA and never sees a web page.
 //
@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 // the card and there is a window where Stripe knows about a payment we cannot attribute.
 //
 // TRIAL VS NO TRIAL CHANGES WHICH SECRET COMES BACK. With a free trial the first invoice is zero, so
-// there is nothing to charge and Stripe hands back a SetupIntent — we are saving a card for later,
+// there is nothing to charge and Stripe hands back a SetupIntent. We are saving a card for later,
 // not taking money now. Without a trial there is a real invoice and a PaymentIntent. The phone has
 // to be told which one it is holding, because PaymentSheet refuses both at once.
 export async function POST(request: NextRequest) {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
  if (!priceId) return NextResponse.json({ error: `That plan isn’t priced yet. Set ${priceEnvName(tier, interval)} in Stripe.` }, { status: 503 });
 
  const plan = await getStorePlan(slug);
- // Refuse rather than stack a second subscription on the same store — changing plan is its own
+ // Refuse rather than stack a second subscription on the same store. Changing plan is its own
  // action (billing/manage), and two live subscriptions means two charges a month.
  if (plan.stripeSubscriptionId && plan.status && !["canceled", "incomplete_expired"].includes(plan.status)) {
  return NextResponse.json({ error: "This store already has a plan. Change it instead of starting a second one." }, { status: 409 });
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
  // Keep the card on file when the trial ends, or the subscription cancels itself on day 31.
  ...(TRIAL_DAYS > 0 ? { trial_settings: { end_behavior: { missing_payment_method: "cancel" } } } : {}),
  payment_settings: { save_default_payment_method: "on_subscription" },
- // The webhook reads exactly these (app/api/webhooks/stripe/route.ts) — same shape Checkout writes,
+ // The webhook reads exactly these (app/api/webhooks/stripe/route.ts). Same shape Checkout writes,
  // so a subscription started on the phone syncs through the identical path as one started on the web.
  metadata: { type: "store_subscription", store_slug: slug, tier, interval },
  expand: { 0: "latest_invoice.payment_intent", 1: "pending_setup_intent" },

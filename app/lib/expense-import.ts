@@ -1,18 +1,18 @@
 // Reading a seller's own costs spreadsheet.
 //
-// Every store already tracks this somewhere — a spreadsheet with a date, what it was, and what it
+// Every store already tracks this somewhere. A spreadsheet with a date, what it was, and what it
 // cost. Retyping a year of that into a form is the reason nobody fills in their costs, and without
 // costs the profit and loss statement is just revenue with a nice font.
 //
-// So: take the file as it is. This module is the whole of the reading, and it is pure — text in,
-// rows and problems out — so every awkward real-world case below is a unit test rather than
+// So: take the file as it is. This module is the whole of the reading, and it is pure. Text in,
+// rows and problems out, so every awkward real-world case below is a unit test rather than
 // something discovered on a seller's live data.
 //
 // WHAT MAKES THIS AWKWARD. Nobody's spreadsheet looks like anybody else's:
 //   • Excel writes ";" as the separator in European locales, and a UTF-8 BOM at the front.
 //   • Amounts arrive as "$1,234.56", "1.234,56", "(45.00)" for a negative, "45 USD", or "-".
 //   • Dates arrive as ISO, as 3/4/2026 (which is March or April depending on the country), or as
-//     45678 — Excel's own day-number, which is what you get when a date column is pasted as values.
+//     45678: Excel's own day-number, which is what you get when a date column is pasted as values.
 //   • There are total rows, blank rows, and a title row above the headers.
 // Guessing wrong here writes bad money into their books, so anything not understood becomes a
 // PROBLEM the seller sees before importing, never a silent zero.
@@ -30,7 +30,7 @@ export type ParsedExpense = {
  category: ExpenseCategory;
 };
 
-/** One row we could not use, and why — shown to the seller rather than dropped. */
+/** One row we could not use, and why. Shown to the seller rather than dropped. */
 export type ImportProblem = { row: number; reason: string; raw: string };
 
 export type ParseResult = {
@@ -100,7 +100,7 @@ export function sniffDelimiter(text: string): string {
  */
 export function parseAmount(raw: string): number | null {
  let s = String(raw ?? "").trim();
- if (!s || s === "-" || s === "—") return null;
+ if (!s || s === "-" || s === "-") return null;
  let negative = false;
  if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
  if (/^-/.test(s)) { negative = true; s = s.slice(1); }
@@ -131,7 +131,7 @@ const iso = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
  * A date cell to YYYY-MM-DD, or null.
  *
  * `preferDayFirst` decides 3/4/2026. It can't be inferred from one cell, so the caller looks at the
- * whole column first (see sniffDayFirst) — a column containing 13/02/2026 has settled the question
+ * whole column first (see sniffDayFirst): a column containing 13/02/2026 has settled the question
  * for every other row in it.
  */
 export function parseDate(raw: string, preferDayFirst = false): string | null {
@@ -139,7 +139,7 @@ export function parseDate(raw: string, preferDayFirst = false): string | null {
  if (!s) return null;
 
  // Excel serial day-number: what you get pasting a date column as values. Day 1 is 1900-01-01, and
- // Excel believes 1900 was a leap year, so everything from March 1900 is one day out — the standard
+ // Excel believes 1900 was a leap year, so everything from March 1900 is one day out. The standard
  // 25569-day offset to the Unix epoch already absorbs that.
  if (/^\d{5}(\.\d+)?$/.test(s)) {
   const serial = Math.floor(Number(s));
@@ -168,7 +168,7 @@ export function parseDate(raw: string, preferDayFirst = false): string | null {
   return valid(y, m, d) ? iso(y, m, d) : null;
  }
 
- // "12 Mar 2026", "March 12, 2026" — let the platform handle the month names.
+ // "12 Mar 2026", "March 12, 2026". Let the platform handle the month names.
  //
  // But NOT a bare number. Date.parse("99999") is the year 99999, so a reference or invoice number
  // sitting in the date column would import as a real date instead of being reported as a problem.
@@ -221,7 +221,7 @@ export function detectColumns(headers: readonly string[]): Partial<Record<Import
  return map;
 }
 
-/** Whether a row of cells reads as headers rather than data — used to find the real header row. */
+/** Whether a row of cells reads as headers rather than data. Used to find the real header row. */
 export function looksLikeHeader(cells: readonly string[]): boolean {
  const m = detectColumns(cells);
  return m.amount !== undefined && (m.date !== undefined || m.label !== undefined);
@@ -243,7 +243,7 @@ const CATEGORY_HINTS: [ExpenseCategory, RegExp][] = [
  * Best guess at a category from the seller's own words.
  *
  * An explicit category cell wins if it names one of ours; otherwise the description is read. Nothing
- * recognised falls to "other", which is honest — better a cost in the wrong bucket than not counted.
+ * recognised falls to "other", which is honest. Better a cost in the wrong bucket than not counted.
  */
 export function guessCategory(categoryCell: string, label: string): ExpenseCategory {
  const explicit = String(categoryCell ?? "").trim().toLowerCase();
@@ -264,7 +264,7 @@ const TOTAL_ROW = /^(total|totals|subtotal|sum|grand\s*total|balance)\b/i;
  * Read a whole file into expenses and problems.
  *
  * `override` lets the seller correct the column guesses in the preview and re-read without editing
- * her file — the mapping is the only thing the UI needs to change.
+ * her file: the mapping is the only thing the UI needs to change.
  */
 export function parseExpenseFile(text: string, override?: Partial<Record<ImportField, number>>): ParseResult {
  const rows = parseDelimited(text);
@@ -313,7 +313,7 @@ export function parseExpenseFile(text: string, override?: Partial<Record<ImportF
  return { headers, mapping, expenses, problems, skipped };
 }
 
-/** Anything that isn't a delimited text file — so the UI can say what to do instead of failing. */
+/** Anything that isn't a delimited text file, so the UI can say what to do instead of failing. */
 export function looksBinary(text: string): boolean {
  // .xlsx and .numbers are ZIPs ("PK\x03\x04"); .xls is an OLE2 compound file.
  return /^PK\x03\x04/.test(text) || /^\xD0\xCF\x11\xE0/.test(text) || text.slice(0, 2000).includes("\u0000");

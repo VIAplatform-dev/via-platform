@@ -37,7 +37,19 @@ export async function GET(request: NextRequest) {
  });
 }
 
-/** POST { email, role? } — invite someone into the workspace. */
+/**
+ * POST { email, role?, permissions? }: invite someone into the workspace.
+ *
+ * `permissions` IS SET BEFORE THE INVITE GOES OUT, not after. It used to be a two-step: add the
+ * person, which grants the default staff set and mails them a working sign-in link that instant,
+ * then reopen their row and take areas away. So for the window between the two, every new hire
+ * could open inventory, orders, the inbox and the customer list whether or not that was ever the
+ * intention, and the owner's actual decision arrived second. Sent here, the areas are written
+ * before the mail is.
+ *
+ * Absent (or an owner) means what it always did: null permissions, which reads as the default set.
+ * An empty array is a real answer, the owner ticked nothing, and is stored as such.
+ */
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -60,15 +72,21 @@ export async function POST(request: NextRequest) {
 
  await addStoreUser(slug, email, role);
 
+ // Before the mail. An owner has everything by definition, so a permissions list on one is a
+ // contradiction rather than a restriction. Dropped rather than half-applied.
+ if (role !== "owner" && Array.isArray(body?.permissions)) {
+  await setStoreUserPermissions(slug, email, normalisePermissions(body.permissions));
+ }
+
  // TELL THEM. This wrote a row and said nothing to anybody: access was real from that moment, but
- // the person only ever found out by happening to sign in with that exact address. Best-effort —
+ // the person only ever found out by happening to sign in with that exact address. Best-effort,
  // the seat is granted either way, and a mail provider having a bad minute must not undo that.
  const inviter = (await auth().catch(() => null))?.user?.email ?? null;
  const storeName = CURATED.find((st) => st.slug === slug)?.name || slug;
  void sendStoreInvite({
   email, storeName, role, invitedBy: inviter,
   // Addressed to the store, so the link lands them in the right shop even where they belong to more
-  // than one — see the membership check in storeAuth.resolveStoreSlug.
+  // than one: see the membership check in storeAuth.resolveStoreSlug.
   signInUrl: `${getBaseUrl()}/admin/home?store=${encodeURIComponent(slug)}`,
  }).catch(() => {});
 
@@ -76,7 +94,7 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ ok: true, users: after, seats: { used: after.length, limit: seatsForTier(tier), remaining: Math.max(0, seatsForTier(tier) - after.length) } });
 }
 
-/** DELETE ?email= — take someone out of the workspace. */
+/** DELETE ?email= take someone out of the workspace. */
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -91,7 +109,7 @@ export async function DELETE(request: NextRequest) {
 
  // Removing the last owner leaves a store nobody can administer, with no way back without support.
  if (target.role === "owner" && users.filter((u) => u.role === "owner").length <= 1) {
-  return NextResponse.json({ error: "This is the only owner — make someone else an owner first." }, { status: 400 });
+  return NextResponse.json({ error: "This is the only owner. Make someone else an owner first." }, { status: 400 });
  }
 
  await removeStoreUser(slug, email);
@@ -101,7 +119,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 /**
- * PATCH { email, permissions } — what one staff member can reach.
+ * PATCH { email, permissions }: what one staff member can reach.
  *
  * Owner-only, like every other change on this page. An owner's own permissions are not editable:
  * they have everything by definition, and a form that let you take an area off an owner would be

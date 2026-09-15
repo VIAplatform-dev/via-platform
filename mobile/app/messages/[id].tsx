@@ -58,7 +58,7 @@ export default function ConversationScreen() {
         contentContainerStyle={{ padding: spacing.lg }}
         ListEmptyComponent={
           <Text style={{ textAlign: "center", marginTop: spacing.xxl, fontFamily: fonts.serif, fontSize: 16, color: colors.textMuted }}>
-            Say hello — stores usually reply the same day.
+            Say hello: stores usually reply the same day.
           </Text>
         }
         renderItem={({ item }) => {

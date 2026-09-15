@@ -5,7 +5,7 @@ import { createItem, listAvailableItems } from "@/app/lib/db/inventory";
 import { parseItems } from "@/app/lib/parse-items";
 import { MAX_ITEM_IMAGES } from "@/app/lib/item-limits";
 
-// POST { csv, status? } — bulk-add inventory from a pasted/uploaded CSV. The on-ramp for
+// POST { csv, status? }: bulk-add inventory from a pasted/uploaded CSV. The on-ramp for
 // stores with no Shopify to connect. Accepts flexible exports (Shopify/Square/spreadsheet);
 // a row needs a title + price. Images (URLs in the file) are re-hosted to our storage.
 // Idempotent by title. Items land as drafts by default so the seller reviews before go-live.
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
  const parsed = parseItems(csv);
  if (!parsed.length) {
- return NextResponse.json({ error: "Couldn’t read any items — make sure your file has a header row with at least a title and price column." }, { status: 400 });
+ return NextResponse.json({ error: "Couldn’t read any items. Make sure your file has a header row with at least a title and price column." }, { status: 400 });
  }
 
  const seller = await getSellerBySlug(slug);

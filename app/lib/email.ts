@@ -35,7 +35,7 @@ function offerBtn(url: string, label: string): string {
 
 /**
  * Send a transactional email that reaches the store's OWN customer (offer updates, etc.) wearing the
- * store's brand — its accent, logo, fonts, and sender name/reply-to — not VYA's. Reuses the campaign
+ * store's brand, its accent, logo, fonts, and sender name/reply-to, not VYA's. Reuses the campaign
  * shell (with a custom CTA) so shoppers get a consistent look across marketing and transactional mail.
  * A subtle "Powered by VYA" line stays in the footer. Best-effort; never throws.
  */
@@ -64,7 +64,7 @@ export async function sendStoreBrandedTransactional(
 // Addresses that exist in the database but can never receive mail: the importer stamps a synthetic
 // `slug@imported.vya` on every store it pulls in, and test data leaves .local/.invalid behind. They
 // look like real addresses to every `if (email)` check, so a notification sent to one disappears
-// with no bounce and no error — the store simply never hears from us.
+// with no bounce and no error. The store simply never hears from us.
 const UNROUTABLE_DOMAIN = /@(?:[\w-]+\.)*(?:imported\.vya|invalid|localhost|local|test|example\.(?:com|org|net))$/i;
 
 /** The address if mail can actually reach it, else null. */
@@ -75,7 +75,7 @@ export function routableEmail(email: string | null | undefined): string | null {
 }
 
 /**
- * Where a store's OWN notifications land. One definition — store-contact.ts holds the order.
+ * Where a store's OWN notifications land. One definition: store-contact.ts holds the order.
  *
  * IT USED TO STOP AT THE HARDCODED MAP, which meant it only worked for the shops VYA onboarded by
  * hand. Every store that signed up for itself fell through to ops, so its offers and order alerts
@@ -95,7 +95,7 @@ export async function storeOwnerInbox(storeSlug: string): Promise<string> {
 /**
  * The store's own address, or null when it truly has none.
  *
- * For mail that is FOR the seller and meaningless to anyone else — a shopper's message, an offer.
+ * For mail that is FOR the seller and meaningless to anyone else. A shopper's message, an offer.
  * Sending those to ops doesn't help the seller and does put a buyer's words in VYA's inbox.
  */
 export async function storeContactOrNone(storeSlug: string): Promise<string | null> {
@@ -106,7 +106,7 @@ export async function storeContactOrNone(storeSlug: string): Promise<string | nu
 /**
  * A VYA-branded to-do alert to the store itself (a booking to approve, a piece to check in). Stays
  * VYA-branded on purpose: it's an internal prompt, not something a customer ever sees.
- * Best-effort — never throws, so a mail outage can't fail the thing that triggered it.
+ * Best-effort, never throws, so a mail outage can't fail the thing that triggered it.
  */
 export async function sendStoreOwnerAlert(
  storeSlug: string,
@@ -116,7 +116,7 @@ export async function sendStoreOwnerAlert(
   if (!process.env.RESEND_API_KEY) return false;
   await getResend().emails.send({
    from: FROM_EMAIL,
-   // `to` may be several addresses, comma-separated — a shop is rarely one person. Each is checked
+   // `to` may be several addresses, comma-separated. A shop is rarely one person. Each is checked
    // for routability on its own, so one placeholder address can't silence the alert for everyone.
    to: (() => {
     const many = String(opts.to || "").split(/[,;\s]+/).map((e) => routableEmail(e.trim())).filter(Boolean) as string[];
@@ -165,7 +165,7 @@ export async function sendOfferUpdateToStore(offer: Offer): Promise<void> {
  try {
  if (!process.env.RESEND_API_KEY) return;
  const item = offer.itemTitle || "your piece";
- const line = offer.status === "accepted" ? `accepted your counter — <b>${offerMoney(offer.amountCents)}</b>, it’s a deal`
+ const line = offer.status === "accepted" ? `accepted your counter: <b>${offerMoney(offer.amountCents)}</b>, it’s a deal`
  : offer.status === "pending" ? `countered at <b>${offerMoney(offer.amountCents)}</b>`
  : offer.status === "withdrawn" ? "withdrew their offer" : "passed on the deal";
  await getResend().emails.send({
@@ -179,7 +179,7 @@ export async function sendOfferUpdateToStore(offer: Offer): Promise<void> {
 
 /**
  * Notify a store that consignments reached their agreed end date. Internal owner alert (goes to the
- * store's contact inbox), so it stays VYA-branded/neutral like the other owner notifications — it's a
+ * store's contact inbox), so it stays VYA-branded/neutral like the other owner notifications. It's a
  * to-do prompt, not a customer email. Best-effort.
  */
 export async function sendConsignmentExpiryDigest(
@@ -205,7 +205,7 @@ export async function sendConsignmentExpiryDigest(
 }
 
 /**
- * Sourcing alert — email a store the sourcing opportunities that just entered the window: brands /
+ * Sourcing alert: email a store the sourcing opportunities that just entered the window: brands /
  * categories / eras where VYA buyers' demand is rising and few stores carry them. Internal owner
  * alert (VYA-branded/neutral), a nudge to open Market Insights. Best-effort; returns whether it sent.
  */
@@ -234,9 +234,9 @@ export async function sendSourcingAlert(
  from: FROM_EMAIL,
  to: await storeOwnerInbox(storeSlug),
  subject,
- html: `<p>New sourcing opportunities on VYA — where buyers' demand is rising and few stores carry it. Worth sourcing while the window's still open.</p>
+ html: `<p>Rising demand on VYA that few stores are carrying. Worth sourcing now.</p>
   <table style="border-collapse:collapse;width:100%;max-width:560px;margin:14px 0;">${rows}</table>
-  <p style="color:#a29b93;font-size:12px;line-height:1.5;">The number is a 0–100 sourcing-opportunity score. Aggregated across VYA's stores — never any single store's private numbers.</p>
+  <p style="color:#a29b93;font-size:12px;line-height:1.5;">The number is a 0–100 sourcing-opportunity score. Aggregated across VYA's stores, never any single store's private numbers.</p>
   <p>${offerBtn(`${BASE_URL}/infrastructure/admin/trends`, "Open Trends")}</p>`,
  });
  return true;
@@ -245,7 +245,7 @@ export async function sendSourcingAlert(
 
 /**
  * Notify the buyer that the store responded to their offer. This reaches the store's OWN customer, so
- * it's sent wearing the STORE's brand (accent/logo/fonts) and from the store's sender — not VYA's.
+ * it's sent wearing the STORE's brand (accent/logo/fonts) and from the store's sender, not VYA's.
  * Best-effort.
  */
 export async function sendOfferUpdateToBuyer(offer: Offer): Promise<void> {
@@ -256,7 +256,7 @@ export async function sendOfferUpdateToBuyer(offer: Offer): Promise<void> {
  let subject: string, body: string, cta: { label: string; url: string } | undefined;
  if (offer.status === "accepted") {
  subject = `Your offer on ${item} was accepted 🎉`;
- body = `The seller **accepted your offer** of **${offerMoney(offer.amountCents)}** on ${item}.\n\n${offer.binding ? "Complete your purchase at the agreed price." : "It's yours to grab — buy it now before someone else does."}`;
+ body = `The seller **accepted your offer** of **${offerMoney(offer.amountCents)}** on ${item}.\n\n${offer.binding ? "Complete your purchase at the agreed price." : "It's yours to grab. Buy it now before someone else does."}`;
  cta = { label: offer.binding ? "Complete purchase" : "Buy now", url: link };
  } else if (offer.status === "pending") {
  subject = `The seller countered your offer on ${item}`;
@@ -264,14 +264,14 @@ export async function sendOfferUpdateToBuyer(offer: Offer): Promise<void> {
  cta = { label: "View & respond", url: link };
  } else {
  subject = `Update on your offer for ${item}`;
- body = `The seller passed on your offer for ${item} this time — but it's still available at **${offerMoney(offer.listPriceCents)}** if you'd like it.`;
+ body = `The seller passed on your offer for ${item} this time, but it's still available at **${offerMoney(offer.listPriceCents)}** if you'd like it.`;
  cta = { label: "See the piece", url: link };
  }
  await sendStoreBrandedTransactional(offer.storeSlug, { to: offer.buyerEmail, subject, body, cta });
  } catch (e) { console.error("[offer] buyer notify failed", e); }
 }
 
-// The verified ADDRESS order emails are sent from. The display NAME varies — the
+// The verified ADDRESS order emails are sent from. The display NAME varies. The
 // buyer's confirmation shows the STORE's name so it reads as if from the store they
 // bought from. Set EMAIL_FROM (e.g. "<orders@theviaplatform.com>") once that domain
 // is verified; until then it falls back to the verified vyaplatform.com domain.
@@ -324,10 +324,10 @@ function viaShell(subtitle: string, content: string, unsubscribeUrl?: string, he
  const year = new Date().getFullYear();
  // Falls back to the unsubscribe PAGE, not /account. Seventeen of the twenty-three emails built
  // on this shell pass no URL, so their "Unsubscribe here" link led to an account page behind a
- // login — which for anyone who never made a password is not an unsubscribe at all. The page asks
+ // login, which for anyone who never made a password is not an unsubscribe at all. The page asks
  // for the address when the link doesn't carry one.
  const unsubUrl = unsubscribeUrl || `${BASE_URL}/unsubscribe`;
- // Top navigation — spaced-caps links to the main VYA sections, like a site header.
+ // Top navigation: spaced-caps links to the main VYA sections, like a site header.
  const navLink = (label: string, path: string) =>
  `<a href="${BASE_URL}${path}" style="font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:#5D0F17;text-decoration:none;font-family:Georgia,'Times New Roman',serif;">${label}</a>`;
  const navSep = `<span style="color:rgba(93,15,23,0.32);padding:0 9px;font-size:10px;">&middot;</span>`;
@@ -337,12 +337,12 @@ function viaShell(subtitle: string, content: string, unsubscribeUrl?: string, he
  navLink("Browse", "/browse"),
  navLink("Stores", "/stores"),
  ].join(navSep);
- // Full-width editorial hero (Revolve-style masthead photo) — only when supplied.
+ // Full-width editorial hero (Revolve-style masthead photo), only when supplied.
  const hero = heroImage
- ? `<a href="${BASE_URL}/new-arrivals" style="display:block;text-decoration:none;"><img src="${heroImage}" alt="VYA — New Arrivals" width="600" style="display:block;width:100%;height:auto;border:0;" border="0" /></a>`
+ ? `<a href="${BASE_URL}/new-arrivals" style="display:block;text-decoration:none;"><img src="${heroImage}" alt="VYA: New Arrivals" width="600" style="display:block;width:100%;height:auto;border:0;" border="0" /></a>`
  : "";
- // Section eyebrow (spaced caps) labels the email — e.g. "New Arrivals",
- // "Your Favorites" — so each email reads as a section of VYA.
+ // Section eyebrow (spaced caps) labels the email. E.g. "New Arrivals",
+ // "Your Favorites", so each email reads as a section of VYA.
  const eyebrow = subtitle
  ? `<div style="font-size:12px;letter-spacing:0.34em;text-transform:uppercase;color:#5D0F17;font-family:Georgia,'Times New Roman',serif;margin:0;">${subtitle}</div>`
  : "";
@@ -430,7 +430,7 @@ u + .body .email-inner { background-color: #FFFDF8 !important; }
 }
 
 /**
- * Insider Newsletter shell — cream background (#FFFDF8) with brand burgundy
+ * Insider Newsletter shell: cream background (#FFFDF8) with brand burgundy
  * text (#5D0F17). Uses VYA brand fonts: Playfair Display (headlines) +
  * Cormorant Garamond (body) via Google Fonts, with Georgia fallback.
  */
@@ -438,13 +438,13 @@ function insiderShell(content: string, unsubscribeUrl?: string): string {
  const year = new Date().getFullYear();
  // Falls back to the unsubscribe PAGE, not /account. Seventeen of the twenty-three emails built
  // on this shell pass no URL, so their "Unsubscribe here" link led to an account page behind a
- // login — which for anyone who never made a password is not an unsubscribe at all. The page asks
+ // login, which for anyone who never made a password is not an unsubscribe at all. The page asks
  // for the address when the link doesn't carry one.
  const unsubUrl = unsubscribeUrl || `${BASE_URL}/unsubscribe`;
  const BG = "#FFFDF8";
  const TEXT = "#5D0F17";
  const BODY_FONT = "'Cormorant Garamond', Georgia, 'Times New Roman', serif";
- // Note: table-based layout with bgcolor attrs on every cell is required —
+ // Note: table-based layout with bgcolor attrs on every cell is required,
  // Gmail strips CSS backgrounds, only honors bgcolor reliably.
  const html = `<!DOCTYPE html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml">
@@ -472,15 +472,15 @@ body, table, td { background-color: ${BG} !important; }
 </head>
 <body class="body" bgcolor="${BG}" style="margin:0;padding:0;background-color:${BG};font-family:${BODY_FONT};">
 
-<!-- 100% width outer table — forces cream all the way to the email-client edges -->
+<!-- 100% width outer table. Forces cream all the way to the email-client edges -->
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="${BG}" style="background-color:${BG};">
  <tr>
  <td bgcolor="${BG}" align="center" style="background-color:${BG};padding:48px 16px;">
 
- <!-- Constrained inner table — actual content column -->
+ <!-- Constrained inner table. Actual content column -->
  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" bgcolor="${BG}" style="background-color:${BG};max-width:560px;width:100%;">
 
- <!-- Header — cream to match body -->
+ <!-- Header: cream to match body -->
  <tr>
  <td bgcolor="${BG}" align="center" style="background-color:${BG} !important;padding:40px 24px 32px;">
   <img src="https://vyaplatform.com/vya-logo.png" alt="VYA" width="160"
@@ -540,7 +540,7 @@ function emailShell(content: string): string {
 <style>
 :root { color-scheme: light only; }
 ${baseStyles()}
-/* Force light mode — prevent Apple Mail / Outlook dark mode inversion */
+/* Force light mode: prevent Apple Mail / Outlook dark mode inversion */
 u + .body { background-color: #FFFDF8 !important; }
 u + .body .wrapper { background-color: #FFFDF8 !important; }
 [data-ogsc] body, [data-ogsc] .wrapper { background-color: #FFFDF8 !important; }
@@ -583,7 +583,7 @@ function formatEmailPrice(price: number | string, currency: string): string {
 
 /** Append UTM parameters to any VYA URL. When `recipient` is given, also embeds a
  * per-recipient `u=` token so a click from this email is attributable to the subscriber
- * (even logged out / guest checkout) — see app/lib/recipientToken.ts + /api/track. */
+ * (even logged out / guest checkout). See app/lib/recipientToken.ts + /api/track. */
 function withUtm(url: string, campaign: string, content?: string, recipient?: string | null): string {
  const sep = url.includes("?") ? "&" : "?";
  let out = `${url}${sep}utm_source=email&utm_medium=email&utm_campaign=${encodeURIComponent(campaign)}`;
@@ -603,31 +603,31 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Seller email campaign. Sends AS THE STORE — the from-name is the store and
- * replies route to the store's own email — but over VYA's verified domain (you
+ * Seller email campaign. Sends AS THE STORE. The from-name is the store and
+ * replies route to the store's own email, but over VYA's verified domain (you
  * can't send "from" a gmail/unverified domain without it being spam-filtered).
  * Links are UTM-tagged so the campaign shows up in the store's audience insights.
  */
-// A store's email brand — pulled from its storefront design so campaigns match the store automatically.
+// A store's email brand. Pulled from its storefront design so campaigns match the store automatically.
 export type EmailBrand = {
  accent: string; text: string; bg: string;
  headingFont?: string; bodyFont?: string; logo?: string | null;
  // Store-customizable extras (default to the classic look when unset):
- buttonLabel?: string; // CTA button text — "Shop now" when unset
- footerText?: string; // the small print under the email — a template with {store} when unset
- showAccentBar?: boolean; // the thin colour bar across the top — on when unset
- buttonStyle?: "rounded" | "pill" | "square"; // CTA corner style — "rounded" when unset
- headerAlign?: "center" | "left"; // logo/heading + button alignment — "center" when unset
- // The overall STRUCTURE, not just colours — a full-redesign lever, all deliverability-safe:
+ buttonLabel?: string; // CTA button text: "Shop now" when unset
+ footerText?: string; // the small print under the email. A template with {store} when unset
+ showAccentBar?: boolean; // the thin colour bar across the top, on when unset
+ buttonStyle?: "rounded" | "pill" | "square"; // CTA corner style: "rounded" when unset
+ headerAlign?: "center" | "left"; // logo/heading + button alignment. "center" when unset
+ // The overall STRUCTURE, not just colours. A full-redesign lever, all deliverability-safe:
  //   classic  = card on a soft grey, rounded, accent bar (the default)
- //   minimal  = flat full-bleed, no card/bar, a hairline under the header — airy & clean
+ //   minimal  = flat full-bleed, no card/bar, a hairline under the header. Airy & clean
  //   editorial= thin-bordered card, outlined button, a magazine frame
- //   bold     = the whole card is the accent colour, reversed light text — high-impact
+ //   bold     = the whole card is the accent colour, reversed light text. High-impact
  layout?: "classic" | "minimal" | "editorial" | "bold";
 };
 const DEFAULT_BRAND: EmailBrand = { accent: "#5D0F17", text: "#1c1917", bg: "#ffffff" };
 
-// Accept only known brand fields, coerced + clamped — never trust a raw client (or model) shape.
+// Accept only known brand fields, coerced + clamped, never trust a raw client (or model) shape.
 // Shared by the design API, the live preview, and the Sidekick's update_email_design tool.
 const BRAND_HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 function brandColor(v: unknown, fallback: string): string { return typeof v === "string" && BRAND_HEX.test(v.trim()) ? v.trim() : fallback; }
@@ -659,7 +659,7 @@ function fontStack(name: string | undefined, kind: "heading" | "body"): string {
  if (!name) return kind === "heading" ? serif : sans;
  return `'${name}', ${EMAIL_SERIF.has(name) ? serif : sans}`;
 }
-// Darken a hex by fraction f (0..1) — for the "bold" layout's backdrop behind an accent card.
+// Darken a hex by fraction f (0..1), for the "bold" layout's backdrop behind an accent card.
 function darken(hex: string, f: number): string {
  const h = (hex || "").replace("#", "");
  if (h.length !== 6) return hex;
@@ -706,8 +706,8 @@ export async function getStoreEmailBrand(slug: string): Promise<EmailBrand> {
 }
 
 // Lightweight, email-safe formatting for store-written emails (campaigns + automations). Stores
-// write with a familiar shorthand — # / ## headings, **bold**, *italic*, [links](url), - bullets,
-// ![images](url), --- dividers — and it renders to inline-styled HTML that survives email clients.
+// write with a familiar shorthand. # / ## headings, **bold**, *italic*, [links](url), - bullets,
+// ![images](url), --- dividers, and it renders to inline-styled HTML that survives email clients.
 export function renderEmailBody(raw: string, brand: EmailBrand = DEFAULT_BRAND): string {
  const headStack = fontStack(brand.headingFont, "heading");
  const cleanUrl = (u: string) => (/^(https?:|mailto:)/i.test(u.trim()) ? u.trim() : "#");
@@ -736,12 +736,12 @@ export function renderEmailBody(raw: string, brand: EmailBrand = DEFAULT_BRAND):
  return out.join("") || `<p style="margin:0;font-size:15px;color:#a8a29e;">Your email will preview here as you write.</p>`;
 }
 
-// The full campaign/automation email — the shared renderer behind both what's sent and the
+// The full campaign/automation email. The shared renderer behind both what's sent and the
 // in-browser preview, so what a store sees is exactly what lands in the inbox.
 export function campaignEmailHtml(opts: { storeName: string; body: string; link?: string; brand?: EmailBrand; cta?: { label: string; url: string }; unsubscribeUrl?: string }): string {
  const cleanName = opts.storeName.replace(/[<>"\n\r]/g, "").trim() || "Your store";
  const b = opts.brand || DEFAULT_BRAND;
- // A custom `cta` (used by transactional emails — offer updates, etc.) overrides both the button
+ // A custom `cta` (used by transactional emails. Offer updates, etc.) overrides both the button
  // URL and its label; otherwise fall back to the campaign link + the brand's default button label.
  const cta = opts.cta?.url || (opts.link ? withUtm(opts.link, "campaign") : null);
  const bodyStack = fontStack(b.bodyFont, "body");
@@ -757,7 +757,7 @@ export function campaignEmailHtml(opts: { storeName: string; body: string; link?
  const shell = layout === "classic" ? "border-radius:16px;box-shadow:0 4px 24px -8px rgba(0,0,0,0.12);"
  : layout === "editorial" ? `border-radius:2px;border:1px solid ${dark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.12)"};`
  : layout === "bold" ? "border-radius:14px;"
- : "border-radius:0;"; // minimal — flat, full-bleed
+ : "border-radius:0;"; // minimal: flat, full-bleed
  const barHtml = layout === "classic" && b.showAccentBar !== false ? `<div style="height:5px;background:${b.accent};"></div>` : "";
  const headDivide = layout === "minimal" || layout === "editorial" ? `border-bottom:1px solid ${dark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.09)"};padding-bottom:22px;` : "";
  const align = b.headerAlign === "left" ? "left" : "center";
@@ -788,8 +788,8 @@ export function campaignEmailHtml(opts: { storeName: string; body: string; link?
 }
 
 // A store-branded shell for TRANSACTIONAL emails (order confirmation, shipping, sale alerts).
-// Mirrors the campaign chrome — the store's OWN logo/name + brand colours, a neutral "Powered by
-// VYA" footnote — but carries rich HTML (order tables, addresses, tracking) instead of markdown.
+// Mirrors the campaign chrome. The store's OWN logo/name + brand colours, a neutral "Powered by
+// VYA" footnote, but carries rich HTML (order tables, addresses, tracking) instead of markdown.
 // No VYA nav, no VYA logo, no competitor links, no unsubscribe (transactional mail isn't marketing).
 // This is what the buyer sees, so it must read as the store's email, never VYA's.
 function storeTransactionalShell(brand: EmailBrand, storeName: string, eyebrow: string, content: string): string {
@@ -818,7 +818,7 @@ function storeTransactionalShell(brand: EmailBrand, storeName: string, eyebrow: 
  </div></body></html>`);
 }
 
-// Brand-derived palette for transactional content panels — neutral surfaces that sit under any
+// Brand-derived palette for transactional content panels. Neutral surfaces that sit under any
 // store's accent, so the order table reads the same whether the brand is burgundy or forest green.
 function txnTokens(b: EmailBrand) {
  return { text: b.text, accent: b.accent, btnText: readableOn(b.accent), muted: "#8a8178", panelBg: "#faf8f4", panelBorder: "rgba(0,0,0,0.09)" };
@@ -826,7 +826,7 @@ function txnTokens(b: EmailBrand) {
 
 // Trial lifecycle nudge (VYA → the store OWNER): "connect payouts + pick a plan to go live."
 // Fired by the weekly cron at day 7/14/21/27 of the 30-day trial, until they subscribe. This is a
-// getvya.ai OS email (the OS green), NOT a customer-facing store email — so it doesn't wear the
+// getvya.ai OS email (the OS green), NOT a customer-facing store email, so it doesn't wear the
 // store's brand or the marketplace shell.
 export async function sendTrialNudge(p: { to: string; storeName: string; daysLeft: number }): Promise<void> {
  if (!p.to) return;
@@ -841,15 +841,15 @@ export async function sendTrialNudge(p: { to: string; storeName: string; daysLef
    <div style="height:5px;background:${ACCENT};"></div>
    <div style="padding:34px 36px 30px;">
     <p style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:${ACCENT};margin:0 0 14px;">VYA · ${escapeHtml(p.storeName)}</p>
-    <h1 style="font-size:23px;font-weight:700;margin:0 0 12px;letter-spacing:-0.01em;">You're set up — now get paid.</h1>
+    <h1 style="font-size:23px;font-weight:700;margin:0 0 12px;letter-spacing:-0.01em;">You're set up. Now get paid.</h1>
     <p style="font-size:15px;line-height:1.65;color:#44403c;margin:0 0 8px;">${urgency}</p>
-    <p style="font-size:15px;line-height:1.65;color:#44403c;margin:0 0 22px;">Connect your payouts and choose a plan to take your storefront live and start selling. Keep building until then — nothing goes public until you're ready.</p>
+    <p style="font-size:15px;line-height:1.65;color:#44403c;margin:0 0 22px;">Connect your payouts and choose a plan to go live. Nothing is public until you are ready.</p>
     <a href="https://getvya.ai/admin/billing" style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;padding:13px 30px;border-radius:10px;font-size:14px;font-weight:600;">Choose your plan →</a>
    </div>
   </div>
   <p style="text-align:center;font-size:11px;color:#a8a29e;margin:16px 0 0;">getvya.ai · the operating system for secondhand</p>
  </div></body></html>`);
- await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.to, subject: `${left <= 3 ? `${left} days left — ` : ""}Take ${p.storeName} live`, html });
+ await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.to, subject: `${left <= 3 ? `${left} days left: ` : ""}Take ${p.storeName} live`, html });
 }
 
 export async function sendStoreCampaign(opts: {
@@ -864,7 +864,7 @@ export async function sendStoreCampaign(opts: {
  brand?: EmailBrand;
  /**
   * Build the HTML for one recipient. Campaigns written in the composer pass this, so the email that
-  * sends is the one the seller laid out — the design, the pieces, the code, the link row. Without it
+  * sends is the one the seller laid out. The design, the pieces, the code, the link row. Without it
   * this falls back to the plain headline-and-link build, which is all the older callers (the
   * assistant, automations) ever had.
   */
@@ -880,7 +880,7 @@ export async function sendStoreCampaign(opts: {
  const chunk = opts.recipients.slice(i, i + 100);
  try {
  // Per-recipient: a one-click unsubscribe link in the footer + List-Unsubscribe headers
- // (RFC 8058) — required by Gmail/Yahoo bulk-sender rules and to stay out of spam.
+ // (RFC 8058): required by Gmail/Yahoo bulk-sender rules and to stay out of spam.
  await resend.batch.send(chunk.map((to) => {
  const unsubscribeUrl = `${BASE_URL}/api/storefront/unsubscribe?t=${signUnsubToken(opts.storeSlug, to)}`;
  return {
@@ -897,14 +897,14 @@ export async function sendStoreCampaign(opts: {
  return { sent, failed };
 }
 
-// The pure HTML for the new-arrivals email — a store name, intro, a 2-up grid of REAL product
+// The pure HTML for the new-arrivals email. A store name, intro, a 2-up grid of REAL product
 // cards (photo + title + price, each linking to the piece), and a Shop CTA. Exported so it can be
 // previewed without sending.
 /**
  * New arrivals, in the shared automated-email format.
  *
- * Was a 2-up grid of tiles, which reads as a catalogue page. One piece per row — photo, name, its
- * own button — reads like a shop showing you what came in, and it's the same shape as every other
+ * Was a 2-up grid of tiles, which reads as a catalogue page. One piece per row. Photo, name, its
+ * own button: reads like a shop showing you what came in, and it's the same shape as every other
  * automatic email the store sends. See email-template.ts for why that sameness matters.
  */
 export function newArrivalsEmailHtml(opts: {
@@ -920,7 +920,7 @@ export function newArrivalsEmailHtml(opts: {
   storeName: opts.storeName,
   logo: b?.logo ?? null,
   eyebrow: "New in",
-  // The intro the store wrote IS the headline — it's the one sentence they'd say.
+  // The intro the store wrote IS the headline. It's the one sentence they'd say.
   headline: opts.intro,
   button: opts.shopUrl ? { label: b?.buttonLabel || "Shop new arrivals", url: withUtm(opts.shopUrl, "new_arrivals") } : null,
   products: opts.products.map((p) => ({
@@ -977,7 +977,7 @@ export async function sendGiveawayConfirmation(email: string, referralCode: stri
  await resend.emails.send({
  from: FROM_EMAIL,
  to: email,
- subject: "You're almost there — VYA Giveaway",
+ subject: "You're almost there: VYA Giveaway",
  html: emailShell(`
  <h2>You're almost there.</h2>
  <p>Thanks for signing up! You're just a few steps away from being officially entered to win a $1,000 shopping spree on VYA. Share your unique link with two friends and have them enter too.</p>
@@ -999,8 +999,8 @@ export async function sendFriendEnteredEmail(
  const isComplete = friendNumber === 2;
 
  const subject = isComplete
- ? "You're officially entered — VYA Giveaway"
- : "1 of 2 friends entered — VYA Giveaway";
+ ? "You're officially entered. VYA Giveaway"
+ : "1 of 2 friends entered. VYA Giveaway";
 
  const heading = isComplete ? "You're officially entered!" : "1 down, 1 to go.";
 
@@ -1036,7 +1036,7 @@ export async function sendGiveawayReminder(
 
  switch (category) {
  case "no_activity":
- subject = "Don't forget — share to enter the VYA Giveaway";
+ subject = "Don't forget. Share to enter the VYA Giveaway";
  heading = "You haven't shared your link yet.";
  body = `
  <p>You signed up for the VYA Giveaway, but you haven't shared your referral link yet. To be officially entered to win a $1,000 shopping spree, share your link with two friends and have them enter.</p>
@@ -1047,7 +1047,7 @@ export async function sendGiveawayReminder(
  break;
 
  case "invited_no_entries":
- subject = "Your friends haven't entered yet — VYA Giveaway";
+ subject = "Your friends haven't entered yet. VYA Giveaway";
  heading = "Your friends haven't entered yet.";
  body = `
  <p>You invited friends to the VYA Giveaway, but none of them have entered yet. Send them a reminder or share your link with others to make sure you're officially in the running.</p>
@@ -1058,7 +1058,7 @@ export async function sendGiveawayReminder(
  break;
 
  case "one_referral":
- subject = "1 more friend to go — VYA Giveaway";
+ subject = "1 more friend to go. VYA Giveaway";
  heading = "You're almost there.";
  body = `
  <p>One of your friends has entered the giveaway, but you need one more to be officially entered to win a $1,000 shopping spree on VYA.</p>
@@ -1087,8 +1087,8 @@ export async function sendReferralInsiderWelcomeEmail(email: string, firstName?:
  subject: "You're a VYA Insider ✦",
  html: emailShell(`
  <h2>You're officially a VYA Insider.</h2>
- <p>Hi ${name} — you brought two friends to VYA, and that means you're in.</p>
- <p>As a VYA Insider, you'll get our bimonthly newsletter with inside scoops on the best finds, styling tips, and trend breakdowns — before anyone else hears about them.</p>
+ <p>Hi ${name}: you brought two friends to VYA, and that means you're in.</p>
+ <p>As a VYA Insider, you'll get our bimonthly newsletter with inside scoops on the best finds, styling tips, and trend breakdowns, before anyone else hears about them.</p>
  <p class="muted">Keep an eye on your inbox. Your first issue is on its way.</p>
  `),
  });
@@ -1104,7 +1104,7 @@ export async function sendMembershipConfirmation(email: string) {
  subject: "Welcome to VYA Insider",
  html: emailShell(`
  <h2>You're in.</h2>
- <p>Welcome to VYA Insider. You now have 24-hour early access to new arrivals from all of our stores — before anyone else sees them.</p>
+ <p>Welcome to VYA Insider. You now have 24-hour early access to new arrivals from all of our stores, before anyone else sees them.</p>
  <p class="muted">Head to your Insider page to see what's just dropped.</p>
  <a href="${insiderUrl}" class="btn">View New Arrivals</a>
  <p style="font-size: 12px; color: rgba(93,15,23,0.45); margin-top: 24px;">You'll be billed $10/month. You can cancel anytime from your account page.</p>
@@ -1214,7 +1214,7 @@ export async function sendInsiderNewArrivalsEmail(
 
  function productCell(p: DBProduct): string {
  const url = productViaUrl(p, "insider_new_arrivals");
- // Escape & in URLs for valid HTML attributes — Shopify CDN URLs contain &width=, &v=, etc.
+ // Escape & in URLs for valid HTML attributes. Shopify CDN URLs contain &width=, &v=, etc.
  const safeImgSrc = p.image ? p.image.replace(/&/g, "&amp;") : null;
  const imgBlock = safeImgSrc
  ? `<img src="${safeImgSrc}" alt="${p.title.replace(/"/g, "&quot;")}" width="240"
@@ -1230,7 +1230,7 @@ export async function sendInsiderNewArrivalsEmail(
  : `<span style="color:#5D0F17;font-size:13px;font-family:Georgia,'Times New Roman',serif;">${priceStr}</span>`;
 
  // Use a table layout so each element is its own link-safe block.
- // Avoid <p> inside <a> — email clients break the outer <a> at block elements.
+ // Avoid <p> inside <a> email clients break the outer <a> at block elements.
  const safeUrl = url.replace(/&/g, "&amp;");
  return `
  <a href="${safeUrl}" style="display:block;text-decoration:none;color:inherit;">
@@ -1296,7 +1296,7 @@ export async function sendInsiderNewArrivalsEmail(
  await resend.emails.send({
  from: FROM_EMAIL,
  to: email,
- subject: "VYA Insider — New Arrivals Just Dropped",
+ subject: "VYA Insider: New Arrivals Just Dropped",
  html,
  });
  sent++;
@@ -1311,15 +1311,15 @@ export async function sendInsiderNewArrivalsEmail(
 
 /**
  * Send a new arrivals email to all approved VYA platform users.
- * Different from Insider — goes to everyone approved on the platform.
+ * Different from Insider: goes to everyone approved on the platform.
  */
 /**
- * Known designer brands — checked against the full title (not just the first word)
+ * Known designer brands. Checked against the full title (not just the first word)
  * so "Vintage Chanel Bag" and "Beige Burberry Coat" both resolve correctly.
  * Multi-word brands listed before single-word ones so longer matches win.
  */
 const KNOWN_BRANDS: string[] = [
- // Multi-word first (order matters — longer match wins)
+ // Multi-word first (order matters. Longer match wins)
  "Alexander McQueen", "Alexander Wang",
  "Ann Demeulemeester",
  "Betsey Johnson",
@@ -1394,7 +1394,7 @@ function extractBrand(title: string): string | null {
 }
 
 /** Sort products by brand frequency (most items first), then alphabetically within same count.
- * Only known designer brands count — unrecognised titles sort to the end.
+ * Only known designer brands count. Unrecognised titles sort to the end.
  * Returns sorted products + the top brand names in order. */
 function sortByBrand(products: DBProduct[]): { sorted: DBProduct[]; topBrands: string[] } {
  const brandCount = new Map<string, number>();
@@ -1419,10 +1419,10 @@ function sortByBrand(products: DBProduct[]): { sorted: DBProduct[]; topBrands: s
  return { sorted, topBrands: brandOrder };
 }
 
-// Eight pieces, two across — four rows. Change these two together with the layout below.
+// Eight pieces, two across. Four rows. Change these two together with the layout below.
 export const NEW_ARRIVALS_ITEM_COUNT = 8;
 // The weekly subject line, edited from /admin/collections so it can change every week without a
-// deploy. Unset falls back to DEFAULT_NEW_ARRIVALS_SUBJECT — an empty setting never ships blank.
+// deploy. Unset falls back to DEFAULT_NEW_ARRIVALS_SUBJECT. An empty setting never ships blank.
 export const NEW_ARRIVALS_SUBJECT_KEY = "new_arrivals_subject";
 export const DEFAULT_NEW_ARRIVALS_SUBJECT = "Just in";
 const IMAGE_RADIUS = "6px";
@@ -1445,15 +1445,15 @@ export async function sendNewArrivalsEmail(
  // selection gets grouped by brand for a nicer flow.
  const sortedProducts = preserveOrder ? products : sortByBrand(products).sorted;
  const subject = (subjectOverride || "").trim() || DEFAULT_NEW_ARRIVALS_SUBJECT;
- // Eight pieces, laid out two across — four rows. Deliberately short: the old 25-piece wall
+ // Eight pieces, laid out two across. Four rows. Deliberately short: the old 25-piece wall
  // meant most of the email was never scrolled to.
  const display = sortedProducts.slice(0, NEW_ARRIVALS_ITEM_COUNT);
 
  function productCell(p: DBProduct, recipient: string): string {
  const url = productViaUrl(p, "new_arrivals_email", recipient);
- // Escape & in URLs for valid HTML attributes — Shopify CDN URLs contain &width=, &v=, etc.
+ // Escape & in URLs for valid HTML attributes. Shopify CDN URLs contain &width=, &v=, etc.
  const safeImgSrc = p.image ? p.image.replace(/&/g, "&amp;") : null;
- // height:auto shows the FULL product image at its natural aspect ratio — bigger,
+ // height:auto shows the FULL product image at its natural aspect ratio. Bigger,
  // and nothing cropped off (the old fixed 220px + object-fit:cover cut pieces off).
  // border-radius is honoured by every modern client; Outlook desktop ignores it and shows
  // square corners, which is a clean fallback rather than a broken one.
@@ -1462,7 +1462,7 @@ export async function sendNewArrivalsEmail(
  style="display:block;width:100%;height:${IMAGE_HEIGHT}px;object-fit:cover;border-radius:${IMAGE_RADIUS};" border="0" />`
  : `<div style="width:100%;height:${IMAGE_HEIGHT}px;background:rgba(93,15,23,0.06);border-radius:${IMAGE_RADIUS};"></div>`;
 
- // Avoid <p> inside <a> — email clients break the outer <a> at block elements.
+ // Avoid <p> inside <a> email clients break the outer <a> at block elements.
  const safeUrl = url.replace(/&/g, "&amp;");
  return `
  <a href="${safeUrl}" style="display:block;text-decoration:none;color:inherit;">
@@ -1603,12 +1603,12 @@ export async function sendBuyerReplyNotification(params: {
 export type EditLook = {
  /** Publicly-hosted image URL (e.g. https://vyaplatform.com/y2k-edit/look-1.jpg) */
  image: string;
- /** Shoppable pieces in the look — label ("Dress") + product URL. */
+ /** Shoppable pieces in the look. Label ("Dress") + product URL. */
  items: { label: string; url: string }[];
 };
 
 /**
- * One-off "Y2K, Styled" edit — a shop-the-look lookbook. Each look is a
+ * One-off "Y2K, Styled" edit. A shop-the-look lookbook. Each look is a
  * full-width editorial photo followed by its shoppable pieces. Uses the shared
  * VYA shell (top nav + logo) with a "Y2K, Styled" section label. Sends to all
  * approved pilot users. Per-recipient links carry the attribution token.
@@ -1620,7 +1620,7 @@ export async function sendY2KEditEmail(
  if (emails.length === 0 || looks.length === 0) return { sent: 0, failed: 0 };
 
  const resend = getResend();
- const subject = "Y2K, Styled — The VYA Edit";
+ const subject = "Y2K, Styled. The VYA Edit";
 
  function lookBlock(look: EditLook, index: number, recipient: string): string {
  const safeImg = look.image.replace(/&/g, "&amp;");
@@ -1636,7 +1636,7 @@ export async function sendY2KEditEmail(
  const gap = index < looks.length - 1 ? "60px" : "8px";
  return `
  <a href="${withUtm(`${BASE_URL}/new-arrivals`, "y2k_edit", "look", recipient).replace(/&/g, "&amp;")}" style="display:block;text-decoration:none;">
- <img src="${safeImg}" alt="VYA Y2K Edit — Look ${index + 1}" width="552"
+ <img src="${safeImg}" alt="VYA Y2K Edit. Look ${index + 1}" width="552"
  style="display:block;width:100%;height:auto;border:0;margin:0 0 16px;" border="0" />
  </a>
  <div style="text-align:center;margin:0 0 ${gap};">
@@ -1725,13 +1725,13 @@ export async function sendReengagementEmail(
  for (const { email, firstName } of emails) {
  const unsubUrl = `${BASE_URL}/unsubscribe?email=${encodeURIComponent(email)}`;
  const greeting = firstName ? firstName.trim() : null;
- const subtitle = greeting ? `Hi ${greeting} — welcome to VYA` : "Welcome to VYA";
+ const subtitle = greeting ? `Hi ${greeting}: welcome to VYA` : "Welcome to VYA";
  const html = viaShell(subtitle, content, unsubUrl);
  try {
  await resend.emails.send({
  from: FROM_EMAIL,
  to: email,
- subject: "Great finds are waiting for you — VYA",
+ subject: "Great finds are waiting for you. VYA",
  html,
  });
  sent++;
@@ -1841,7 +1841,7 @@ export async function sendPriceDropEmails(
 
  const unsubUrl = `${BASE_URL}/unsubscribe?email=${encodeURIComponent(email)}`;
  const subject = items.length > 1
- ? `Price drops on your favorites — don't miss out`
+ ? `Price drops on your favorites. Don't miss out`
  : `Your saved piece just dropped in price`;
 
  try {
@@ -1886,7 +1886,7 @@ export async function sendSourcingConfirmationToUser(details: SourcingEmailDetai
  await resend.emails.send({
  from: FROM_EMAIL,
  to: details.userEmail,
- subject: "Your sourcing request has been received — VYA",
+ subject: "Your sourcing request has been received. VYA",
  html: emailShell(`
  <h2>We're on it.</h2>
  <p>Your sourcing request has been received and your $20 fee has been processed. We'll reach out within 21 business days if we find a match.</p>
@@ -1918,7 +1918,7 @@ export async function sendSourcingRequestToStores(
  </div>`
  : "";
 
- // Store email: no customer contact info — only shared after offer is accepted
+ // Store email: no customer contact info, only shared after offer is accepted
  const storeHtml = emailShell(`
  <p style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(93,15,23,0.5);margin:0 0 8px;">Sourcing Request from VYA</p>
  <h2 style="margin-bottom:20px;">New Sourcing Request</h2>
@@ -1939,11 +1939,11 @@ export async function sendSourcingRequestToStores(
 
  // Admin email: full details including customer info
  const adminHtml = emailShell(`
- <p style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(93,15,23,0.5);margin:0 0 8px;">Sourcing Request — Admin Copy</p>
+ <p style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(93,15,23,0.5);margin:0 0 8px;">Sourcing Request. Admin Copy</p>
  <h2 style="margin-bottom:20px;">New Sourcing Request</h2>
  ${imageBlock}
  <table style="width:100%;border-collapse:collapse;margin:20px 0;">
- <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);width:120px;">Customer</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">${details.userName || "—"} &lt;${details.userEmail}&gt;</td></tr>
+ <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);width:120px;">Customer</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">${details.userName || "-"} &lt;${details.userEmail}&gt;</td></tr>
  <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);">Description</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">${details.description}</td></tr>
  <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);">Budget</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">$${details.priceMin} – $${details.priceMax}</td></tr>
  <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);">Condition</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">${details.condition}</td></tr>
@@ -1960,21 +1960,21 @@ export async function sendSourcingRequestToStores(
  await resend.emails.send({
  from: FROM_EMAIL,
  to: VIA_EMAIL,
- subject: "New Sourcing Request — VYA Admin",
+ subject: "New Sourcing Request: VYA Admin",
  html: adminHtml,
  });
  } catch (err) {
  console.error("Failed to send sourcing admin email:", err);
  }
 
- // Store copy without customer contact info — send in batches to stay under rate limit
+ // Store copy without customer contact info. Send in batches to stay under rate limit
  for (let i = 0; i < storeRecipients.length; i++) {
  const email = storeRecipients[i];
  try {
  await resend.emails.send({
  from: FROM_EMAIL,
  to: email,
- subject: "New Sourcing Request — Submit Your Offer",
+ subject: "New Sourcing Request: Submit Your Offer",
  html: storeHtml,
  });
  } catch (err) {
@@ -1987,7 +1987,7 @@ export async function sendSourcingRequestToStores(
  }
 }
 
-/** Weekly listing-quality nudge to a store partner — which listings need fixing. */
+/** Weekly listing-quality nudge to a store partner, which listings need fixing. */
 export async function sendStoreListingDigest(params: {
  email: string;
  storeName: string;
@@ -2016,7 +2016,7 @@ export async function sendStoreListingDigest(params: {
 
  const html = `<div style="background:#FFFDF8;padding:32px 20px;font-family:Georgia,'Times New Roman',serif;color:#5D0F17;">
  <div style="max-width:560px;margin:0 auto;">
- <h1 style="font-size:23px;font-weight:500;margin:0 0 10px;">${params.storeName} — listings to tidy up</h1>
+ <h1 style="font-size:23px;font-weight:500;margin:0 0 10px;">${params.storeName}: listings to tidy up</h1>
  <p style="font-size:15px;line-height:1.6;color:rgba(93,15,23,0.7);margin:0 0 18px;">
   <strong>${params.flagged}</strong> ${params.flagged === 1 ? "listing" : "listings"} on VYA ${params.flagged === 1 ? "is" : "are"} missing details that help ${params.flagged === 1 ? "it" : "them"} sell. Completing ${params.flagged === 1 ? "it" : "them"} gets more views and faster sales.
  </p>
@@ -2030,19 +2030,19 @@ export async function sendStoreListingDigest(params: {
  await resend.emails.send({
  from: FROM_EMAIL,
  to: params.email,
- subject: `${params.flagged} listing${params.flagged !== 1 ? "s" : ""} to complete — ${params.storeName}`,
+ subject: `${params.flagged} listing${params.flagged !== 1 ? "s" : ""} to complete: ${params.storeName}`,
  html,
  });
 }
 
 /**
- * "You've been added to <shop>" — the email that was missing.
+ * "You've been added to <shop>". The email that was missing.
  *
  * Adding a teammate wrote a row in store_users and told nobody. Access was real from that moment,
  * but the person had no idea: they only got in if they happened to sign in with that exact address
  * for some other reason. An invitation nobody receives is not an invitation.
  *
- * The row IS the grant — access is by email match — so this carries no token to redeem. What it
+ * The row IS the grant, access is by email match, so this carries no token to redeem. What it
  * carries is the news, and a link to the door.
  */
 export async function sendStoreInvite(params: {
@@ -2056,19 +2056,19 @@ export async function sendStoreInvite(params: {
  if (!resend) return;
  const who = params.invitedBy ? `${params.invitedBy} has` : "You've been";
  const what = params.role === "owner"
-  ? "You can do everything an owner can — including adding other people."
+  ? "You can do everything an owner can, including adding other people."
   : "You'll see the areas they've given you access to; they can change that any time.";
  const html = `<div style="background:#FFFDF8;padding:32px 20px;font-family:Georgia,'Times New Roman',serif;color:#5D0F17;">
  <div style="max-width:560px;margin:0 auto;">
  <h1 style="font-size:23px;font-weight:500;margin:0 0 10px;">${who} added you to ${params.storeName}</h1>
  <p style="font-size:15px;line-height:1.6;color:rgba(93,15,23,0.7);margin:0 0 18px;">
-  You now have access to ${params.storeName} on VYA. Sign in with <strong>${params.email}</strong> — this address is
+  You now have access to ${params.storeName} on VYA. Sign in with <strong>${params.email}</strong>. This address is
   the key, so use it exactly as written here.
  </p>
  <p style="font-size:13px;line-height:1.6;color:rgba(93,15,23,0.55);margin:0 0 22px;">${what}</p>
  <a href="${params.signInUrl}" style="display:inline-block;background:#5D0F17;color:#FFFDF8;text-decoration:none;padding:12px 24px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">Open ${params.storeName}</a>
  <p style="font-size:12px;color:rgba(93,15,23,0.4);margin:24px 0 0;">
-  Not expecting this? Ignore it — nothing happens until you sign in, and whoever added you can remove you again.
+  Not expecting this? Ignore it: nothing happens until you sign in, and whoever added you can remove you again.
  </p>
  </div>
 </div>`;
@@ -2102,7 +2102,7 @@ export async function sendSourcingOfferToCustomer(details: {
  A store has reviewed your sourcing request and submitted an offer.
  </p>
  <p style="font-size:15px;color:rgba(93,15,23,0.65);font-family:Georgia,'Times New Roman',serif;line-height:1.75;margin:0 0 32px;">
- You can accept this offer — or wait to see if other stores respond. Once you accept, the store will reach out directly.
+ You can accept this offer, or wait to see if other stores respond. Once you accept, the store will reach out directly.
  </p>
  <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(93,15,23,0.5);font-family:Georgia,'Times New Roman',serif;margin:0 0 4px;">Your Request</p>
  <p style="font-size:14px;color:#5D0F17;font-family:Georgia,'Times New Roman',serif;margin:0 0 24px;line-height:1.5;">${details.requestDescription}</p>
@@ -2118,14 +2118,14 @@ export async function sendSourcingOfferToCustomer(details: {
  font-family:Georgia,'Times New Roman',serif;">View &amp; Accept Offer</a>
  <p style="font-size:12px;color:rgba(93,15,23,0.5);font-family:Georgia,'Times New Roman',serif;margin:20px 0 0;line-height:1.7;">
  This is an additional fee charged by the store on top of the item price, for sourcing and finding the piece for you.
- You are under no obligation to accept — your $20 VYA sourcing fee is separate and unaffected.
+ You are under no obligation to accept. Your $20 VYA sourcing fee is separate and unaffected.
  </p>
  `;
 
  await resend.emails.send({
  from: FROM_EMAIL,
  to: details.customerEmail,
- subject: `${details.storeName} submitted a sourcing offer — VYA`,
+ subject: `${details.storeName} submitted a sourcing offer. VYA`,
  html: viaShell("Sourcing Offer", content),
  });
 }
@@ -2150,7 +2150,7 @@ export async function sendSourcingOfferAcceptedToStore(details: {
  Please reach out to them directly to arrange the next steps.
  </p>
  <table style="width:100%;border-collapse:collapse;margin:0 0 32px;">
- <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);width:130px;">Customer</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">${details.customerName || "—"}</td></tr>
+ <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);width:130px;">Customer</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">${details.customerName || "-"}</td></tr>
  <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);">Email</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;"><a href="mailto:${details.customerEmail}" style="color:#5D0F17;">${details.customerEmail}</a></td></tr>
  <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);">Request</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">${details.requestDescription}</td></tr>
  <tr><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:rgba(93,15,23,0.5);">Your Fee</td><td style="padding:8px 0;border-bottom:1px solid rgba(93,15,23,0.1);font-size:14px;color:#5D0F17;">$${details.fee}</td></tr>
@@ -2165,7 +2165,7 @@ export async function sendSourcingOfferAcceptedToStore(details: {
  await resend.emails.send({
  from: FROM_EMAIL,
  to: details.storeEmail,
- subject: `Your sourcing offer was accepted — VYA`,
+ subject: `Your sourcing offer was accepted. VYA`,
  html: viaShell("Offer Accepted", content),
  });
 }
@@ -2226,7 +2226,7 @@ export async function sendCollabsLinksStuckAlert(stuckProducts: DBProduct[]): Pr
  await resend.emails.send({
  from: FROM_EMAIL,
  to: "hana@vyaplatform.com",
- subject: `${stuckProducts.length} product${stuckProducts.length !== 1 ? "s" : ""} missing Collabs links — action needed`,
+ subject: `${stuckProducts.length} product${stuckProducts.length !== 1 ? "s" : ""} missing Collabs links. Action needed`,
  html: viaShell("Collabs Coverage Alert", content),
  });
 }
@@ -2301,7 +2301,7 @@ export async function sendPilotApprovalEmail(
  await resend.emails.send({
  from: FROM_EMAIL,
  to: email,
- subject: "You're approved — welcome to VYA",
+ subject: "You're approved. Welcome to VYA",
  html: viaShell("You're in.", content),
  });
 }
@@ -2316,7 +2316,7 @@ export async function sendFeedbackEmail(
  const content = `
  <p style="font-size:15px;color:#5D0F17;font-family:Georgia,serif;margin:0 0 16px;">Hi,</p>
  <p style="font-size:15px;color:#5D0F17;font-family:Georgia,serif;line-height:1.75;margin:0 0 24px;">
- We're building VYA around you — and we'd love to hear what you actually think.
+ We're building VYA around you, and we'd love to hear what you actually think.
  </p>
  <p style="font-size:15px;color:#5D0F17;font-family:Georgia,serif;line-height:1.75;margin:0 0 24px;">
  It takes 2 minutes and genuinely shapes what we build next.
@@ -2370,7 +2370,7 @@ export async function sendWaitlistConfirmationEmail(
  await resend.emails.send({
  from: FROM_EMAIL,
  to: email,
- subject: "You're on the waitlist — VYA",
+ subject: "You're on the waitlist. VYA",
  html: viaShell("You're on the list.", content),
  });
 }
@@ -2391,7 +2391,7 @@ export async function sendCollabsCredentialsExpiredAlert(): Promise<void> {
  await resend.emails.send({
  from: FROM_EMAIL,
  to: "hana@vyaplatform.com",
- subject: "Action needed — Shopify Collabs credentials expired",
+ subject: "Action needed. Shopify Collabs credentials expired",
  html: viaShell("Collabs Credentials Expired", content),
  });
 }
@@ -2601,7 +2601,7 @@ export async function sendPopupThankYouEmail(
  </p>
  <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:0 0 12px;
  font-family:Georgia,'Times New Roman',serif;">
- If you have a moment, I'd really love your feedback as we continue building — you can share it here:
+ If you have a moment, I'd really love your feedback as we continue building. You can share it here:
  </p>
  <div style="margin:0 0 28px;">
  <a href="https://form.typeform.com/to/Vgzmmp5a"
@@ -2625,7 +2625,7 @@ export async function sendPopupThankYouEmail(
  </p>
  <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:0 0 4px;
  font-family:Georgia,'Times New Roman',serif;">
- Thank you again for being part of this — it is just the beginning.
+ Thank you again for being part of this. It is just the beginning.
  </p>
  <p style="font-size:16px;color:#5D0F17;line-height:1.7;margin:24px 0 0;
  font-family:Georgia,'Times New Roman',serif;">
@@ -2680,7 +2680,7 @@ export async function sendStoreSaleEmail({
 }): Promise<void> {
  const resend = getResend();
 
- // One-click magic sign-in that drops the owner into THEIR OWN store portal — resolveStoreSlug maps
+ // One-click magic sign-in that drops the owner into THEIR OWN store portal. ResolveStoreSlug maps
  // their session email → their store. Redirect straight to /store/dashboard (a SESSION_ONLY route, no
  // pilot cookie needed); NOT through pilot-check, which would bounce a non-pilot store email to
  // /pilot-pending. NOT the legacy tokened /for-stores/analytics mini-page.
@@ -2824,13 +2824,13 @@ export async function sendMonthlyReportEmail({
  </tr>
  </table>
 
- ${sectionHeader("What Members Are Browsing — Top Categories")}
+ ${sectionHeader("What Members Are Browsing. Top Categories")}
  ${topCategories.length === 0 ? `<p style="font-size:13px;color:rgba(93,15,23,0.4);font-family:Georgia,serif;">No click data this month.</p>` : `
  <table width="100%" cellpadding="0" cellspacing="0">
  <tbody>${categoryRows}</tbody>
  </table>`}
 
- ${sectionHeader("Most-Wanted Products — Top Clicked")}
+ ${sectionHeader("Most-Wanted Products. Top Clicked")}
  ${topProducts.length === 0 ? `<p style="font-size:13px;color:rgba(93,15,23,0.4);font-family:Georgia,serif;">No click data this month.</p>` : `
  <table width="100%" cellpadding="0" cellspacing="0">
  <thead>
@@ -2864,7 +2864,7 @@ export async function sendMonthlyReportEmail({
  await resend.emails.send({
  from: "VYA Platform <hana@vyaplatform.com>",
  to: "hana@vyaplatform.com",
- subject: `VYA Monthly Report — ${monthLabel}`,
+ subject: `VYA Monthly Report: ${monthLabel}`,
  html,
  });
 }
@@ -2886,7 +2886,7 @@ export async function sendWinbackEmail(
  : "It's been a while. Come see what's new.";
  const body =
  tier === "14d"
- ? "You haven't been back in a bit — and new pieces have been coming in every day. Vintage moves fast. Don't miss it."
+ ? "You haven't been back in a bit, and new pieces have been coming in every day. Vintage moves fast. Don't miss it."
  : "A lot has changed since you last visited. New stores, new arrivals, pieces you won't find anywhere else.";
 
  const content = `
@@ -2943,7 +2943,7 @@ export async function sendViewedItemReminderEmail(
  Still thinking about it?
  </p>
  <p style="font-size:15px;color:rgba(93,15,23,0.65);font-family:Georgia,'Times New Roman',serif;line-height:1.75;margin:0 0 4px;">
- You looked at this — and it&rsquo;s still here. But vintage is one of a kind.
+ You looked at this, and it&rsquo;s still here. But vintage is one of a kind.
  </p>
  ${imgBlock}
  <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:rgba(93,15,23,0.5);
@@ -3002,7 +3002,7 @@ export async function sendViewedItemReminderEmail(
  Still thinking about these?
  </p>
  <p style="font-size:15px;color:rgba(93,15,23,0.65);font-family:Georgia,'Times New Roman',serif;line-height:1.75;margin:0 0 24px;">
- You browsed these pieces recently — and they&rsquo;re still available. Each one is one of a kind.
+ You browsed these pieces recently, and they&rsquo;re still available. Each one is one of a kind.
  </p>
  <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;">
  ${itemsHtml}
@@ -3187,13 +3187,13 @@ export async function sendLastChanceEmail(
 
 
 // ============================================================================
-// Insider Newsletter — curated email for highly-engaged members.
+// Insider Newsletter: curated email for highly-engaged members.
 // ============================================================================
 
 /**
  * Sends the insider newsletter to a list of emails using the rose-background
  * shell. The `contentHtml` is dropped directly into the body of the email
- * between the logo and the footer — it should be already-formatted HTML.
+ * between the logo and the footer. It should be already-formatted HTML.
  *
  * Use the helper `getInsiderAudienceEmails()` to pull the audience.
  */
@@ -3232,9 +3232,9 @@ function fmtMoney(cents: number, currency: string): string {
  return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD", maximumFractionDigits: 0 }).format((cents || 0) / 100);
 }
 
-/** Buyer's order confirmation — what they bought + that the seller will ship. */
+/** Buyer's order confirmation: what they bought + that the seller will ship. */
 export async function sendBuyerOrderConfirmation(p: {
- storeSlug: string; // resolves the store's verified sender + brand — the email must read as theirs
+ storeSlug: string; // resolves the store's verified sender + brand. The email must read as theirs
  buyerEmail: string;
  orderId: string;
  itemTitle: string;
@@ -3274,7 +3274,7 @@ export async function sendBuyerOrderConfirmation(p: {
  const row = (label: string, val: string, bold = false) => `<tr><td style="padding:5px 0;font-size:14px;color:${t.muted};">${label}</td><td align="right" style="padding:5px 0;font-size:14px;color:${t.text};${bold ? "font-weight:700;font-size:15px;" : ""}">${val}</td></tr>`;
  const content = `
  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.14em;color:${t.muted};margin:0 0 6px;">Order #${orderNo}</p>
- <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 24px;">Your order is confirmed — thank you.</p>
+ <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 24px;">Your order is confirmed. Thank you.</p>
  <div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:22px 24px;margin:0 0 20px;">
  <table width="100%" cellpadding="0" cellspacing="0"><tr>
  ${p.imageUrl ? `<td width="78" valign="top"><img src="${p.imageUrl}" alt="" width="66" style="display:block;border-radius:6px;border:1px solid ${t.panelBorder};" /></td>` : ""}
@@ -3298,23 +3298,23 @@ export async function sendBuyerOrderConfirmation(p: {
  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 6px;">Shipping to</p>
  <p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">${addr}</p>
  </div>` : ""}
- <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 22px;">${p.collect ? `Your piece is being held for you at ${escapeHtml(storeName)} — nothing to post, just come and collect it.` : `${escapeHtml(storeName)} will ship your piece soon — you'll get tracking by email once it's on the way.`}</p>
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 22px;">${p.collect ? `Your piece is being held for you at ${escapeHtml(storeName)}: nothing to post, just come and collect it.` : `${escapeHtml(storeName)} will ship your piece soon. You'll get tracking by email once it's on the way.`}</p>
  <div style="text-align:center;margin:4px 0;"><a href="${orderUrl}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 34px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:600;">View your order →</a></div>
  ${legalLine ? `<p style="font-size:11px;color:${t.muted};line-height:1.6;margin:22px 0 0;text-align:center;">${escapeHtml(legalLine)}</p>` : ""}
  `;
  const html = storeTransactionalShell(brand, storeName, "Order confirmed", content);
  // From the STORE the buyer ordered from (their verified domain when set, else VYA's shared
- // domain); replies go to the seller. Never VYA-branded — this lands in the buyer's inbox.
+ // domain); replies go to the seller. Never VYA-branded. This lands in the buyer's inbox.
  await resend.emails.send({
  from: `${fromDisplayName(storeName)} <${sender.fromAddress || orderSenderAddress()}>`,
  to: p.buyerEmail,
  replyTo: sender.replyTo || p.replyTo || undefined,
- subject: `Your order from ${storeName} — #${orderNo}`,
+ subject: `Your order from ${storeName}: #${orderNo}`,
  html,
  });
 }
 
-/** Seller's sale notification — what sold, where to ship, link to buy the label. Goes to the
+/** Seller's sale notification: what sold, where to ship, link to buy the label. Goes to the
  *  store's own inbox (an ops alert), so it's rendered in their brand and links to their workspace. */
 export async function sendSellerSaleNotification(p: {
  storeSlug: string;
@@ -3325,7 +3325,7 @@ export async function sendSellerSaleNotification(p: {
  currency: string;
  buyerName?: string | null;
  ship: { line1?: string | null; line2?: string | null; city?: string | null; state?: string | null; postal?: string | null; country?: string | null };
- /** Set when the buyer is collecting in store — there is nothing to post and no label to buy. */
+ /** Set when the buyer is collecting in store. There is nothing to post and no label to buy. */
  collect?: { address: string | null; instructions: string | null } | null;
  orderId: string;
 }): Promise<void> {
@@ -3347,20 +3347,20 @@ export async function sendSellerSaleNotification(p: {
  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${t.muted};margin:0 0 8px;">${p.collect ? "Collecting in store" : "Ship to"}</p>
  <p style="font-size:15px;color:${t.text};line-height:1.6;margin:0;">${p.collect ? `${escapeHtml(p.buyerName || "Your buyer")} is collecting this${p.collect.address ? ` from ${escapeHtml(p.collect.address)}` : ""}.` : addr || "(address on the order)"}</p>
  </div>
- <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 20px;">${p.collect ? "Nothing to post — set it aside and mark it collected when they've picked it up." : "Shipping's already paid — just generate your prepaid label, print it, and mark it shipped from your dashboard."}</p>
+ <p style="font-size:15px;color:${t.text};line-height:1.7;margin:0 0 20px;">${p.collect ? "Nothing to post: set it aside and mark it collected when they've picked it up." : "Shipping's already paid, just generate your prepaid label, print it, and mark it shipped from your dashboard."}</p>
  <a href="${url}" style="display:inline-block;background:${t.accent};color:${t.btnText} !important;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;">${p.collect ? "View the order →" : "Get your label →"}</a>
  `;
  const html = storeTransactionalShell(brand, p.storeName, "You made a sale", content);
- await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.sellerEmail, subject: p.collect ? `You sold ${p.itemTitle} — held for collection` : `You sold ${p.itemTitle} — ship it`, html });
+ await resend.emails.send({ from: `VYA <${orderSenderAddress()}>`, to: p.sellerEmail, subject: p.collect ? `You sold ${p.itemTitle}: held for collection` : `You sold ${p.itemTitle}: ship it`, html });
 }
 
-/** Buyer's shipping/tracking email — sent when the order ships. Store-branded, from the store. */
+/** Buyer's shipping/tracking email: sent when the order ships. Store-branded, from the store. */
 export async function sendBuyerTrackingEmail(p: {
  storeSlug: string;
  buyerEmail: string;
  storeName: string;
  itemTitle: string;
- /** Every piece in the parcel, when the buyer took more than one — one email per bag, not per piece. */
+ /** Every piece in the parcel, when the buyer took more than one. One email per bag, not per piece. */
  itemTitles?: string[];
  trackingNumber: string;
  trackingUrl?: string | null;
@@ -3401,7 +3401,7 @@ export async function sendBuyerTrackingEmail(p: {
  });
 }
 
-/** Buyer's prepaid RETURN label — emailed when the store starts a return. Store-branded. */
+/** Buyer's prepaid RETURN label. Emailed when the store starts a return. Store-branded. */
 export async function sendReturnLabelEmail(p: {
  storeSlug: string; buyerEmail: string; storeName: string; itemTitle: string; returnLabelUrl: string; paidBy: "buyer" | "store";
 }): Promise<void> {
@@ -3412,7 +3412,7 @@ export async function sendReturnLabelEmail(p: {
  const storeName = sender.fromName || p.storeName;
  const t = txnTokens(brand);
  const costLine = p.paidBy === "store"
- ? "Return shipping is on us — just print the label and send it back."
+ ? "Return shipping is on us, just print the label and send it back."
  : "The cost of return shipping will be deducted from your refund.";
  const content = `
  <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 18px;">Here's your prepaid return label for <b>${p.itemTitle}</b>. 📦</p>
@@ -3442,7 +3442,7 @@ export async function sendReturnRejectedEmail(p: {
  const storeName = sender.fromName || p.storeName;
  const t = txnTokens(brand);
  const reason = p.note ? `<div style="background:${t.panelBg};border:1px solid ${t.panelBorder};border-radius:10px;padding:16px 20px;margin:0 0 20px;"><p style="font-size:14px;color:${t.text};line-height:1.6;margin:0;">${escapeHtml(p.note)}</p></div>` : "";
- const back = p.shipBack ? "We're sending it back to you — you'll get tracking separately." : "Please reach out with any questions.";
+ const back = p.shipBack ? "We're sending it back to you. You'll get tracking separately." : "Please reach out with any questions.";
  const content = `
  <p style="font-size:16px;color:${t.text};line-height:1.7;margin:0 0 16px;">We received your return of <b>${p.itemTitle}</b>, but unfortunately we weren't able to accept it.</p>
  ${reason}
@@ -3462,12 +3462,12 @@ export async function sendReturnRejectedEmail(p: {
  * One automated email, in the shared format.
  *
  * Automations are written as a subject and a short body. The FIRST line of that body becomes the
- * headline — it's the sentence the store actually wants read — and the rest sits underneath in
+ * headline, it's the sentence the store actually wants read, and the rest sits underneath in
  * small text. That keeps a store's own words while giving every automatic email the same shape.
  */
 /**
  * The HTML for one automation email. Exported so the Automations page can PREVIEW a flow with the
- * same function that sends it — the campaign composer shipped for months with a preview drawn by
+ * same function that sends it. The campaign composer shipped for months with a preview drawn by
  * different code than the send, and the difference only ever showed up in a shopper's inbox.
  */
 export function automationEmailHtml(opts: {

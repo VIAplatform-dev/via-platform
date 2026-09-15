@@ -140,7 +140,7 @@ export default function GiveawayModal({ isOpen, onClose, refCode }: GiveawayModa
           body: JSON.stringify({ email: email.trim(), source: acquisitionSource("giveaway_modal") }),
         });
       } catch {
-        // Non-blocking — continue to giveaway entry
+        // Non-blocking: continue to giveaway entry
       }
 
       const res = await fetch("/api/giveaway/enter", {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "VYA Cross-Lister",
   "version": "0.4.2",
-  "description": "Cross-list your VYA inventory to Depop & Vestiaire, and sync your listing likes back to VYA — from your own browser.",
+  "description": "Cross-list your VYA inventory to Depop & Vestiaire, and sync your listing likes back to VYA, from your own browser.",
   "permissions": [
     "storage",
     "tabs",

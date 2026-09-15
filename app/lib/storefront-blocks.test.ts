@@ -17,7 +17,7 @@ test("a link that can execute is stripped on the way in", () => {
  }
 });
 
-test("the label beside it is left alone — only link props are filtered", () => {
+test("the label beside it is left alone, only link props are filtered", () => {
  const out = sanitizeBlocks(block({ cta: "Shop the edit", ctaHref: "/shop" }))[0].props;
  assert.equal(out.cta, "Shop the edit");
 });
@@ -25,6 +25,6 @@ test("the label beside it is left alone — only link props are filtered", () =>
 test("the sections whose button navigates offer a link field; the others don't", () => {
  const has = (t: string) => Boolean(blockDef(t)?.fields.some((f) => f.key === "ctaHref"));
  for (const t of ["hero", "split", "spotlight", "countdown"]) assert.equal(has(t), true, t);
- // These buttons subscribe, submit and book — a link field on them would do nothing.
+ // These buttons subscribe, submit and book. A link field on them would do nothing.
  for (const t of ["newsletter", "contact", "appointments"]) assert.equal(has(t), false, t);
 });

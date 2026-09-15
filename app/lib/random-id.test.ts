@@ -13,7 +13,7 @@ test("gives a different one each time", () => {
  assert.equal(ids.size, 200);
 });
 
-test("still works where crypto.randomUUID does not exist — the case that broke checkout", () => {
+test("still works where crypto.randomUUID does not exist. The case that broke checkout", () => {
  // A plain-http page: `crypto` is present but `randomUUID` is not, because it is secure-context
  // only. Calling it threw, the throw escaped to React, and the checkout page died.
  const real = globalThis.crypto;

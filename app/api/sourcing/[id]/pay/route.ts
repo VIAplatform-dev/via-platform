@@ -53,7 +53,7 @@ export async function POST(
  return NextResponse.json({ error: "Request not found" }, { status: 404 });
  }
 
- // Already paid — block duplicate payment
+ // Already paid: block duplicate payment
  if (req.status !== "pending_payment") {
  return NextResponse.json({ error: "This request has already been paid." }, { status: 400 });
  }
@@ -68,7 +68,7 @@ export async function POST(
  });
  }
  } catch {
- // Session expired or invalid — fall through to create a new one
+ // Session expired or invalid. Fall through to create a new one
  }
  }
 

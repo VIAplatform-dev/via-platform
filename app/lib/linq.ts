@@ -1,4 +1,4 @@
-// Linq — multi-channel messaging transport (iMessage / RCS / SMS) for OUTBOUND
+// Linq: multi-channel messaging transport (iMessage / RCS / SMS) for OUTBOUND
 // notifications only. We send exact content; protocol auto-selects (iMessage → RCS → SMS).
 // ONE shared VYA number (LINQ_FROM_NUMBER) sends nudges like "[Store] new message";
 // the conversation itself lives in the VYA inbox, so there's no inbound routing here.
@@ -24,7 +24,7 @@ export function toE164(raw: string | null | undefined): string | null {
  return digits.length >= 8 ? `+${digits}` : null;
 }
 
-// Send a text to one recipient. Best-effort — returns a result, never throws, and
+// Send a text to one recipient. Best-effort: returns a result, never throws, and
 // no-ops (ok:false, not_configured) when Linq isn't set up.
 export async function sendLinqText(to: string, text: string): Promise<{ ok: boolean; detail?: string }> {
  const key = process.env.LINQ_API_KEY?.trim();

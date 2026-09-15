@@ -7,7 +7,7 @@ import { weightUnitFor, toOz, fromOz, type WeightUnit } from "@/app/lib/weight-u
 import { tierForWeight, parcelMismatch, describeParcel, defaultParcelFor, type ParcelEstimate } from "@/app/lib/parcel-core";
 import { cn } from "./ui";
 
-// Sizing and condition as structure — the three rows both listing forms share (owner audit #27,
+// Sizing and condition as structure. The three rows both listing forms share (owner audit #27,
 // #31). Pure display over the -core modules; the forms own the state.
 
 const chip = (on: boolean) => cn("rounded-full border px-3 py-1.5 text-[12px] transition", on ? "border-[var(--accent,#0e9f76)] bg-[var(--accent,#0e9f76)] text-white" : "border-stone-300 bg-white text-stone-600 hover:border-stone-400");
@@ -30,9 +30,9 @@ export function ConditionChips({ value, onChange, note, onNoteChange, flagged }:
    </div>
    {grade && <p className="mt-1.5 text-[11.5px] text-stone-400">{CONDITION_DEFINITIONS[grade]}</p>}
    {!grade && value.trim() && (
-    <p className="mt-1.5 text-[11.5px] text-stone-500">Saved as “{value}”{nearest ? <> — closest is <button type="button" className="underline" onClick={() => onChange(nearest)}>{nearest}</button></> : null}. Pick a grade to put it on the scale.</p>
+    <p className="mt-1.5 text-[11.5px] text-stone-500">Saved as “{value}”{nearest ? <>, closest is <button type="button" className="underline" onClick={() => onChange(nearest)}>{nearest}</button></> : null}. Pick a grade to put it on the scale.</p>
    )}
-   <input value={note} onChange={(e) => onNoteChange(e.target.value)} placeholder="Condition note — light wear to the sole, tiny mark inside…" className={cn(inputCls, "mt-2")} aria-label="Condition note" />
+   <input value={note} onChange={(e) => onNoteChange(e.target.value)} placeholder="Condition note: light wear to the sole, tiny mark inside…" className={cn(inputCls, "mt-2")} aria-label="Condition note" />
   </div>
  );
 }
@@ -43,7 +43,7 @@ export function MeasurementFields({ category, values, onChange, unit }: { catego
  if (!keys.length) return null;
  return (
   <div data-testid="measurement-fields">
-   <label className="mb-1.5 block text-[12px] font-medium text-stone-700">Measurements <span className="font-normal text-stone-400">— flat, in {unit === "cm" ? "centimetres" : "inches"}</span></label>
+   <label className="mb-1.5 block text-[12px] font-medium text-stone-700">Measurements <span className="font-normal text-stone-400"> flat, in {unit === "cm" ? "centimetres" : "inches"}</span></label>
    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
     {keys.map((k) => (
      <label key={k} className="block">
@@ -87,7 +87,7 @@ export function ShipsAsRow({ weightOz, onChange, estimate, category, hint, weigh
    <div className="flex flex-wrap items-center gap-3">
     <span className="text-[13px] text-stone-800">{describeParcel(tier, typed ?? est.weightOz)}</span>
     <span className="flex items-center gap-1 text-[12px] text-stone-500">
-     {/* Typed in the store's unit, handed back in ounces — one stored unit, her numbers. */}
+     {/* Typed in the store's unit, handed back in ounces. One stored unit, her numbers. */}
      <input
       inputMode="numeric"
       value={weightOz ? String(fromOz(weightOz, weightUnit)) : ""}

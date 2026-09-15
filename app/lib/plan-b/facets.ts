@@ -1,7 +1,7 @@
 // Shopify's storefront FILTER, SORT and PAGE parameters, applied to live VYA inventory.
 //
 // A Horizon-generation theme doesn't filter in the browser. Clicking a facet or changing the sort
-// re-requests the page — through the Section Rendering API (see section-render.ts) — with Shopify's
+// re-requests the page, through the Section Rendering API (see section-render.ts), with Shopify's
 // parameters appended, and morphs the returned section in:
 //
 //   /collections/all?filter.p.vendor=Chanel&filter.v.price.lte=50000&sort_by=price-ascending&page=2
@@ -16,7 +16,7 @@
 //
 // A Horizon-generation theme can ALSO file a facet through Shopify's Standard Product Taxonomy
 // (filter.v.t.shopify.size) or a linked Metaobject (filter.p.m.custom.brand) instead of a plain
-// value — both submit an opaque id ("gid://shopify/TaxonomyValue/2885"), never the label a shopper
+// value: both submit an opaque id ("gid://shopify/TaxonomyValue/2885"), never the label a shopper
 // ticked. See facet-labels.ts: the page being served carries the id → label translation on the very
 // checkbox that submitted it, and `opts.labels` (built from that page) is how it reaches here.
 //
@@ -32,7 +32,7 @@ export type FacetItem = {
  era?: string | null;
  condition?: string | null;
  size?: string | null;
- /** Fabric, as Shopify's own Standard Product Taxonomy calls it — matched against the item's own
+ /** Fabric, as Shopify's own Standard Product Taxonomy calls it. Matched against the item's own
   *  "material" field, which is the same thing under VYA's name for it. */
  material?: string | null;
  status?: string;
@@ -57,7 +57,7 @@ export function parseSort(params: URLSearchParams): SortKey {
 }
 
 /**
- * Shopify writes prices in these parameters as WHOLE CURRENCY UNITS, not cents — `filter.v.price.lte=500`
+ * Shopify writes prices in these parameters as WHOLE CURRENCY UNITS, not cents. `filter.v.price.lte=500`
  * means $500. We store cents. Getting this wrong doesn't error, it just silently filters everything
  * out (every item is "over 500 cents"), which is indistinguishable from an empty collection.
  */
@@ -76,19 +76,19 @@ function norm(s: unknown): string {
 /**
  * Every value the theme sent for one filter key, resolved to a real label.
  *
- * Shopify repeats the parameter for a multi-select — `?filter.p.vendor=Chanel&filter.p.vendor=Dior`
+ * Shopify repeats the parameter for a multi-select. `?filter.p.vendor=Chanel&filter.p.vendor=Dior`
  * means "Chanel OR Dior". Reading only the first value turned every multi-select into a single
  * select, so a shopper ticking a second brand watched results *shrink*.
  *
  * A value that IS a label ("Chanel") passes through resolveFacetValue unchanged when there's no
- * matching entry in `labels` — the classic case, and every store without taxonomy/metaobject facets.
+ * matching entry in `labels`. The classic case, and every store without taxonomy/metaobject facets.
  */
 function values(params: URLSearchParams, key: string, labels: Map<string, string>): string[] {
  return params.getAll(key).map((v) => norm(resolveFacetValue(v, labels))).filter(Boolean);
 }
 
 /** The SAME facet, filed under whichever of Shopify's parameter conventions the theme actually
- *  uses — a classic field (`filter.p.vendor`) and a taxonomy/metaobject one can both be present, and
+ *  uses. A classic field (`filter.p.vendor`) and a taxonomy/metaobject one can both be present, and
  *  a shopper who ticks one of each means both (OR), same as two values under one key. */
 function anyOf(params: URLSearchParams, keys: string[], labels: Map<string, string>): string[] {
  return keys.flatMap((k) => values(params, k, labels));
@@ -104,7 +104,7 @@ function matchesAny(itemValue: unknown, wanted: string[]): boolean {
 export type FacetResult<T> = { items: T[]; total: number };
 
 /**
- * Filter, then sort, then paginate — in that order, because a page number means nothing until the
+ * Filter, then sort, then paginate, in that order, because a page number means nothing until the
  * result set it indexes into is final.
  *
  * `total` is the count AFTER filtering and BEFORE paging: it's what pagination needs to know how
@@ -125,7 +125,7 @@ export function applyFacets<T extends FacetItem>(
  const materials = anyOf(params, ["filter.p.m.custom.fabric", "filter.v.t.shopify.fabric"], labels);
  // Size is the filter that matters most on one-of-one vintage. Shopify has filed it three different
  // ways across theme generations: an OPTION filter, a custom metafield, and (Horizon) a Standard
- // Product Taxonomy value — a shopper on any of them means the same thing.
+ // Product Taxonomy value: a shopper on any of them means the same thing.
  const sizes = anyOf(params, ["filter.v.option.size", "filter.p.m.custom.size", "filter.v.t.shopify.size"], labels);
  const gte = priceBound(params, "filter.v.price.gte");
  const lte = priceBound(params, "filter.v.price.lte");

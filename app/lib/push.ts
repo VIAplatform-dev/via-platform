@@ -1,6 +1,6 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Server-side Expo push delivery. Tokens are collected by the app (customers in
-// user_push_tokens, stores in store_push_tokens) — this sends banner pushes to
+// user_push_tokens, stores in store_push_tokens). This sends banner pushes to
 // them via the Expo Push API. Best-effort: failures never throw to the caller.
 // ───────────────────────────────────────────────────────────────────────────
 

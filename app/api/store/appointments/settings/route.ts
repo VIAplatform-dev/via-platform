@@ -7,7 +7,7 @@ import { seller, unauthorized } from "../_shared";
 
 export const dynamic = "force-dynamic";
 
-// A shop's diary rules. Warnings ride along so the form can flag combinations that will confuse —
+// A shop's diary rules. Warnings ride along so the form can flag combinations that will confuse,
 // a deposit with no Stripe account behind it, say.
 async function withWarnings(slug: string, settings: AppointmentSettings) {
  const pay = await getSellerPayments(slug).catch(() => null);

@@ -56,7 +56,7 @@ function MetricCard({ label, pct, n, ci, verdict, sub }: { label: string; pct: n
  <p className="text-[12px] font-medium text-stone-700">{label}</p>
  <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide ${v.chip}`}>{v.t}</span>
  </div>
- <p className="mt-1 text-[26px] font-semibold leading-none tabular-nums text-stone-900">{pct == null ? "—" : `${pct}%`}</p>
+ <p className="mt-1 text-[26px] font-semibold leading-none tabular-nums text-stone-900">{pct == null ? "-" : `${pct}%`}</p>
  <p className="mt-1.5 text-[10.5px] text-stone-400">{n ? `n=${n}${ci ? ` · 95% CI ${ciStr(ci)}` : ""}` : "no data yet"}{sub ? ` · ${sub}` : ""}</p>
  </div>
  );
@@ -70,7 +70,7 @@ function Readiness({ b }: { b: BetaReadiness }) {
  <div className="flex items-start justify-between gap-4">
  <div>
  <h2 className="text-[15px] font-semibold text-stone-900">Beta readiness</h2>
- <p className="mt-0.5 text-[11px] text-stone-500">Brand, price, and specific-piece must each clear <b>95%</b> — judged on the <i>lower</i> end of the confidence interval, so a lucky small sample can’t call it. Price is graded against what items actually sold for.</p>
+ <p className="mt-0.5 text-[11px] text-stone-500">Brand, price, and specific-piece must each clear <b>95%</b>, judged on the <i>lower</i> end of the confidence interval, so a lucky small sample can’t call it. Price is graded against what items actually sold for.</p>
  </div>
  <span className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold ${b.ready ? "bg-emerald-600 text-white" : "bg-stone-800 text-white"}`}>{b.ready ? "READY ✓" : "NOT READY"}</span>
  </div>
@@ -92,7 +92,7 @@ function Readiness({ b }: { b: BetaReadiness }) {
  )}
  {segs.length > 0 && (
  <div className="mt-3 overflow-x-auto">
- <p className="mb-1.5 text-[11px] font-medium text-stone-500">Price accuracy by segment <span className="font-normal text-stone-400">— where it’s solid vs weak</span></p>
+ <p className="mb-1.5 text-[11px] font-medium text-stone-500">Price accuracy by segment <span className="font-normal text-stone-400"> where it’s solid vs weak</span></p>
  <table className="w-full text-[12px]">
  <thead className="text-left text-[10px] uppercase tracking-wide text-stone-400"><tr><th className="py-1 pr-4 font-medium">Segment</th><th className="py-1 pr-4 font-medium">Graded</th><th className="py-1 pr-4 font-medium">±10%</th><th className="py-1 pr-4 font-medium">±20%</th><th className="py-1 pr-4 font-medium">Median err</th><th className="py-1 font-medium">Verdict</th></tr></thead>
  <tbody>
@@ -100,9 +100,9 @@ function Readiness({ b }: { b: BetaReadiness }) {
  <tr key={s.segment} className="border-t border-stone-100">
  <td className="py-1.5 pr-4 capitalize text-stone-700">{s.segment}</td>
  <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.n}</td>
- <td className="py-1.5 pr-4 tabular-nums font-semibold text-stone-800">{s.within10Pct == null ? "—" : `${s.within10Pct}%`}</td>
- <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.within20Pct == null ? "—" : `${s.within20Pct}%`}</td>
- <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.medianErrorPct == null ? "—" : `±${s.medianErrorPct}%`}</td>
+ <td className="py-1.5 pr-4 tabular-nums font-semibold text-stone-800">{s.within10Pct == null ? "-" : `${s.within10Pct}%`}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.within20Pct == null ? "-" : `${s.within20Pct}%`}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.medianErrorPct == null ? "-" : `±${s.medianErrorPct}%`}</td>
  <td className="py-1.5"><span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold ${VERDICT_STYLE[s.verdict].chip}`}>{VERDICT_STYLE[s.verdict].t}</span></td>
  </tr>
  ))}
@@ -119,7 +119,7 @@ type EvalResult = { sample: number; withReverseImage: boolean; fields: { field: 
 type EvalRun = { ranAt: string; sample: number; brandPct: number | null; eraPct: number | null; categoryPct: number | null; pricePct: number | null };
 type ArmScore = { brand: { pct: number | null; correct: number; total: number }; specific: { pct: number | null; correct: number; total: number }; era: { pct: number | null; correct: number; total: number } };
 type AblationRun = { sample: number; goldenOnly: boolean; memoryHitRate: number; base: ArmScore; withMemory: ArmScore; delta: { brandPct: number | null; specificPct: number | null; eraPct: number | null }; note: string };
-const pctStr = (n: number | null) => (n == null ? "—" : `${n}%`);
+const pctStr = (n: number | null) => (n == null ? "-" : `${n}%`);
 const SOURCE_LABEL: Record<string, string> = { intake: "AI listings", items: "VYA inventory", marketplace: "Marketplace" };
 
 type TrendPoint = { date: string; factualKeptPct: number | null; brandPct: number | null; categoryPct: number | null; materialPct: number | null; eraPct: number | null; priceWithin10Pct: number | null; listings30d: number };
@@ -153,13 +153,13 @@ function TrendHero({ trend, onSeed, seeding }: { trend: Trend | null; onSeed: ()
   <div className="flex items-start justify-between gap-4">
   <div>
    <h2 className="text-[15px] font-semibold text-stone-900">Accuracy toward onboarding</h2>
-   <p className="mt-0.5 text-[11px] text-stone-500">Recent (30-day) factual accuracy from seller edits — the share of brand / category / material / era the AI got right (kept, not corrected). Clear <b>{trend?.gate ?? 95}%</b> before onboarding stores. <span className="text-stone-400">Only listings drafted through AI intake are graded — imported or hand-typed listings have no AI guess to check, so they’re not counted here.</span></p>
+   <p className="mt-0.5 text-[11px] text-stone-500">Recent (30-day) factual accuracy from seller edits. The share of brand / category / material / era the AI got right (kept, not corrected). Clear <b>{trend?.gate ?? 95}%</b> before onboarding stores. <span className="text-stone-400">Only listings drafted through AI intake are graded. Imported or hand-typed listings have no AI guess to check, so they’re not counted here.</span></p>
   </div>
   <span className={`shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold ${ready ? "bg-emerald-600 text-white" : "bg-stone-800 text-white"}`}>{ready ? "READY ✓" : cur == null ? "NO DATA" : "NOT YET"}</span>
   </div>
   {cur == null ? (
   <div className="mt-4 flex flex-wrap items-center gap-3">
-   <p className="text-[12px] text-stone-500">No snapshots yet — seed the trend from your past listings.</p>
+   <p className="text-[12px] text-stone-500">No snapshots yet. Seed the trend from your past listings.</p>
    <button onClick={onSeed} disabled={seeding} className="rounded-lg bg-stone-900 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">{seeding ? "Building…" : "Seed from past listings"}</button>
   </div>
   ) : (
@@ -171,7 +171,7 @@ function TrendHero({ trend, onSeed, seeding }: { trend: Trend | null; onSeed: ()
    <Sparkline points={line} gate={trend?.gate ?? 95} />
    <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11px]">
    {([["Brand", latest?.brandPct], ["Category", latest?.categoryPct], ["Material", latest?.materialPct], ["Era", latest?.eraPct], ["Price ±10%", latest?.priceWithin10Pct]] as [string, number | null | undefined][]).map(([l, v]) => (
-    <span key={l} className="text-stone-500"><b className="tabular-nums text-stone-800">{v == null ? "—" : `${v}%`}</b> {l}</span>
+    <span key={l} className="text-stone-500"><b className="tabular-nums text-stone-800">{v == null ? "-" : `${v}%`}</b> {l}</span>
    ))}
    </div>
   </div>
@@ -251,7 +251,7 @@ export default function IntakeAccuracyPage() {
  }
 
  const price = data?.price;
- // Calibration verdict — honest about sample size + spread, not just the median.
+ // Calibration verdict: honest about sample size + spread, not just the median.
  const cal = !price || price.samples < 3 ? null
  : price.samples < 10 ? { t: `Too little data · ${price.samples} listings`, c: "text-stone-400" }
  : price.medianRatio >= 0.9 && price.medianRatio <= 1.1
@@ -264,7 +264,7 @@ export default function IntakeAccuracyPage() {
  <div className="mb-6 flex items-end justify-between">
  <div>
  <h1 className="text-xl font-semibold tracking-tight text-stone-900">Intake AI accuracy</h1>
- <p className="mt-1 text-[13px] text-stone-500">Where the listing AI gets corrected — the feedback loop, measured. Cross-store.</p>
+ <p className="mt-1 text-[13px] text-stone-500">Where the listing AI gets corrected. The feedback loop, measured. Cross-store.</p>
  </div>
  <div className="inline-flex rounded-lg border border-stone-200 p-0.5 text-[12px]">
  {[30, 90, 3650].map((d) => (
@@ -277,18 +277,18 @@ export default function IntakeAccuracyPage() {
 
  <TrendHero trend={trend} onSeed={seedTrend} seeding={seeding} />
 
- {/* ── Lab: research & tooling — collapsed by default so the readiness view stays clean ── */}
+ {/* ── Lab: research & tooling. Collapsed by default so the readiness view stays clean ── */}
  <details className="mb-6 rounded-xl border border-stone-200 bg-stone-50/40">
- <summary className="cursor-pointer select-none px-5 py-3 text-[13px] font-medium text-stone-600">Advanced — experiments &amp; tooling <span className="font-normal text-stone-400">· training data · manual exams · memory A/B · weekly history</span></summary>
+ <summary className="cursor-pointer select-none px-5 py-3 text-[13px] font-medium text-stone-600">Advanced. Experiments &amp; tooling <span className="font-normal text-stone-400">· training data · manual exams · memory A/B · weekly history</span></summary>
  <div className="space-y-6 px-3 pb-3">
 
- {/* Training dataset — labeled examples banked for a future VYA model. */}
+ {/* Training dataset: labeled examples banked for a future VYA model. */}
  {train && (
  <div className="mb-6 rounded-xl border border-stone-200 bg-white p-5">
  <div className="mb-3 flex items-center justify-between">
  <div>
  <p className="text-[13px] font-medium text-stone-700">Training dataset</p>
- <p className="text-[11px] text-stone-400">Clean, labeled examples banked for a future VYA model — new AI listings + everything already on the platform.</p>
+ <p className="text-[11px] text-stone-400">Clean, labeled examples banked for a future VYA model. New AI listings + everything already on the platform.</p>
  </div>
  <button onClick={backfill} disabled={backfilling} className="shrink-0 rounded-lg border border-stone-300 px-3 py-1.5 text-[12px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50">
  {backfilling ? "Backfilling…" : "Backfill existing listings"}
@@ -306,12 +306,12 @@ export default function IntakeAccuracyPage() {
  </div>
  )}
 
- {/* Practice exam — grade the current AI against labeled photos. */}
+ {/* Practice exam: grade the current AI against labeled photos. */}
  <div className="mb-6 rounded-xl border border-stone-200 bg-white p-5">
  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
  <div>
  <p className="text-[13px] font-medium text-stone-700">Practice exam</p>
- <p className="text-[11px] text-stone-400">Run the current AI on labeled photos and grade it — do this before &amp; after a prompt change to see if it improved. Costs a little per photo.</p>
+ <p className="text-[11px] text-stone-400">Run the current AI on labeled photos and grade it. Do this before &amp; after a prompt change to see if it improved. Costs a little per photo.</p>
  </div>
  <div className="flex items-center gap-2">
  <select value={evalSample} onChange={(e) => setEvalSample(Number(e.target.value))} className="rounded-lg border border-stone-300 px-2 py-1.5 text-[12px]">
@@ -321,13 +321,13 @@ export default function IntakeAccuracyPage() {
  <button onClick={runExam} disabled={evalRunning} className="rounded-lg bg-stone-900 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">{evalRunning ? "Grading…" : "Run exam"}</button>
  </div>
  </div>
- {evalRunning && <p className="text-[12px] text-stone-400">Running the AI on {evalSample} photos — this can take a minute…</p>}
+ {evalRunning && <p className="text-[12px] text-stone-400">Running the AI on {evalSample} photos. This can take a minute…</p>}
  {evalResult && !evalRunning && (
  <div>
  <div className="flex flex-wrap gap-3">
  {evalResult.fields.map((f) => (
  <div key={f.field} className="rounded-lg bg-stone-50 px-4 py-2 text-center">
- <p className="text-lg font-semibold tabular-nums text-stone-900">{f.total ? `${f.pct}%` : "—"}</p>
+ <p className="text-lg font-semibold tabular-nums text-stone-900">{f.total ? `${f.pct}%` : "-"}</p>
  <p className="text-[11px] text-stone-500">{cap(f.field)} <span className="text-stone-400">({f.correct}/{f.total})</span></p>
  </div>
  ))}
@@ -346,7 +346,7 @@ export default function IntakeAccuracyPage() {
  {evalResult.misses.map((m, i) => (
  <div key={i} className="flex items-center gap-2 text-[12px]">
  <span className="w-16 shrink-0 text-stone-400">{m.field}</span>
- <span className="text-red-600 line-through decoration-red-300">{m.guessed || "—"}</span>
+ <span className="text-red-600 line-through decoration-red-300">{m.guessed || "-"}</span>
  <span className="text-stone-400">→</span>
  <span className="font-medium text-emerald-700">{m.truth}</span>
  <a href={m.image} target="_blank" rel="noopener noreferrer" className="ml-auto shrink-0 text-[11px] text-stone-400 underline">photo</a>
@@ -359,16 +359,16 @@ export default function IntakeAccuracyPage() {
  )}
  </div>
 
- {/* Ablation — does the learning loop actually add accuracy? Memory OFF vs ON, same items. */}
+ {/* Ablation: does the learning loop actually add accuracy? Memory OFF vs ON, same items. */}
  <div className="mb-6 rounded-xl border border-stone-200 bg-white p-5">
  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
  <div>
- <p className="text-[13px] font-medium text-stone-700">Does memory actually help? <span className="font-normal text-stone-400">— the honest test</span></p>
+ <p className="text-[13px] font-medium text-stone-700">Does memory actually help? <span className="font-normal text-stone-400"> the honest test</span></p>
  <p className="text-[11px] text-stone-400">Runs the same photos with the learning loop OFF vs ON. A positive delta = memory is really adding accuracy; ~0 = it isn’t (usually because the corpus is still empty). Reverse-image is held out so the delta is memory alone.</p>
  </div>
  <button onClick={runAblationNow} disabled={ablationRunning} className="shrink-0 rounded-lg bg-stone-900 px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50">{ablationRunning ? "Running…" : "Run A/B"}</button>
  </div>
- {ablationRunning && <p className="text-[12px] text-stone-400">Drafting each photo twice (off vs on) — this takes a minute…</p>}
+ {ablationRunning && <p className="text-[12px] text-stone-400">Drafting each photo twice (off vs on): this takes a minute…</p>}
  {ablation && !ablationRunning && (
  <div>
  <div className="overflow-x-auto">
@@ -378,9 +378,9 @@ export default function IntakeAccuracyPage() {
  {([["Brand", ablation.base.brand, ablation.withMemory.brand, ablation.delta.brandPct], ["Specific", ablation.base.specific, ablation.withMemory.specific, ablation.delta.specificPct], ["Era", ablation.base.era, ablation.withMemory.era, ablation.delta.eraPct]] as [string, ArmScore["brand"], ArmScore["brand"], number | null][]).map(([label, off, on, delta]) => (
  <tr key={label} className="border-t border-stone-100">
  <td className="py-1.5 pr-4 text-stone-700">{label}</td>
- <td className="py-1.5 pr-4 tabular-nums text-stone-500">{off.pct == null ? "—" : `${off.pct}%`}</td>
- <td className="py-1.5 pr-4 tabular-nums text-stone-800">{on.pct == null ? "—" : `${on.pct}%`}</td>
- <td className={`py-1.5 tabular-nums font-semibold ${delta == null ? "text-stone-400" : delta > 0 ? "text-emerald-600" : delta < 0 ? "text-red-600" : "text-stone-400"}`}>{delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta} pts`}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-500">{off.pct == null ? "-" : `${off.pct}%`}</td>
+ <td className="py-1.5 pr-4 tabular-nums text-stone-800">{on.pct == null ? "-" : `${on.pct}%`}</td>
+ <td className={`py-1.5 tabular-nums font-semibold ${delta == null ? "text-stone-400" : delta > 0 ? "text-emerald-600" : delta < 0 ? "text-red-600" : "text-stone-400"}`}>{delta == null ? "-" : `${delta > 0 ? "+" : ""}${delta} pts`}</td>
  </tr>
  ))}
  </tbody>
@@ -392,7 +392,7 @@ export default function IntakeAccuracyPage() {
  )}
  </div>
 
- {/* Weekly exam history — auto-runs Mondays; watch the trend climb. */}
+ {/* Weekly exam history: auto-runs Mondays; watch the trend climb. */}
  {evalRuns.length > 0 && (
  <div className="mb-6 rounded-xl border border-stone-200 bg-white p-5">
  <p className="mb-1 text-[13px] font-medium text-stone-700">Weekly exams</p>
@@ -442,13 +442,13 @@ export default function IntakeAccuracyPage() {
  {data.betaReadiness && <Readiness b={data.betaReadiness} />}
  {data.totalPublishes < 25 && (
  <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-[12px] text-amber-800">
- <b>Only {data.totalPublishes} AI-intake listing{data.totalPublishes === 1 ? "" : "s"} to grade so far</b> — <i>not</i> your whole inventory. Imported and hand-typed listings have no AI guess to check, so they aren’t counted. At this size the numbers are <b>directional, not reliable yet</b> — one item can swing a category. They firm up as more listings go through AI intake (aim for a few dozen per category).
+ <b>Only {data.totalPublishes} AI-intake listing{data.totalPublishes === 1 ? "" : "s"} to grade so far</b>, <i>not</i> your whole inventory. Imported and hand-typed listings have no AI guess to check, so they aren’t counted. At this size the numbers are <b>directional, not reliable yet</b> one item can swing a category. They firm up as more listings go through AI intake (aim for a few dozen per category).
  </div>
  )}
  <div className="grid grid-cols-3 gap-3">
  <Stat label="Listings" value={data.totalPublishes.toLocaleString()} hint="AI-drafted, published" />
  <Stat label="Corrections" value={data.totalCorrections.toLocaleString()} hint="fields sellers changed" />
- <Stat label="Price median" value={price ? `${price.medianRatio.toFixed(2)}×` : "—"} hint={cal ? cal.t : "need ≥3 priced"} />
+ <Stat label="Price median" value={price ? `${price.medianRatio.toFixed(2)}×` : "-"} hint={cal ? cal.t : "need ≥3 priced"} />
  </div>
 
  {/* Per-field accuracy lives in the hero now (coverage-aware); the old precision-only bars were a
@@ -487,11 +487,11 @@ export default function IntakeAccuracyPage() {
  </div>
  )}
 
- {/* Brand accuracy by category — where the model IDs the brand right vs wrong */}
+ {/* Brand accuracy by category, where the model IDs the brand right vs wrong */}
  {data.brandSegments && data.brandSegments.length > 0 && (
  <div className="rounded-xl border border-stone-200 bg-white p-5">
- <p className="mb-1 text-[13px] font-medium text-stone-700">Brand accuracy — by category</p>
- <p className="mb-3 text-[11px] text-stone-400">How often the AI gets the brand right when the seller didn’t type it (graded house-level — Dior = Christian Dior). Only cases where the model actually did the identifying.</p>
+ <p className="mb-1 text-[13px] font-medium text-stone-700">Brand accuracy, by category</p>
+ <p className="mb-3 text-[11px] text-stone-400">How often the AI gets the brand right when the seller didn’t type it (graded house-level: Dior = Christian Dior). Only cases where the model actually did the identifying.</p>
  <div className="overflow-x-auto">
  <table className="w-full text-[12px]">
  <thead className="text-left text-[11px] uppercase tracking-wide text-stone-400">
@@ -515,11 +515,11 @@ export default function IntakeAccuracyPage() {
  </div>
  )}
 
- {/* Where pricing lands — by category (where it fails vs works) */}
+ {/* Where pricing lands, by category (where it fails vs works) */}
  {data.segments && data.segments.length > 0 && (
  <div className="rounded-xl border border-stone-200 bg-white p-5">
- <p className="mb-1 text-[13px] font-medium text-stone-700">Where pricing lands — by category</p>
- <p className="mb-3 text-[11px] text-stone-400">Is the AI’s price landing near where sellers actually list? <b>1.00× = spot on;</b> above 1 means the AI priced too <b>low</b>, below 1 too <b>high</b>. Categories under 3 priced listings are too thin to judge — they’ll firm up as you list.</p>
+ <p className="mb-1 text-[13px] font-medium text-stone-700">Where pricing lands, by category</p>
+ <p className="mb-3 text-[11px] text-stone-400">Is the AI’s price landing near where sellers actually list? <b>1.00× = spot on;</b> above 1 means the AI priced too <b>low</b>, below 1 too <b>high</b>. Categories under 3 priced listings are too thin to judge. They’ll firm up as you list.</p>
  <div className="overflow-x-auto">
  <table className="w-full text-[12px]">
  <thead className="text-left text-[11px] uppercase tracking-wide text-stone-400">
@@ -531,8 +531,8 @@ export default function IntakeAccuracyPage() {
  const thin = s.priced < 3;
  const show = !thin && r != null;
  const reading = s.priced === 0 ? "No priced listings yet"
- : thin ? `Too thin to judge — only ${s.priced}`
- : r == null ? "—"
+ : thin ? `Too thin to judge, only ${s.priced}`
+ : r == null ? "-"
  : r >= 0.9 && r <= 1.1 ? "On the money"
  : r > 1.3 ? `AI priced way too LOW (sellers listed ~${Math.round((r - 1) * 100)}% higher)`
  : r > 1.1 ? "AI runs a bit low"
@@ -543,7 +543,7 @@ export default function IntakeAccuracyPage() {
  <tr key={s.category} className="border-t border-stone-100">
  <td className="py-1.5 pr-4 capitalize text-stone-700">{s.category}</td>
  <td className="py-1.5 pr-4 tabular-nums text-stone-500">{s.priced}<span className="text-stone-300"> / {s.publishes}</span></td>
- <td className={`py-1.5 pr-4 font-semibold tabular-nums ${c}`}>{show ? `${r.toFixed(2)}×` : "—"}</td>
+ <td className={`py-1.5 pr-4 font-semibold tabular-nums ${c}`}>{show ? `${r.toFixed(2)}×` : "-"}</td>
  <td className={`py-1.5 ${c}`}>{reading}</td>
  </tr>
  );
@@ -554,11 +554,11 @@ export default function IntakeAccuracyPage() {
  </div>
  )}
 
- {/* What sellers are changing — the live correction feed (what people are putting in) */}
+ {/* What sellers are changing. The live correction feed (what people are putting in) */}
  {data.corrections && data.corrections.length > 0 && (
  <div className="rounded-xl border border-stone-200 bg-white p-5">
  <p className="mb-1 text-[13px] font-medium text-stone-700">What sellers are changing</p>
- <p className="mb-3 text-[11px] text-stone-400">Every field a seller corrected from the AI’s draft, newest first — the raw stream of where the model is wrong, with the photo.</p>
+ <p className="mb-3 text-[11px] text-stone-400">Every field a seller corrected from the AI’s draft, newest first. The raw stream of where the model is wrong, with the photo.</p>
  <div className="max-h-[28rem] space-y-1.5 overflow-y-auto pr-1">
  {data.corrections.map((c, i) => (
  <div key={i} className="flex items-center gap-2.5 rounded-lg border border-stone-100 px-2 py-1.5">
@@ -566,9 +566,9 @@ export default function IntakeAccuracyPage() {
  {c.imageUrl ? <img src={c.imageUrl} alt="" className="h-9 w-9 shrink-0 rounded-md bg-stone-100 object-cover" /> : <div className="h-9 w-9 shrink-0 rounded-md bg-stone-100" />}
  <span className="w-16 shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-center text-[10px] font-medium uppercase tracking-wide text-stone-500">{c.field}</span>
  <span className="min-w-0 flex-1 truncate">
- <span className="text-red-600 line-through decoration-red-300">{c.aiValue || "—"}</span>
+ <span className="text-red-600 line-through decoration-red-300">{c.aiValue || "-"}</span>
  <span className="mx-1.5 text-stone-400">→</span>
- <span className="font-medium text-emerald-700">{c.finalValue || "—"}</span>
+ <span className="font-medium text-emerald-700">{c.finalValue || "-"}</span>
  </span>
  <span className="shrink-0 text-[10px] text-stone-400">{c.store}</span>
  </div>
@@ -577,7 +577,7 @@ export default function IntakeAccuracyPage() {
  </div>
  )}
 
- <p className="text-[11px] text-stone-400">True per-field accuracy: only fields the AI actually predicted are scored (fields sellers pre-typed are excluded). Each graded field is a labeled example — the dataset the eval harness will replay.</p>
+ <p className="text-[11px] text-stone-400">True per-field accuracy: only fields the AI actually predicted are scored (fields sellers pre-typed are excluded). Each graded field is a labeled example. The dataset the eval harness will replay.</p>
  </div>
  </details>
  )}

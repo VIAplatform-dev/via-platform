@@ -26,7 +26,7 @@ export async function GET(request: Request) {
  const status = searchParams.get("status"); // read-only lock inspection, no send
 
  // The secret is required unconditionally for every mode (test send, status probe, or the real
- // cron run) — testEmail/status previously bypassed the secret check entirely, making this an
+ // cron run): testEmail/status previously bypassed the secret check entirely, making this an
  // unauthenticated open email-relay (testEmail) and an unauthenticated internal-state leak (status).
  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,7 +42,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
    ok: true,
    skipped: true,
-   reason: `Not 5 PM Eastern — it is ${easternHour(new Date())}:00 ET. The other UTC slot sends today.`,
+   reason: `Not 5 PM Eastern. It is ${easternHour(new Date())}:00 ET. The other UTC slot sends today.`,
    cronSchedule,
   });
  }
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
  // Read last-sent time first (used for the since window + rollback below)
  const lastSentRaw = await getSetting("new_arrivals_last_sent_at");
 
- // Lock status probe — tells us whether the 120h lock is what blocked the last cron run.
+ // Lock status probe: tells us whether the 120h lock is what blocked the last cron run.
  if (status) {
  const hoursSince = lastSentRaw ? Math.round((Date.now() - new Date(lastSentRaw).getTime()) / 3_600_000) : null;
  return NextResponse.json({
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
 
  try {
  if (!testEmail) {
- // Atomically claim the send slot — prevents double-sends from concurrent
+ // Atomically claim the send slot. Prevents double-sends from concurrent
  // Vercel cron invocations. Only the first caller wins the UPDATE; any
  // concurrent duplicate sees 0 rows returned and skips immediately.
  await sql`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`;
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
  : 0;
  return NextResponse.json({
  ok: true,
- message: `New arrivals email already sent ${hoursSince}h ago — needs 120h to reset.`,
+ message: `New arrivals email already sent ${hoursSince}h ago: needs 120h to reset.`,
  skipped: true,
  lastSentAt: lastSentRaw,
  hoursSince,
@@ -181,7 +181,7 @@ export async function GET(request: Request) {
  debug: { since: sinceIso, totalInWindow: unfiltered.total, afterShopifyFilter: unfiltered.after_shopify_filter },
  });
  }
- // Nothing to send — release the slot so the next run retries.
+ // Nothing to send: release the slot so the next run retries.
  await rollback();
  return NextResponse.json({ ok: true, message: "No new arrivals this week.", sent: 0 });
  }

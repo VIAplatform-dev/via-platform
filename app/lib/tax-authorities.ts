@@ -1,6 +1,6 @@
 // Where a seller actually goes to get registered.
 //
-// VYA's tax screen tells Stripe that a store HAS a registration. It cannot get her one — that comes
+// VYA's tax screen tells Stripe that a store HAS a registration. It cannot get her one. That comes
 // from a government, and it is the step sellers get stuck on, because "register for VAT" is not a
 // thing anyone finds by guessing. So: name the authority and link straight to its registration page.
 //
@@ -45,7 +45,7 @@ export const EU_OSS: Authority = {
  what: "One Stop Shop (OSS/IOSS)",
  authority: "European Commission",
  url: "https://vat-one-stop-shop.ec.europa.eu/index_en",
- note: "One registration covers VAT for all EU countries — you don't need one per country.",
+ note: "One registration covers VAT for all EU countries. You don't need one per country.",
 };
 
 const EU_MEMBERS = new Set([
@@ -53,7 +53,7 @@ const EU_MEMBERS = new Set([
  "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE",
 ]);
 
-/** US states with no state sales tax — there is nothing to register for, which is worth saying. */
+/** US states with no state sales tax. There is nothing to register for, which is worth saying. */
 export const NO_SALES_TAX_STATES: Record<string, string> = {
  DE: "Delaware has no sales tax.",
  MT: "Montana has no sales tax.",
@@ -80,7 +80,7 @@ export const US_STATE_AUTHORITIES: Record<string, Authority> = {
  AZ: { what: "Transaction privilege tax licence", authority: "Arizona Dept of Revenue", url: "https://azdor.gov/transaction-privilege-tax-tpt" },
 };
 
-/** Where to start for a US state we don't list — 24 states register through one system. */
+/** Where to start for a US state we don't list. 24 states register through one system. */
 export const US_FALLBACK: Authority = {
  what: "Sales tax registration",
  authority: "Streamlined Sales Tax",
@@ -95,7 +95,7 @@ export type AuthorityAnswer =
 /**
  * Where to go to register for one place.
  *
- * A US state with no sales tax gets an answer, not a link — "there is nothing to register for" is
+ * A US state with no sales tax gets an answer, not a link. "there is nothing to register for" is
  * the most useful thing we can say, and a link would imply otherwise.
  */
 export function authorityFor(country: unknown, state?: unknown): AuthorityAnswer | null {

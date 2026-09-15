@@ -6,8 +6,8 @@ import { EmailFrame } from "../EmailFrame";
 
 // The gallery a seller sees before the blank box.
 //
-// Every card shows the REAL subject and opening line this shop would send — filled server-side with
-// the store's name and its newest pieces — because a card reading "{count} new pieces" is asking her
+// Every card shows the REAL subject and opening line this shop would send. Filled server-side with
+// the store's name and its newest pieces, because a card reading "{count} new pieces" is asking her
 // to finish writing it, which is the thing the gallery exists to avoid.
 
 type Template = {
@@ -48,7 +48,7 @@ export default function StartingPoints() {
    {open && (
     <>
      <p className="mt-0.5 text-[12px] text-stone-500">
-      Each one opens as a draft with your shop&rsquo;s details already in it. Click one to read it, then change anything you like.
+      Each opens as a draft with your shop&rsquo;s details filled in. Change anything you like.
      </p>
 
      <div className="mt-3 flex flex-wrap gap-1.5">
@@ -71,7 +71,7 @@ export default function StartingPoints() {
         className="group w-[240px] shrink-0 snap-start overflow-hidden rounded-xl border border-stone-200 bg-white text-left transition hover:border-stone-400 sm:w-auto"
        >
         {/* The card IS the email: a real render, scaled down. A sketch is a guess at what you'd
-            get — this is what would arrive, in your colours, with your pieces in it.
+            get: this is what would arrive, in your colours, with your pieces in it.
             600px wide scaled to the card, clipped at a readable height. */}
         <div className="relative h-[190px] overflow-hidden border-b border-stone-100 bg-white">
          <iframe

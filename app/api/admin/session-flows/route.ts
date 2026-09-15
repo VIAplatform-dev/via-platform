@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
  FROM session_agg
  `),
 
- // 2. Funnel — session-based for top 3 stages, direct table counts for clicks/orders
+ // 2. Funnel: session-based for top 3 stages, direct table counts for clicks/orders
  safe(() => sql`
  WITH pv AS (
  SELECT user_id, page_type, timestamp, session_id

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-// THE PROXY NO LONGER GUARDS /api/store — each route does.
+// THE PROXY NO LONGER GUARDS /api/store. Each route does.
 //
 // proxy.ts allowlists "/api/store" as one entry, because listing forty of them one by one meant
 // forty-two siblings were silently left off: reaching Rentals, Sales tax or your own People page
@@ -33,7 +33,7 @@ const DELEGATES = /return\s+\w+\(\s*request\s*,/;
 /** An OAuth provider redirects back with no session to speak of; these verify their own state. */
 const CALLBACK = /callback/;
 
-test("every /api/store route authorises itself — the proxy stopped doing it for them", () => {
+test("every /api/store route authorises itself. The proxy stopped doing it for them", () => {
  const files = routeFiles(ROOT);
  assert.ok(files.length > 100, `expected the full store API, found ${files.length}`);
 
@@ -47,7 +47,7 @@ test("every /api/store route authorises itself — the proxy stopped doing it fo
  assert.deepEqual(
   unguarded.map((f) => f.replace(ROOT + path.sep, "")),
   [],
-  "these routes are reachable without authenticating — either authenticate, or take /api/store back out of PUBLIC_ROUTES",
+  "these routes are reachable without authenticating. Either authenticate, or take /api/store back out of PUBLIC_ROUTES",
  );
 });
 

@@ -7,7 +7,7 @@
  * them again, or she leaves.
  *
  * ONLY A STORE BUILDING FROM SCRATCH. A seller who brought her own website over already has her
- * products — they came in with the site, from Shopify or Squarespace or wherever she was. Asking
+ * products. They came in with the site, from Shopify or Squarespace or wherever she was. Asking
  * HER about Depop is a question with no right answer: her pieces are already here, and the prompt
  * reads as VYA not knowing what it just did.
  *
@@ -33,7 +33,7 @@ export type PromptVerdict =
 
 /**
  * `action` is what the button does. Without the extension the honest button is "get the extension",
- * not "bring them over" — a button that cannot do the thing it says is worse than the question.
+ * not "bring them over". A button that cannot do the thing it says is worse than the question.
  */
 export function depopPrompt(s: PromptState): PromptVerdict {
  if (s.hasCapturedSite) return { show: false, why: "imported-site" };

@@ -22,7 +22,7 @@ test("net profit subtracts every cost the store actually bore", () => {
 });
 
 test("a loss is reported as a loss, not clamped to zero", () => {
- // THE BUG THIS EXISTS FOR. Home wrapped the figure in Math.max(0, …), so a bad month read as £0 —
+ // THE BUG THIS EXISTS FOR. Home wrapped the figure in Math.max(0, …), so a bad month read as £0,
  // which turns bad news into no news. A store that lost money needs to see the minus sign.
  assert.ok(netProfit(MONTH) < 0);
 });
@@ -37,7 +37,7 @@ test("label costs count, because they are recorded on every order", () => {
  assert.equal(netProfit(noLabels) - netProfit(MONTH), 9_000);
 });
 
-test("no cost on record means no net figure — not a 100% margin", () => {
+test("no cost on record means no net figure, not a 100% margin", () => {
  // A piece with no cost is unknown, not free. Margin.ts already refuses to compute on it; the
  // net figure follows the same rule so an uncosted month never prints a profit it can't defend.
  assert.equal(netProfit({ ...MONTH, coveredSales: 0, costCents: 0 }), null);
@@ -68,7 +68,7 @@ test("a zero line is omitted so a cash-only store isn't shown empty rows", () =>
 });
 
 test("the missing-cost note says how many sold pieces the figure could not include", () => {
- assert.equal(missingCostNote({ ...MONTH, coveredSales: 6, totalSales: 9 }), "Cost missing on 3 sold pieces — not counted above.");
- assert.equal(missingCostNote({ ...MONTH, coveredSales: 8, totalSales: 9 }), "Cost missing on 1 sold piece — not counted above.");
+ assert.equal(missingCostNote({ ...MONTH, coveredSales: 6, totalSales: 9 }), "Cost missing on 3 sold pieces, not counted above.");
+ assert.equal(missingCostNote({ ...MONTH, coveredSales: 8, totalSales: 9 }), "Cost missing on 1 sold piece, not counted above.");
  assert.equal(missingCostNote(MONTH), null);
 });

@@ -12,7 +12,7 @@ export default function BigCartelSetupPage() {
  const displaySlug = storeSlug || "your-store-id";
  const displayName = storeName || "Your Store Name";
 
- // Combined snippet — click tracking on all pages + conversion on /success
+ // Combined snippet: click tracking on all pages + conversion on /success
  const trackingCode = `<!-- VYA Tracking -->
 <script>
 (function() {

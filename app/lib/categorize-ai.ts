@@ -3,7 +3,7 @@
 // whose category is free text, wrong, or missing.
 //
 // Deliberately narrow: it picks ONE slug from a fixed list, or says "unknown". It never
-// invents a category — an unrecognised item is left alone rather than guessed at, because
+// invents a category: an unrecognised item is left alone rather than guessed at, because
 // a wrong tag is worse than an untagged one (it hides the item under the wrong filter).
 
 import { AI_MODELS } from "./ai-models";
@@ -15,14 +15,14 @@ import {
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = AI_MODELS.categorize;
 
-// The full taxonomy, grouped, as the model sees it — slug first so it answers with a slug.
+// The full taxonomy, grouped, as the model sees it. Slug first so it answers with a slug.
 const TAXONOMY = CATEGORY_GROUPS
- .map((g) => `${g.label}:\n${g.slugs.map((s) => `  ${s} — ${categoryTagLabel(s)}`).join("\n")}`)
+ .map((g) => `${g.label}:\n${g.slugs.map((s) => `  ${s}: ${categoryTagLabel(s)}`).join("\n")}`)
  .join("\n");
 
 const SYSTEM = `You categorise second-hand fashion items for a vintage marketplace.
 
-Reply with EXACTLY ONE slug from this list, and nothing else — no punctuation, no explanation:
+Reply with EXACTLY ONE slug from this list, and nothing else, no punctuation, no explanation:
 
 ${TAXONOMY}
 
@@ -58,7 +58,7 @@ export async function categorizeItem(item: { id: string; title: string; imageUrl
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
   await recordAnthropic(MODEL, "categorize", data).catch(() => {});
   const answer = (data.content?.find((c) => c.type === "text")?.text ?? "").trim().toLowerCase();
-  // Only a verbatim slug counts — anything else (including "unknown") leaves the item alone.
+  // Only a verbatim slug counts. Anything else (including "unknown") leaves the item alone.
   return { id: item.id, slug: isCanonicalCategory(answer) ? answer : null };
  } catch {
   return { id: item.id, slug: null };

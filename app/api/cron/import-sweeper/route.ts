@@ -11,12 +11,12 @@ export const maxDuration = 300;
 //
 // A crawl of a big store outlives a single function invocation (maxDuration 300s; one store in the
 // corpus is 95 pages / 51 MB), so an import stopping half-way is normal, not exceptional. The
-// seller's browser resumes it while their tab is open — this is the backstop for when it isn't:
+// seller's browser resumes it while their tab is open. This is the backstop for when it isn't:
 // they closed the laptop, or the instance died mid-crawl and nothing marked the job finished.
 //
 // Two duties:
 //   1. Claim jobs still marked `running` that have gone silent past the stall window (their instance
-//      is gone) and flip them to `paused` — done atomically in SQL so two overlapping sweeps can't
+//      is gone) and flip them to `paused`. Done atomically in SQL so two overlapping sweeps can't
 //      both grab the same job.
 //   2. Continue `paused` jobs that still have queued pages.
 //

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // The clean funnel for the acting store, straight off the canonical event stream: views →
 // favorites → checkout-starts → purchases over a window, plus the per-item breakdown (enriched with
 // each piece's title/photo/price so the store sees WHICH item is viewed most / abandoned most).
-// One key — the payoff of the unified events model. (?days=30 default.)
+// One key: the payoff of the unified events model. (?days=30 default.)
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

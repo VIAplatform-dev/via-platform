@@ -5,7 +5,7 @@
 // previews, each with its own hardcoded `border-black/20 bg-white/70`. On a cream template that
 // reads as a white box pasted onto the page; on a dark one it is worse. And because none of them
 // used the corner token, a store set to soft corners still drew square inputs next to its rounded
-// buttons — which is exactly how it looked on Corner Shop.
+// buttons, which is exactly how it looked on Corner Shop.
 //
 // Two rules make a field belong to the page it is on:
 //   · colour comes from `currentColor`, so the field inherits the storefront's ink and ground

@@ -23,12 +23,12 @@ export async function POST(req: NextRequest) {
  const pageType = String(b?.pageType || "page").slice(0, 40);
  const title = b?.title ? String(b.title).slice(0, 200) : null;
 
- // Session id — shared with the storefront tracker so one visit can span both surfaces.
+ // Session id: shared with the storefront tracker so one visit can span both surfaces.
  let sessionId = req.cookies.get(SESSION_COOKIE)?.value || null;
  let setCookie: string | null = null;
  if (!sessionId) { sessionId = crypto.randomUUID(); setCookie = `${SESSION_COOKIE}=${sessionId}; Path=/; Max-Age=1800; HttpOnly; SameSite=Lax`; }
 
- // Always log the pageview (what pages shoppers browse — clean per-store data).
+ // Always log the pageview (what pages shoppers browse. Clean per-store data).
  await recordStorePageview({ storeSlug, path, pageType, title, sessionId, surface: "marketplace" }).catch(() => {});
 
  // On the first hit for this store this session, record the acquisition source. Internal

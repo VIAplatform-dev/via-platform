@@ -1,4 +1,4 @@
-// Holds on the phone — the words for a piece kept back for someone. Mirrors app/lib/holds-core.ts.
+// Holds on the phone. The words for a piece kept back for someone. Mirrors app/lib/holds-core.ts.
 
 const DAY = 86_400_000;
 

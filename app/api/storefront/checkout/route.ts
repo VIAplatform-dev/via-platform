@@ -11,6 +11,8 @@ import { getConsignmentItemByProduct } from "@/app/lib/consignment-db";
 import { consignorCutCents } from "@/app/lib/consignment-logic";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { quoteShipping } from "@/app/lib/shipping-zones";
+import { parcelFor } from "@/app/lib/parcel-estimate";
+import { refusalMessage } from "@/app/lib/shipping-embargo";
 import { validateDiscount, computeDiscount, distributeDiscount } from "@/app/lib/store-discounts-db";
 import { recordEvent } from "@/app/lib/analytics-events-db";
 import type { Item } from "@/app/lib/db/schema";
@@ -27,8 +29,8 @@ function baseUrl(request: NextRequest) {
  return `${proto}://${host}`;
 }
 
-// POST — check out the cart. Each seller has their own connected Stripe account,
-// so a direct charge can only cover one seller — we group the cart by seller and
+// POST: check out the cart. Each seller has their own connected Stripe account,
+// so a direct charge can only cover one seller. We group the cart by seller and
 // open one Stripe Checkout Session per seller (direct charge + VYA application
 // fee). Returns a session per seller; a single-seller cart is the common case.
 export async function POST(request: NextRequest) {
@@ -36,12 +38,12 @@ export async function POST(request: NextRequest) {
 
  const token = request.cookies.get(COOKIE)?.value;
  if (!token) return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
- // This store's bag — see storefront-cart-scope.
+ // This store's bag: see storefront-cart-scope.
  const ids = await getCartItemIds(token, await requestBagSellerId(request, token));
  if (!ids.length) return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
 
  // We collect the address on VYA (so we can quote a live shipping rate first), then
- // open the Stripe session — same pattern as the single-item Buy-now checkout.
+ // open the Stripe session. Same pattern as the single-item Buy-now checkout.
  const body = await request.json().catch(() => null);
  const buyer = body?.buyer || {};
  const ship = body?.ship || {};
@@ -74,7 +76,7 @@ export async function POST(request: NextRequest) {
  const seller = await getSellerById(sellerId);
  if (!seller) continue;
  const pay = await getSellerPayments(seller.slug);
- // Also skips an account from the other Stripe mode — see stripe-mode.ts.
+ // Also skips an account from the other Stripe mode. See stripe-mode.ts.
  const acctId = payableAccountId(pay);
  if (!acctId) continue; // store can't take payment yet
 
@@ -88,7 +90,7 @@ export async function POST(request: NextRequest) {
 
  const amounts = reserved.map((it) => it.priceCents);
  const subtotal = amounts.reduce((s, a) => s + a, 0);
- // Per-store discount code — ONLY this seller's own code applies. validateDiscount is scoped by
+ // Per-store discount code, ONLY this seller's own code applies. validateDiscount is scoped by
  // seller.slug, so a code created by another store in the cart can never touch this store's items.
  let off = 0; let freeShip = false; let applied: { id: number; code: string } | null = null;
  const discountCode = typeof body?.discountCode === "string" ? body.discountCode : "";
@@ -101,16 +103,16 @@ export async function POST(request: NextRequest) {
 
  // Sales tax, when the store has turned it on. DIRECT charge on their connected
  // account, so Stripe Tax calculates against THEIR registrations and THEY stay
- // merchant of record — the "connected account is responsible" model from
+ // merchant of record: the "connected account is responsible" model from
  // Stripe's Connect tax docs. VYA calculates nothing and is liable for nothing.
  const taxPref = await getTaxSettings(seller.slug).catch(() => ({ enabled: false, productTaxCode: null as string | null }));
  // Only ask for automatic_tax once the account has finished Stripe Tax setup.
  // Where a seller has no registration Stripe simply calculates nothing, which is
- // correct — but an account that never completed setup can fail the session, and
+ // correct, but an account that never completed setup can fail the session, and
  // losing a sale is worse than not charging tax on it.
  const taxReady = taxPref.enabled ? await stripeTaxReady(acctId).catch(() => ({ active: false, registrations: 0, country: null as string | null })) : { active: false, registrations: 0, country: null as string | null };
  const tax = { enabled: taxPref.enabled && taxReady.active, productTaxCode: taxPref.productTaxCode };
- // Does the price this seller typed already include tax? It is not a preference — it follows from
+ // Does the price this seller typed already include tax? It is not a preference. It follows from
  // where the store is established (see tax-inclusive.ts). A UK seller's "200" means £200 all in,
  // because UK consumer law requires the shopper to see the VAT-inclusive figure; a US seller's
  // "200" means $200 before tax, because US sales tax depends on the buyer's address and no single
@@ -143,32 +145,39 @@ export async function POST(request: NextRequest) {
  },
  };
  });
- // Server-authoritative shipping, PER SELLER — each store ships its own parcel, so each session
+ // Server-authoritative shipping, PER SELLER. Each store ships its own parcel, so each session
  // charges that store's own flat tier. Never a client-supplied value, and not "only the first seller"
  // (which used to leave sellers 2..N charged for a label the buyer never paid for).
  const shipSettings = await getShippingSettings(seller.slug);
  const shipFree = shipSettings.mode === "store_pays" || (shipSettings.mode === "free_over" && shipSettings.freeThresholdCents != null && subtotal >= shipSettings.freeThresholdCents);
- // Flat-rate by size (Depop/Poshmark-style), PER SELLER — the buyer pays one clean, consistent tier
+ // Flat-rate by size (Depop/Poshmark-style), PER SELLER: the buyer pays one clean, consistent tier
  // price for this store's parcel, same number every time. VYA buys the real discounted label at
  // fulfillment and keeps the spread; margin is baked into the tier + kept safe by round-up dims.
+ // Per piece: what she measured, else what the piece IS, else a plain default. The `|| 16` /
+ // `|| 12` / `|| 9` / `|| 3` this replaces looked like a harmless fallback and was not: those
+ // numbers sit exactly on the Small tier's limits, so every unmeasured piece sold with 800 of
+ // postage and a coat's label cost 2200. See parcel-estimate.ts.
+ const parcels = reserved.map((it) => parcelFor(it));
  const parcel = {
- weightOz: reserved.reduce((s, it) => s + (it.weightOz || 16), 0),
- lengthIn: Math.max(...reserved.map((it) => it.lengthIn || 12)),
- widthIn: Math.max(...reserved.map((it) => it.widthIn || 9)),
- heightIn: reserved.reduce((s, it) => s + (it.heightIn || 3), 0),
+ weightOz: parcels.reduce((s, p) => s + p.weightOz, 0),
+ lengthIn: Math.max(...parcels.map((p) => p.lengthIn)),
+ widthIn: Math.max(...parcels.map((p) => p.widthIn)),
+ heightIn: parcels.reduce((s, p) => s + p.heightIn, 0),
  };
  // Priced by DESTINATION, not just by parcel size. One flat rate everywhere meant the same $14 for
- // the next town and for Sydney, which is a loss on every export — see shipping-zones.ts. A zone the
+ // the next town and for Sydney, which is a loss on every export. See shipping-zones.ts. A zone the
  // store hasn't opened is refused here rather than sold: taking money for a parcel she has no way to
  // post is worse than losing the sale.
  const shipQuote = quoteShipping({
  fromCountry: shipSettings.shipFrom?.country || "US",
  toCountry: ship.country || "US",
+ // The state, so an embargoed region inside a shippable country is refused here too.
+ toRegion: ship.state,
  parcel,
  zones: shipSettings.zones,
  });
  if (!shipQuote.ok) {
- return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
+ return NextResponse.json({ error: refusalMessage(shipQuote) }, { status: 400 });
  }
  const shipHere = shipFree || !shipQuote.ok ? 0 : shipQuote.amountCents;
  const effShip = freeShip ? 0 : shipHere; // a free-shipping code waives the buyer's shipping charge
@@ -177,7 +186,7 @@ export async function POST(request: NextRequest) {
  // Stripe decide rather than us guessing.
  if (effShip > 0) lineItems[reserved.length] = { quantity: 1, price_data: { currency: cur, unit_amount: effShip, product_data: { name: "Shipping", ...(tax.enabled ? { tax_code: TAX_CODE_SHIPPING } : {}) }, ...(tax.enabled ? { tax_behavior: taxBehavior } : {}) } };
  // Consignment (Model A): route each consigned item's consignor cut into VYA's balance, on top
- // of the platform fee — so we hold it and pay the consignor out (Stripe won't let the store
+ // of the platform fee, so we hold it and pay the consignor out (Stripe won't let the store
  // transfer to them directly). Computed on the DISCOUNTED per-item price.
  let consignTotal = 0;
  for (let i = 0; i < reserved.length; i++) {

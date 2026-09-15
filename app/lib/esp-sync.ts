@@ -1,6 +1,6 @@
 // Push everything to the store's email tool, in one call.
 //
-// Extracted so the Apps page and the assistant do the SAME thing — two paths that "sync" but send
+// Extracted so the Apps page and the assistant do the SAME thing. Two paths that "sync" but send
 // different data is how a seller ends up with contacts in Mailchimp and no products.
 import { espAuth } from "./esp-auth";
 import { pushContacts, syncStore, syncProducts, syncOrders, syncCustomers } from "./esp-client";
@@ -14,7 +14,7 @@ import { listSellerOrders } from "./db/orders";
 export async function syncEspNow(storeSlug: string): Promise<{ ok: boolean; note: string; sent?: number }> {
  const r = await espAuth(storeSlug);
  if (!r) return { ok: false, note: "No email tool is connected." };
- if (!r.auth) return { ok: false, note: "That connection has stopped working — connect it again." };
+ if (!r.auth) return { ok: false, note: "That connection has stopped working. Connect it again." };
  if (!r.conn.listId) return { ok: false, note: "Choose which list to sync into first." };
 
  const profiles = await listCustomerProfiles(storeSlug).catch(() => []);
@@ -27,7 +27,7 @@ export async function syncEspNow(storeSlug: string): Promise<{ ok: boolean; note
  const push = await pushContacts(r.conn.provider, r.auth, r.conn.listId, contacts);
 
  // Mailchimp only: the store itself, so their product and abandoned-basket emails have something
- // to work with. Best-effort — a store that fails to sync mustn't fail the contacts that worked.
+ // to work with. Best-effort: a store that fails to sync mustn't fail the contacts that worked.
  let extra = "";
  if (r.conn.provider === "mailchimp") {
   try {
@@ -63,7 +63,7 @@ export async function syncEspNow(storeSlug: string): Promise<{ ok: boolean; note
 
  const note = push.ok
   ? `${push.sent} contacts sent to ${r.conn.listName || "your list"}${extra}`
-  : `${push.sent} sent, ${push.failed} failed — ${push.reason || "unknown"}`;
+  : `${push.sent} sent, ${push.failed} failed. ${push.reason || "unknown"}`;
  await recordEspSync(storeSlug, note).catch(() => {});
  return { ok: push.ok, note, sent: push.sent };
 }

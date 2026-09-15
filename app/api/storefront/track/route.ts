@@ -6,8 +6,8 @@ import { recordEvent } from "@/app/lib/analytics-events-db";
 
 export const dynamic = "force-dynamic";
 
-const SESSION_COOKIE = "via_sess";      // per-session (30 min) — powers traffic-source + pageviews
-const SHOPPER_COOKIE = "via_shopper";   // stable anonymous shopper (1 yr) — powers product views/favorites
+const SESSION_COOKIE = "via_sess";      // per-session (30 min): powers traffic-source + pageviews
+const SHOPPER_COOKIE = "via_shopper";   // stable anonymous shopper (1 yr): powers product views/favorites
 const SESSION_TTL = 1800;
 const SHOPPER_TTL = 60 * 60 * 24 * 365;
 
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   slug, hasSession, referrer, utmSource, utmMedium, path,
   selfHost: request.headers.get("host") || "vyaplatform.com",
   // The beacon runs on the shopper's own request, so its UA and edge geo headers
-  // are the shopper's — not the storefront server's.
+  // are the shopper's, not the storefront server's.
   userAgent: request.headers.get("user-agent"),
   geo: geoFromHeaders(request.headers),
  });

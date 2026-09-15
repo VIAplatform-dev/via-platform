@@ -6,7 +6,7 @@
  *
  *  1. The seller's `/collections/<h>/products.json` lists the pieces still on their site. We keep
  *     pieces that have vanished from that feed (see items.status) so a shopper who follows an old
- *     link still lands somewhere. So we compare only the pieces their feed still lists — the same
+ *     link still lands somewhere. So we compare only the pieces their feed still lists. The same
  *     rule the catalog-level `extraHere` already uses.
  *  2. What we FILE and what we SERVE are not the same number, and only one of them reaches a
  *     shopper. A rail held 94 pieces in the database and served 401, because the storefront padded
@@ -24,13 +24,13 @@
 export type SourceCollectionRead = {
  handle: string;
  count: number;
- /** The read failed or was throttled — `count` is not evidence. */
+ /** The read failed or was throttled. `count` is not evidence. */
  unread?: boolean;
- /** The read stopped at our page cap — `count` is a floor, not a total. */
+ /** The read stopped at our page cap. `count` is a floor, not a total. */
  truncated?: boolean;
  /**
   * The product handles their feed actually returned. When present, the comparison is made on these
-  * rather than on `count` — see the note on ourActive below.
+  * rather than on `count`. See the note on ourActive below.
   */
  handles?: string[];
 };
@@ -45,7 +45,7 @@ export type CollectionComparison = {
  collectionsOff: string[];
  /** Could not be read from their site; not counted either way. */
  collectionsUnread: string[];
- /** `handle served/filed` — the page disagrees with our own filing. Always our bug. */
+ /** `handle served/filed`. The page disagrees with our own filing. Always our bug. */
  collectionsInflated: string[];
 };
 
@@ -67,7 +67,7 @@ export function compareCollections(opts: {
   */
  ourActive?: Set<string>;
  /**
-  * Handles the seller shows but does not sell — no price and nothing available, an archive display
+  * Handles the seller shows but does not sell, no price and nothing available, an archive display
   * piece. The importer skips these on purpose and the catalogue comparison excludes them on purpose;
   * the collection comparison has to do the same or it reports them as pieces we are missing.
   */
@@ -78,7 +78,7 @@ export function compareCollections(opts: {
   * collection handle → which answer the page says it is giving. A page serving what the captured
   * page showed (because the collection could not be read from the seller's store) legitimately
   * differs from our filing and is not a fault; only a page claiming to serve our filing is held to
-  * it. An unstamped page is still checked — absence must not be an escape hatch.
+  * it. An unstamped page is still checked. Absence must not be an escape hatch.
   */
  servedSource?: Map<string, string | null | undefined>;
 }): CollectionComparison {
@@ -101,11 +101,11 @@ export function compareCollections(opts: {
   }
   // Like for like. Preferred form: compare the pieces themselves. A piece on their page we do not
   // have is a real gap; a piece we show that they do not is a real extra ONLY if it is still for
-  // sale on their site — a sold piece their feed dropped is expected, and is what made a correct
+  // sale on their site. A sold piece their feed dropped is expected, and is what made a correct
   // store like ascensio-demo read as drifting in eleven collections.
   let comparable: number;
   if (c.handles) {
-   // Their list, minus the pieces they are not selling — we were never going to import those.
+   // Their list, minus the pieces they are not selling. We were never going to import those.
    const sellableHandles = unsellable ? c.handles.filter((h) => !unsellable.has(h)) : c.handles;
    const theirs = new Set(sellableHandles);
    const held = new Set(mine);
@@ -129,14 +129,14 @@ export function compareCollections(opts: {
   compared.push({ handle: c.handle, ours: oursCount, source: theirCount });
  }
 
- // What we serve must equal what we filed — but "what we filed" now has TWO legitimate answers,
+ // What we serve must equal what we filed, but "what we filed" now has TWO legitimate answers,
  // because each rail mirrors its seller's own behaviour with sold pieces. Where she keeps them, the
  // page serves the whole filing. Where she drops them, the page serves only the live pieces while
  // the filing still holds the rest: the filing records what belongs in the collection, not what is
  // for sale this morning.
  //
  // Comparing against raw membership alone put feathers on the BLOCKING list for three rails whose
- // gaps — 1, 3 and 3 — were exactly their sold pieces, and told the seller her collections were
+ // gaps, 1, 3 and 3. Were exactly their sold pieces, and told the seller her collections were
  // "showing pieces you didn't put in them" when they were showing precisely what she puts in them.
  //
  // Neither answer is a fault. Anything else still is: this exists because a 94-piece rail once went

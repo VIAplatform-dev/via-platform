@@ -4,7 +4,7 @@ import { adminProductToImported } from "./shopify-admin.ts";
 
 // A CONNECTED store should import strictly better than a scraped one: exact money in the shop's
 // own currency, the full size run, the store's own product identity, and true collection
-// membership — none of which has to be inferred from HTML.
+// membership: none of which has to be inferred from HTML.
 
 const node = (over: Record<string, unknown> = {}) => ({
  id: "gid://shopify/Product/123",
@@ -84,7 +84,7 @@ test("a variant's colour option is captured separately from its size", () => {
 });
 
 // A rental shop lists each piece as 3 Day Rental / 7 Day Rental / Purchase, and leaves an option at
-// $0.00 to mean "not offered". The first option is not the buy price — see variant-pricing.ts.
+// $0.00 to mean "not offered". The first option is not the buy price. See variant-pricing.ts.
 const rentalNode = (prices: { rent3: string; purchase: string; rent7: string }) => node({
  options: [{ name: "Title", values: ["3 Day Rental", "Purchase", "7 Day Rental"] }],
  variants: { edges: [
@@ -107,7 +107,7 @@ test("rental options are not kept as the sizes a piece is sold in, and Purchase 
  assert.equal(p.variants?.[0].size, null);
 });
 
-test("a rent-only listing arrives unpriced and marked rent-only — never at its rental price", () => {
+test("a rent-only listing arrives unpriced and marked rent-only, never at its rental price", () => {
  const p = adminProductToImported(rentalNode({ rent3: "0.00", purchase: "0.00", rent7: "150.00" }), "USD");
  assert.equal(p.priceCents, null);
  assert.equal(p.price, "");

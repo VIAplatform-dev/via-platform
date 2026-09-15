@@ -5,7 +5,7 @@ import { listActivity, listActiveStores } from "@/app/lib/seller-activity-db";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// The VYA owner's view of what a seller has been doing. Owner-only — a store must never be able to
+// The VYA owner's view of what a seller has been doing. Owner-only: a store must never be able to
 // read another store's log, and has no reason to read its own here.
 function isVyaOwner(request: NextRequest): boolean {
  const pw = process.env.ADMIN_PASSWORD;

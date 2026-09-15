@@ -2,7 +2,7 @@
 //
 // Every vintage shop kept books before VYA existed, and they are all a CSV export of the same
 // four ideas in a different order: when, what, what it cost me, what it sold for. This turns one of
-// those into rows VYA can add up, WITHOUT asking her to reformat anything first — a mapping screen
+// those into rows VYA can add up, WITHOUT asking her to reformat anything first. A mapping screen
 // that demands "rename your columns to date/amount/category" is a screen people close.
 //
 // Pure: no I/O, no database. Every guess it makes is reported back so the import screen can show her
@@ -26,7 +26,7 @@ export type ParseResult = {
  headers: string[];
  /** Which header index was read as what. -1 when the file had no such column. */
  mapping: { date: number; label: number; amountIn: number; amountOut: number; amount: number };
- /** Rows we could not read, with the reason — never silently dropped. */
+ /** Rows we could not read, with the reason, never silently dropped. */
  skipped: { line: number; reason: string; raw: string }[];
  /** True when dates read as day-first (14/03/2026). Reported because it is a guess. */
  dayFirst: boolean;
@@ -53,7 +53,7 @@ export function splitLine(line: string, delim: string): string[] {
  return out.map((s) => s.trim());
 }
 
-/** Comma, semicolon or tab — whichever appears most on the header line. */
+/** Comma, semicolon or tab. Whichever appears most on the header line. */
 export function detectDelimiter(headerLine: string): string {
  const counts = [",", ";", "\t"].map((d) => ({ d, n: (headerLine.match(new RegExp(`\\${d}`, "g")) || []).length }));
  counts.sort((a, b) => b.n - a.n);
@@ -63,7 +63,7 @@ export function detectDelimiter(headerLine: string): string {
 /**
  * Money, in cents, however her spreadsheet wrote it.
  *
- * Handles a currency symbol, thousands separators, a trailing minus, and accountants' brackets —
+ * Handles a currency symbol, thousands separators, a trailing minus, and accountants' brackets,
  * "(45.00)" is minus forty-five in every ledger ever exported. Returns null for anything that isn't
  * a number, so a total row or a note can be skipped rather than counted as zero.
  */
@@ -76,7 +76,7 @@ export function parseMoney(raw: string): number | null {
  s = s.replace(/[^\d.,\-]/g, "");           // drop £ $ € and stray words
  if (s.startsWith("-")) { negative = true; s = s.slice(1); }
  if (!s || !/\d/.test(s)) return null;
- // "1.234,56" (European) vs "1,234.56" — the LAST separator is the decimal one.
+ // "1.234,56" (European) vs "1,234.56": the LAST separator is the decimal one.
  const lastComma = s.lastIndexOf(",");
  const lastDot = s.lastIndexOf(".");
  if (lastComma > lastDot) s = s.replace(/\./g, "").replace(",", ".");
@@ -120,7 +120,7 @@ const ymd = (y: number, m: number, d: number) =>
  * Does this file write dates day-first?
  *
  * Proof first: any value above 12 in one position settles it for the whole file. Failing that, DOTS
- * decide — `04.03.2026` is the European way of writing it and means 4 March, and reading it as
+ * decide: `04.03.2026` is the European way of writing it and means 4 March, and reading it as
  * 3 April would move a seller's takings into the wrong month without a word.
  */
 export function detectDayFirst(values: string[]): boolean {
@@ -128,8 +128,8 @@ export function detectDayFirst(values: string[]): boolean {
  for (const v of values) {
   const m = String(v).match(/^(\d{1,2})([-/.])(\d{1,2})[-/.]\d{2,4}$/);
   if (!m) continue;
-  if (+m[1] > 12) return true;   // 14/03 — first field is the day
-  if (+m[3] > 12) return false;  // 03/14 — second field is the day
+  if (+m[1] > 12) return true;   // 14/03: first field is the day
+  if (+m[3] > 12) return false;  // 03/14: second field is the day
   if (m[2] === ".") dotted = true;
  }
  return dotted;
@@ -159,7 +159,7 @@ export function mapHeaders(headers: string[]): ParseResult["mapping"] {
 /**
  * Read a whole file.
  *
- * A sheet with both a cost and a sale column produces TWO rows per line — money out and money in —
+ * A sheet with both a cost and a sale column produces TWO rows per line, money out and money in,
  * which is what a resale ledger actually records: she bought a coat for 40 and sold it for 120, and
  * a P&L needs both halves, not the difference.
  */

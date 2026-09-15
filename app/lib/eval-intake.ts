@@ -6,10 +6,10 @@ import { brandMatch } from "./brand-match";
 import { estimatePrice } from "./price-engine";
 import { gate } from "./concurrency";
 
-// The eval harness — a "practice exam" for the intake AI. Takes labeled examples from
+// The eval harness. A "practice exam" for the intake AI. Takes labeled examples from
 // the training dataset (photo → the seller-confirmed brand/era/category/price), runs
 // the CURRENT AI on each photo blind, and grades its guesses against the answer key.
-// Run it before/after a prompt change to know — not guess — whether it got better.
+// Run it before/after a prompt change to know, not guess. Whether it got better.
 
 function db() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -19,7 +19,7 @@ function db() {
 
 const norm = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
 
-// Specific-piece grading (leak-free — it never consults the reference index the item lives in;
+// Specific-piece grading (leak-free: it never consults the reference index the item lives in;
 // it asks whether the AI's OWN drafted title/query names the right model). We compare the
 // distinctive (non-brand, non-generic) tokens of the truth title against the AI's title+query.
 const GENERIC_TOKENS = new Set([
@@ -37,7 +37,7 @@ function distinctiveTokens(title: string, brand: string | null | undefined): str
 // Returns true (model matched), false (missed), or null (truth carries no specific model → not gradable).
 export function specificMatch(aiTitle: string, aiQuery: string | null, truthTitle: string, brand: string | null): boolean | null {
  const truth = distinctiveTokens(truthTitle, brand);
- if (truth.length === 0) return null; // truth is just "brand + garment" — nothing specific to grade
+ if (truth.length === 0) return null; // truth is just "brand + garment". Nothing specific to grade
  const ai = new Set([...distinctiveTokens(aiTitle, brand), ...distinctiveTokens(aiQuery || "", brand)]);
  const hit = truth.filter((t) => ai.has(t)).length;
  return hit / truth.length >= 0.5; // AI named at least half the distinctive model tokens
@@ -64,8 +64,8 @@ export type EvalResult = {
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Condition is a free-text note ("Excellent — light wear to the sole"), so grade on the leading
-// grade word rather than an exact string match — that's the part the resale grade actually turns on.
+// Condition is a free-text note ("Excellent: light wear to the sole"), so grade on the leading
+// grade word rather than an exact string match. That's the part the resale grade actually turns on.
 function gradeWord(s: string | null | undefined): string { return norm((s || "").split(/[—:\-]/)[0]); }
 
 export async function runEval(opts: { sample: number; withReverseImage: boolean; withPrice: boolean; goldenOnly?: boolean }): Promise<EvalResult> {
@@ -99,7 +99,7 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  const imageUrl = Array.isArray(r.image_urls) ? r.image_urls[0] : null;
  if (!imageUrl || typeof imageUrl !== "string") return null;
  try {
- const draft = await draftListing([imageUrl]); // blind — no seller memory, no answer
+ const draft = await draftListing([imageUrl]); // blind, no seller memory, no answer
  let brand = draft.brand?.value ?? null;
  let matches: VisualMatch[] = []; // hoisted so the price grading can feed them as comps, like production
  if (opts.withReverseImage && isCompsConfigured()) {
@@ -111,7 +111,7 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  if (opts.withPrice && Number(r.price_cents) > 0) {
  const query = draft.searchQuery || [brand, draft.category].filter(Boolean).join(" ") || draft.title;
  // Price EXACTLY like a live listing: feed the reverse-image matches as comps + full context, not a
- // stripped-down call — so the graded price reflects the real production pricer, not a weaker one.
+ // stripped-down call, so the graded price reflects the real production pricer, not a weaker one.
  const est = await estimatePrice({ query, photoUrl: imageUrl, minMarkupBps: 3000, extraComps: matchesToComps(matches), context: { brand, era: draft.era?.value ?? null, material: draft.material?.value ?? null, condition: draft.condition?.value ?? null } }).catch(() => null);
  if (est?.suggestedCents) priceOk = Math.abs(est.suggestedCents - Number(r.price_cents)) / Number(r.price_cents) <= 0.2;
  }
@@ -150,7 +150,7 @@ export async function runEval(opts: { sample: number; withReverseImage: boolean;
  return { sample: valid.length, withReverseImage: opts.withReverseImage, goldenOnly: ranGolden, fields: ["brand", "era", "material", "condition", "category", "specific"].map(fieldStat), price, misses: misses.slice(0, 30) };
 }
 
-// ── Nightly exam history — one row per automated run, so the trend is visible each
+// ── Nightly exam history. One row per automated run, so the trend is visible each
 // morning without re-spending tokens.
 let runsEnsured = false;
 async function ensureRunsTable() {

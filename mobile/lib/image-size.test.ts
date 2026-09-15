@@ -63,7 +63,7 @@ test("every named size is a real number of pixels, largest last", () => {
 test("a card asks for its own width in pixels, never more than twice over", () => {
  // A two-column grid on a 390pt phone: cards about 185pt wide.
  assert.equal(widthForLayout(185, 2), 370);
- // The same card on a 3x screen — capped, because the extra pixels cost bytes and show nothing.
+ // The same card on a 3x screen. Capped, because the extra pixels cost bytes and show nothing.
  assert.equal(widthForLayout(185, 3), 370);
  // A photo filling the width of the phone.
  assert.equal(widthForLayout(390, 3), 780);
@@ -74,7 +74,7 @@ test("the layout width is clamped at both ends", () => {
  assert.equal(widthForLayout(40, 2), IMG.thumb);
  // A tablet, or a bug: never ask for more than the largest size we ever draw.
  assert.equal(widthForLayout(4000, 2), IMG.full);
- // Not measured yet — a layout that hasn't been through a pass has width 0.
+ // Not measured yet: a layout that hasn't been through a pass has width 0.
  assert.equal(widthForLayout(0, 3), IMG.thumb);
  assert.equal(widthForLayout(185, 0), 370);
  assert.equal(widthForLayout(NaN, NaN), IMG.thumb);

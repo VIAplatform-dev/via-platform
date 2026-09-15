@@ -6,13 +6,13 @@ import { recordQrScan, scanLocationFromHeaders } from "@/app/lib/qr-scans-db";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /q/{code} — a printed QR code was scanned.
+ * GET /q/{code}: a printed QR code was scanned.
  *
  * Records where it happened (city/region/country from Vercel's edge headers) and forwards to
  * the code's destination from the qr_codes table.
  *
  * Every failure here ends in a redirect, never an error page. A card printed last season, a
- * code someone retired, a database having a bad minute — all of them still put the person
+ * code someone retired, a database having a bad minute. All of them still put the person
  * somewhere real, because the alternative is a stranger at an event staring at a 404.
  */
 export async function GET(request: NextRequest, ctx: { params: Promise<{ code: string }> }) {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ code: s
  }
 
  const res = NextResponse.redirect(destinationFor(destination, raw), 307);
- // Phone browsers and QR apps both cache aggressively. A cached redirect is a lost scan —
+ // Phone browsers and QR apps both cache aggressively. A cached redirect is a lost scan,
  // and worse, it would pin the code to an old destination after you repoint it.
  res.headers.set("Cache-Control", "no-store, max-age=0");
  return res;

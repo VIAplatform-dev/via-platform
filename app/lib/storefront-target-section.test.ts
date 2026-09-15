@@ -29,7 +29,7 @@ test("a small section that is fully visible keeps the element even when a taller
 });
 
 test("a tall section you are scrolled into the middle of keeps the element", () => {
- // Only 40% of the hero is on screen, but it fills the whole canvas — you are looking at nothing else.
+ // Only 40% of the hero is on screen, but it fills the whole canvas. You are looking at nothing else.
  const sections = [sec("hero", -800, 900)];
  assert.equal(pickTargetSection(VIEW, sections, "hero"), "hero");
 });

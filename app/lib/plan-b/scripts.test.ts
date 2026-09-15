@@ -4,7 +4,7 @@ import { classifyScript, shouldKeepScript, rewriteInlineJsUrls, ownOrigins, dete
 
 const ORIGIN = "https://blummier.com";
 
-test("the store's own theme code is kept — that's the point of Plan B", () => {
+test("the store's own theme code is kept. That's the point of Plan B", () => {
  assert.equal(classifyScript("/assets/theme.js", ORIGIN), "keep");
  assert.equal(classifyScript("https://blummier.com/assets/global.js", ORIGIN), "keep");
  assert.equal(classifyScript("https://www.blummier.com/assets/global.js", ORIGIN), "keep");
@@ -26,7 +26,7 @@ test("outside vendors are stripped even though the origin is isolated", () => {
  }
 });
 
-test("Shopify's checkout is stripped on every plan — it takes the order away", () => {
+test("Shopify's checkout is stripped on every plan. It takes the order away", () => {
  for (const src of [
   "https://shop.app/checkout-button.js",
   "https://cdn.shopify.com/shopifycloud/shop-js/modules/v2/client.shop-login.js",
@@ -38,11 +38,11 @@ test("Shopify's checkout is stripped on every plan — it takes the order away",
 
 test("the checkout preload bootstrap is stripped even though it's same-origin", () => {
  // /checkouts/internal/preloads.js ships on EVERY Shopify theme, served from the SELLER's own
- // domain — so the sameSite "keep" check would otherwise wave it through (no host-level signal
+ // domain, so the sameSite "keep" check would otherwise wave it through (no host-level signal
  // distinguishes it from the theme's own code). Kept, it initializes Shopify's checkout SPA and
  // starts lazy-loading its component chunks (hydrate.js, PaymentButtons.js,
  // ShippingMethodSelector.js, BillingAddressForm.js…) against OUR origin instead of Shopify's real
- // checkout host — every one 404s, and it's checkout machinery running where it never should.
+ // checkout host: every one 404s, and it's checkout machinery running where it never should.
  assert.equal(classifyScript("https://blummier.com/checkouts/internal/preloads.js?locale=en-US", ORIGIN), "checkout");
  assert.equal(shouldKeepScript("https://blummier.com/checkouts/internal/preloads.js?locale=en-US", ORIGIN), false);
 });
@@ -54,7 +54,7 @@ test("an unrecognised third-party host is dropped, not trusted", () => {
 });
 
 test("a relative src is the store's own file, so it is kept", () => {
- // It resolves against the page's own origin — there is no third party involved.
+ // It resolves against the page's own origin. There is no third party involved.
  assert.equal(classifyScript("assets/theme.js", ORIGIN), "keep");
  assert.equal(classifyScript("./bundle.js?v=9", ORIGIN), "keep");
 });
@@ -69,7 +69,7 @@ test("hardcoded absolute store URLs in inline JS are brought home", () => {
  assert.ok(!out.includes("https://blummier.com"), "no absolute self-reference survives");
 });
 
-test("the .myshopify.com address is rewritten too — apps hardcode it", () => {
+test("the .myshopify.com address is rewritten too. Apps hardcode it", () => {
  const js = `fetch("https://blummier-shop.myshopify.com/cart/add.js")`;
  const out = rewriteInlineJsUrls(js, ownOrigins("https://blummier.com", "blummier-shop.myshopify.com"));
  assert.equal(out, `fetch("/cart/add.js")`);
@@ -86,7 +86,7 @@ test("www is normalised away when rewriting", () => {
  assert.equal(out, `x("/search/suggest")`);
 });
 
-test("a protocol-relative self-URL is brought home too — for a real ROUTE", () => {
+test("a protocol-relative self-URL is brought home too, for a real ROUTE", () => {
  // Themes sometimes write a hardcoded ROUTE as protocol-relative ("//store.com/cart/add.js"), not
  // just https://. Only `https?://` was originally required, so a bare `//` never matched, and the
  // request resolved against the seller's real domain instead of the VYA-hosted one it's supposed to
@@ -98,10 +98,10 @@ test("a protocol-relative self-URL is brought home too — for a real ROUTE", ()
 
 test("a /cdn/ static-asset reference is NEVER brought home, protocol-relative or not", () => {
  // /cdn/ is Shopify's universal static-asset prefix (theme JS/CSS/fonts/images) on every store,
- // regardless of theme — we never mirror these files ourselves, so rewriting them to relative
+ // regardless of theme: we never mirror these files ourselves, so rewriting them to relative
  // doesn't land on a working copy, it 404s on our own origin. For a stray analytics script that's a
- // wash; for the theme's OWN import map — every "@theme/x" entry is exactly this shape
- // ("//store.com/cdn/shop/t/1/assets/component.js") — it's catastrophic: rewritten to relative,
+ // wash; for the theme's OWN import map. Every "@theme/x" entry is exactly this shape
+ // ("//store.com/cdn/shop/t/1/assets/component.js"). It's catastrophic: rewritten to relative,
  // every module 404s and the theme's entire component framework never initializes (this is exactly
  // how a real regression shipped: product galleries, variant pickers, cart drawer, all of it dead).
  const protoRelative = `var s=document.createElement('script');s.src="//blummier.com/cdn/shopifycloud/storefront/assets/shop_events_listener-4e26a9ce.js";document.head.appendChild(s);`;
@@ -127,7 +127,7 @@ test("the .myshopify.com address is read off the page, not required from the cal
 });
 
 test("absolute Shopify commerce URLs are neutralised wherever they survive", () => {
- // These belong to Shopify, not the seller's origin, so origin-based rewriting can't reach them —
+ // These belong to Shopify, not the seller's origin, so origin-based rewriting can't reach them,
  // and every one is a route out of VYA's checkout.
  const html = `<a href="https://stmi2y-ea.myshopify.com/cart/add">x</a>
   <script>var u="https:\\/\\/stmi2y-ea.myshopify.com\\/checkout";var p="https://shop.app/pay";</script>`;
@@ -145,7 +145,7 @@ test("a myshopify URL that is NOT commerce is left alone", () => {
 test("a theme's libraries on a package CDN are its OWN code, and are kept", () => {
  // Stripping these was a real visible bug: without Swiper the theme's category row collapsed into
  // cramped touching circles, and without the lazy-loader hero videos stayed blank. Neither shows up
- // in a unit test or the harness — only in a browser.
+ // in a unit test or the harness, only in a browser.
  for (const src of [
   "https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js",
   "https://cdn.jsdelivr.net/npm/vanilla-lazyload@19.1.3/dist/lazyload.min.js",

@@ -15,7 +15,7 @@ const CLOTHING_CATS = new Set([
 ]);
 const SHOE_CATS = new Set(["shoes", "boots", "heels", "sneakers", "sandals", "flats"]);
 const BAG_CATS = new Set(["bags", "totes", "clutches", "crossbody-bags", "handbags"]);
-// Bag/accessory signals — if a title or description looks like a bag, treat it as
+// Bag/accessory signals, if a title or description looks like a bag, treat it as
 // a bag even when the category guesser fell back to clothing (so it's checked for
 // measurements, never a wearer size).
 const BAG_SIGNAL = /\b(bag|handbag|purse|clutch|tote|pouch|backpack|crossbody|cross-body|satchel|hobo|baguette|bucket|wallet on chain|woc|chanel 22|lady dior|birkin|kelly|constance|neverfull|speedy|pochette|peekaboo|marmont|dionysus|hourglass|loulou|capucines)\b|strap\s*drop|handle\s*drop/i;
@@ -34,7 +34,7 @@ function db() {
 }
 
 // Tracks which listings have already triggered a "missing details" email, so each
-// one is alerted ONCE — stores aren't nagged about the same listing repeatedly,
+// one is alerted ONCE. Stores aren't nagged about the same listing repeatedly,
 // and only newly-added flagged listings get emailed.
 let _alertColReady = false;
 async function ensureAlertColumn(sql: ReturnType<typeof db>): Promise<void> {
@@ -61,7 +61,7 @@ function hasMeasurements(desc: string | null): boolean {
 
 // Does the title/description mention ANY human-readable size? This is broader and
 // more lenient than deriveSize (which only extracts filter-grade sizes), because
-// here we just need to know whether a size was communicated at all — including
+// here we just need to know whether a size was communicated at all, including
 // spelled-out sizes ("Medium to Large size"), ranges ("S/M"), region numerics
 // ("US 6"), and "Size: M". Erring toward "yes" avoids nagging listings that
 // clearly state a size.
@@ -73,7 +73,7 @@ function mentionsSize(title: string, desc: string | null): boolean {
  if (/\b(?:x-?small|x-?large|xx-?large|small|medium|large|petite|xxs|xs|s|m|l|xl|xxl)\b(?:\s+(?:to|and|&|\/|-|–)\s+\b(?:x-?small|x-?large|xx-?large|small|medium|large|xxs|xs|s|m|l|xl|xxl)\b)?\s+size\b/i.test(t)) return true;
  // A size range: "Medium to Large", "S/M", "M-L", "small-medium", "XS to S"
  if (/\b(?:xxs|xs|x-?small|x-?large|small|medium|large|s|m|l|xl|xxl)\s*(?:to|\/|-|–)\s*(?:xxs|xs|x-?small|x-?large|small|medium|large|s|m|l|xl|xxl)\b/i.test(t)) return true;
- // Standalone multi-letter sizes (safe — not common words): XS, XL, XXL, 2XL
+ // Standalone multi-letter sizes (safe, not common words): XS, XL, XXL, 2XL
  if (/\b(?:xxs|xs|xl|xxl|xxxl|2xl|3xl|osfm|oversized|one[\s-]?size|free[\s-]?size|true to size|plus[\s-]?size)\b/i.test(t)) return true;
  // Region numerics: US 6, EU 38, UK 10, IT 42
  if (/\b(?:us|uk|eu|it|fr|jp)\s*\d{1,2}(?:\.\d)?\b/i.test(t)) return true;

@@ -4,7 +4,7 @@ import { getCaptureOrigin } from "@/app/lib/site-capture-db";
 export const dynamic = "force-dynamic";
 
 // A shopper's "Saved" page on a store's own storefront, reachable at {slug}.vyasites.com/favorites
-// — which is where a theme's own favourites link points, so shoppers do land here.
+// which is where a theme's own favourites link points, so shoppers do land here.
 //
 // Mostly superseded by the drawer (see plan-b/wishlist.ts), which opens over her own shop instead of
 // navigating away from it and is bound to those same links when saved pieces are switched on. This
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 // TWO THINGS WERE WRONG WITH IT. It fetched from a hardcoded https://vyaplatform.com, which is a
 // different origin from the store the shopper is on, so the session cookie was never sent and the
 // page was permanently empty. And it had no answer for a signed-out shopper beyond "nothing saved
-// yet" — a dead end, now that saving requires signing in to the shop.
+// yet": a dead end, now that saving requires signing in to the shop.
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
  const { slug } = await params;
  const origin = (await getCaptureOrigin(slug).catch(() => null)) || "";

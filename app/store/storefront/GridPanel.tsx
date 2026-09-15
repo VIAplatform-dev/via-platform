@@ -3,7 +3,7 @@
 // The Grid panel: settings for a product grid she added to her imported site.
 //
 // Every change is sent to the page at once ({vya:"gridset"}), which re-renders the grid from live
-// inventory in her theme's card — so what she sees is what a shopper gets. Bounds come from the one
+// inventory in her theme's card, so what she sees is what a shopper gets. Bounds come from the one
 // definition the save and the shopper's page also use (app/lib/site-builder/grid-config.ts).
 import { Minus, Plus, RotateCw, Trash2 } from "lucide-react";
 import { GRID_BOUNDS, type GridConfig, type GridRatio, type GridCard } from "@/app/lib/site-builder/grid-config";
@@ -65,7 +65,7 @@ export default function GridPanel(props: {
       {(props.collections || []).map((col) => <option key={col.slug} value={col.slug}>{col.title} ({col.itemCount})</option>)}
      </select>
     </label>
-    {props.empty && <p className="-mt-2 text-[11.5px] leading-snug text-amber-700">No pieces in this collection yet — shoppers won&rsquo;t see this grid until it has some.</p>}
+    {props.empty && <p className="-mt-2 text-[11.5px] leading-snug text-amber-700">No pieces in this collection yet. Shoppers won&rsquo;t see this grid until it has some.</p>}
 
     <div>
      <span className="mb-1 block text-[12px] font-medium text-stone-600">How many</span>

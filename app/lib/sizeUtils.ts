@@ -1,4 +1,4 @@
-// Pure size parsing/normalisation/sorting helpers — NO database or server imports, so they are safe
+// Pure size parsing/normalisation/sorting helpers, NO database or server imports, so they are safe
 // to bundle into Client Components (ProductCard, FilteredProductGrid). Kept out of inventory.ts (which
 // imports db.ts) so a client component never drags the server-only chain into the browser bundle.
 
@@ -31,15 +31,15 @@ function fmtNum(n: number): string {
 export function convertSizeToUS(raw: string, categorySlug: string, title?: string, currency?: string): string | null {
  const s = raw.trim();
  const normalized = normalizeSize(s);
- // Detect footwear from the TITLE as well as the category — category inference misses
+ // Detect footwear from the TITLE as well as the category. Category inference misses
  // typo'd/one-word titles ("…LABOOTS"), and getting this wrong applies the CLOTHING scale
  // to a shoe (EU 36 → "US 4" instead of the shoe table's US 5.5).
  const isShoe = SHOE_RE.test(categorySlug) || (!!title && SHOE_RE.test(title));
- // The store's sizing region, inferred from its Shopify base currency — a UK shop's bare
+ // The store's sizing region, inferred from its Shopify base currency. A UK shop's bare
  // shoe number is a UK size (women's US = UK + 2), so "3.5" → US 5.5, not raw "3.5".
  const region = currency === "GBP" ? "UK" : currency === "EUR" ? "EU" : "US";
 
- // European sizing — read the ACTUAL system off the original string. Italian,
+ // European sizing. Read the ACTUAL system off the original string. Italian,
  // French and German women's clothing use DIFFERENT US offsets, so collapsing
  // them all to one "EU − 32" formula is wrong (e.g. Italian houses like Gucci/
  // Prada label "IT 40", which is US 4, not US 8).
@@ -72,7 +72,7 @@ export function convertSizeToUS(raw: string, categorySlug: string, title?: strin
  return null;
  }
 
- // Bare numeric — infer from category
+ // Bare numeric: infer from category
  if (/^\d+(?:\.\d+)?$/.test(normalized)) {
  const num = parseFloat(normalized);
  if (isShoe && num >= 34 && num <= 44) {
@@ -107,14 +107,14 @@ export function normalizeSize(raw: string): string {
  if (/^(xxxl|3xl)$/i.test(s)) return "XXXL";
  if (/^(os|osfm|one\s*size)$/i.test(s)) return "One Size";
 
- // Range sizes — collapse to the smaller size
+ // Range sizes. Collapse to the smaller size
  if (/^(xs)[\/\-](s)$/i.test(s)) return "XS";
  if (/^(s)[\/\-](m)$/i.test(s)) return "S";
  if (/^(m)[\/\-](l)$/i.test(s)) return "M";
  if (/^(l)[\/\-](xl)$/i.test(s)) return "L";
  if (/^(xl)[\/\-](xxl)$/i.test(s)) return "XL";
 
- // EU / IT / FR / DE are all the same European scale — normalise to "EU XX"
+ // EU / IT / FR / DE are all the same European scale. Normalise to "EU XX"
  // e.g. "IT 40", "IT40", "EU 38.", "FR 42" → "EU 40", "EU 38", "EU 42"
  const euMatch = /^(IT|EU|FR|DE)\s*(\d+(?:\.\d+)?)$/i.exec(s);
  if (euMatch) return `EU ${euMatch[2]}`;
@@ -133,11 +133,11 @@ export function normalizeSize(raw: string): string {
 }
 
 // The set of bare, prefix-stripped size tokens a product should match a filter
-// on. A size can describe a RANGE of fits — a seller's "best fits US 2-4", a
-// variant "S/M" — and such an item must surface under EVERY size in that range,
+// on. A size can describe a RANGE of fits. A seller's "best fits US 2-4", a
+// variant "S/M", and such an item must surface under EVERY size in that range,
 // not just an exact string match. Single sizes return one token (the same value
 // the facet list is keyed on); ranges expand to every size they cover.
-//   "US 2-4"  → ["2","4"]          "6-8" → ["6","8"]   (endpoints only — no 3, no 7)
+//   "US 2-4"  → ["2","4"]          "6-8" → ["6","8"]   (endpoints only, no 3, no 7)
 //   "S/M"     → ["S","M"]          "8"   → ["8"]
 const SIZE_LETTER_ORDER = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
 function bareSize(s: string): string {
@@ -159,7 +159,7 @@ export function expandSizeKeys(rawSize: string | null | undefined): string[] {
  const bi = SIZE_LETTER_ORDER.indexOf(b.toUpperCase());
  if (ai !== -1 && bi !== -1 && bi >= ai) return SIZE_LETTER_ORDER.slice(ai, bi + 1);
  }
- // Single size — normalise the same way the facet keys are built.
+ // Single size: normalise the same way the facet keys are built.
  return [bareSize(normalizeSize(rawSize))];
 }
 

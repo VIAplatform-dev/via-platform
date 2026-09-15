@@ -7,7 +7,7 @@ import {
 } from "./shipping-economics.ts";
 import { SHIPPING_TIERS, MIN_MARGIN_CENTS } from "./shipping-tiers.ts";
 
-test("the Large tier loses money to the far coast — the finding this file exists for", () => {
+test("the Large tier loses money to the far coast. The finding this file exists for", () => {
   const large = tierEconomics("large");
   assert.ok(large.losesMoneyFar, "large should be flagged as loss-making far");
   assert.ok(large.marginFarCents < 0, `margin was ${large.marginFarCents}`);

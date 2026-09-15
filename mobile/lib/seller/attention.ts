@@ -1,8 +1,8 @@
 // The server's "Needs you" rows, folded into the phone's list.
 //
 // /api/store/attention (app/lib/attention-core.ts) already decides what counts, what it is called
-// and the order. The phone's Home draws three kinds of row of its own — holds with the customer's
-// name, unread messages, the consignor payouts line — so this drops the server's duplicates of
+// and the order. The phone's Home draws three kinds of row of its own. Holds with the customer's
+// name, unread messages, the consignor payouts line, so this drops the server's duplicates of
 // those and adds an icon and, where the app has the screen, an in-app route.
 
 export type AttentionRow = { id: string; label: string; count: number; href: string; urgent: boolean };

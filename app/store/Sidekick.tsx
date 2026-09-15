@@ -31,7 +31,7 @@ const ACTION_LABELS: Record<string, string> = {
  update_email_design: "Updated email design", revert_last_change: "Reverted last change",
 };
 
-// How tall the composer may grow before it starts scrolling instead. Roughly seven lines — enough to
+// How tall the composer may grow before it starts scrolling instead. Roughly seven lines. Enough to
 // hold a paragraph in view, short enough that the message log never gets squeezed out of the panel.
 const COMPOSER_MAX_PX = 168;
 
@@ -39,17 +39,17 @@ const SUGGESTIONS = ["Build my whole storefront for me", "Make my storefront mor
 
 // A yes/no question deserves yes/no buttons.
 //
-// VYA confirms before it changes anything ("Want me to add a reviews section?"), which is right — but
+// VYA confirms before it changes anything ("Want me to add a reviews section?"), which is right, but
 // it means the most common reply in the whole product is the word "yes", typed out.
 //
 // Finding the question is the whole problem. An earlier pass read only the final LINE, which missed
-// every real case: VYA writes "I can make the hero taller.\n\nShall I go ahead?" — where the question
-// is the last line — but just as often "Shall I go ahead? Just say the word." or a question closing a
+// every real case: VYA writes "I can make the hero taller.\n\nShall I go ahead?", where the question
+// is the last line, but just as often "Shall I go ahead? Just say the word." or a question closing a
 // paragraph. So: locate the last "?", allow a short sign-off after it, and take the sentence that
 // ends there.
 //
-// Deliberately conservative about WHICH questions qualify. An open question — "what should the
-// heading say?" — must never get Yes/No buttons, because the buttons would be the wrong reply and the
+// Deliberately conservative about WHICH questions qualify. An open question: "what should the
+// heading say?": must never get Yes/No buttons, because the buttons would be the wrong reply and the
 // merchant would click one anyway.
 const YES_NO_OPENERS = /^(?:do|does|did|should|shall|would|will|can|could|may|is|are|was|were|have|has|want|ready|okay|ok|sound|look)\b|(?:want me to|shall i|should i|would you like|do you want|ok(?:ay)? to|sound good|look right|make sense|go ahead|shall we)\b/i;
 function isYesNoQuestion(text: string): boolean {
@@ -92,7 +92,7 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  const [open, setOpen] = useState(false);
  const [suppressed, setSuppressed] = useState(false); // hide launcher when the home full-page chat is open
  // The launcher sits fixed bottom-right on every page, which on some (e.g. a wide inventory table)
- // lands right on top of real content with no way to move it. Let people dismiss it for the tab —
+ // lands right on top of real content with no way to move it. Let people dismiss it for the tab,
  // sessionStorage, not permanent, so it's back next visit rather than gone for good by accident.
  const [dismissed, setDismissed] = useState(false);
  useEffect(() => {
@@ -118,7 +118,7 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: "smooth" }); }, [msgs, busy]);
 
  // A one-row textarea doesn't wrap so much as HIDE: a long message scrolls its own single visible
- // line and everything already written disappears upward. So the box grows with the text — up to a
+ // line and everything already written disappears upward. So the box grows with the text. Up to a
  // point, after which it scrolls rather than swallowing the whole panel. Driven off `input` (not the
  // change handler) so it also collapses back to one row after a send clears the field, and resizes
  // correctly when the composer is seeded from the studio.
@@ -177,7 +177,7 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  msgsRef.current = after; setMsgs(after);
  if (r.ok && (d.actions || []).some((a: Action) => a.ok && WRITE_TOOLS.has(a.name))) window.dispatchEvent(new Event("vya:store-updated"));
  } catch {
- const after: Msg[] = [...msgsRef.current, { role: "assistant", content: "Couldn’t reach me just now — try again." }];
+ const after: Msg[] = [...msgsRef.current, { role: "assistant", content: "Couldn’t reach me just now. Try again." }];
  msgsRef.current = after; setMsgs(after);
  }
  busyRef.current = false; setBusy(false);
@@ -198,7 +198,7 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  //
  // The studio's per-section VYA button hands its context down as `seed`. It is a PROP and not an
  // event on purpose: the studio mounts this component only while the Assist tab is open, so an event
- // dispatched in the same tick as the tab switch fires before the listener exists and is lost — which
+ // dispatched in the same tick as the tab switch fires before the listener exists and is lost, which
  // is exactly what "the VYA button doesn't connect to anything" was.
  //
  // Seeding never sends. The section is context for a request the merchant hasn't written yet, and
@@ -224,8 +224,8 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  return (
  <>
  {/* Launcher */}
- {/* On a phone the wordmark pill sat on top of whatever was bottom-right — a form's last button, a
-     table row — so there it is just the round icon: a 48px target that covers a third as much. */}
+ {/* On a phone the wordmark pill sat on top of whatever was bottom-right. A form's last button, a
+     table row, so there it is just the round icon: a 48px target that covers a third as much. */}
  {!docked && !open && !suppressed && !dismissed && (
  <div className="fixed bottom-4 right-4 z-50 sm:bottom-5 sm:right-5">
  <button onClick={() => setOpen(true)} aria-label="Ask VYA" className="group flex items-center gap-2 rounded-full bg-[#5D0F17] p-2.5 text-[#FFFDF8] shadow-[0_10px_30px_-8px_rgba(93,15,23,0.6)] transition hover:bg-[#4a0c12] sm:pr-4">
@@ -266,7 +266,7 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  <div ref={scroller} className="flex-1 space-y-3.5 overflow-y-auto px-4 py-4">
  {msgs.length === 0 && (
  <div className="text-[13px] text-[#5D0F17]/60">
- <p className="mb-3 leading-relaxed">Hi — I run and customize your store with you. I remember our chats. Try:</p>
+ <p className="mb-3 leading-relaxed">Hi: I run and customize your store with you. I remember our chats. Try:</p>
  <div className="space-y-1.5">
  {SUGGESTIONS.map((s) => (
  <button key={s} onClick={() => send(s)} className="block w-full rounded-lg border border-[#5D0F17]/12 bg-white px-3 py-2 text-left text-[12.5px] text-[#3a2f28] transition hover:border-[#5D0F17]/30 hover:bg-[#5D0F17]/[0.03]">{s}</button>
@@ -284,7 +284,7 @@ export default function Sidekick({ docked = false, seed, onSeedUsed }: { docked?
  )}
  {m.role === "assistant" ? <RichText text={m.content} /> : m.content ? <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content}</span> : null}
  {m.role === "assistant" && <ActionChips actions={m.actions} />}
- {/* Only the LAST message, and only when nothing is in flight — an older question answered out of
+ {/* Only the LAST message, and only when nothing is in flight. An older question answered out of
      order would attach "Yes" to whatever VYA asked most recently, not to what was clicked. */}
  {m.role === "assistant" && i === msgs.length - 1 && !busy && isYesNoQuestion(m.content) && (
  <div className="mt-2.5 flex gap-1.5">

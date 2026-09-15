@@ -65,7 +65,7 @@ export default function ListingQualityPage() {
  <main className="min-h-screen bg-[#FBF8F1] p-8 text-[#5D0F17]">
  <div className="mx-auto max-w-6xl">
  <h1 className="font-serif text-2xl">Listing Quality</h1>
- <p className="mt-1 text-sm text-[#5D0F17]/55">Products missing a size/measurements, description, or image — so they can be fixed.</p>
+ <p className="mt-1 text-sm text-[#5D0F17]/55">Products missing a size/measurements, description, or image, so they can be fixed.</p>
 
  {loading ? (
  <p className="mt-8 text-sm text-[#5D0F17]/50">Loading…</p>
@@ -124,9 +124,9 @@ export default function ListingQualityPage() {
     <tr key={s.storeSlug} className="cursor-pointer hover:bg-[#5D0F17]/[0.03]" onClick={() => setStore(s.storeSlug)}>
     <td className="px-5 py-3">{s.storeName}</td>
     <td className="px-3 py-3 text-right">{s.flagged} / {s.total}</td>
-    <td className="px-3 py-3 text-right">{s.noSizing || "—"}</td>
-    <td className="px-3 py-3 text-right">{s.noDescription || "—"}</td>
-    <td className="px-5 py-3 text-right">{s.noImage || "—"}</td>
+    <td className="px-3 py-3 text-right">{s.noSizing || "-"}</td>
+    <td className="px-3 py-3 text-right">{s.noDescription || "-"}</td>
+    <td className="px-5 py-3 text-right">{s.noImage || "-"}</td>
     </tr>
    ))}
    </tbody>

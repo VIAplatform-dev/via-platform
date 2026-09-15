@@ -28,7 +28,7 @@ test("the marketplaces name themselves", () => {
 });
 
 test("history she brought over is labelled by where it came FROM", () => {
- // "Shopify" is the useful answer, not "an import" — it sits next to Depop and answers the same
+ // "Shopify" is the useful answer, not "an import". It sits next to Depop and answers the same
  // question she was already asking.
  assert.equal(fromImportSource("shopify"), "shopify");
  assert.equal(fromImportSource("square"), "square");
@@ -48,7 +48,7 @@ test("what a seller reads", () => {
  assert.equal(channelLabel(""), "Other");
 });
 
-test("revenue per channel, biggest first — the answer to 'is Depop worth it'", () => {
+test("revenue per channel, biggest first. The answer to 'is Depop worth it'", () => {
  const out = rollUp([
   { channel: "depop", amountCents: 5000 },
   { channel: "storefront", amountCents: 40000 },

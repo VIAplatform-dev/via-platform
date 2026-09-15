@@ -23,7 +23,7 @@ function buildGroupCheckoutUrl(items: CartItem[]): string {
 
  // Combine EVERY item that has a proper Shopify cart variant, from the same store. A single item
  // without one (e.g. a piece synced without a variant id) is skipped rather than bailing the whole
- // cart to one product page — so multi-item checkout keeps as many items as it can.
+ // cart to one product page, so multi-item checkout keeps as many items as it can.
  for (const item of items) {
  if (!item.checkoutUrl) continue;
  try {
@@ -38,7 +38,7 @@ function buildGroupCheckoutUrl(items: CartItem[]): string {
  }
  }
 
- // Return a clean cart URL — the /api/track route handles the /discount/ redirect
+ // Return a clean cart URL. The /api/track route handles the /discount/ redirect
  // for attribution, so we don't need to embed the discount code here. Only fall back to a single
  // product page when NOT ONE item had a usable cart variant.
  if (!storeOrigin || variantEntries.length === 0) return items[0].externalUrl;

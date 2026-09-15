@@ -61,7 +61,7 @@ export default async function RootLayout({
 }) {
  // A store's own domain shows the STORE's chrome, never VYA's.
  //
- // AdminHide decides by path, from the browser's URL — and on a store's own origin the browser's
+ // AdminHide decides by path, from the browser's URL, and on a store's own origin the browser's
  // URL is "/", because the proxy rewrites to /s/{slug} internally where usePathname can't see it.
  // So the marketplace header (VYA's wordmark, Stores/Categories/Designers, its cart and account)
  // rendered on top of the seller's shop. Decided here instead, on the server, from the Host: the

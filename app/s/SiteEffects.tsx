@@ -7,7 +7,7 @@ import type { SiteEffects } from "@/app/lib/storefront-effects";
  * The pointer effects, drawn by us.
  *
  * One canvas pinned over the page, ignoring pointer events, drawing whichever effect the store
- * chose. It's OUR code rather than the seller's for the reason in storefront-effects.ts — a
+ * chose. It's OUR code rather than the seller's for the reason in storefront-effects.ts. A
  * storefront shares an origin with the marketplace, so a seller's script would run next to a
  * shopper's session.
  *
@@ -53,7 +53,7 @@ export default function SiteEffects({ effects, accent }: { effects: SiteEffects;
   let px = -1000, py = -1000;      // where the pointer is
   let tx = -1000, ty = -1000;      // where the comet/ring has got to
   let moved = false;
- // Where the last speck was emitted. Glitter is a TRAIL — it marks where the pointer went, so it
+ // Where the last speck was emitted. Glitter is a TRAIL. It marks where the pointer went, so it
  // has to stop when the pointer stops. Without this, `moved` latched true on the first movement and
  // every frame afterwards kept spawning at the last position, so a cursor left sitting still poured
  // sparkles onto one spot for as long as the page was open.
@@ -98,7 +98,7 @@ export default function SiteEffects({ effects, accent }: { effects: SiteEffects;
    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
    if (kind === "trail" || kind === "ring") {
-    // Eased chase — the shape catches up rather than sticking to the pointer.
+    // Eased chase: the shape catches up rather than sticking to the pointer.
     tx += (px - tx) * 0.18;
     ty += (py - ty) * 0.18;
     if (moved && px > -500) {

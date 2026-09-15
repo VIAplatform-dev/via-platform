@@ -13,7 +13,7 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 // Measured API spend from the cost tracker: real $ per provider/operation, cost per listing, and the
-// monthly run-rate — computed from each API's own usage numbers. GET ?days=30 (default).
+// monthly run-rate: computed from each API's own usage numbers. GET ?days=30 (default).
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const days = Math.max(1, Math.min(365, parseInt(request.nextUrl.searchParams.get("days") ?? "30", 10) || 30));

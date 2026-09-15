@@ -6,8 +6,8 @@ import type { Product } from "../../lib/types";
 
 // The results of one saved search.
 //
-// There is no "get one saved search" endpoint — /api/mobile/saved-searches/[id] only accepts DELETE
-// — so the list is fetched and the one we want picked out of it. That is also why the filters are
+// There is no "get one saved search" endpoint. /api/mobile/saved-searches/[id] only accepts DELETE
+// so the list is fetched and the one we want picked out of it. That is also why the filters are
 // replayed against the feed here rather than the server returning matches directly.
 
 type SavedSearch = {
@@ -55,7 +55,7 @@ export default function SavedSearchScreen() {
         loading={list.isLoading || results.isLoading}
         refreshing={results.isRefetching}
         onRefresh={() => results.refetch()}
-        empty={{ title: "Nothing matches right now.", body: "We'll keep watching — new pieces land daily." }}
+        empty={{ title: "Nothing matches right now.", body: "We'll keep watching. New pieces land daily." }}
       />
     </>
   );

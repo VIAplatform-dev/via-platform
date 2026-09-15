@@ -6,7 +6,7 @@ import type { Collection, Item } from "./schema";
 import { mergeStorefrontCollectionItems } from "./collections-core";
 
 // The `position` column is added lazily and idempotently rather than through a migration step, the
-// same way the other additive columns in this codebase are — so a deploy never lands code that reads
+// same way the other additive columns in this codebase are, so a deploy never lands code that reads
 // a column the database doesn't have yet. One statement, once per process.
 let orderReady: Promise<void> | null = null;
 function ensureOrderColumn(): Promise<void> {
@@ -18,7 +18,7 @@ function ensureOrderColumn(): Promise<void> {
 }
 
 /**
- * `image_url` and `position` on `collections` — the cover photo and the seller's own order. Added
+ * `image_url` and `position` on `collections`. The cover photo and the seller's own order. Added
  * the same lazy, idempotent way as `position` on item_collections above, for the same reason: a
  * deploy must never land code that reads a column the database doesn't have yet.
  */
@@ -71,7 +71,7 @@ export async function getOrCreateCollection(sellerId: string, title: string): Pr
 }
 
 /** A seller's collections with a live count of active items in each. By default only collections that
- * actually hold items are returned — so imported-but-empty collections and ones whose inventory was
+ * actually hold items are returned, so imported-but-empty collections and ones whose inventory was
  * removed don't clutter the picker or the storefront nav (pass includeEmpty for management views). */
 export async function listCollections(sellerId: string, includeEmpty = false): Promise<(Collection & { itemCount: number })[]> {
  await ensureCollectionDisplayColumns();
@@ -104,7 +104,7 @@ export async function listCollections(sellerId: string, includeEmpty = false): P
  * The import needs this to tell two very different things apart: "the source says this item is no
  * longer in that collection" and "we couldn't read that collection from the source just now".
  * setItemCollections() replaces an item's collections wholesale, so without the existing links a
- * partial read of the source silently DELETES curation — see syncCollectionMembership().
+ * partial read of the source silently DELETES curation. See syncCollectionMembership().
  */
 export async function listItemCollectionIds(sellerId: string): Promise<Map<string, string[]>> {
  const db = getDb();
@@ -132,7 +132,7 @@ export async function setItemCollections(itemId: string, collectionIds: string[]
 }
 
 /** Add many of the seller's items to a collection (creating it by title if new) WITHOUT touching their
- * other collection memberships — the bulk "add selected items to a collection" action from inventory.
+ * other collection memberships. The bulk "add selected items to a collection" action from inventory.
  * Only the seller's own items are linked (guards against cross-store leakage). */
 export async function addItemsToCollection(sellerId: string, title: string, itemIds: string[]): Promise<Collection> {
  const col = await getOrCreateCollection(sellerId, title);
@@ -143,7 +143,7 @@ export async function addItemsToCollection(sellerId: string, title: string, item
  const ownedIds = owned.map((r) => r.id);
  if (ownedIds.length) {
  await ensureOrderColumn();
- // Newly added pieces go to the END of the collection. Appending is the predictable behaviour —
+ // Newly added pieces go to the END of the collection. Appending is the predictable behaviour,
  // adding an item should never silently reshuffle what a storefront section is already showing.
  const [{ next } = { next: 0 }] = (await db.execute(dsql`SELECT COALESCE(MAX(position) + 1, 0) AS next FROM item_collections WHERE collection_id = ${col.id}::uuid`)).rows as { next: number }[];
  await db.insert(itemCollections)
@@ -170,7 +170,7 @@ export async function renameCollection(sellerId: string, id: string, title: stri
 }
 
 /** Delete ALL of a seller's collections (memberships cascade). Used when the owner clears the store's
- * whole inventory — the empty collections shouldn't linger behind. Returns how many were removed. */
+ * whole inventory: the empty collections shouldn't linger behind. Returns how many were removed. */
 /** Set (or clear, with null) a collection's cover photo. Scoped to the seller so an id from
  *  another store can't be written to. */
 export async function setCollectionImage(sellerId: string, id: string, imageUrl: string | null): Promise<Collection | null> {
@@ -246,13 +246,13 @@ export async function getItemCollectionIds(itemId: string): Promise<string[]> {
  * handle.
  *
  * The assignment-only view left new listings invisible. Imported products get assigned from the
- * source's own collection endpoints, but anything the seller adds in the portal afterwards —
- * which is most of a vintage store's week-to-week inventory — belongs to no collection, so a
+ * source's own collection endpoints, but anything the seller adds in the portal afterwards,
+ * which is most of a vintage store's week-to-week inventory. Belongs to no collection, so a
  * "Bags" page would silently omit a bag they'd just listed. Matching on category/brand mirrors
  * what a shopper expects that page to mean, and explicit assignments still take precedence in
  * ordering. Handles are compared loosely ("alexander-mcqueen" → "alexander mcqueen").
  *
- * The match applies to the seller's OWN listings only — an imported piece already carries the
+ * The match applies to the seller's OWN listings only. An imported piece already carries the
  * filing from their site, and adding a guess on top of it inflated one 81-piece rail to 401. See
  * mergeStorefrontCollectionItems.
  */
@@ -262,11 +262,11 @@ export async function listCollectionItemsForStorefront(
  handle: string,
  /**
   * What the SELLER does with sold pieces in this collection, read off her own shop.
-  * `true` keeps them, `false` clears them out, `null` we could not tell — and `null` must keep
+  * `true` keeps them, `false` clears them out, `null` we could not tell, and `null` must keep
   * today's behaviour (show them) rather than guess her intent away. See collection-sold-policy.ts.
   *
   * Six of eight sellers keep them; ascensio-demo and chill-boutique clear them, and on those two we
-  * were putting the archive back — which was the whole of the "31 pieces here, 21 on hers"
+  * were putting the archive back, which was the whole of the "31 pieces here, 21 on hers"
   * difference the parity check reported. A discrepancy we created, and then flagged ourselves for.
   */
  keepsSold: boolean | null = null,
@@ -292,10 +292,10 @@ export async function listCollectionItems(collectionId: string, opts?: { manage?
  await ensureOrderColumn();
  const db = getDb();
  // Three views of the same collection:
- //   manage     — everything except removed (the seller's own list)
- //   storefront — active AND sold, because a vintage store's archive is part of browsing; hiding
+ //   manage: everything except removed (the seller's own list)
+ //   storefront: active AND sold, because a vintage store's archive is part of browsing; hiding
  //                sold pieces turned a 37-piece archive collection into a single card
- //   default    — active only (internal callers that mean "buyable right now")
+ //   default: active only (internal callers that mean "buyable right now")
  const visible = opts?.manage
   ? dsql`${items.status} <> 'removed'`
   : opts?.storefront
@@ -307,7 +307,7 @@ export async function listCollectionItems(collectionId: string, opts?: { manage?
  .innerJoin(itemCollections, eq(itemCollections.itemId, items.id))
  .where(and(eq(itemCollections.collectionId, collectionId), visible))
  // The seller's chosen order first; anything never ordered falls in behind it, newest first. `id`
- // last so the sequence is fully deterministic — a section showing "the first 5" must show the SAME
+ // last so the sequence is fully deterministic. A section showing "the first 5" must show the SAME
  // five on every render, which is exactly what was not true before.
  // Deliberately NOT sorted available-first: a curated collection has an order the seller chose, and
  // hoisting the one in-stock piece to the front reordered their archive against their wishes. The
@@ -331,7 +331,7 @@ export async function reorderCollectionItems(collectionId: string, orderedItemId
  if (!ids.length) return;
  const db = getDb();
  // One statement rather than a write per row: a 60-item collection shouldn't be 60 round trips.
- // ::int on the index — a bare parameter arrives as text and Postgres won't coerce it into an
+ // ::int on the index. A bare parameter arrives as text and Postgres won't coerce it into an
  // integer column ("column position is of type integer but expression is of type text").
  const cases = dsql.join(ids.map((id, i) => dsql`WHEN ${id}::uuid THEN ${i}::int`), dsql` `);
  await db.execute(dsql`
@@ -344,7 +344,7 @@ export async function reorderCollectionItems(collectionId: string, orderedItemId
  * Whether this seller keeps sold pieces in this collection, as observed on her own shop.
  *
  * `null` means we have not been able to tell, and the caller must keep today's behaviour rather
- * than guess — see app/lib/collection-sold-policy.ts for why that third state exists.
+ * than guess. See app/lib/collection-sold-policy.ts for why that third state exists.
  *
  * Additive and self-healing, same shape as ensurePublishAtColumn.
  */
@@ -369,7 +369,7 @@ export async function setCollectionKeepsSold(collectionId: string, keeps: boolea
  * Remember WHICH collections we have actually read from the seller's own site.
  *
  * Without this the serve path cannot tell "we have never read this collection" from "we read it and
- * it is empty", and answers both with the frozen snapshot from capture day — which is how
+ * it is empty", and answers both with the frozen snapshot from capture day, which is how
  * shop-vintage-charm ended up with fifteen collections showing six pieces each where her site shows
  * none. See app/lib/plan-b/collection-contents.ts.
  *
@@ -397,14 +397,14 @@ export async function markCollectionsRead(collectionIds: string[]): Promise<void
 }
 
 /**
- * A collection, and whether we have actually read it from the seller's site — in ONE query.
+ * A collection, and whether we have actually read it from the seller's site, in ONE query.
  *
  * The two used to be separate calls, which put a second database round trip on every collection
  * page view: the busiest page type on 21 stores, paying for a row we had already fetched.
  *
  * Raw SQL rather than drizzle because `members_synced_at` is deliberately NOT in the schema object.
  * If it were, a `select()` would name it, and any database where the migration had not run yet
- * would fail the whole query — turning a missing nicety into a collection page that does not load.
+ * would fail the whole query. Turning a missing nicety into a collection page that does not load.
  * Here a missing column costs one fallback and a warning, and the page still serves.
  */
 let membershipReadWarned = false;
@@ -425,11 +425,11 @@ export async function getCollectionWithSyncState(
   return row ? { id: row.id, slug: row.slug, membershipKnown: Boolean(row.members_synced_at), keepsSold: row.keeps_sold } : null;
  } catch (e) {
   // Said once, out loud. The first version of this swallowed the error and every collection page
-  // silently kept serving its crawl-day snapshot — a fix that does not apply is worse than no fix,
+  // silently kept serving its crawl-day snapshot. A fix that does not apply is worse than no fix,
   // because you stop looking for it.
   if (!membershipReadWarned) {
    membershipReadWarned = true;
-   console.warn(`[collections] cannot read members_synced_at — every collection falls back to its captured grid: ${String((e as Error).message).slice(0, 120)}`);
+   console.warn(`[collections] cannot read members_synced_at. Every collection falls back to its captured grid: ${String((e as Error).message).slice(0, 120)}`);
   }
   const fallback = await getCollectionBySlug(sellerId, slug).catch(() => null);
   return fallback ? { id: fallback.id, slug: fallback.slug, membershipKnown: false, keepsSold: null } : null;

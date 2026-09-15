@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-// Editorial sections — blog (the journal row) and spotlight (one hero piece).
+// Editorial sections. Blog (the journal row) and spotlight (one hero piece).
 import { FreeField, ImageSlot, emptyHint, spotlightProps, type EditKit, type Item, panBgImg, ArrangeHandle, splitRatioOf } from "./kit";
 import { ITEM_SCHEMAS } from "@/app/lib/storefront-items";
 
@@ -43,7 +43,7 @@ function BlogRow({ kit }: { kit: EditKit }) {
  );
 }
 
-// One lead story at full width with the rest listed beside it — the front page. Gives the newest or
+// One lead story at full width with the rest listed beside it. The front page. Gives the newest or
 // best piece the weight it deserves instead of flattening everything into equal cards.
 function BlogFeature({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
@@ -73,7 +73,7 @@ function BlogFeature({ kit }: { kit: EditKit }) {
 }
 
 // One post per row: thumbnail, title, excerpt. Scales past three posts without the page becoming a
-// grid of near-identical cards — the archive view.
+// grid of near-identical cards. The archive view.
 function BlogList({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const { posts, set } = usePosts(kit);
@@ -123,7 +123,7 @@ function SpotlightHalf({ kit }: { kit: EditKit }) {
  );
 }
 
-// The details sit over the photo, bottom-left. One image, one price, one button — the way a single
+// The details sit over the photo, bottom-left. One image, one price, one button. The way a single
 // piece is presented in a lookbook rather than in a catalogue.
 function SpotlightOverlay({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
@@ -140,7 +140,7 @@ function SpotlightOverlay({ kit }: { kit: EditKit }) {
  );
 }
 
-// Photo above, details centred beneath — the product-page shape. The one spotlight layout that
+// Photo above, details centred beneath. The product-page shape. The one spotlight layout that
 // doesn't reflow between a phone and a desktop.
 function SpotlightStacked({ kit }: { kit: EditKit }) {
  return (
@@ -160,7 +160,7 @@ export function renderBlog(kit: EditKit, variant: string) {
 }
 export function renderSpotlight(kit: EditKit, variant: string) {
  // A Spotlight pointed at a collection features that collection's lead piece. Rebuilt here rather
- // than inside each layout so all three behave identically — and so a new Spotlight layout gets it
+ // than inside each layout so all three behave identically, and so a new Spotlight layout gets it
  // without having to know the feature exists.
  kit = { ...kit, p: spotlightProps(kit.ctx, kit.p) };
  switch (variant) {

@@ -20,7 +20,7 @@ test("a shortened policy is not topped up from the old copy", () => {
 test("whitespace is trimmed but the words are never touched", () => {
  assert.equal(resolveReturnsText("  Returns within 30 days.  ", null), "Returns within 30 days.");
  // No case changes, no punctuation added, nothing appended.
- const odd = "returns?? ask us — we're reasonable";
+ const odd = "returns?? ask us. We're reasonable";
  assert.equal(resolveReturnsText(odd, null), odd);
 });
 

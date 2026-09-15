@@ -8,12 +8,13 @@ import { emptyBagMessage } from "@/app/lib/storefront-cart-core";
 import { assignTier } from "@/app/lib/shipping-tiers";
 import { combineParcels } from "@/app/lib/parcel-core";
 import { resolveBuyerShipping } from "@/app/lib/shipping-price";
+import { refusalMessage } from "@/app/lib/shipping-embargo";
 import { resolveDelivery } from "@/app/lib/checkout-delivery.ts";
 
 export const dynamic = "force-dynamic";
 const COOKIE = "via_cart";
 
-// POST { toAddress } — live shipping for the whole bag. The cart's items ship as one
+// POST { toAddress }: live shipping for the whole bag. The cart's items ship as one
 // parcel (weights summed) from the store's ship-from. Free when the store covers it;
 // falls back to free if rates can't be computed so a sale is never blocked. Mirrors
 // /api/storefront/shipping-rates but for the cart. Single-seller carts are the norm.
@@ -24,17 +25,17 @@ export async function POST(request: NextRequest) {
  if (!token) return NextResponse.json({ error: "Your bag is empty." }, { status: 400 });
  // A collection needs no address, so the address check waits until we know (from the STORE's
  // settings, below) whether this really is one. A shopper claiming pickup at a store that doesn't
- // offer it still gets asked for her address — she just gets asked a moment later.
+ // offer it still gets asked for her address. She just gets asked a moment later.
  const hasAddress = !!(to.street1 && to.city && to.zip);
  const claimed = typeof body?.delivery === "string" ? body.delivery : null;
  if (!hasAddress && claimed !== "pickup") return NextResponse.json({ error: "A full address is required." }, { status: 400 });
 
- // This store's bag — see storefront-cart-scope.
+ // This store's bag: see storefront-cart-scope.
  const ids = await getCartItemIds(token, await requestBagSellerId(request, token));
  const items = [];
  let sellerId = "";
  // Pieces that sold while the shopper was deciding are named back to them rather than reported as
- // an empty bag — see emptyBagMessage.
+ // an empty bag: see emptyBagMessage.
  const gone: string[] = [];
  for (const id of ids) { const it = await getItem(id); if (it && it.status !== "sold" && it.status !== "removed") { items.push(it); sellerId = it.sellerId; } else if (it) { gone.push(it.title); } }
  if (!items.length) return NextResponse.json({ error: emptyBagMessage(ids.length, gone) }, { status: 409 });
@@ -47,18 +48,18 @@ export async function POST(request: NextRequest) {
  // Flat-rate pricing: the buyer pays one clean tier price by parcel size (auto-detected from the
  // items' captured weight/dimensions). VYA buys the real discounted label at fulfillment and keeps
  // the spread. Combine the bag into one parcel: sum weights + heights, take the largest L/W.
- // The SAME combination the label is bought from (combineParcels) — this was a second copy of it,
+ // The SAME combination the label is bought from (combineParcels). This was a second copy of it,
  // with its own "or call it 16oz" default, so the price a buyer was quoted and the parcel we later
  // purchased could disagree about what was in the box.
  const parcel = combineParcels(items, { shippingPaidCents: null });
  const tier = assignTier(parcel);
- // One clean, consistent flat price by size — same number every time (Depop/Poshmark-style), matching
+ // One clean, consistent flat price by size. Same number every time (Depop/Poshmark-style), matching
  // exactly what checkout charges. Priced by ZONE with the store's own tier prices when it set them
  // (shipping-zones.ts + shipping-prices-core.ts). A collection needs no zone, so a country she
  // doesn't post to is only refused once we know this is a delivery.
  // ONE resolver, shared with /shipping-rates and with cart-intent's authoritative charge
  // (shipping-price.ts). Three separate calculations is how a buyer gets shown one price and
- // billed another; the store's own policy — live rate + markup, or its flat zone prices — is
+ // billed another; the store's own policy, live rate + markup, or its flat zone prices. Is
  // applied in exactly one place.
  const quote = hasAddress
   ? await resolveBuyerShipping({ settings: shipping, sellerName: seller.name, sellerEmail: seller.email, to, parcel })
@@ -67,17 +68,17 @@ export async function POST(request: NextRequest) {
 
  // The one place the choice is priced: what she claimed, checked against what this store offers.
  // A claim of "pickup" at a store with no collection address comes back as a delivery, postage and
- // all — cart-intent re-runs exactly this before charging, so the quote and the charge agree.
+ // all: cart-intent re-runs exactly this before charging, so the quote and the charge agree.
  // Read off the body ALREADY parsed above. `request.clone()` throws once the body has been
- // consumed — and it throws synchronously, before the `.catch()` can attach — so the clone took the
+ // consumed, and it throws synchronously, before the `.catch()` can attach, so the clone took the
  // whole request down with a 500 and checkout stopped at "Couldn't prepare checkout."
  const d = resolveDelivery({ claimed, subtotalCents: subtotal, parcelShipCents: charge, settings: shipping });
  if (d.method === "pickup") {
   return NextResponse.json({ free: true, rates: [], delivery: "pickup", pickupAvailable: true, collectFrom: d.collectFrom, instructions: d.instructions });
  }
- // She asked to collect somewhere that doesn't do it — she's being posted to, so we need the address.
- if (!hasAddress) return NextResponse.json({ error: "This store isn’t offering collection — a full address is required." }, { status: 400 });
- if (quote && !quote.ok) return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
+ // She asked to collect somewhere that doesn't do it. She's being posted to, so we need the address.
+ if (!hasAddress) return NextResponse.json({ error: "This store isn’t offering collection. A full address is required." }, { status: 400 });
+ if (quote && !quote.ok) return NextResponse.json({ error: refusalMessage(quote) }, { status: 400 });
  if (d.shippingCents === 0) return NextResponse.json({ free: true, rates: [], delivery: "ship", pickupAvailable: d.pickupAvailable });
  return NextResponse.json({ free: false, delivery: "ship", pickupAvailable: d.pickupAvailable, currency: items[0].currency, rates: [{ provider: "VYA", service: `${tier.label} parcel`, costCents: d.shippingCents, estDays: null }] });
 }

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // ───────────────────────────────────────────────────────────────────────────
-// Depop probe — the instrument that turns "we think this might work" into a fact.
+// Depop probe: the instrument that turns "we think this might work" into a fact.
 //
 // Everything blocking Depop right now is one unknown: we have never seen a completed, logged-in
 // Depop response, so we don't know which endpoints answer, what a sold-items payload looks like, or
@@ -16,14 +16,14 @@ export const maxDuration = 60;
 //
 // So this asks Depop directly and reports exactly what came back. Three questions, in order:
 //
-//   1. reachable — can our servers talk to Depop AT ALL, with no credential? If this is blocked,
+//   1. reachable: can our servers talk to Depop AT ALL, with no credential? If this is blocked,
 //      nothing else matters and the answer is "Cloudflare blocks our egress", not "bad session".
-//   2. session   — does the stored credential come back as logged in? This is the one that tells us
+//   2. session: does the stored credential come back as logged in? This is the one that tells us
 //      whether server-side posting is viable, which is the whole architectural bet.
-//   3. url       — anything the operator wants to try, with the session attached. This is how the
+//   3. url: anything the operator wants to try, with the session attached. This is how the
 //      sold-items endpoint gets mapped: probe candidates until one answers, then set DEPOP_SOLD_PATH.
 //
-// The session value is NEVER returned. Bodies are truncated — enough to recognise a shape, not
+// The session value is NEVER returned. Bodies are truncated. Enough to recognise a shape, not
 // enough to dump someone's account into a log.
 //
 // Admin-only: it makes outbound requests on a seller's credential and returns raw upstream

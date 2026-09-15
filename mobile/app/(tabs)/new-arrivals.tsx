@@ -8,7 +8,7 @@ import ProductGrid from "../../components/ProductGrid";
 import type { PagedProducts } from "../../lib/types";
 import { colors } from "../../lib/theme";
 
-// New Arrivals — the only genuinely paged screen. The API advances `nextOffset` by the RAW rows it
+// New Arrivals. The only genuinely paged screen. The API advances `nextOffset` by the RAW rows it
 // consumed rather than the filtered count, so paging stays consistent when its category filters
 // drop items; that is why the cursor comes from the response and is never computed here.
 

@@ -25,27 +25,27 @@ function HomeInner() {
  useEffect(() => {
  api<{ items: MarketItem[] }>("/api/store/market/inventory?view=available").then((r) => { if (r.ok) setRack(r.data.items); });
  }, []);
- // The rack at a glance — every active and drafted piece. The API already sorts bring-list first.
+ // The rack at a glance. Every active and drafted piece. The API already sorts bring-list first.
  const tiles = rack ?? [];
  const c = home?.counts;
  const left = c ? Math.max(0, c.available) : null;
- // The auto-named session ("Market · Aug 28") already carries the date — don't print it twice.
+ // The auto-named session ("Market · Aug 28") already carries the date. Don't print it twice.
  const rawDate = home ? new Date(home.session.createdAt).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) : "";
  const monthDay = home ? new Date(home.session.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
  const date = home && !home.session.name.includes(monthDay) ? rawDate : "";
 
  return (
  <MarketPage className="!pt-0 sm:!pt-0">
- {/* Band — bleeds to the page edges on phones, rounded card on desktop. */}
+ {/* Band: bleeds to the page edges on phones, rounded card on desktop. */}
  <div className="-mx-4 px-5 pb-14 pt-6 text-white sm:-mx-6 sm:rounded-b-[28px] sm:px-7 sm:pt-8" style={{ background: WINE }}>
  <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-white/70">Selling in person</p>
  <h1 className="mt-1.5 text-[30px] font-medium leading-[1.05] tracking-tight" style={{ fontFamily: "var(--font-display)" }}>
  {home ? home.session.name : "Market"}{date && <><br /><span className="text-white/80">{date}</span></>}
  </h1>
  <div className="mt-4 flex gap-6 text-[12.5px] text-white/85">
- <span><b className="block text-[20px] font-medium leading-none" style={{ fontFamily: "var(--font-display)" }}>{c ? money(c.grossTodayCents) : "—"}</b>today</span>
- <span><b className="block text-[20px] font-medium leading-none" style={{ fontFamily: "var(--font-display)" }}>{c ? c.soldToday : "—"}</b>sold</span>
- <span><b className="block text-[20px] font-medium leading-none" style={{ fontFamily: "var(--font-display)" }}>{left ?? "—"}</b>on the rack</span>
+ <span><b className="block text-[20px] font-medium leading-none" style={{ fontFamily: "var(--font-display)" }}>{c ? money(c.grossTodayCents) : "-"}</b>today</span>
+ <span><b className="block text-[20px] font-medium leading-none" style={{ fontFamily: "var(--font-display)" }}>{c ? c.soldToday : "-"}</b>sold</span>
+ <span><b className="block text-[20px] font-medium leading-none" style={{ fontFamily: "var(--font-display)" }}>{left ?? "-"}</b>on the rack</span>
  {c && c.brought > 0 && <span><b className="block text-[20px] font-medium leading-none" style={{ fontFamily: "var(--font-display)" }}>{c.broughtLeft}<span className="text-[13px] text-white/60">/{c.brought}</span></b>brought · {money(c.broughtValueCents)} left</span>}
  </div>
  {c && (c.cashCents > 0 || c.cardCents > 0) && <p className="mt-3 text-[12.5px] text-white/75">In the tin: <b className="text-white">{money(c.cashCents)}</b> cash · <b className="text-white">{money(c.cardCents)}</b> card</p>}

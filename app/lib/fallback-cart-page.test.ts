@@ -32,7 +32,7 @@ test("shows the subtotal as the sum of the lines", () => {
 });
 
 // Checkout must be a real link. On VYA's own origin the serve path strips every <script> AFTER the
-// cart page is built, so anything depending on a click handler arrives dead — which is why
+// cart page is built, so anything depending on a click handler arrives dead, which is why
 // injectCartPage's checkout button does nothing on a Plan A cart page today.
 test("checkout is a plain link, so it survives script stripping", () => {
  const $ = cheerio.load(buildFallbackCartPage(CHROME, LINES, "/checkout?cart=1"));
@@ -77,7 +77,7 @@ test("replaces the borrowed page's content instead of rendering the cart underne
 });
 
 // Titles come from seller-controlled inventory, and this HTML is served on the seller's own origin
-// where their scripts already run — a title that became live markup would be stored XSS against
+// where their scripts already run. A title that became live markup would be stored XSS against
 // their shoppers. Asserted by PARSING the result rather than grepping it: a title is legitimately
 // allowed to appear as inert text inside an alt attribute, and a substring search can't tell the
 // difference between that and an injected element.
@@ -86,7 +86,7 @@ test("a title containing markup stays inert", () => {
  const out = buildFallbackCartPage(CHROME, evil, "/checkout?cart=1");
  const $ = cheerio.load(out);
  const imgs = $("[data-vya-fallback-cart] img").toArray();
- assert.equal(imgs.length, 1, "only the product's own image may exist — the title must not spawn one");
+ assert.equal(imgs.length, 1, "only the product's own image may exist. The title must not spawn one");
  assert.equal($(imgs[0]).attr("src"), "https://x/1.jpg");
  assert.ok(!$(imgs[0]).attr("onerror"), "no event handler may survive from the title");
  // …and it still reads correctly to a shopper.

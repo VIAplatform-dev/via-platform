@@ -1,7 +1,7 @@
 /**
  * What a hosted-store checkout actually charges for getting the piece to the buyer.
  *
- * This is the ONE place that answers "how much postage is owed, and is this a collection?" — for the
+ * This is the ONE place that answers "how much postage is owed, and is this a collection?", for the
  * quote the shopper sees, for the PaymentIntent that charges her, and for the Checkout Session. The
  * three used to each re-derive it inline, which is exactly how one of them ends up trusting the
  * browser.
@@ -9,7 +9,7 @@
  * The rule the whole feature rests on: the shopper's choice is a CLAIM, not an instruction. It is
  * checked against what the seller actually offers (see pickup-core) before a cent comes off. A
  * request that says "pickup" at a store with no collection address is priced as a delivery, postage
- * and all — the worst a tampered request can do is make the shopper pay what she already owed.
+ * and all: the worst a tampered request can do is make the shopper pay what she already owed.
  */
 
 import { deliveryChoice, pickupOffered, type Delivery, type DeliveryMethod, type PickupSettings } from "./pickup-core.ts";
@@ -38,7 +38,7 @@ export function freeShippingFor(settings: ShipPolicy, subtotalCents: number): bo
  * Price this bag's delivery, server-side.
  *
  * `claimed` is whatever the browser said ("pickup", "ship", nonsense, nothing). `parcelShipCents` is
- * the flat tier already computed from the bag's real weight and dimensions — never a number the
+ * the flat tier already computed from the bag's real weight and dimensions, never a number the
  * client sent.
  */
 export function resolveDelivery(args: {
@@ -57,7 +57,7 @@ export function resolveDelivery(args: {
 /**
  * The delivery stamped onto the payment, so the webhook can record it on the order.
  *
- * Takes a RESOLVED Delivery, never a raw string — so nothing a shopper typed can become an order's
+ * Takes a RESOLVED Delivery, never a raw string, so nothing a shopper typed can become an order's
  * delivery method without passing resolveDelivery first.
  */
 export function deliveryMetadata(d: Delivery): Record<string, string> {
@@ -72,8 +72,8 @@ export function deliveryMetadata(d: Delivery): Record<string, string> {
 }
 
 /**
- * Read that stamp back off a Stripe object. Safe to trust: we wrote it. An order with no stamp — any
- * order placed before collection existed — is a delivery.
+ * Read that stamp back off a Stripe object. Safe to trust: we wrote it. An order with no stamp. Any
+ * order placed before collection existed. Is a delivery.
  */
 export function deliveryFromMetadata(md: Record<string, string | undefined> | null | undefined): {
  method: DeliveryMethod;
@@ -90,7 +90,7 @@ export function deliveryFromMetadata(md: Record<string, string | undefined> | nu
 }
 
 /**
- * What the buyer actually paid — the item plus whatever postage was collected. A collected order
+ * What the buyer actually paid. The item plus whatever postage was collected. A collected order
  * charged no postage, so a refund of one hands back the item price and nothing more.
  */
 export function chargedTotalCents(o: { amountCents: number; shippingPaidCents?: number | null }): number {

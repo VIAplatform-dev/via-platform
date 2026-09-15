@@ -1,5 +1,5 @@
 /**
- * Saved pieces on a seller's own storefront — her customers' wishlists, on her shop.
+ * Saved pieces on a seller's own storefront. Her customers' wishlists, on her shop.
  *
  * A shopper puts a heart on a piece and finds it again later, on any page of the shop, without
  * making an account. It is off until the seller turns it on (storefront_settings.wishlist_enabled),
@@ -7,18 +7,18 @@
  * is her call rather than ours.
  *
  * HER CARD IS NOT TOUCHED. On an imported store a product card is the seller's own markup, cloned
- * from her theme and filled with live data by injectCollectionItems — a function a dozen shops
+ * from her theme and filled with live data by injectCollectionItems. A function a dozen shops
  * depend on. Building the heart into it would put a wishlist inside her grid's blast radius. So the
  * browser finds pieces the way a shopper does, by their address (/products/…), and lays a heart over
  * each link. The theme's markup, classes and layout are untouched; remove the feature and the page
  * is byte-for-byte what it was.
  *
- * SIGNED IN TO HER SHOP, AND NOWHERE ELSE. Saving requires a store session — the magic-link sign-in
+ * SIGNED IN TO HER SHOP, AND NOWHERE ELSE. Saving requires a store session. The magic-link sign-in
  * the account panel already offers (see account-panel.ts), scoped to this seller's shop alone. No
  * password is ever made; a shopper types an email and clicks a link.
  *
  * The heart is shown to everyone. A signed-out shopper who taps it gets the sign-in panel, not a
- * silent failure and not a heart that fills in and forgets — the piece they were reaching for is
+ * silent failure and not a heart that fills in and forgets. The piece they were reaching for is
  * saved the moment they come back. That is the honest order: ask at the point they wanted
  * something, never before.
  *
@@ -78,7 +78,7 @@ const HEART_SVG =
 
 /**
  * @param opts.slug      the store, for the favourite endpoints.
- * @param opts.shopName  her shop's name — the drawer is hers, not VYA's.
+ * @param opts.shopName  her shop's name. The drawer is hers, not VYA's.
  * @param opts.apiBase   where the favourite routes live. Empty on her own domain (same origin);
  *                       the VYA origin when the page is served from a /site/… path, because a
  *                       relative /api/… there would resolve against the wrong host.
@@ -107,7 +107,7 @@ export function injectWishlist(html: string, opts: { slug: string; shopName: str
   catch(e){return "$"+((c||0)/100).toFixed(2)}
  }
  /* The piece a link points at. Kept in step with app/lib/plan-b/wishlist-core.ts, which is where
-    this logic is tested — the browser cannot import it, so the two are written to match. */
+    this logic is tested. The browser cannot import it, so the two are written to match. */
  function refOf(href){
   if(!href)return null;
   var m=/\\/products\\/([^/?#]+)/i.exec(href);
@@ -135,12 +135,12 @@ export function injectWishlist(html: string, opts: { slug: string; shopName: str
    var r=hearts[i].getAttribute("data-vya-ref");
    var on=!!state[r];
    hearts[i].setAttribute("aria-pressed",on?"true":"false");
-   hearts[i].setAttribute("aria-label",(on?"Saved — remove ":"Save ")+"this piece");
+   hearts[i].setAttribute("aria-label",(on?"Saved. Remove ":"Save ")+"this piece");
   }
  }
 
  /* A heart over every link to a piece. The link's own box is made the positioning context, so the
-    heart sits on the photograph rather than anywhere near it — and only over links that HAVE a
+    heart sits on the photograph rather than anywhere near it, and only over links that HAVE a
     photograph, because a heart floating over a text link is not a control anyone recognises. */
  function decorate(){
   var links=document.querySelectorAll('a[href*="/products/"]');
@@ -184,11 +184,11 @@ export function injectWishlist(html: string, opts: { slug: string; shopName: str
   var box=document.getElementById("vya-wl-body");
   if(!box)return;
   if(!signedIn){
-   /* Not "nothing saved yet" — that is a dead end for somebody who has a list and has simply not
+   /* Not "nothing saved yet". That is a dead end for somebody who has a list and has simply not
       said who they are. */
    box.innerHTML='<p id="vya-wl-hint" style="font-size:14px;line-height:1.5"></p>'
     +'<button class="vya-primary" data-vya-wishlist-signin="1" style="width:100%;padding:13px;border:none;border-radius:6px;background:#111;color:#fff;font:600 12px/1 inherit;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-top:14px">Sign in to save</button>'
-    +'<p class="vya-note" style="margin-top:14px">No password — we email you a link.</p>';
+    +'<p class="vya-note" style="margin-top:14px">No password. We email you a link.</p>';
    /* Her shop's name is seller-entered: written as text, never as markup. */
    document.getElementById("vya-wl-hint").textContent=
     "Sign in to "+SHOP+" to save pieces and find them again on any device.";
@@ -233,7 +233,7 @@ export function injectWishlist(html: string, opts: { slug: string; shopName: str
     in finishes what they started.
 
     localStorage, NOT sessionStorage. The sign-in is a link in an email, and an email client opens it
-    in a NEW TAB — where sessionStorage is empty, so the piece they asked for would be quietly
+    in a NEW TAB, where sessionStorage is empty, so the piece they asked for would be quietly
     dropped and they would land on the shop wondering where it went. localStorage is per-origin and
     survives the hop. It is stamped, and only honoured for an hour, so a link clicked days later does
     not silently save something they have forgotten asking for. */
@@ -297,7 +297,7 @@ export function injectWishlist(html: string, opts: { slug: string; shopName: str
   if(si){e.preventDefault();e.stopImmediatePropagation();askToSignIn(null);return;}
  },true);
 
- /* HER CONTROL FIRST. Most themes already have a favourites or wishlist link in the header — the
+ /* HER CONTROL FIRST. Most themes already have a favourites or wishlist link in the header. The
     same ones favourites-icon.ts puts a heart on. Binding those means saved pieces live exactly
     where her shoppers already look, in her own header, in her own type.
     Never an account link: telling those two apart is the whole point of favourites-icon.ts. */
@@ -320,7 +320,7 @@ export function injectWishlist(html: string, opts: { slug: string; shopName: str
 
  /* AND OURS WHERE SHE HAS NONE. A shop whose shoppers can save pieces but cannot find them again
     has not got the feature. Deliberately a small corner button rather than something inserted into
-    her header, which is hers — and it only appears once something is actually saved, so a shop with
+    her header, which is hers, and it only appears once something is actually saved, so a shop with
     an empty list is not carrying a control for a list that does not exist. */
  function mountFab(){
   if(document.getElementById("vya-wl-fab"))return;

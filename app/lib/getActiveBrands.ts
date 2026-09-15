@@ -28,7 +28,7 @@ async function _getActiveBrandsUncached(): Promise<ActiveBrand[]> {
  .sort((a, b) => b.productCount - a.productCount);
 }
 
-// Cache for 10 minutes — inventory is already cached so this is cheap
+// Cache for 10 minutes. Inventory is already cached so this is cheap
 export const getActiveBrands = unstable_cache(
  _getActiveBrandsUncached,
  ["active-brands"],

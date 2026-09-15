@@ -44,7 +44,7 @@ test("a wallet is an accessory, not a bag", () => {
 
 test("the title falls back to the category when VYA's is unhelpful", () => {
  // Jackets, not Coats: Vestiaire lists them as separate item types, and this used to collapse both
- // into Coats — which matched their dropdown by luck rather than by being right.
+ // into Coats, which matched their dropdown by luck rather than by being right.
  assert.deepEqual(vestiaireCategory("", "Vintage Levi's denim jacket"), { category: "Clothing", subcategory: "Jackets" });
 });
 
@@ -70,7 +70,7 @@ test("colours use Vestiaire's list, including the ones Depop lacks", () => {
 });
 
 test("an unbranded piece is refused with a reason", () => {
- // Vestiaire is curated — queueing this wastes the seller's afternoon.
+ // Vestiaire is curated. Queueing this wastes the seller's afternoon.
  const r = vestiaireEligibility(null);
  assert.equal(r.ok, false);
  if (!r.ok) assert.match(r.reason, /designer brand/i);
@@ -152,7 +152,7 @@ test("category, condition and price each block on their own", () => {
  assert.match(vestiaireReadiness({ ...ready, priceCents: 0 }).blocking.join(" "), /No price/);
 });
 
-test("advisories don't block — they're what a reviewer rejects, not what the form stops", () => {
+test("advisories don't block: they're what a reviewer rejects, not what the form stops", () => {
  const r = vestiaireReadiness({ ...ready, size: "", description: "" });
  assert.equal(r.ready, true, "still listable");
  assert.equal(r.advisory.length >= 2, true);
@@ -164,7 +164,7 @@ test("three photos passes but still suggests the label and hardware shots", () =
 });
 
 test("a colour the seller typed beats one guessed from the words", () => {
- // Before there was a field, this could only read the title and description — and "Silk dress"
+ // Before there was a field, this could only read the title and description, and "Silk dress"
  // names no colour, so Vestiaire's required field was unfillable however complete the listing was.
  assert.equal(vestiaireColour("Dress", "Silk dress"), "");
  assert.equal(vestiaireColour("Dress", "Silk dress", "Navy"), "Navy");
@@ -207,7 +207,7 @@ test("the types they list separately aren't collapsed into one", () => {
 
 test("a piece with no colour anywhere is refused before the seller opens their site", () => {
  // Vestiaire's Details step requires it. Without this the run reached their form, filled four
- // steps, and only then reported "Colour: nothing in VYA" — too late to be any use.
+ // steps, and only then reported "Colour: nothing in VYA": too late to be any use.
  const c = vestiaireReadiness({
   title: "Women's Dress", brand: "Chanel", category: "Dresses", condition: "Good",
   material: "Silk", size: "M", description: "A dress.", priceCents: 38000,
@@ -241,7 +241,7 @@ test("pattern is read from the words, and 'plain' only when the piece is one col
  assert.equal(vestiairePattern("Python print bag", "", null), "Snakeskin", "their word, not ours");
  // One colour and nothing calling it a print → plain. Safe in a way a guessed fibre isn't.
  assert.equal(vestiairePattern("Silk dress", "A lovely dress.", "Navy"), "Plain");
- // Multicolour is a print by definition — don't call it plain.
+ // Multicolour is a print by definition. Don't call it plain.
  assert.equal(vestiairePattern("Silk dress", "", "Multicolour"), "");
  // No colour known and no pattern word → say nothing.
  assert.equal(vestiairePattern("Silk dress", "", null), "");

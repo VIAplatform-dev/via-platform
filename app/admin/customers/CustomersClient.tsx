@@ -50,7 +50,7 @@ type UnmatchedConversion = {
 };
 
 function fmtTime(date: string | null) {
- if (!date) return "—";
+ if (!date) return "-";
  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -187,7 +187,7 @@ function ActivityPanel({ customer, onClose }: { customer: Customer; onClose: () 
  {/* Header */}
  <div style={{ padding: "20px 24px", borderBottom: "1px solid #e4e4e7", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
  <div>
- <p style={{ fontWeight: 600, color: "#09090b", fontSize: 15, margin: 0 }}>{customer.name || "—"}</p>
+ <p style={{ fontWeight: 600, color: "#09090b", fontSize: 15, margin: 0 }}>{customer.name || "-"}</p>
  <p style={{ fontSize: 12, color: "#71717a", margin: "2px 0 0" }}>{customer.email}</p>
  </div>
  <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#a1a1aa", lineHeight: 1, padding: 0 }}>×</button>
@@ -197,7 +197,7 @@ function ActivityPanel({ customer, onClose }: { customer: Customer; onClose: () 
  {loading ? (
  <p style={{ fontSize: 13, color: "#a1a1aa", marginTop: 24 }}>Loading…</p>
  ) : !data?.userId ? (
- <p style={{ fontSize: 13, color: "#a1a1aa", marginTop: 24 }}>No account activity yet — user hasn&apos;t signed in.</p>
+ <p style={{ fontSize: 13, color: "#a1a1aa", marginTop: 24 }}>No account activity yet. User hasn&apos;t signed in.</p>
  ) : (
  <>
  {/* Favorites */}
@@ -250,7 +250,7 @@ function ActivityPanel({ customer, onClose }: { customer: Customer; onClose: () 
 }
 
 function fmt(date: string | null) {
- if (!date) return "—";
+ if (!date) return "-";
  return new Date(date).toLocaleDateString("en-US", {
  month: "short",
  day: "numeric",
@@ -325,7 +325,7 @@ export default function CustomersClient() {
  remaining = data.remaining ?? 0;
  if (data.sent === 0) break; // nothing was sent, stop to avoid infinite loop
  }
- setEmailProgress(`Done — ${totalSent} emails sent`);
+ setEmailProgress(`Done: ${totalSent} emails sent`);
  setTimeout(() => setEmailProgress(null), 4000);
  } finally {
  setApprovingAll(false);
@@ -371,7 +371,7 @@ export default function CustomersClient() {
  });
  }, []);
 
- // Source counts drive the chips below — computed off the STATUS-filtered set so the
+ // Source counts drive the chips below. Computed off the STATUS-filtered set so the
  // numbers match what you'd actually see, but not off the source filter itself
  // (otherwise selecting TikTok would zero out every other chip).
  const sourceCounts = customers.reduce<Record<string, number>>((acc, c) => {
@@ -600,7 +600,7 @@ export default function CustomersClient() {
  <td style={{ padding: "12px 16px", color: "#d4d4d8" }}>{i + 1}</td>
  <td style={{ padding: "12px 16px" }}>
  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
- <p style={{ fontWeight: 500, color: "#09090b", margin: 0 }}>{c.name || "—"}</p>
+ <p style={{ fontWeight: 500, color: "#09090b", margin: 0 }}>{c.name || "-"}</p>
  {c.pageViewCount > 0 && (
  <span title={`${c.pageViewCount} site page visits`} style={{ display: "inline-flex", alignItems: "center", gap: 2, fontSize: 10, color: "#6d28d9", background: "#ede9fe", padding: "1px 5px", borderRadius: 4 }}>
  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -674,7 +674,7 @@ export default function CustomersClient() {
  {c.lastActiveAt ? (
  <span style={{ color: "#09090b", fontWeight: 500 }}>{fmt(c.lastActiveAt)}</span>
  ) : (
- <span style={{ color: "#d4d4d8" }}>—</span>
+ <span style={{ color: "#d4d4d8" }}>-</span>
  )}
  </td>
  <td style={{ padding: "12px 16px", fontSize: 12, color: "#71717a" }}>{fmt(c.signedUpAt)}</td>
@@ -683,17 +683,17 @@ export default function CustomersClient() {
  <span style={{ fontSize: 12, fontWeight: 600, color: "#15803d" }}>
  ${c.totalSpend.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
  </span>
- ) : <span style={{ fontSize: 12, color: "#a1a1aa" }}>—</span>}
+ ) : <span style={{ fontSize: 12, color: "#a1a1aa" }}>-</span>}
  </td>
  <td style={{ padding: "12px 16px" }}>
  {c.referralCode ? (
  <code style={{ fontSize: 11, background: "#f4f4f5", padding: "1px 6px", color: "#09090b", fontFamily: "monospace", borderRadius: 4 }}>{c.referralCode}</code>
- ) : "—"}
+ ) : "-"}
  </td>
  <td style={{ padding: "12px 16px" }}>
  {c.referredBy ? (
  <code style={{ fontSize: 11, background: "#fef9c3", color: "#854d0e", padding: "1px 6px", fontFamily: "monospace", borderRadius: 4 }}>{c.referredBy}</code>
- ) : "—"}
+ ) : "-"}
  </td>
  <td style={{ padding: "12px 16px" }}>
  {c.status !== "approved" && (

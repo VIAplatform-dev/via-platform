@@ -3,12 +3,12 @@ import { getProductById } from "@/app/lib/db";
 import { resizeImage } from "@/app/lib/imageUtils";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Product image proxy — serves each listing's photo from a CLEAN vyaplatform.com
+// Product image proxy: serves each listing's photo from a CLEAN vyaplatform.com
 // URL (e.g. /i/mookie-studios-3780080/0.jpg) instead of the seller's cdn.shopify.com.
 // This is what lets Google/Lens attribute the image to the VYA page (and surface us
 // in reverse-image search), rather than crediting the seller's original store which
 // serves the same bytes. Only serves images that belong to a DB-known, displayable
-// product — so it is NOT an open proxy (no SSRF). Cached hard at the edge, so the
+// product, so it is NOT an open proxy (no SSRF). Cached hard at the edge, so the
 // upstream fetch happens rarely and bandwidth stays cheap.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
  status: 200,
  headers: {
  "Content-Type": contentType,
- // 7d browser, 30d CDN, serve-stale-while-revalidating — stable enough for Google to
+ // 7d browser, 30d CDN, serve-stale-while-revalidating. Stable enough for Google to
  // index, cheap enough that we almost never re-fetch the seller's CDN.
  "Cache-Control": "public, max-age=604800, s-maxage=2592000, stale-while-revalidate=604800",
  },

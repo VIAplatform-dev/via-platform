@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!adminToken && adminToken === hashPassword(adminPassword);
 }
 
-// GET /api/admin/demand?days=30 — marketplace-wide demand intelligence (internal/beta).
+// GET /api/admin/demand?days=30: marketplace-wide demand intelligence (internal/beta).
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const { searchParams } = new URL(request.url);

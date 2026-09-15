@@ -11,7 +11,7 @@ test("a settings page knows which group it lives in", () => {
  assert.equal(groupFor("/admin/settings/shipping")?.label, "Selling");
  assert.equal(groupFor("/admin/settings/payments")?.label, "Store");
  assert.equal(groupFor("/admin/settings/domain")?.label, "Channels");
- // The index itself belongs to no one group — it shows them all.
+ // The index itself belongs to no one group. It shows them all.
  assert.equal(groupFor("/admin/settings"), null);
  assert.equal(groupFor("/admin/inventory"), null);
 });

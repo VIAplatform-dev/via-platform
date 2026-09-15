@@ -4,9 +4,9 @@ import { PRIVACY, SOURCING } from "./config";
 import { sourceNowScore, priceBenchmark, type Trend } from "./metrics";
 import { scanCatalogBySegment, type SegmentType } from "./market-metrics-db";
 
-// ── "Source Now" — what to buy right now, while the window's open ──────────────────────────────
+// ── "Source Now": what to buy right now, while the window's open ──────────────────────────────
 // A pick is a segment (brand / category / era) where the market's own buyers show RISING or HIGH
-// demand AND the shelves are thin (a supply gap) — the moment to source before every store piles in
+// demand AND the shelves are thin (a supply gap): the moment to source before every store piles in
 // and the price climbs. Every input is aggregated across ≥5 stores (privacy floor) from thousands of
 // first-party engagement events, so it's a market pattern, not one store's noise. Asking price is
 // shown as CONTEXT (from the live catalog), never as a claim about what things sold for.
@@ -27,7 +27,7 @@ export type SourcePick = {
  supplyGap: number;
  storeCount: number;
  activeSupply: number;
- askP25: number | null; // typical ASKING range across the market (dollars) — context, not "sold for"
+ askP25: number | null; // typical ASKING range across the market (dollars). Context, not "sold for"
  askMedian: number | null;
  askP75: number | null;
  reason: string;
@@ -37,7 +37,7 @@ const money = (n: number | null) => (n == null ? null : `$${Math.round(n).toLoca
 
 function buildReason(p: { trend: Trend; storeCount: number; activeSupply: number; askMedian: number | null; askP25: number | null; askP75: number | null }): string {
  const lead = p.trend === "rising" ? "Demand is climbing" : "Demand is high";
- const supply = `only ${p.storeCount} store${p.storeCount === 1 ? "" : "s"} carry it (${p.activeSupply} in stock market-wide) — under-supplied`;
+ const supply = `only ${p.storeCount} store${p.storeCount === 1 ? "" : "s"} carry it (${p.activeSupply} in stock market-wide). Under-supplied`;
  const price = p.askMedian != null
   ? ` Lists around ${money(p.askMedian)}${p.askP25 != null && p.askP75 != null ? ` (${money(p.askP25)}–${money(p.askP75)})` : ""}.`
   : "";
@@ -45,7 +45,7 @@ function buildReason(p: { trend: Trend; storeCount: number; activeSupply: number
 }
 
 // Read the latest metric snapshot, keep only privacy-safe segments, and surface the ones that are a
-// live sourcing opportunity — ranked by how strong the opportunity is.
+// live sourcing opportunity: ranked by how strong the opportunity is.
 export async function getSourceNow(windowKey: "7d" | "30d"): Promise<{ asOfDate: string | null; picks: SourcePick[]; empty?: boolean }> {
  const sql = db();
  let metricRows: Array<Record<string, unknown>>;
@@ -58,7 +58,7 @@ export async function getSourceNow(windowKey: "7d" | "30d"): Promise<{ asOfDate:
    WHERE window_key = ${windowKey} AND as_of_date = (SELECT MAX(as_of_date) FROM market_metrics)
   `) as Array<Record<string, unknown>>;
  } catch {
-  return { asOfDate: null, picks: [], empty: true }; // table not built yet — degrade, don't error
+  return { asOfDate: null, picks: [], empty: true }; // table not built yet. Degrade, don't error
  }
  if (metricRows.length === 0) return { asOfDate: null, picks: [], empty: true };
  const asOfDate = metricRows[0].as_of as string;
@@ -78,7 +78,7 @@ export async function getSourceNow(windowKey: "7d" | "30d"): Promise<{ asOfDate:
   txnCount: Number(r.txn_count),
  }));
 
- // Privacy gate FIRST — only ≥5-store segments survive, so every pick is a market pattern.
+ // Privacy gate FIRST, only ≥5-store segments survive, so every pick is a market pattern.
  const visible = gateSegments(raw, PRIVACY);
 
  // The sourcing window: demand is RISING (or already HIGH) AND the shelves are thin.

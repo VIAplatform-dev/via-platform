@@ -2,7 +2,7 @@
 //
 // WHY INTENT HAS TO BE REMEMBERED. The link arrives by email, so the tap that starts a sign-in and
 // the tap that finishes it are minutes apart and may be in a different app. By the time the callback
-// runs, nothing on screen remembers which button was pressed — and "Sign in as a store" followed by
+// runs, nothing on screen remembers which button was pressed, and "Sign in as a store" followed by
 // the shopper marketplace, with no word about why, is the failure this exists to stop.
 //
 // The destination itself is decided here, in one tested function, rather than inline in the callback.
@@ -17,7 +17,7 @@ export type Destination =
 /**
  * Where to land after the emailed link is exchanged.
  *
- * `slug` is the store the address belongs to, as the server resolved it — null for an address with
+ * `slug` is the store the address belongs to, as the server resolved it. Null for an address with
  * no shop.
  *
  * A STORE SIGN-IN THAT FINDS NO SHOP DOES NOT SILENTLY BECOME A SHOPPER SIGN-IN. She is signed in
@@ -37,7 +37,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const KEY = "vya-signin-intent";
 
-/** Stamped, and only honoured for an hour — a link opened days later should not still be steering. */
+/** Stamped, and only honoured for an hour. A link opened days later should not still be steering. */
 export async function rememberIntent(intent: SignInIntent): Promise<void> {
  try { await AsyncStorage.setItem(KEY, JSON.stringify({ intent, at: Date.now() })); } catch { /* not worth failing a sign-in over */ }
 }

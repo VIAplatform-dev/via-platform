@@ -32,7 +32,7 @@ test("Shop Pay / checkout modules resolve as EMPTY modules, so dynamic import() 
  const plan = planCdnRequest("/cdn/shopifycloud/shop-js/modules/v2/loader.shop-login-button.en.esm.js", "", ORIGIN);
  assert.equal(plan.action, "inert");
  assert.match((plan as { contentType: string }).contentType, /javascript/);
- // The body must be EMPTY of behaviour, not empty of characters — and must parse as a classic
+ // The body must be EMPTY of behaviour, not empty of characters, and must parse as a classic
  // script too, so it carries no `export`. (It used to be `export {};`, which threw a syntax error
  // wherever Shopify injected the script the classic way.)
  const body = (plan as { body: string }).body;
@@ -60,7 +60,7 @@ test("a denied path with no known extension is refused rather than guessed at", 
  assert.equal(planCdnRequest("/cdn/s/trekkie.storefront.min.woff2", "", ORIGIN).action, "deny");
 });
 
-test("isDeniedScriptUrl is the denylist only — a plain theme asset is not denied", () => {
+test("isDeniedScriptUrl is the denylist only. A plain theme asset is not denied", () => {
  assert.equal(isDeniedScriptUrl("https://angearchive.com/cdn/shop/t/1/assets/dialog.js"), false);
  assert.equal(isDeniedScriptUrl("https://angearchive.com/cdn/shopifycloud/perf-kit/shopify-perf-kit-3.8.4.min.js"), true);
  assert.equal(isDeniedScriptUrl(""), false);

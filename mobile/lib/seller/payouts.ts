@@ -1,16 +1,16 @@
 // Whether a consignor can actually be paid right now, and what the button should say.
 //
 // Three amounts are in play and they are NOT interchangeable:
-//   balanceCents  — everything she is owed, hold or no hold.
-//   payableCents  — the part past the return hold that VYA holds and can send.
-//   offPlatform   — owed for eBay/Depop sales. Real debt, but the marketplace paid the STORE, so
+//   balanceCents. Everything she is owed, hold or no hold.
+//   payableCents. The part past the return hold that VYA holds and can send.
+//   offPlatform: owed for eBay/Depop sales. Real debt, but the marketplace paid the STORE, so
 //                   VYA has nothing to send; the store settles it and records that it did.
-//   inFlightCents — already reserved by a bank debit that hasn't cleared. Not payable twice.
+//   inFlightCents. Already reserved by a bank debit that hasn't cleared. Not payable twice.
 //
 // Direct deposit ("stripe") can only ever send `payable`. Cash, cheque and store credit are the
 // store paying out of its own pocket and writing it down, so they can settle marketplace sales too.
 // Offering one number for both would either hide real debt or promise a transfer that cannot happen
-// — the server refuses that case, and this is what stops the phone offering it in the first place.
+// the server refuses that case, and this is what stops the phone offering it in the first place.
 
 export type PayoutRow = {
   method: string;
@@ -50,7 +50,7 @@ export function payoutActionFor(row: PayoutRow, defaultMethod?: string | null): 
     // Owed but nothing to pay: say WHICH of the two reasons it is, because they have different fixes.
     const note =
       sends && offPlatform > 0
-        ? "What they're owed was sold on a marketplace that paid you directly — record it as cash instead."
+        ? "What they're owed was sold on a marketplace that paid you directly. Record it as cash instead."
         : row.balanceCents > 0
           ? "Still inside the return hold."
           : null;

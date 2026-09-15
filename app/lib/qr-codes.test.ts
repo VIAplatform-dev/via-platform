@@ -38,8 +38,8 @@ test("both hosts are allowed, with or without www", () => {
 });
 
 test("a destination we do not own is refused", () => {
- // A printed card cannot be recalled. If a bad row ever reaches the qr_codes table — a typo,
- // a paste, a compromised write — it must not be able to send our own QR off our domains.
+ // A printed card cannot be recalled. If a bad row ever reaches the qr_codes table. A typo,
+ // a paste, a compromised write. It must not be able to send our own QR off our domains.
  // "getvya.ai.evil.com" is the one that catches a naive suffix check.
  for (const u of [
   "https://evil.com/steal",

@@ -3,19 +3,19 @@ import { ensureAnalyticsViews } from "./views";
 import { deltaPct, type ResolvedPeriod, type Window } from "./period";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — pricing & catalog.
+// Analytics: pricing & catalog.
 //
 // Two prices matter and they are not the same number: what a store ASKS (the
 // live catalog) and what things actually GO FOR (realised sale amounts). The gap
 // between them is the most useful pricing signal a reseller has, so both appear
-// side by side as mean and median — median because one $6,000 Birkin should not
+// side by side as mean and median. Median because one $6,000 Birkin should not
 // move the read on a $180 catalog.
 //
 // Sell-through is period-scoped: sold in the window ÷ (sold in the window + what
 // is still listed). It answers "of what I could have sold, how much did I".
 // ───────────────────────────────────────────────────────────────────────────
 
-/** Shared band definition — the API and the UI must agree on where $250 falls. */
+/** Shared band definition: the API and the UI must agree on where $250 falls. */
 export const PRICE_BANDS: { label: string; minCents: number; maxCents: number | null }[] = [
  { label: "Under $100", minCents: 0, maxCents: 10_000 },
  { label: "$100–249", minCents: 10_000, maxCents: 25_000 },
@@ -162,7 +162,7 @@ export async function getCatalogMetrics(sellerId: string, period: ResolvedPeriod
     WHERE s.seller_id = ${sellerId}::uuid
      AND s.sold_at >= ${current.startISO} AND s.sold_at < ${current.endISO}
    `,
-   // Price distribution across the LIVE catalog — "how much of my stock sits under $100".
+   // Price distribution across the LIVE catalog. "how much of my stock sits under $100".
    sql`
     SELECT width_bucket(price_cents, ${BAND_EDGES})::int AS band, COUNT(*)::int AS n
     FROM items WHERE seller_id = ${sellerId}::uuid AND status = 'active'

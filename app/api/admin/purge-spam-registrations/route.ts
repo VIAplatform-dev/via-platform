@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
 
 // Clean up the bot-spam pilot registrations (casino/link spam injected into the name fields).
-// Matches only rows whose NAME contains a URL or spam markers — real names never do — and never
+// Matches only rows whose NAME contains a URL or spam markers, real names never do, and never
 // touches approved accounts. GET = dry-run preview (count + samples); GET ?apply=1 = delete.
 // Admin-gated (middleware also guards /api/admin/*).
 

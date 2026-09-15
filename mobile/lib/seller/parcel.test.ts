@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { tierForWeight, parcelMismatch, describeParcel, defaultParcelFor, TIERS } from "./parcel.ts";
 
-// Mirror of app/lib/parcel-core.ts. The thresholds are copied from app/lib/shipping-tiers.ts —
+// Mirror of app/lib/parcel-core.ts. The thresholds are copied from app/lib/shipping-tiers.ts,
 // if those move, these must move with them, and the test below pins the numbers.
 
 test("the tier thresholds match the server's (small ≤ 16 oz, medium ≤ 48 oz)", () => {
@@ -26,7 +26,9 @@ test("a mismatch only when the tiers differ, worded for the phone's one line", (
   assert.equal(parcelMismatch({ typedWeightOz: 20, estimate: { tier: "medium", weightOz: 24, source: "ai" } }), null);
   assert.equal(parcelMismatch({ typedWeightOz: null, estimate: { tier: "large", weightOz: 52, source: "ai" } }), null);
   const m = parcelMismatch({ typedWeightOz: 8, estimate: { tier: "large", weightOz: 52, source: "ai" }, category: "coats-jackets" });
-  assert.equal(m?.message, "You typed 8 oz, but this looks like a coat (large parcel). Buyers get quoted the small tier and you pay the difference.");
+  // The weight is the one thing that comes back to her. A thin PRICE is settled between VYA and
+  // the carrier; an understated SIZE is re-rated after the parcel ships and billed on.
+  assert.equal(m?.message, "You typed 8 oz, but this looks like a coat (large parcel). Buyers get quoted the small tier, and the carrier bills you the difference once it ships.");
 });
 
 test("describeParcel reads as the Review row", () => {

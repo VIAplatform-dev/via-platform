@@ -6,15 +6,15 @@ import crypto from "crypto";
 // The real admin sign-in is password → OTP emailed via Resend → code entry. That is correct for
 // production and painful on localhost, where it means round-tripping an email to look at a page.
 // The proxy already accepts a `via_admin_token` cookie equal to sha256(ADMIN_PASSWORD), so this
-// route just sets that cookie directly — it grants nothing the password alone doesn't.
+// route just sets that cookie directly. It grants nothing the password alone doesn't.
 //
 // THREE INDEPENDENT GUARDS, because an auth bypass that ships is the worst kind of convenience:
 //   1. Refuses unless NODE_ENV === "development" (`next build` sets "production").
-//   2. Refuses unless the request Host is loopback — so it can't be reached over the LAN even in
+//   2. Refuses unless the request Host is loopback, so it can't be reached over the LAN even in
 //      dev, which matters because the dev server binds 0.0.0.0 and gets shared on a network.
 //   3. Refuses if ADMIN_PASSWORD is unset or is the `[SENSITIVE]` placeholder `vercel env pull`
 //      writes, so it can never mint a token from a non-secret.
-// Any refusal is a 404, not a 403 — an endpoint that says "forbidden" tells a scanner it exists.
+// Any refusal is a 404, not a 403. An endpoint that says "forbidden" tells a scanner it exists.
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
  const token = crypto.createHash("sha256").update(password).digest("hex");
 
  const to = request.nextUrl.searchParams.get("to") || "/admin";
- // Only same-origin paths — never an absolute URL, so this can't be used as an open redirect.
+ // Only same-origin paths, never an absolute URL, so this can't be used as an open redirect.
  const dest = to.startsWith("/") && !to.startsWith("//") ? to : "/admin";
 
  const res = NextResponse.redirect(new URL(dest, request.nextUrl.origin));

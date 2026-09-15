@@ -103,7 +103,7 @@ export default function RecoveryPage() {
  <span className="h-12 w-12 shrink-0 rounded bg-stone-100 bg-cover bg-center ring-1 ring-black/5" style={a.itemImage ? { backgroundImage: `url("${a.itemImage.replace(/"/g, "%22")}")` } : undefined} />
  <div className="min-w-0 flex-1">
  <p className="truncate text-[13px] font-medium text-stone-800">{a.itemTitle || "Item"}</p>
- <p className="truncate text-[12.5px] text-stone-700">{a.name || "—"}</p>
+ <p className="truncate text-[12.5px] text-stone-700">{a.name || "-"}</p>
  <a href={`mailto:${a.email}`} className="block truncate text-[12px] text-stone-400 hover:text-stone-600 hover:underline">{a.email}</a>
  </div>
  </div>
@@ -137,7 +137,7 @@ export default function RecoveryPage() {
  </div>
  </TD>
  <TD>
- <span className="block font-medium text-stone-800">{a.name || "—"}</span>
+ <span className="block font-medium text-stone-800">{a.name || "-"}</span>
  <a href={`mailto:${a.email}`} className="block text-[12px] text-stone-400 hover:text-stone-600 hover:underline">{a.email}</a>
  </TD>
  <TD className="hidden lg:table-cell"><span className="text-stone-500">{ago(a.createdAt)}</span></TD>
@@ -158,7 +158,7 @@ export default function RecoveryPage() {
  </table>
  </div>
  </TechCard>
- <p className="mt-3 text-[12px] text-stone-400">Only shoppers who entered their email at checkout appear here. Reminders send from your store’s email — set it up in Settings → Email. The automated version runs on your Marketing → Automations “abandoned cart” toggle.</p>
+ <p className="mt-3 text-[12px] text-stone-400">Shoppers who left an email at checkout and didn’t finish. Send a reminder, or switch it on automatically under Marketing → Automations.</p>
  </>
  )}
  </AdminPage>

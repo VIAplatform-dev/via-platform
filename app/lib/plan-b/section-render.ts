@@ -1,7 +1,7 @@
 // Shopify's SECTION RENDERING API, answered from live VYA inventory.
 //
-// WHY THIS EXISTS. Shopify's new theme generation — Horizon and the themes built on it (Dwell,
-// Vessel, Seed…) — stopped doing client-side rendering. Instead the theme asks the SERVER to
+// WHY THIS EXISTS. Shopify's new theme generation. Horizon and the themes built on it (Dwell,
+// Vessel, Seed…): stopped doing client-side rendering. Instead the theme asks the SERVER to
 // re-render one section and morphs the result into the page:
 //
 //   GET /collections/all?section_id=template--123__main      ← facets, sorting, pagination
@@ -10,7 +10,7 @@
 //
 // The response must be an HTML FRAGMENT containing `id="shopify-section-{id}"`. We answered the
 // full page (942KB of it), so `morphSection()` couldn't find the section and threw, and predictive
-// search — which parses the response for `.predictive-search-empty-section` — threw on every
+// search, which parses the response for `.predictive-search-empty-section`. Threw on every
 // search-drawer open.
 //
 // This is not a per-theme shim. Four of our captured stores already run four DIFFERENT themes that
@@ -19,7 +19,7 @@
 // `section_id` and are completely unaffected.
 //
 // What we DON'T do is render Liquid. We slice the section out of the page our existing pipeline
-// already built — the one that injects live inventory — so a section response carries exactly the
+// already built, the one that injects live inventory, so a section response carries exactly the
 // same live data the full page would.
 import * as cheerio from "cheerio";
 
@@ -68,7 +68,7 @@ export function emptySection(sectionId: string): string {
  *   parsed = DOMParser(html).querySelector('.predictive-search-empty-section')   ← must exist
  *   morph(predictiveSearchResults, parsed)                                        ← childrenOnly
  * `childrenOnly` means the CHILDREN of `.predictive-search-empty-section` replace the children of
- * the results container — so the results div has to live INSIDE it, mirroring what the capture has
+ * the results container, so the results div has to live INSIDE it, mirroring what the capture has
  * inside `.predictive-search-form__content`. `#predictive-search-products` is required too: when the
  * shopper has recently-viewed items the theme prepends them into that element and bails out if it's
  * missing.
@@ -78,7 +78,7 @@ export function predictiveSearchEmptySection(sectionId: string): string {
   // Shopify's newer "Shapes" theme (and others built the same way) reads this section differently:
   // its PredictiveSearch component does
   //   new DOMParser().parseFromString(text, "text/html").querySelector("#predictive-search-count").textContent
-  // unconditionally, with no null check — a response missing this exact id throws inside the fetch
+  // unconditionally, with no null check. A response missing this exact id throws inside the fetch
   // handler's own .then(), which its .catch() turns into `this.rawQuery = ""`. Confirmed against the
   // theme's real code, not guessed: every keystroke was being wiped the instant the debounced search
   // fired, which read as "the search bar won't even let me type."
@@ -103,20 +103,20 @@ export type SuggestCard = {
  * card class alone was right, but the grid CSS lives on `predictive-search-results__list` (a <ul>),
  * the cards are <li> carrying the `--product` modifier, and everything inside a card is a
  * `resource-card` with its own media/content/title parts. Emitting a bare <a> with only the card
- * class meant not one rule matched, so every result rendered at its natural size — two enormous
+ * class meant not one rule matched, so every result rendered at its natural size. Two enormous
  * photographs per row with the title and price run together, against four tidy cards on her own
  * site. Every check passed it, because the right products, titles and prices were all present.
  *
  * Verified against a live Horizon-family response rather than guessed, and the whole family shares
  * this markup. A theme that doesn't simply won't match the extra classes, which is what it already
- * does today — so this can only widen what styles correctly, never narrow it.
+ * does today, so this can only widen what styles correctly, never narrow it.
  *
  * Two deliberate omissions from the real thing:
  *  · `<product-card-link>`, the theme's custom element for view transitions. It keys off a Shopify
  *    product id we don't have, and the `resource-card` inside it is what carries the styling.
  *  · the srcset/secondary hover image, which needs the CDN's own resizing parameters.
  *
- * `data-single-result-url` on a lone result is what lets Enter jump straight to it — the theme reads
+ * `data-single-result-url` on a lone result is what lets Enter jump straight to it. The theme reads
  * that attribute before falling back to the full search page.
  */
 export function predictiveSearchResultsSection(sectionId: string, cards: SuggestCard[]): string {
@@ -139,7 +139,7 @@ export function predictiveSearchResultsSection(sectionId: string, cards: Suggest
  }).join("");
  const count = `${cards.length} search result${cards.length === 1 ? "" : "s"} found`;
  return `<div id="${SECTION_ID_PREFIX}${escapeAttr(sectionId)}" class="shopify-section">` +
-  // See predictiveSearchEmptySection() — required by the "Shapes"-family theme convention, not the
+  // See predictiveSearchEmptySection(): required by the "Shapes"-family theme convention, not the
   // Horizon one the rest of this section's markup targets. Both read from the same response fine.
   `<span id="predictive-search-count" class="visually-hidden">${cards.length} result${cards.length === 1 ? "" : "s"}</span>` +
   `<div id="predictive-search-results" class="predictive-search-dropdown" role="listbox" aria-label="Search results"${single}>` +

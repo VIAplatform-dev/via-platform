@@ -17,7 +17,7 @@ import {
 // Allow up to 5 minutes for bulk generation
 export const maxDuration = 300;
 
-// Simple hash function — must match middleware
+// Simple hash function: must match middleware
 function hashPassword(password: string): string {
  const crypto = require("crypto");
  return crypto.createHash("sha256").update(password).digest("hex");
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
  // Get products missing collabs links from VYA's database.
  // Build a map from numeric Shopify ID → the exact DB value (may be a full GID
- // like "gid://shopify/Product/12345" or just the numeric string — normalise
+ // like "gid://shopify/Product/12345" or just the numeric string. Normalise
  // to the numeric suffix so it matches what the Collabs API returns).
  const missingProducts = await getProductsMissingCollabsLink(storeSlug);
  // numericId → dbShopifyId (the exact string stored in the DB, used for the UPDATE)
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
  // If no existing affiliate link, create one using the Collabs product ID
  if (!collabsUrl) {
  if (rateLimited) {
- // Already hit daily limit — skip creating but count it
+ // Already hit daily limit. Skip creating but count it
  rateLimitSkipped++;
  continue;
  }

@@ -22,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
  const store = stores.find((s) => s.slug === sf.storeSlug);
  const name = store?.name ?? "Storefront";
  const description = sf.tagline || (store ? `Shop ${store.name}, vintage and one-of-a-kind.` : undefined);
- // The seller's own domain IS the canonical public site — index it when live.
+ // The seller's own domain IS the canonical public site. Index it when live.
  return {
  title: name,
  description,

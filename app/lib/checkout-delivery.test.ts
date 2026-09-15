@@ -52,7 +52,7 @@ test("a forged pickup at a store that does not offer it falls back to delivery W
  assert.equal(d.pickupAvailable, false);
 });
 
-test("pickup toggled on with no address is not an offer — the postage stands", () => {
+test("pickup toggled on with no address is not an offer. The postage stands", () => {
  const d = resolveDelivery({ claimed: "pickup", ...BAG, settings: NO_ADDRESS });
  assert.equal(d.pickupAvailable, false, "a toggle with nowhere to collect from is not an offer");
  assert.equal(d.method, "ship");
@@ -71,7 +71,7 @@ test("the postage is re-derived from the store's own policy, never read off the 
 
 test("a seller who switches collection off mid-cart gets the postage back on the next quote", () => {
  // The shopper chose collection a minute ago; the seller has since turned it off. Nothing is
- // remembered from the earlier quote — the charge is re-derived from the settings as they are NOW.
+ // remembered from the earlier quote. The charge is re-derived from the settings as they are NOW.
  const before = resolveDelivery({ claimed: "pickup", ...BAG, settings: BUYER_PAYS });
  assert.equal(before.shippingCents, 0);
  const off: ShipPolicy = { ...BUYER_PAYS, pickup: { ...OPEN, enabled: false } };
@@ -88,7 +88,7 @@ test("a store that absorbs postage charges nothing either way", () => {
  const shipped = resolveDelivery({ claimed: "ship", ...BAG, settings: s });
  assert.equal(shipped.shippingCents, 0);
  assert.equal(shipped.freeShipping, true);
- // Collection is still worth offering — it is same-day, and it still says where to go.
+ // Collection is still worth offering. It is same-day, and it still says where to go.
  const collected = resolveDelivery({ claimed: "pickup", ...BAG, settings: s });
  assert.equal(collected.method, "pickup");
  assert.equal(collected.shippingCents, 0);
@@ -100,7 +100,7 @@ test("free over a threshold: charged below it, free at and above it", () => {
  const s: ShipPolicy = { mode: "free_over", freeThresholdCents: 15000, pickup: OPEN };
  assert.equal(resolveDelivery({ claimed: "ship", subtotalCents: 14999, parcelShipCents: 1200, settings: s }).shippingCents, 1200);
  assert.equal(resolveDelivery({ claimed: "ship", subtotalCents: 15000, parcelShipCents: 1200, settings: s }).shippingCents, 0);
- // A free-shipping bag collected in store is still a collection — the seller prints no label.
+ // A free-shipping bag collected in store is still a collection. The seller prints no label.
  const d = resolveDelivery({ claimed: "pickup", subtotalCents: 15000, parcelShipCents: 1200, settings: s });
  assert.equal(d.method, "pickup");
  assert.equal(d.shippingCents, 0);
@@ -133,13 +133,13 @@ test("a delivery order records no collection details", () => {
  assert.equal(back.collectFrom, null);
 });
 
-test("an order with no delivery stamp at all is a delivery — every order placed before this existed", () => {
+test("an order with no delivery stamp at all is a delivery. Every order placed before this existed", () => {
  const back = deliveryFromMetadata({});
  assert.equal(back.method, "ship");
  assert.equal(back.collectFrom, null);
 });
 
-test("metadata claiming pickup is only read back, never re-authorised — it is our own stamp", () => {
+test("metadata claiming pickup is only read back, never re-authorised. It is our own stamp", () => {
  // Stripe metadata is written by the server after resolveDelivery, so reading it back is safe.
  // What must NOT happen is a *shopper-supplied* field reaching an order: deliveryMetadata is the
  // only way in, and it takes a resolved Delivery, not a string.
@@ -149,7 +149,7 @@ test("metadata claiming pickup is only read back, never re-authorised — it is 
 });
 
 test("a very long collection address is truncated rather than failing the payment", () => {
- // Stripe refuses a metadata value over 500 chars — and would refuse the whole PaymentIntent with it.
+ // Stripe refuses a metadata value over 500 chars, and would refuse the whole PaymentIntent with it.
  const long: PickupSettings = { enabled: true, address: { street1: "A".repeat(300), city: "B".repeat(300) }, instructions: "C".repeat(600) };
  const md = deliveryMetadata(resolveDelivery({ claimed: "pickup", ...BAG, settings: { mode: "buyer_pays", freeThresholdCents: null, pickup: long } }));
  assert.ok(md.collect_from.length <= 480, "the address must fit in Stripe metadata");

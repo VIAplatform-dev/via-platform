@@ -2,7 +2,7 @@
 // stopped. This is the milestone that replaces silence with a report.
 //
 // Every dependency is INJECTED (the `ImportDeps` record) rather than imported directly, so the step
-// machine — ordering, which failures are fatal, what resumes, what a warning says — is unit tested
+// machine, ordering, which failures are fatal, what resumes, what a warning says. Is unit tested
 // with fakes and no database, no network, no store. The real wiring lives in the route.
 //
 // The rule this file enforces: a step that fails says so. Nothing here returns zeros on failure and
@@ -27,7 +27,7 @@ export type CrawlOutcome = {
 };
 
 /** `warnings` carries partial failures the importer survived (a product that wouldn't save, an
- *  order-history read that failed) — degradations that must still reach the seller. */
+ *  order-history read that failed). Degradations that must still reach the seller. */
 export type ImportStatsLike = { added: number; updated: number; unchanged: number; skipped: number; removed: number; warnings?: string[] };
 
 export type ImportDeps<P extends ProductLike = ProductLike> = {
@@ -68,16 +68,16 @@ export type RunOutcome = {
  report: string;
  /** `brand` = the site couldn't be copied and we built from its branding instead. */
  mode: "site" | "brand";
- /** Set when the store is password-protected — the caller turns this into seller guidance. */
+ /** Set when the store is password-protected. The caller turns this into seller guidance. */
  locked: boolean;
  error: string | null;
 };
 
 // The crawl stops at 180s of the platform's 300s function limit, leaving ~2 minutes for the steps
 // that follow it (products, collections, membership, blocks, checks). Overrunning is now
-// recoverable — a resume picks up after a completed crawl — but it costs the seller a round trip,
+// recoverable, a resume picks up after a completed crawl, but it costs the seller a round trip,
 // so the budget is set to avoid it rather than rely on it.
-// maxPages is a backstop, not the pacing mechanism — budgetMs (with its resume loop) is. Keep this
+// maxPages is a backstop, not the pacing mechanism. BudgetMs (with its resume loop) is. Keep this
 // high enough that a real store's catalog is never the thing that truncates a crawl (see wire.ts).
 const DEFAULTS = { maxPages: 3000, budgetMs: 180_000 };
 
@@ -85,7 +85,7 @@ const DEFAULTS = { maxPages: 3000, budgetMs: 180_000 };
  * Run (or resume) an import.
  *
  * Fatal vs. warning: only the crawl and an outright password lock stop an import. Everything
- * else — products, collections, membership, studio blocks, fidelity checks — degrades to a warning,
+ * else, products, collections, membership, studio blocks, fidelity checks. Degrades to a warning,
  * because a store whose design copied fine but whose collections didn't link is a partial success
  * worth keeping, and the seller needs to be TOLD which half failed.
  */
@@ -169,7 +169,7 @@ export async function runImport<P extends ProductLike>(
  crawlState = crawl.state;
  counts = { ...counts, pages: crawl.pages };
  if (crawl.warnings?.length) extraWarnings.push(...crawl.warnings);
- // Pages that wouldn't load used to vanish into `catch {}`. Report them — capped, so a store with
+ // Pages that wouldn't load used to vanish into `catch {}`. Report them: capped, so a store with
  // 60 broken pages produces a readable warning rather than 60 of them.
  if (crawl.failed.length) {
   const shown = crawl.failed.slice(0, 3).map((f) => f.path).join(", ");
@@ -177,7 +177,7 @@ export async function runImport<P extends ProductLike>(
   extraWarnings.push(`${crawl.failed.length} page${crawl.failed.length === 1 ? "" : "s"} couldn’t be copied (${shown}${more}).`);
  }
 
- // Out of time with pages still queued: stop cleanly and stay resumable. Nothing is lost — the
+ // Out of time with pages still queued: stop cleanly and stay resumable. Nothing is lost: the
  // browser and the sweeper cron both know how to continue a paused job.
  if (!crawl.complete) {
   steps = withStep(steps, "crawl", { status: "partial", detail: `${crawl.pages} pages so far` });
@@ -199,7 +199,7 @@ export async function runImport<P extends ProductLike>(
  }
 
  // ── 3. Products ───────────────────────────────────────────────────────────────────────────────
- // A failure here is NOT fatal — the design capture already succeeded and is worth keeping — but it
+ // A failure here is NOT fatal, the design capture already succeeded and is worth keeping, but it
  // is loudly reported, because "0 products" and "the product import crashed" must never look alike.
  const products = await step("products", async () => {
   const pulled = await deps.pullProducts(slug, url);
@@ -223,7 +223,7 @@ export async function runImport<P extends ProductLike>(
   // Partial failures the importer survived (an unsaveable listing, an unreadable order history).
   if (stats.warnings?.length) extraWarnings.push(...stats.warnings);
   if (!products.pulled.length) {
-   extraWarnings.push("We couldn’t read any products from your store — upload a CSV or connect your platform to bring your inventory over.");
+   extraWarnings.push("We couldn’t read any products from your store. Upload a CSV or connect your platform to bring your inventory over.");
   }
  }
 
@@ -235,7 +235,7 @@ export async function runImport<P extends ProductLike>(
  if (made != null) counts = { ...counts, collections: made };
 
  // Without this the collections stay empty and every captured collection page silently falls back
- // to the frozen source grid — the exact failure this milestone exists to make visible.
+ // to the frozen source grid. The exact failure this milestone exists to make visible.
  const membership = await step("membership", () => deps.syncMembership(slug, url, products?.pulled ?? ([] as P[])), {
   detail: (m) => `${m.links} item${m.links === 1 ? "" : "s"} across ${m.collections} collection${m.collections === 1 ? "" : "s"}`,
   warnOnFail: (m) => `We couldn’t file your products into their collections: ${m}`,
@@ -251,7 +251,7 @@ export async function runImport<P extends ProductLike>(
   warnOnFail: (m) => `We couldn’t rebuild your homepage in the editor: ${m}`,
  });
 
- // ── 6. Structural checks — did the copy actually come out right? ───────────────────────────────
+ // ── 6. Structural checks. Did the copy actually come out right? ───────────────────────────────
  const checkWarnings = await step("checks", () => deps.checkCapture(slug, crawl.paths), {
   detail: (w) => (w.length ? `${w.length} issue${w.length === 1 ? "" : "s"} found` : "nav, grids and collections look right"),
   warnOnFail: (m) => `We couldn’t verify the copied pages: ${m}`,

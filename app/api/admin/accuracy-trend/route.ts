@@ -5,7 +5,7 @@ import { getAccuracyTrend, snapshotAccuracy, backfillAccuracyTrend } from "@/app
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Listing-accuracy TREND over time — the "are we getting better?" view. Reads the daily snapshots and
+// Listing-accuracy TREND over time. The "are we getting better?" view. Reads the daily snapshots and
 // surfaces the headline numbers per day so you can watch recent-listing quality climb toward the 95%
 // onboarding gate. rolling-30d is the line to watch (recent quality); *All is all-time (drags on old
 // pre-fix listings). Pass ?snapshot=1 to take today's reading now (seed the baseline before the cron).
@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
  const q = new URL(request.url).searchParams;
  const days = Math.max(1, Math.min(365, Number(q.get("days")) || 90));
  try {
-  // ?backfill=N — reconstruct N weeks of history from the timestamped training data (one-time seed so
-  // the chart shows where accuracy has already been). ?snapshot=1 — just take today's point.
+  // ?backfill=N: reconstruct N weeks of history from the timestamped training data (one-time seed so
+  // the chart shows where accuracy has already been). ?snapshot=1, just take today's point.
   const backfillWeeks = Number(q.get("backfill"));
   if (backfillWeeks > 0) await backfillAccuracyTrend(backfillWeeks);
   else if (q.get("snapshot") === "1") await snapshotAccuracy();
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
    gapToGatePct: gap,                       // how far the recent (30d) factual accuracy is below 95
    deltaSinceFirstSnapshotPct: trend.deltaVsFirstPct, // + means improving
    latest,
-   points: trend.points,                    // one per day — chart the factualKeptPct line
+   points: trend.points,                    // one per day: chart the factualKeptPct line
   });
  } catch (e) {
   return NextResponse.json({ error: String(e) }, { status: 500 });

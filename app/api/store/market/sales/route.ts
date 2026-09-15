@@ -6,7 +6,7 @@ import { summarizeSales } from "@/app/lib/market/sales-core";
 
 export const dynamic = "force-dynamic";
 
-// GET — this session's in-person sales + totals.
+// GET: this session's in-person sales + totals.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

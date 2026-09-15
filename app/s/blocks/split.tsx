@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-// Split — a photo beside a story. The editorial workhorse: an about paragraph, a category pitch, a
+// Split: a photo beside a story. The editorial workhorse: an about paragraph, a category pitch, a
 // sourcing note. Four arrangements of the same four fields (heading, body, button, photo).
 import { FreeField, ImageSlot, PhotoFrame, panBgImg, type EditKit, ArrangeHandle, splitRatioOf } from "./kit";
 
@@ -55,7 +55,7 @@ function SplitOffset({ kit }: { kit: EditKit }) {
 
 // ── panel ───────────────────────────────────────────────────────────────────────────────────────
 // Edge to edge, no page margin: the photo fills its half and the copy sits on a solid panel filling
-// the other. The most graphic of the four — the two halves meet on a hard line.
+// the other. The most graphic of the four. The two halves meet on a hard line.
 function SplitPanel({ kit }: { kit: EditKit }) {
  const { b, ctx, p } = kit;
  const right = imageRight(p);
@@ -73,7 +73,7 @@ function SplitPanel({ kit }: { kit: EditKit }) {
 
 // ── stacked ─────────────────────────────────────────────────────────────────────────────────────
 // Photo above, copy centred beneath it in a narrow measure. The one arrangement that's identical on
-// a phone and a desktop, so nothing reflows — worth choosing when most of a store's traffic is mobile.
+// a phone and a desktop, so nothing reflows. Worth choosing when most of a store's traffic is mobile.
 function SplitStacked({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  return (

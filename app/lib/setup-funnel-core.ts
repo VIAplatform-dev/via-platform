@@ -1,11 +1,11 @@
-// Where stores get stuck — the owner's view of the setup checklist across every store.
+// Where stores get stuck. The owner's view of the setup checklist across every store.
 //
 // "If 3 sellers out of 10 get stuck somewhere, we need to explain better." Each incomplete store
 // counts once, against the step it is stuck on (its `next`); the percentage is of ALL stores, so
 // the bars read as "3 of 10", not "3 of the 5 who haven't finished". Complete stores sit in the
 // table and never in a bar. The domain never blocks, so it is never a bar either.
 //
-// "Stuck since" is days since the store's sellers.created_at — the cheapest honest number: it is
+// "Stuck since" is days since the store's sellers.created_at. The cheapest honest number: it is
 // how long she has had a workspace without finishing. Activity-based ages would need a scan of
 // items and orders per store on every load.
 

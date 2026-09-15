@@ -12,13 +12,13 @@ import { getBooking, rentalContext, ownerOfItem } from "@/app/lib/rentals/rental
 
 export const dynamic = "force-dynamic";
 
-// POST { rentalId, buyer:{email,name,phone}, ship:{…}, shippingCostCents } — pay for a rental.
+// POST { rentalId, buyer:{email,name,phone}, ship:{…}, shippingCostCents }: pay for a rental.
 //
 // Deliberately its own route rather than a branch inside item-intent. A rental doesn't reserve the
 // item, doesn't sell it, and doesn't route a consignment cut; sharing that code path would mean
 // threading "but not when it's a rental" through every step of a sale.
 //
-// The card is saved (setup_future_usage) whatever the store's cover model is — late fees and damage
+// The card is saved (setup_future_usage) whatever the store's cover model is. Late fees and damage
 // are charged off-session weeks later, long after a card authorisation would have lapsed, and that
 // is the only mechanism that works past the ~7-day hold window.
 export async function POST(request: NextRequest) {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
  const { settings } = await rentalContext(booking.itemId, owner.storeSlug);
  // Renting off means OFF. The storefront hides the Rent button when a store turns renting off,
- // but this route never checked — so a booking already in flight, or anyone holding the URL,
+ // but this route never checked, so a booking already in flight, or anyone holding the URL,
  // could still pay for a rental the store had stopped offering. The button is a courtesy; this
  // is the gate.
  if (!settings.enabled) {
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
  // A DISCOUNT ON A RENTAL, on whatever this store decided it comes off.
  //
- // A rental is three numbers — the hire fee, the damage waiver, and the deposit — so "15% off" has
+ // A rental is three numbers, the hire fee, the damage waiver, and the deposit, so "15% off" has
  // no single meaning. The store answers that in Settings → Rentals (`discountApplies`), and the
  // deposit is never an option: it is the renter's own money coming back to her, so discounting it
  // would refund more than she ever paid. Stores that have not chosen take no codes at all, which is
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
  if (rentalCode) {
   const d = await validateDiscount(seller.slug, rentalCode).catch(() => null);
   // A rental has no line items to scope against, so a piece-specific code is matched on the piece
-  // being rented — anything naming other pieces simply does not apply here.
+  // being rented. Anything naming other pieces simply does not apply here.
   if (d) {
    const lastOrderAt = d.audience === "all" ? null : await lastOrderAtForBuyer(seller.slug, buyerEmail);
    const base = scope === "rent_waiver" ? rentCents + waiverCents : rentCents;
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
    amountCents: amount, currency,
   });
  } catch (e) {
-  // The dates stay held — the hold has its own expiry, so a failed payment simply lets it lapse
+  // The dates stay held. The hold has its own expiry, so a failed payment simply lets it lapse
   // rather than releasing dates a buyer may be about to retry.
   return NextResponse.json({ error: e instanceof Error ? e.message : "Checkout failed." }, { status: 502 });
  }

@@ -4,10 +4,11 @@ import { getSellerById } from "@/app/lib/db/sellers";
 import { getShippingSettings } from "@/app/lib/store-shipping-db";
 import { parcelForLabel } from "@/app/lib/parcel-core";
 import { resolveBuyerShipping, resolveExpedited } from "@/app/lib/shipping-price";
+import { refusalMessage } from "@/app/lib/shipping-embargo";
 
 export const dynamic = "force-dynamic";
 
-// POST { itemId, toAddress } — live shipping options for the buyer's address.
+// POST { itemId, toAddress }: live shipping options for the buyer's address.
 // Returns { free: true } when the store covers shipping for this piece, or the
 // cheapest 1–2 rates when the buyer pays. Falls back to free if rates can't be
 // computed (Shippo off / no ship-from) so a sale is never blocked.
@@ -29,17 +30,17 @@ export async function POST(request: NextRequest) {
 
  // Flat-rate pricing: one clean tier price by the piece's size (auto-detected from its captured
  // weight/dimensions). VYA buys the real discounted label at fulfillment and keeps the spread.
- // No shipping paid yet — this IS the quote — so the floor is the middle of the ladder rather than
+ // No shipping paid yet, this IS the quote, so the floor is the middle of the ladder rather than
  // a mailer. Guessing small here undercharges the shopper and the store eats it at label time.
  const parcel = parcelForLabel({ item, shippingPaidCents: null });
- // One clean, consistent flat price by size — same number every time (Depop/Poshmark-style), matching
+ // One clean, consistent flat price by size. Same number every time (Depop/Poshmark-style), matching
  // exactly what checkout charges. Priced by ZONE with the store's own tier prices when it set them
  // (shipping-zones.ts + shipping-prices-core.ts); a country she doesn't serve is refused, not sold.
  // ONE resolver for the quote AND the charge (shipping-price.ts). They were computed separately
  // and my own change made them disagree: this route started returning a live rate while
  // /cart-intent still charged the zone price, so a buyer could be shown $17 and billed $24.
  const priced = await resolveBuyerShipping({ settings: shipping, sellerName: seller.name, sellerEmail: seller.email, to, parcel });
- if (!priced.ok) return NextResponse.json({ error: "This store doesn’t ship to that country yet." }, { status: 400 });
+ if (!priced.ok) return NextResponse.json({ error: refusalMessage(priced) }, { status: 400 });
 
  const express = await resolveExpedited({
   settings: shipping, sellerName: seller.name, sellerEmail: seller.email, to, parcel,

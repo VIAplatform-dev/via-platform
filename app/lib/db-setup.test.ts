@@ -4,7 +4,7 @@ import { once, isDuplicateObjectError, ensureSchema } from "./db-setup.ts";
 
 test("concurrent callers do the one-time setup exactly once", async () => {
  // Reads fired through Promise.all all reach setup before any finishes. A boolean flag
- // cannot stop that — every caller sees it false and fires its own CREATE TABLE. Postgres
+ // cannot stop that: every caller sees it false and fires its own CREATE TABLE. Postgres
  // then races creating the SERIAL column's sequence and one caller dies on a duplicate key
  // in pg_class. Memoize the in-flight promise instead.
  let runs = 0;
@@ -16,7 +16,7 @@ test("concurrent callers do the one-time setup exactly once", async () => {
  assert.equal(runs, 1);
 });
 
-test("a failed setup is not cached — the next caller retries", async () => {
+test("a failed setup is not cached. The next caller retries", async () => {
  // Caching a rejected promise would turn one connection blip into permanent failure.
  let runs = 0;
  const setup = once(async () => {
@@ -51,7 +51,7 @@ test("ensureSchema runs once and tolerates only the duplicate race", async () =>
   runs++;
   throw Object.assign(new Error("dup"), { code: "42P07" });
  });
- await ensure(); // must not throw — another instance created it
+ await ensure(); // must not throw: another instance created it
  assert.equal(runs, 1);
 
  const bad = ensureSchema(async () => {

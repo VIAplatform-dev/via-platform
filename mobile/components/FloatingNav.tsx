@@ -7,7 +7,7 @@ import { colors, fonts, spacing } from "../lib/theme";
 
 // Back / search / bag on white pucks, floating over whatever is behind them.
 //
-// Used on product, store, collection and category — screens that open big photography. A stack
+// Used on product, store, collection and category. Screens that open big photography. A stack
 // header would crop that, and worse, expo-router labels its back button with the route it came
 // from, which is how "(tabs)" ended up on screen.
 

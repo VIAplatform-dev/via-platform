@@ -15,7 +15,7 @@ test("a missing date is unknown, not zero days", () => {
  assert.equal(daysListed("not a date", NOW), null);
 });
 
-test("only live pieces age — sold, drafts and removed are not sitting on a rail", () => {
+test("only live pieces age. Sold, drafts and removed are not sitting on a rail", () => {
  const items = [
   { status: "active", createdAt: "2026-05-01T00:00:00.000Z" }, // 129 days
   { status: "active", createdAt: "2026-07-01T00:00:00.000Z" }, // 68 days

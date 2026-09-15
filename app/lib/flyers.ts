@@ -1,6 +1,6 @@
 // The printed flyers, and the addresses they point at.
 //
-// Each flyer gets its own top-level path — vyaplatform.com/vintage — because it is printed on
+// Each flyer gets its own top-level path, vyaplatform.com/vintage, because it is printed on
 // paper. Short enough to type when a scan fails, and readable enough to say out loud.
 //
 // TWO THINGS FOLLOW FROM THE FACT THAT THESE ARE PRINTED:
@@ -8,7 +8,7 @@
 //   1. A slug here can never be renamed or removed once a run is printed. The paper cannot be
 //      redeployed. Adding is fine; changing is not.
 //   2. Every path must be listed in proxy.ts's PUBLIC_ROUTES. Anything the site does not
-//      recognise redirects to /login, so an unlisted flyer sends every scan to a sign-in wall —
+//      recognise redirects to /login, so an unlisted flyer sends every scan to a sign-in wall,
 //      the one outcome a flyer cannot survive.
 //
 // The headline is the flyer's own line, carried onto the screen so the joke does not die at the
@@ -23,7 +23,7 @@ export type Flyer = {
  /**
   * Where they land once they are in. Defaults to the homepage.
   *
-  * A flyer that promises something specific should deliver it — the Fendi poster sends people to
+  * A flyer that promises something specific should deliver it. The Fendi poster sends people to
   * Fendi, not to a homepage they then have to search. MUST be a relative path: Auth.js rejects a
   * cross-origin callbackUrl, and the sign-in hop would quietly fall back to /login, which is the
   * waitlist wall this whole flow exists to skip.
@@ -40,8 +40,8 @@ export const FLYERS: Flyer[] = [
  {
   slug: "emma-stolen-bag",
   headline: "Emma, I know you stole my Fendi baguette.",
-  // The flyer's punchline is its second line — dropping it would land the setup without the joke.
-  subhead: "I have proof. Get your own — archive Fendi and more, from vintage stores around the world.",
+  // The flyer's punchline is its second line. Dropping it would land the setup without the joke.
+  subhead: "I have proof. Get your own: archive Fendi and more, from vintage stores around the world.",
   destination: "/brands/fendi",
  },
  {
@@ -62,7 +62,7 @@ export const FLYERS: Flyer[] = [
  {
   slug: "postcard",
   headline: "You found us.",
-  subhead: "Archive fashion from vintage stores around the world — skip the waitlist.",
+  subhead: "Archive fashion from vintage stores around the world. Skip the waitlist.",
  },
 ];
 
@@ -81,7 +81,7 @@ export function isFlyerSlug(slug: string | null | undefined): boolean {
 /**
  * What goes in pilot_access.source.
  *
- * Namespaced, because that column is shared with every other signup path — a bare "vintage"
+ * Namespaced, because that column is shared with every other signup path. A bare "vintage"
  * would collide with anything else that ever calls itself that, and attribution would quietly
  * merge two different things. The column is VARCHAR(50); a test holds us to it.
  */
@@ -91,7 +91,7 @@ export function flyerSource(slug: string): string {
 
 /**
  * Where a scan of this flyer should end up after signing in. Always a relative path, and always
- * something — an unknown slug yields the homepage rather than undefined, because this value is
+ * something. An unknown slug yields the homepage rather than undefined, because this value is
  * interpolated into a sign-in callback and a blank there strands the person mid-signup.
  */
 export function flyerDestination(slug: string | null | undefined): string {

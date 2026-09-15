@@ -6,8 +6,8 @@
 
 /**
  * Hosts a QR may send someone to. A printed code cannot be recalled, so the destination is
- * checked against this list on write AND on read: a bad row in qr_codes — a typo, a bad paste,
- * a compromised write — must never be able to turn our own printed card into an open redirect.
+ * checked against this list on write AND on read: a bad row in qr_codes. A typo, a bad paste,
+ * a compromised write: must never be able to turn our own printed card into an open redirect.
  */
 const ALLOWED_HOSTS = new Set([
  "getvya.ai",
@@ -56,7 +56,7 @@ export function qrTargetUrl(raw: string): string {
 /**
  * Where a scan forwards to. Tagged as utm so the visit lands in `utm_visits` alongside every
  * other marketing source, not only in the QR scan log. The destination's own query string is
- * preserved — a code may legitimately point at a filtered or sorted page.
+ * preserved. A code may legitimately point at a filtered or sorted page.
  */
 export function destinationFor(destination: string | null | undefined, rawCode: string): string {
  const url = new URL(isAllowedDestination(destination) ? destination! : FALLBACK_DESTINATION);
@@ -68,12 +68,12 @@ export function destinationFor(destination: string | null | undefined, rawCode: 
 
 // Link previewers fetch a URL the moment it is pasted into a chat, and crawlers find anything
 // that ends up on a public page. Counting those as scans would invent visits in cities nobody
-// stood in — which is the whole point of the location data.
+// stood in, which is the whole point of the location data.
 const BOT_UA =
  /bot|crawl|spider|slurp|facebookexternalhit|whatsapp|telegram|embedly|preview|curl|wget|python-requests|node-fetch|axios|headless|lighthouse|monitor|scanner|feedfetcher/i;
 
 export function isLikelyBotScan(userAgent: string | null | undefined): boolean {
- // A missing user-agent is unusual but not proof of a bot — count it rather than silently
+ // A missing user-agent is unusual but not proof of a bot. Count it rather than silently
  // drop a real scan.
  if (!userAgent) return false;
  return BOT_UA.test(userAgent);

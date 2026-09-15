@@ -246,7 +246,7 @@ export default function AdminConversionsPage() {
  });
  const d = await res.json();
  setEmailStatus(d.emailSent ? "sent" : "error");
- setEmailErrorMsg(d.emailError ?? (d.emailSent ? null : "No matching store config — check store slug"));
+ setEmailErrorMsg(d.emailError ?? (d.emailSent ? null : "No matching store config. Check store slug"));
  } catch (err) {
  setEmailStatus("error");
  setEmailErrorMsg(String(err));
@@ -370,7 +370,7 @@ export default function AdminConversionsPage() {
  <span style={{ background: "#f4f4f5", color: "#09090b", borderRadius: 4, padding: "1px 5px" }}>{c.orderId}</span>
  </td>
  <td style={{ padding: "11px 16px", fontSize: 13, fontWeight: 600, color: c.orderTotal === 0 ? "#dc2626" : "#09090b" }}>
- {c.orderTotal === 0 ? "— (missing)" : fmt(c.orderTotal, c.currency)}
+ {c.orderTotal === 0 ? ": (missing)" : fmt(c.orderTotal, c.currency)}
  </td>
  <td style={{ padding: "11px 16px", fontSize: 12, color: "#09090b" }}>
  {c.userEmail ? (
@@ -476,7 +476,7 @@ export default function AdminConversionsPage() {
  <div key={o.conversionId} style={{ fontSize: 12, color: "#09090b", marginBottom: 4, display: "flex", justifyContent: "space-between", gap: 8 }}>
  <span style={{ fontFamily: "monospace", color: "#a1a1aa", fontSize: 11 }}>{o.orderId}</span>
  <span style={{ flex: 1, fontWeight: o.productName ? 500 : 400, color: o.productName ? "#09090b" : "#a1a1aa" }}>
- {o.productName ?? "—"}
+ {o.productName ?? "-"}
  </span>
  <span style={{ color: "#71717a" }}>{fmt(Number(o.orderTotal), o.currency)}</span>
  </div>
@@ -563,12 +563,12 @@ export default function AdminConversionsPage() {
  </div>
  )}
  {productQuery && productResults.length === 0 && !productSearchLoading && (
- <p style={{ fontSize: 12, color: "#a1a1aa", margin: "0 0 16px" }}>No matches — type the product name below to set it manually.</p>
+ <p style={{ fontSize: 12, color: "#a1a1aa", margin: "0 0 16px" }}>No matches. Type the product name below to set it manually.</p>
  )}
  </>
  ) : null}
 
- {/* Always-visible manual name input — primary for stores with no synced products */}
+ {/* Always-visible manual name input. Primary for stores with no synced products */}
  {!productSearchLoading && (
  <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
  <input
@@ -595,7 +595,7 @@ export default function AdminConversionsPage() {
  All Clicks by This Customer at {selected.storeName}
  </p>
  <p style={{ fontSize: 11, color: "#a1a1aa", margin: "0 0 8px" }}>
- No time limit — use these to identify what they purchased.
+ No time limit: use these to identify what they purchased.
  </p>
  {userClicks.map((click) => (
  <div key={click.clickId} style={{
@@ -607,7 +607,7 @@ export default function AdminConversionsPage() {
  <div style={{ flex: 1 }}>
  <div style={{ fontSize: 13, fontWeight: 600, color: "#09090b", display: "flex", alignItems: "center", gap: 6 }}>
  {click.productSoldOut && <span title="Product is now sold out">🔴</span>}
- {click.productName || "—"}
+ {click.productName || "-"}
  </div>
  <div style={{ fontSize: 11, color: "#a1a1aa", marginTop: 2 }}>
  {fmtDate(click.timestamp)} · {minsApart(click.timestamp, selected.timestamp)}m from order
@@ -676,7 +676,7 @@ export default function AdminConversionsPage() {
  Candidate Clicks (same store, ±48h)
  </p>
  <p style={{ fontSize: 11, color: "#a1a1aa", margin: "0 0 12px" }}>
- 🔴 = product now sold out — strong match signal
+ 🔴 = product now sold out. Strong match signal
  </p>
  {candidatesLoading ? (
  <p style={{ fontSize: 13, color: "#a1a1aa" }}>Loading clicks…</p>
@@ -734,8 +734,8 @@ export default function AdminConversionsPage() {
  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
  <div style={{ flex: 1 }}>
  <div style={{ fontSize: 13, fontWeight: 600, color: "#09090b", display: "flex", alignItems: "center", gap: 6 }}>
- {click.productSoldOut && <span title="Product is now sold out — likely purchased">🔴</span>}
- {click.productName || "—"}
+ {click.productSoldOut && <span title="Product is now sold out. Likely purchased">🔴</span>}
+ {click.productName || "-"}
  </div>
  <div style={{ fontSize: 11, color: "#a1a1aa", marginTop: 2 }}>
  {fmtDate(click.timestamp)} · {minsApart(click.timestamp, selected.timestamp)}m from order

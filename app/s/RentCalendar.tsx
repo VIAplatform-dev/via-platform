@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 //
 // A native <input type="date"> can't do the one thing that matters here: show that the 14th to the
 // 18th is already gone. A renter needs to see the shape of what's free before they pick, so this is
-// two months side by side with taken days struck through and unpickable — the convention every
+// two months side by side with taken days struck through and unpickable. The convention every
 // rental site uses, because it's the only one that answers "when CAN I have it".
 //
 // Selection is a range: first click sets the start, second sets the end. Clicking a day that would
@@ -23,7 +23,7 @@ const iso = (y: number, m: number, day: number) =>
 const DOW = ["M", "T", "W", "T", "F", "S", "S"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-/** Days a rental could actually cover, as a set — cheap at a 90-day horizon and simple to read. */
+/** Days a rental could actually cover, as a set. Cheap at a 90-day horizon and simple to read. */
 function freeDaySet(free: Span[]): Set<string> {
  const out = new Set<string>();
  for (const s of free || []) {
@@ -62,7 +62,7 @@ export default function RentCalendar({
  const [end, setEnd] = useState(value.end || "");
 
  const pickable = (d: string) => available.has(d) && ms(d) >= ms(earliest) && ms(d) <= ms(latest);
- /** Every day from a to b is free — a range can't hop over someone else's rental. */
+ /** Every day from a to b is free. A range can't hop over someone else's rental. */
  const runIsClear = (a: string, b: string) => {
   for (let d = a; ms(d) <= ms(b); d = addDays(d, 1)) if (!available.has(d)) return false;
   return true;

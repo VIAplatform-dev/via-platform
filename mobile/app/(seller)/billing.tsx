@@ -15,13 +15,13 @@ import {
 // Plan & billing, with no web page anywhere in it.
 //
 // This was the last screen that left the app. The web starts a subscription through Stripe Checkout
-// and manages it through the Stripe billing portal — both hosted web pages, both fine in a browser
+// and manages it through the Stripe billing portal. Both hosted web pages, both fine in a browser
 // and wrong in an app. Neither has a Connect-style embedded component, so the answer was not a
 // different widget but a different shape: the SUBSCRIPTION is created on our server incomplete, the
 // CARD is taken in Stripe's native payment sheet, and everything the portal used to do (cancel,
 // resume, change plan, change card, read invoices) is now four API calls and a list.
 //
-// WHAT THE SHEET IS. PaymentSheet is a native iOS/Android view, not a WebView — Stripe's own card
+// WHAT THE SHEET IS. PaymentSheet is a native iOS/Android view, not a WebView. Stripe's own card
 // form, over VYA, in VYA's colours. It is the same component a shopper meets in any Stripe-powered
 // app. The only browser left in the flow is 3-D Secure, which a BANK presents when it wants a
 // customer verified, and which no integration on any platform can skip.
@@ -34,6 +34,8 @@ type Billing = {
   trialDays: number;
   publishableKey: string | null;
   current: CurrentPlan & { cancelAtPeriodEnd?: boolean };
+  /** Whether VYA holds a card it can bill. Shipping's absorb-the-postage modes are gated on it. */
+  hasCard?: boolean;
   tiers?: Tier[];
 };
 
@@ -45,7 +47,7 @@ export default function BillingScreen() {
     enabled: !!storeSlug,
   });
 
-  // StripeProvider has to wrap whatever calls useStripe, and its key comes from the server — so the
+  // StripeProvider has to wrap whatever calls useStripe, and its key comes from the server, so the
   // screen body is a child rather than this component, and renders once the key is known.
   if (q.isError) {
     return (
@@ -61,8 +63,8 @@ export default function BillingScreen() {
       </SellerScreen>
     );
   }
-  // Everything except taking a card still works without Stripe — the plan, the status, the invoices
-  // are all our own API — so the screen renders rather than refusing. `sheet: null` is what every
+  // Everything except taking a card still works without Stripe. The plan, the status, the invoices
+  // are all our own API, so the screen renders rather than refusing. `sheet: null` is what every
   // card-taking control reads to disable itself, whether the reason is a missing publishable key or
   // a binary with no Stripe in it (Expo Go).
   if (!q.data.publishableKey || !stripeAvailable) {
@@ -102,7 +104,7 @@ function BillingWithSheet({ data, refetch, refreshing }: { data: Billing; refetc
   const { initPaymentSheet, presentPaymentSheet } = stripeNative!.useStripe();
 
   async function sheet(params: SheetParams): Promise<SheetResult> {
-    // Stripe's own card form, in VYA's palette. `colors` here takes hex only — the theme's muted
+    // Stripe's own card form, in VYA's palette. `colors` here takes hex only. The theme's muted
     // tones are rgba alpha ramps, so the ones that would be passed through are the solid ones.
     const common = {
       merchantDisplayName: "VYA",
@@ -179,7 +181,7 @@ function BillingBody({
       if (!out.ok) {
         if (!out.cancelled) setError(out.message ?? "That card didn't go through.");
       } else {
-        setNote(r.trialDays > 0 ? `You're on ${tier}. Free for ${r.trialDays} days — we'll bill you after that.` : `You're on ${tier}.`);
+        setNote(r.trialDays > 0 ? `You're on ${tier}. Free for ${r.trialDays} days. We'll bill you after that.` : `You're on ${tier}.`);
       }
       // Refetch either way: the subscription exists server-side the moment we asked for it, and the
       // status line is a truer report of where she got to than anything this screen could infer.
@@ -205,10 +207,14 @@ function BillingBody({
         if (!out.cancelled) setError(out.message ?? "That card didn't save.");
         return;
       }
-      // Saving a card is not the same as billing to it — tell the server to make it the default.
+      // Saving a card is not the same as billing to it. Tell the server to make it the default.
       const id = r.setupIntentClientSecret.split("_secret_")[0];
       await apiPost("/api/store/billing/manage", { action: "card-saved", setupIntentId: id });
-      setNote("New card saved. Future invoices go to it.");
+      // Says what it unlocked, not just that it saved. A seller usually arrives here from a
+      // locked shipping option, and "future invoices" is not the thing she came to fix.
+      setNote(data.hasCard
+        ? "New card saved. Your plan and any postage you cover bill to it now."
+        : "Card saved. You can offer free or discounted postage now, and it bills to this.");
       refetch();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save that card.");
@@ -246,7 +252,7 @@ function BillingBody({
           <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.sm }}>{billingLine(c)}</Text>
         ) : (
           <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.sm }}>
-            No subscription yet — {data.trialDays} days free when you start one.
+            No subscription yet: {data.trialDays} days free when you start one.
           </Text>
         )}
         {c.cancelAtPeriodEnd ? (
@@ -264,11 +270,38 @@ function BillingBody({
       ) : null}
 
       {!data.configured ? (
-        <Notice>Billing isn&apos;t switched on yet — that one is ours to fix. Get in touch from Help.</Notice>
+        <Notice>Billing isn&apos;t switched on yet. That one is ours to fix. Get in touch from Help.</Notice>
       ) : payDisabled ? (
-        // Says WHICH reason — a server with no Stripe key and an app with no Stripe module look
+        // Says WHICH reason: a server with no Stripe key and an app with no Stripe module look
         // identical from here, and only one of them is something she can wait out.
         <Notice>{unavailableNote}</Notice>
+      ) : null}
+
+      {/* ── The card on file ───────────────────────────────────────────────────────────
+          NOT INSIDE "MANAGE". It used to sit under a `subscribed` gate with the plan-switching
+          buttons, and the route behind it refused without a Stripe customer, so a store on the
+          free trial could not add a card at all. That is the store that needs one: shipping's
+          "You pay, free for the buyer" and "Free over an amount" are locked until VYA holds a
+          card it can bill, and there was nowhere on the phone to add it.
+
+          It is its own section because adding a card is not managing a subscription. A seller
+          comes here from a locked shipping option, not from wanting to change plan. */}
+      {data.configured && !payDisabled ? (
+        <>
+          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>CARD ON FILE</Text>
+          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 19 }}>
+            {data.hasCard
+              ? "Your plan bills to this, and so does any postage you cover for a buyer. Nothing comes out of your payout."
+              : "Needed before you can offer free or discounted postage. The label is charged to it when you print one, so nothing comes out of your payout."}
+          </Text>
+          <Button
+            label={data.hasCard ? "Change the card on file" : "Add a card"}
+            busyLabel="Opening…"
+            busy={busy === "card"}
+            kind={data.hasCard ? "secondary" : "primary"}
+            onPress={() => void changeCard()}
+          />
+        </>
       ) : null}
 
       {/* ── Choosing a plan: only when there isn't one ─────────────────────────────────── */}
@@ -295,7 +328,7 @@ function BillingBody({
                 </Text>
               </View>
               {t.tagline ? <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>{t.tagline}</Text> : null}
-              {/* Only what this tier ADDS — three near-identical lists is three nobody finishes. */}
+              {/* Only what this tier ADDS. Three near-identical lists is three nobody finishes. */}
               {(t.newFeatures ?? []).slice(0, 4).map((f) => (
                 <Text key={f} style={{ fontSize: 13, color: colors.textMuted, marginTop: 4 }}>· {f}</Text>
               ))}
@@ -312,14 +345,10 @@ function BillingBody({
         <>
           <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>MANAGE</Text>
 
-          {!payDisabled ? (
-            <Button label="Change the card on file" busyLabel="Opening…" busy={busy === "card"} kind="secondary" onPress={() => void changeCard()} />
-          ) : null}
-
           {tiers.filter((t) => t.id !== c.tier).map((t) => (
             <Button
               key={t.id}
-              label={`Switch to ${t.name} — ${tierPriceLine(t, interval)}`}
+              label={`Switch to ${t.name}: ${tierPriceLine(t, interval)}`}
               busyLabel="Switching…"
               busy={busy === "change-plan"}
               kind="secondary"

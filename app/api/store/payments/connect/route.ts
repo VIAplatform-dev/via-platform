@@ -14,7 +14,7 @@ function baseUrl(request: NextRequest) {
  return `${proto}://${host}`;
 }
 
-// POST — start (or resume) Stripe Connect Express onboarding. Creates the
+// POST: start (or resume) Stripe Connect Express onboarding. Creates the
 // connected account on first call, then returns a one-time onboarding URL.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
  // Refuse rather than overwrite. The row holds ONE account id, so connecting a store that is
  // already live-connected while the server runs test keys would replace its real account with a
  // sandbox one and take its checkout down. This is the check that makes a mis-pointed sandbox
- // annoying instead of destructive — see stripe-mode.ts.
+ // annoying instead of destructive. See stripe-mode.ts.
  const blocked = connectBlockedReason(sp);
  if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
 
@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
  // Deliberately a SEPARATE call, and deliberately swallowed: whether a platform may set a
  // connected account's payout schedule depends on how that account is configured, and a Stripe
  // that refuses the schedule must not be able to stop a seller from onboarding at all. Runs on
- // every connect, so an account created before this existed — or one whose policy has since moved
- // — is reconciled the next time the seller opens payments.
+ // every connect, so an account created before this existed, or one whose policy has since moved
+ // is reconciled the next time the seller opens payments.
  await syncPayoutSchedule(slug).catch(() => null);
 
  // One-time Stripe-hosted onboarding link.

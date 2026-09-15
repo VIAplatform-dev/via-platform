@@ -9,7 +9,7 @@ import { AdminHeader, TechCard, TechButton, StatusPill, cn } from "../../ui";
 //
 // These were three separate ideas that are really one: the address parcels leave FROM, the address
 // buyers collect FROM, and the place Market Mode sells at. Ship-from and collect-from lived in a
-// tab inside General, which is why nobody found them — and ship-from is required before a label can
+// tab inside General, which is why nobody found them, and ship-from is required before a label can
 // be bought or a tax registration added, so a store that never found it was blocked twice over
 // without being told why.
 
@@ -19,12 +19,12 @@ type Pickup = { enabled: boolean; address: Addr; instructions: string | null } |
 // THE `autocomplete` TOKENS ARE WHAT MAKE AN ADDRESS FILL ITSELF.
 //
 // These fields had none, so iOS and Chrome had no idea what any of the boxes were and offered
-// nothing — the seller typed her own address by hand, every time, on a phone. The tokens below are
+// nothing. The seller typed her own address by hand, every time, on a phone. The tokens below are
 // the standard names browsers look for; with them, one tap on the keyboard's suggestion fills the
 // whole block from the address she already has saved on the device. No API, no key, no cost.
 //
 // (The BUYER's address at checkout is Stripe's Address Element, which brings Google-powered
-// search of its own — see app/checkout/page.tsx. This is the seller typing her own.)
+// search of its own. See app/checkout/page.tsx. This is the seller typing her own.)
 const LINE: { key: keyof Addr; label: string; wide?: boolean; autoComplete: string }[] = [
  { key: "street1", label: "Street address", wide: true, autoComplete: "address-line1" },
  { key: "street2", label: "Apt, suite (optional)", wide: true, autoComplete: "address-line2" },
@@ -67,7 +67,7 @@ export default function LocationsPage() {
 
  async function save() {
   setBusy(true); setErr(null); setMsg(null);
-  // Only the address fields — the shipping API merges, so this can't disturb zones or duty.
+  // Only the address fields. The shipping API merges, so this can't disturb zones or duty.
   const r = await fetch("/api/store/shipping", {
    method: "POST", headers: { "Content-Type": "application/json" },
    body: JSON.stringify({
@@ -84,7 +84,7 @@ export default function LocationsPage() {
 
  const setA = (k: keyof Addr, v: string) => setFrom((a) => ({ ...a, [k]: v }));
  const setP = (k: keyof Addr, v: string) => setPickup((p) => ({ enabled: true, instructions: p?.instructions ?? null, address: { ...(p?.address ?? {}), [k]: v } }));
- // Same rule publishing uses — this page used to call an address complete without a state or
+ // Same rule publishing uses. This page used to call an address complete without a state or
  // postcode, then publishing refused it, which is a maddening thing to be told twice.
  const missing = missingShipFrom(from);
  const complete = missing.length === 0;
@@ -113,7 +113,7 @@ export default function LocationsPage() {
       </div>
       {!complete && (
        <p className="border-b border-stone-100 bg-amber-50 px-5 py-2.5 text-[12.5px] text-amber-900">
-        Add your {describeMissing(missing)} — carriers need all of it before you can publish a live listing or print a label.
+        Add your {describeMissing(missing)}: carriers need all of it before you can publish a live listing or print a label.
        </p>
       )}
       {!complete && (
@@ -133,7 +133,12 @@ export default function LocationsPage() {
         </label>
        ))}
        <label className="col-span-2 max-sm:col-span-1">
-        <span className="mb-1 block text-[12px] font-medium text-stone-700">Phone</span>
+        {/* Not optional, whatever it used to look like. USPS refuses a label without a sender
+            phone, and it refuses it at the moment the seller presses Buy label with a packed
+            parcel in front of her. Said here, where it costs nothing to fix. */}
+        <span className="mb-1 block text-[12px] font-medium text-stone-700">
+         Phone <span className="font-normal text-stone-400">· carriers require it</span>
+        </span>
         <input value={from.phone ?? ""} onChange={(e) => setA("phone", e.target.value)} inputMode="tel" autoComplete="tel" className="w-full rounded-md border border-stone-300 px-2.5 py-2 text-[13px] outline-none focus:border-stone-500" />
         <span className="mt-1 block text-[11.5px] text-stone-400">Couriers require one on international parcels.</span>
        </label>

@@ -7,7 +7,7 @@ import { groupIntoParcels } from "@/app/lib/parcels-core";
 
 export const dynamic = "force-dynamic";
 
-// GET — the acting store's orders: live VYA sales + any imported historical orders.
+// GET: the acting store's orders: live VYA sales + any imported historical orders.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

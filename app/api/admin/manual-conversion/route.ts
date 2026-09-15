@@ -50,11 +50,11 @@ function estimateFromCommission(commission: number): number {
  * lost due to a DB outage and the cron snapshot already advanced past it.
  *
  * Body:
- *   storeName    string   — store name (e.g. "Porter's Preloved")
- *   commission   number   — commission earned in USD (order total will be estimated)
- *   orderTotal   number   — (optional) exact order total if known; overrides commission estimate
- *   timestamp    string   — (optional) ISO timestamp; defaults to now
- *   note         string   — (optional) reason / context
+ *   storeName    string. Store name (e.g. "Porter's Preloved")
+ *   commission   number: commission earned in USD (order total will be estimated)
+ *   orderTotal   number: (optional) exact order total if known; overrides commission estimate
+ *   timestamp    string. (optional) ISO timestamp; defaults to now
+ *   note         string. (optional) reason / context
  */
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     VALUES (
       ${conversionId}, ${ts}, ${orderId}, ${total}, 'USD',
       ${JSON.stringify([{
-        productName: `Manual order entry via Shopify Collabs${note ? ` — ${note}` : ""}`,
+        productName: `Manual order entry via Shopify Collabs${note ? `: ${note}` : ""}`,
         quantity: 1,
         price: total,
       }])},

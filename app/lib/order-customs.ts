@@ -1,9 +1,9 @@
-// The customs declaration for one order — the I/O half of customs.ts.
+// The customs declaration for one order. The I/O half of customs.ts.
 //
 // One function, four callers (the automatic label, the seller's manual quote, the buy, and the
 // order screen's rate list). They must agree: if the quote a seller is shown came from a shipment
 // with no declaration and the purchase then attached one, the price she accepted isn't the price
-// she pays — DDP rates are higher than DDU rates, because the duty is in them.
+// she pays. DDP rates are higher than DDU rates, because the duty is in them.
 
 import { getItem } from "./db/inventory";
 import { getShippingSettings } from "./store-shipping-db";
@@ -48,7 +48,7 @@ export async function customsForOrder(opts: {
 
  const shipping = await getShippingSettings(opts.storeSlug).catch(() => null);
  const profile = await getStoreProfile(opts.storeSlug).catch(() => null);
- // A store may only promise "duties covered" when the carrier bills IT, not VYA — see
+ // A store may only promise "duties covered" when the carrier bills IT, not VYA. See
  // resolveDutyMode. On the shared wallet this silently becomes buyer-pays, and `dutyDowngraded`
  // says so, because a seller who thinks she's covering duty will say so on her storefront.
  const { mode: dutyMode, downgraded: dutyDowngraded } = resolveDutyMode(
@@ -66,7 +66,7 @@ export async function customsForOrder(opts: {
   }],
   fromCountry: opts.fromCountry,
   dutyMode,
-  // The registered business signs it, not the shop's trading name — and her VAT number travels
+  // The registered business signs it, not the shop's trading name, and her VAT number travels
   // with it. Both come from Settings → Store details, which promised exactly this and, until now,
   // did nothing with either. See legal-identity.ts.
   signer: customsSigner(profile ?? {}, opts.sellerName),
@@ -74,7 +74,7 @@ export async function customsForOrder(opts: {
   parcelWeightOz: opts.parcelWeightOz,
  });
 
- // Read the description too — "crocodile" is as likely to be in the body as the title.
+ // Read the description too. "crocodile" is as likely to be in the body as the title.
  const warnings = restrictedMaterials(`${title} ${item?.description ?? ""} ${item?.material ?? ""}`);
 
  return { declaration, warnings, needsAesFiling: declaration.eelPfc === null, dutyDowngraded };

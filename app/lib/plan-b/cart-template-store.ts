@@ -1,7 +1,7 @@
 // Where a store's derived cart template lives.
 //
 // Stored as a capture row under a reserved path rather than in a new table. That is deliberate: the
-// template describes THIS capture's markup, so it must be created, replaced and deleted with it —
+// template describes THIS capture's markup, so it must be created, replaced and deleted with it,
 // `deleteCaptures(slug)` wiping the template is the correct behaviour, not a side effect to work
 // around. A separate table would drift out of step with the capture the moment a store re-imports.
 //

@@ -8,12 +8,12 @@
 // So every content field now gets plain English that says what belongs there. Two rules:
 //
 //   1. It is keyed by BLOCK TYPE and FIELD, never by template. Every template therefore shows the
-//      identical words in the identical slots — templates differ by layout and palette, which is the
+//      identical words in the identical slots. Templates differ by layout and palette, which is the
 //      thing a seller is actually choosing between. Copy differences would be noise.
 //   2. It reads as real sentences, not instructions in brackets. A seller should be able to publish
 //      the template untouched and have it make sense, then replace the words at their own pace.
 //
-// The authored guidance copy stays in storefront-templates.ts, unchanged — it still documents what
+// The authored guidance copy stays in storefront-templates.ts, unchanged. It still documents what
 // each block is for, and swapping this pass out is one call site.
 // ───────────────────────────────────────────────────────────────────────────
 import { placeholderImage } from "./storefront-placeholder-image.ts";
@@ -27,7 +27,7 @@ const HEADING: Record<string, string> = {
  blog: "From the journal",
  faq: "Frequently asked questions",
  columns: "Why shop with us",
- // A generic heading, used only when the PAGE doesn't tell us better — see PAGE_COPY. On a
+ // A generic heading, used only when the PAGE doesn't tell us better. See PAGE_COPY. On a
  // Shipping or Condition Scale page, "About us" is simply wrong, and it was appearing there
  // because copy was keyed by block type alone.
  text: "About us",
@@ -58,8 +58,8 @@ const SUBTEXT: Record<string, string> = {
 
 /** Longer body copy. */
 const BODY: Record<string, string> = {
- text: "Tell people who you are and what you sell. A short paragraph is plenty — what you make, where it comes from, and why it matters to you.",
- split: "Tell people who you are and what you sell. A short paragraph is plenty — what you make, where it comes from, and why it matters to you.",
+ text: "Tell people who you are and what you sell. A short paragraph is plenty. What you make, where it comes from, and why it matters to you.",
+ split: "Tell people who you are and what you sell. A short paragraph is plenty. What you make, where it comes from, and why it matters to you.",
  columns: "",
 };
 
@@ -73,7 +73,7 @@ const ITEMS: Record<string, string> = {
  marquee: "Free shipping\nEasy returns\nMade with care\nNew arrivals weekly",
 };
 
-/** Everything else — one value per field, the same wherever that field appears. */
+/** Everything else: one value per field, the same wherever that field appears. */
 const SIMPLE: Record<string, string> = {
  quote: "We started this shop to sell things we'd want to own ourselves.",
  attribution: "A happy customer",
@@ -86,7 +86,7 @@ const SIMPLE: Record<string, string> = {
 /** The FAQ rows, stored as q0/a0, q1/a1… rather than as a list. */
 const FAQ: string[][] = [
  ["How long does delivery take?", "Most orders arrive within three to five working days."],
- ["Can I return something?", "Yes — anything unworn can come back to us within 30 days."],
+ ["Can I return something?", "Yes. Anything unworn can come back to us within 30 days."],
  ["How do I get in touch?", "Send us a message and we'll reply within a day."],
  ["Do you ship internationally?", "We do. Shipping is calculated at checkout."],
 ];
@@ -126,7 +126,7 @@ const qaMatch = (k: string) => /^([qa])(\d+)$/.exec(k);
 /**
  * Replace one block's content with the placeholder set for its type.
  *
- * A field only changes if the template actually authored something there — an empty field stays
+ * A field only changes if the template actually authored something there. An empty field stays
  * empty, so a layout that deliberately omits a subtext doesn't suddenly grow one.
  */
 /**
@@ -137,7 +137,7 @@ const qaMatch = (k: string) => /^([qa])(\d+)$/.exec(k);
  * exists to say something specific, and its placeholder should say the same specific thing.
  *
  * Matched on the page slug, so a template can add a page and get sensible words without touching
- * this file — anything unmatched falls back to the generic heading, which is the old behaviour.
+ * this file: anything unmatched falls back to the generic heading, which is the old behaviour.
  */
 const PAGE_COPY: { match: RegExp; heading: Record<string, string>; body?: Record<string, string> }[] = [
  {
@@ -204,13 +204,13 @@ export function placeholderProps(type: string, props: Record<string, string> | u
   const v = out[k];
   if (typeof v !== "string") continue;
 
-  // Image slots are filled whether or not the template authored one — and templates author them
+  // Image slots are filled whether or not the template authored one, and templates author them
   // EMPTY, on the assumption the seller brings photos. That assumption is what makes a fresh
   // template unreadable: an empty hero looks like a hero that isn't MEANT to have a picture, so a
   // seller can't tell a missing photo from a deliberate design. Every slot the layout defines gets a
   // placeholder, because that is the only way the slot announces itself.
   if (IMAGE_KEYS.has(k)) { out[k] = placeholderImage(seed); continue; }
-  // A gallery's list is LOOSE — comma OR newline separates entries (see ITEM_SCHEMAS) — and every
+  // A gallery's list is LOOSE, comma OR newline separates entries (see ITEM_SCHEMAS), and every
   // data URI carries a comma after its media type. Written raw, one placeholder shatters into two
   // broken half-entries; the codec's escape for that is a backslash.
   if (k === "images") {

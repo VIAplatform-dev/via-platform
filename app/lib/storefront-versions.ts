@@ -1,9 +1,9 @@
-// Named storefront versions — the rules, with no database in them.
+// Named storefront versions. The rules, with no database in them.
 //
 // WHAT THIS IS FOR. A store has ONE storefront today: either the copy of the site we imported
 // (site_captures) or the design they built in the studio (storefront_settings.theme). Whichever
 // arrived last is the one they have, and the other is gone. So a seller who imported her real site
-// and then wanted to try building one from scratch had to destroy the import to do it — and a
+// and then wanted to try building one from scratch had to destroy the import to do it, and a
 // re-import destroys whatever she built. There was no way to keep both and choose.
 //
 // The model is Shopify's, because sellers already understand it: a store keeps a LIST of named
@@ -38,7 +38,7 @@ export const BASE_NAME: Record<VersionKind, string> = {
  * A name that isn't already taken, by appending a counter: "Design", "Design 2", "Design 3".
  *
  * Compared case-insensitively and on trimmed text, because "design" and "Design " read as the same
- * name to the person looking at the list — two rows that look identical are worse than a 2 on the end.
+ * name to the person looking at the list. Two rows that look identical are worse than a 2 on the end.
  */
 export function uniqueName(base: string, existing: readonly string[]): string {
  const want = base.trim() || "Untitled";
@@ -65,7 +65,7 @@ export function normalizeVersionName(raw: unknown): string {
  * Whether a version can be deleted.
  *
  * The published one never can. Deleting what the shop is currently serving would take the storefront
- * down, and "delete" is not where a seller expects to find that decision — she'd publish something
+ * down, and "delete" is not where a seller expects to find that decision. She'd publish something
  * else first, which is exactly the step this forces.
  */
 export function canDelete(v: Pick<VersionSummary, "published">): boolean {
@@ -80,7 +80,7 @@ export function canPublish(v: Pick<VersionSummary, "published">): boolean {
 /**
  * Which storefront a request should be served, given the published version.
  *
- * Serving used to ask one question — "does this store have any captured pages?" — and captures won
+ * Serving used to ask one question, "does this store have any captured pages?", and captures won
  * whenever they existed. That is why a store could never publish a built design after importing:
  * the captures outranked it no matter what. Now the published version decides, and the capture
  * check is only the fallback for stores that predate versions and have no published row yet.

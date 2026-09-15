@@ -1,8 +1,8 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Greeked template copy.
 //
-// Templates are authored with real guidance copy — "[Two or three paragraphs on what you look for
-// and why]" — and that authored text stays in storefront-templates.ts. This module is what turns it
+// Templates are authored with real guidance copy. "[Two or three paragraphs on what you look for
+// and why]", and that authored text stays in storefront-templates.ts. This module is what turns it
 // into lorem ipsum on the way out, for the specimen gallery AND for the store a seller actually
 // receives.
 //
@@ -14,8 +14,8 @@
 // page titles (they're the navigation), and CTA labels (a storefront whose every button says
 // "Lorem ipsum" can't be clicked through). Everything a visitor would read as content is.
 //
-// The substitution is length-matched — a three-word heading becomes three words, a long paragraph
-// stays long — so a greeked page keeps the exact typographic rhythm the design was built around.
+// The substitution is length-matched. A three-word heading becomes three words, a long paragraph
+// stays long, so a greeked page keeps the exact typographic rhythm the design was built around.
 // And it is deterministic: the same input always produces the same output, so nothing reshuffles
 // between renders or between the preview and the store.
 // ───────────────────────────────────────────────────────────────────────────

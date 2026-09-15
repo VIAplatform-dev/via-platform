@@ -147,7 +147,7 @@ export default function CollabsLinksPage() {
  setLog((prev) => [...prev, `ERROR fetching ${data.store}: ${data.error}`]);
  } else if (data.type === "store_products") {
  const totalInfo = data.totalCount !== null ? ` (API says ${data.totalCount} total)` : "";
- const mismatchWarn = data.paginationMismatch ? ` ⚠ PAGINATION MISMATCH — only fetched ${data.count} of ${data.totalCount}` : "";
+ const mismatchWarn = data.paginationMismatch ? ` ⚠ PAGINATION MISMATCH, only fetched ${data.count} of ${data.totalCount}` : "";
  const msg = `${data.store}: fetched ${data.count} products from Collabs${totalInfo}${mismatchWarn}`;
  setStatusMessage(msg);
  setLog((prev) => [
@@ -248,7 +248,7 @@ export default function CollabsLinksPage() {
  {missing.stuckByStore && Object.keys(missing.stuckByStore).length > 0 && (
  <details className="mt-4">
  <summary className="text-xs text-neutral-400 cursor-pointer hover:text-black">
- Show stuck products ({missing.total} total — not in Collabs catalog)
+ Show stuck products ({missing.total} total, not in Collabs catalog)
  </summary>
  <div className="mt-3 mb-2 flex flex-wrap items-center gap-3">
  <button
@@ -269,7 +269,7 @@ export default function CollabsLinksPage() {
  <span style={{ fontSize: 12, color: "#71717a" }}>{purgeResult.deleted} products deleted</span>
  )}
  </div>
- <p className="text-xs text-neutral-400 mb-2">Red button: removes all stuck products 14+ days old (sold-out items Collabs excludes — re-added automatically when relisted). Grey: only removes pre-Collabs era products.</p>
+ <p className="text-xs text-neutral-400 mb-2">Red button: removes all stuck products 14+ days old (sold-out items Collabs excludes. Re-added automatically when relisted). Grey: only removes pre-Collabs era products.</p>
  <div className="mt-3 space-y-4">
  {Object.entries(missing.stuckByStore).map(([slug, prods]) => (
  <div key={slug}>
@@ -326,7 +326,7 @@ export default function CollabsLinksPage() {
  <span>{slug}</span>
  <span>{cov.withId}/{cov.total} have shopify_id</span>
  {cov.withCollabsLink > 0 && <span className="text-neutral-400">({cov.withCollabsLink} have collabs link)</span>}
- {cov.withoutId > 0 && <span className="text-red-400">⚠ {cov.withoutId} missing ID — re-sync needed</span>}
+ {cov.withoutId > 0 && <span className="text-red-400">⚠ {cov.withoutId} missing ID: re-sync needed</span>}
  </div>
  );
  })}
@@ -460,7 +460,7 @@ export default function CollabsLinksPage() {
  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#09090b", marginBottom: 6 }}>
  Store{" "}
  <span style={{ color: "#a1a1aa", fontWeight: 400 }}>
- (optional — leave blank for all stores)
+ (optional: leave blank for all stores)
  </span>
  </label>
  <select
@@ -549,16 +549,16 @@ export default function CollabsLinksPage() {
  ? ` (${result.created} newly created)`
  : ""}
  {result.rateLimitSkipped
- ? ` — ${result.rateLimitSkipped} need links (run again tomorrow)`
+ ? `: ${result.rateLimitSkipped} need links (run again tomorrow)`
  : ""}
  {result.failed
- ? ` — ${result.failed} failed`
+ ? `: ${result.failed} failed`
  : ""}
  </p>
  {result.skippedProducts && result.skippedProducts.length > 0 && (
  <details className="mt-2">
  <summary className="cursor-pointer text-amber-700 font-medium">
- {result.skippedProducts.length} Collabs products not found in VYA DB — re-sync these stores
+ {result.skippedProducts.length} Collabs products not found in VYA DB. Re-sync these stores
  </summary>
  <p className="text-xs text-neutral-500 mt-2 mb-2">
  These products exist in Collabs but VYA doesn&apos;t have their Shopify ID. Go to Admin → Inventory Sync and re-sync these stores, then run this again.

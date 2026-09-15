@@ -10,7 +10,7 @@ import { applyDiscount } from "@/app/lib/market/sale-core";
 type Resp = { item: MarketItem; openCheckout: { id: string; createdAt: string; deviceLabel: string | null } | null };
 const WINE = "#5D0F17";
 
-// Confirm: one item, its photo and price, and a single decision — put it in the cart. Payment happens
+// Confirm: one item, its photo and price, and a single decision. Put it in the cart. Payment happens
 // once, on the cart, for everything the customer is buying.
 function ItemInner() {
  const { id } = useParams<{ id: string }>();
@@ -50,7 +50,7 @@ function ItemInner() {
  if (!cartId) { setAdding(false); return; }
  let save = await api(`/api/store/market/carts/${cartId}`, { method: "PATCH", body: JSON.stringify({ lines: next }) });
  if (!save.ok && save.status === 404) {
- // That cart was paid off or cleared somewhere else — start a fresh one holding just this item.
+ // That cart was paid off or cleared somewhere else. Start a fresh one holding just this item.
  writeCart([line]);
  cartId = await openCart();
  if (!cartId) { setAdding(false); return; }
@@ -82,9 +82,9 @@ function ItemInner() {
  </div>
  </div>
 
- {item.status === "sold" && <div className="mt-4"><Notice tone="warn">Sold {item.soldAt ? new Date(item.soldAt).toLocaleString([], { timeStyle: "short", dateStyle: "medium" }) : ""} — this piece is no longer available.</Notice></div>}
+ {item.status === "sold" && <div className="mt-4"><Notice tone="warn">Sold {item.soldAt ? new Date(item.soldAt).toLocaleString([], { timeStyle: "short", dateStyle: "medium" }) : ""}: this piece is no longer available.</Notice></div>}
  {item.status === "reserved" && data?.openCheckout && <div className="mt-4"><Notice tone="info">A checkout is in progress{data.openCheckout.deviceLabel ? ` on ${data.openCheckout.deviceLabel}` : ""}. <a className="font-semibold underline" href={href(`${B}/checkout/${data.openCheckout.id}`)}>Resume it</a></Notice></div>}
- {item.status === "reserved" && !data?.openCheckout && <div className="mt-4"><Notice tone="warn">Reserved by an online checkout — it frees up automatically if they don’t pay within 10 minutes.</Notice></div>}
+ {item.status === "reserved" && !data?.openCheckout && <div className="mt-4"><Notice tone="warn">Reserved by an online checkout. It frees up automatically if they don’t pay within 10 minutes.</Notice></div>}
  {item.status === "removed" && <div className="mt-4"><Notice tone="warn">This item was removed from sale.</Notice></div>}
 
  <ActionBar>

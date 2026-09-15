@@ -9,8 +9,8 @@ import { destinationAfterAuth, loginHref, safeNext, STORE_LOGIN, lastAuthStall }
 
 // Sign-in and sign-up for SELLERS.
 //
-// They're the same two buttons with different words around them — a magic link or Google either
-// finds the account or creates it — so this renders both, and `mode` only changes the copy. What
+// They're the same two buttons with different words around them. A magic link or Google either
+// finds the account or creates it, so this renders both, and `mode` only changes the copy. What
 // actually differs is where the seller LANDS, and that isn't decided here: /store/continue asks the
 // server whether this email already has a store.
 //
@@ -50,7 +50,7 @@ export default function StoreAuthClient({ mode }: { mode: "login" | "signup" }) 
  const [sent, setSent] = useState<string | null>(null);
  const [error, setError] = useState<string | null>(null);
  // Nothing renders until we know whether they're already signed in. A seller who has a store must
- // never see a sign-in form she doesn't need, not even for one frame — that flash is exactly what
+ // never see a sign-in form she doesn't need, not even for one frame. That flash is exactly what
  // "it keeps asking me to log in when I'm already logged in" looks like from her side.
  const [checking, setChecking] = useState(true);
 
@@ -64,7 +64,7 @@ export default function StoreAuthClient({ mode }: { mode: "login" | "signup" }) 
      // didn't submit"; the real answer is usually that the browser isn't sending a session back on
      // THIS address, which nobody can guess at from an empty screen.
      if (lastAuthStall === "signed-out" && typeof window !== "undefined") {
-      setError(`Signed in, but this browser isn’t sending a session back on ${window.location.host}. Try again here — if it keeps happening, sign in on the address you were given.`);
+      setError(`Signed in, but this browser isn’t sending a session back on ${window.location.host}. Try again here, if it keeps happening, sign in on the address you were given.`);
      } else if (lastAuthStall === "unreachable") {
       setError("We couldn’t reach VYA to finish signing you in. Check your connection and try again.");
      }

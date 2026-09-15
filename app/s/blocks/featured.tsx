@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-// Featured products — five ways to present the same inventory.
+// Featured products. Five ways to present the same inventory.
 //
 // Product content (photo, title, price) comes from the store's listings, not from props, so what
 // varies between these layouts is composition: an even grid, a swipeable rail, one lead piece with
@@ -17,9 +17,9 @@ const MOSAIC_PIECES = 6;    // three alternating large/small pairs
 
 
 // The shared product card. Every layout draws its products with this, so hover behaviour, image
-// radius (.vya-round), and the title/price treatment stay identical across the family — only the
+// radius (.vya-round), and the title/price treatment stay identical across the family, only the
 // arrangement changes.
-// The badge over a sold or held piece — the SAME words and marker the classic grid uses
+// The badge over a sold or held piece. The SAME words and marker the classic grid uses
 // (StorefrontView: `words.sold` / `words.held`, `data-vya-held` on a hold), so a store that shows a
 // held piece as "On hold" on its Shop page shows it that way on its homepage too. Nothing about the
 // link changes: the product page is what refuses the sale.
@@ -45,7 +45,7 @@ function Card({ it, i, shopHref, accent, fg, words, ratio = "aspect-[4/5]" }: { 
  );
 }
 
-// The section heading block — shared by every layout so the eyebrow/heading pair is edited the same
+// The section heading block. Shared by every layout so the eyebrow/heading pair is edited the same
 // way whichever one is chosen.
 function Head({ kit, align = "text-center", className = "mb-12" }: { kit: EditKit; align?: string; className?: string }) {
  const { b, ctx, p, txt } = kit;
@@ -74,7 +74,7 @@ function FeaturedGrid({ kit }: { kit: EditKit }) {
  const shown = products.slice(0, featuredCount(p.limit, 8));
  // Unset = "Auto": fit the row length to how many pieces there actually are.
  const c = p.cols || String(autoColumns(shown.length));
- // autoColumns already avoids a stranded piece, but a template that pins `cols` bypasses it — and
+ // autoColumns already avoids a stranded piece, but a template that pins `cols` bypasses it, and
  // four pieces in a three-wide grid leaves one alone on its own row, which reads as a broken layout
  // rather than a curated one. This is the FEATURED block, a chosen showcase rather than the
  // catalogue, so dropping the odd one out is honest: nothing is hidden that a shopper was promised.
@@ -96,7 +96,7 @@ function FeaturedGrid({ kit }: { kit: EditKit }) {
 }
 
 // ── carousel ────────────────────────────────────────────────────────────────────────────────────
-// A swipeable rail. CSS scroll-snap, no JS — this renderer is shared with the live storefront's
+// A swipeable rail. CSS scroll-snap, no JS. This renderer is shared with the live storefront's
 // server component, and a scroll track is natively swipeable on a phone and trackpad-scrollable on
 // desktop. Card width is the merchant's control; the rail bleeds off the right edge deliberately,
 // which is what signals "there's more this way".
@@ -128,7 +128,7 @@ function FeaturedCarousel({ kit }: { kit: EditKit }) {
 }
 
 // ── editorial ───────────────────────────────────────────────────────────────────────────────────
-// One piece leads at full height with the rest stacked beside it — the magazine opener. Reads as a
+// One piece leads at full height with the rest stacked beside it. The magazine opener. Reads as a
 // point of view rather than an inventory dump, which is the whole reason a vintage store has an
 // "edit" in the first place.
 function FeaturedEditorial({ kit }: { kit: EditKit }) {
@@ -155,7 +155,7 @@ function FeaturedEditorial({ kit }: { kit: EditKit }) {
 
 // ── mosaic ──────────────────────────────────────────────────────────────────────────────────────
 // A deliberately uneven grid: two tall pieces anchoring alternating corners, the rest square. The
-// irregularity is the point — it reads as curation rather than as a catalogue page.
+// irregularity is the point. It reads as curation rather than as a catalogue page.
 function FeaturedMosaic({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;
  const { shopHref, colors, fg } = ctx;
@@ -169,7 +169,7 @@ function FeaturedMosaic({ kit }: { kit: EditKit }) {
     <div className="relative grid grid-cols-2 gap-4 @lg:grid-cols-4 @lg:gap-6" style={p.gap ? { gap: `${p.gap}px` } : undefined}>
      <ArrangeHandle kit={kit} prop="gap" title="Drag to change the spacing" />
      {shown.map((it, i) => {
-      // Every fifth tile starting at the first spans two columns and two rows — a rhythm that keeps
+      // Every fifth tile starting at the first spans two columns and two rows. A rhythm that keeps
       // repeating cleanly however many products the store has.
       const big = i % 5 === 0;
       return (
@@ -185,7 +185,7 @@ function FeaturedMosaic({ kit }: { kit: EditKit }) {
 }
 
 // ── list ────────────────────────────────────────────────────────────────────────────────────────
-// One piece per row: small photo, title, price, hairline between. The archive/stockist treatment —
+// One piece per row: small photo, title, price, hairline between. The archive/stockist treatment,
 // dense, scannable, and the right answer for a store whose pieces are better read than browsed.
 function FeaturedList({ kit }: { kit: EditKit }) {
  const { ctx, p } = kit;

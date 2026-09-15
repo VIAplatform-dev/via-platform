@@ -37,7 +37,7 @@ test("prefers the Shopify shape when a store holds both", () => {
 });
 
 test("never resolves to a page that isn't a product page", () => {
- // A collection whose last segment is the key, and a top-level page — both would send a shopper
+ // A collection whose last segment is the key, and a top-level page. Both would send a shopper
  // somewhere that isn't the piece they clicked.
  assert.equal(pickCapturedProductPath(["/shop/shoes", "/about"], ["shoes"]), null);
  assert.equal(pickCapturedProductPath(SQS_PATHS, ["nothing-like-this"]), null);

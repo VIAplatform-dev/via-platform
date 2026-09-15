@@ -1,6 +1,6 @@
 "use client";
 
-// Category controls, both built on the same idea: a category is a PATH — a family, then a
+// Category controls, both built on the same idea: a category is a PATH. A family, then a
 // category inside it. The editor states that path as a breadcrumb ("Bags › Totes"); the
 // inventory filter walks it (pick a family, then narrow). Two views of one hierarchy, so
 // what you tag with and what you filter by read the same way.
@@ -13,7 +13,7 @@ import {
  familySlugs, isCanonicalCategory,
 } from "@/app/lib/item-tags";
 
-// Positioning is left to the caller — the breadcrumb anchors its menu, the header filter
+// Positioning is left to the caller. The breadcrumb anchors its menu, the header filter
 // portals its own out of the table's scroll container.
 const MENU_BASE = "z-30 max-h-64 min-w-[190px] overflow-y-auto rounded-xl border border-stone-200 bg-white p-1.5 shadow-[0_16px_44px_-12px_rgba(16,24,40,0.35)]";
 const MENU = cn("absolute left-0 top-full mt-1.5", MENU_BASE);
@@ -34,14 +34,14 @@ function useDismiss<T extends HTMLElement>(onDismiss: () => void) {
 }
 
 // ── The editor control: Bags › Totes ─────────────────────────────────────────
-// The value is a canonical slug, or — under the "Other" family — whatever the seller typed.
+// The value is a canonical slug, or, under the "Other" family. Whatever the seller typed.
 export function CategoryBreadcrumb({ value, onChange, className }: {
  value: string | null;
  onChange: (v: string | null) => void;
  className?: string;
 }) {
  // The family shown is the one the value belongs to, until you open the family menu and
- // choose a different one — then it's pending until you pick a category inside it.
+ // choose a different one, then it's pending until you pick a category inside it.
  const [pendingFamily, setPendingFamily] = useState<string | null>(null);
  const [open, setOpen] = useState<"family" | "category" | null>(null);
  const [typed, setTyped] = useState("");
@@ -95,7 +95,7 @@ export function CategoryBreadcrumb({ value, onChange, className }: {
         <span className="font-mono text-[10px] tabular-nums text-stone-400">{g.slugs.length}</span>
        </button>
       ))}
-      {/* Escape hatch — a taxonomy this small can't name everything a vintage store sells. */}
+      {/* Escape hatch: a taxonomy this small can't name everything a vintage store sells. */}
       <div className="mt-1 border-t border-stone-100 pt-1">
        <button
         type="button" role="option" aria-selected={isOther}
@@ -174,7 +174,7 @@ export function CategoryBreadcrumb({ value, onChange, className }: {
 
 // ── Column-header filter ─────────────────────────────────────────────────────
 // The filter lives in the header of the column it filters, so the table needs no bar
-// above it. The header shows the active value in the accent colour — that, plus the
+// above it. The header shows the active value in the accent colour. That, plus the
 // count rail under the table, is what keeps an invisible filter from being a trap.
 export function HeaderFilter({ label, value, onClear, children }: {
  label: string;
@@ -187,7 +187,7 @@ export function HeaderFilter({ label, value, onClear, children }: {
  const ref = useDismiss<HTMLDivElement>(() => setOpen(false));
  const anchor = useRef<HTMLButtonElement>(null);
 
- // The table scrolls horizontally, which also clips vertically — so the menu is positioned
+ // The table scrolls horizontally, which also clips vertically, so the menu is positioned
  // fixed against the button's viewport rect and portalled out of the scroll container.
  const place = () => {
   const r = anchor.current?.getBoundingClientRect();
@@ -242,7 +242,7 @@ export function HeaderFilter({ label, value, onClear, children }: {
  );
 }
 
-// The category menu's body — an accordion, because the flat form ran to ~35 rows once every
+// The category menu's body. An accordion, because the flat form ran to ~35 rows once every
 // subcategory of every present family was offered. One family open at a time; the family
 // holding the current filter opens itself. A family row expands rather than filtering, so
 // "everything in Bags" is its own first child instead of a second hit target on the row.

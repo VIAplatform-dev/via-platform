@@ -1,6 +1,6 @@
 // Platform detection + "can we import this at all?" scoring.
 //
-// Pure functions over a fetched homepage — no network, no DB — so every rule here is testable
+// Pure functions over a fetched homepage, no network, no DB, so every rule here is testable
 // against the saved corpus of real storefronts. Detection decides which extraction rung the
 // importer tries first (see rungs.ts); the shell score decides whether to try at all.
 
@@ -53,7 +53,7 @@ export function visibleTextLength(html: string): number {
  * Is this HTML a client-rendered shell?
  *
  * Gatsby/Vite/CRA/Lovable pages ship a near-empty <div id="root"> and build everything in the
- * browser, so there is nothing for a fetch-based importer to read — no products, no design. We'd
+ * browser, so there is nothing for a fetch-based importer to read, no products, no design. We'd
  * rather say so plainly than "import" a blank page. Measured rather than guessed: a real
  * storefront homepage carries thousands of characters of copy and dozens of images (the smallest
  * genuine store in the corpus still had ~4.8k chars), while the shells had ~66–234 chars and 0–1
@@ -67,7 +67,7 @@ export function shellScore(html: string): ShellScore {
  // storefront is never wrongly declined.
  const isShell = textLength < 600 && images <= 2;
  const reason = isShell
-  ? `only ${textLength} characters of text and ${images} image(s) in the served HTML — this site builds its content in the browser`
+  ? `only ${textLength} characters of text and ${images} image(s) in the served HTML. This site builds its content in the browser`
   : `${textLength} characters of text, ${images} images`;
  return { isShell, bytes, textLength, images, reason };
 }
@@ -77,8 +77,8 @@ export function shellScore(html: string): ShellScore {
  *
  * Cloudflare's managed challenge, Akamai's and PerimeterX's equivalents all answer a *successful*
  * HTTP status with a tiny page that says "prove you're human". captureSite's only gate is `res.ok`,
- * so a challenge served as **200** — which is what ec.2ndstreetusa.com does for the first stretch,
- * switching to 429 only later — would be stored as the seller's storefront on every page, and the
+ * so a challenge served as **200** which is what ec.2ndstreetusa.com does for the first stretch,
+ * switching to 429 only later. Would be stored as the seller's storefront on every page, and the
  * import would report success. That is worse than failing: a store goes live serving a Cloudflare
  * notice under the seller's own name.
  *
@@ -120,7 +120,7 @@ export function detectFramework(html: string): string | null {
  return null;
 }
 
-/** Shopify's theme object, when present — the shim registry keys off this. */
+/** Shopify's theme object, when present. The shim registry keys off this. */
 export function detectShopifyTheme(html: string): string | null {
  const m = html.match(/Shopify\.theme\s*=\s*\{[^}]*"schema_name"\s*:\s*"([^"]+)"/);
  if (m) return m[1];
@@ -133,7 +133,7 @@ export function detectShopifyTheme(html: string): string | null {
  *
  * Detection is always run live rather than trusted from a directory: stores migrate, and every
  * "best BigCommerce stores" listicle in the corpus turned out to include a site that had since
- * moved to Shopify. Ordering matters — the more specific signature wins, and headless Shopify is
+ * moved to Shopify. Ordering matters. The more specific signature wins, and headless Shopify is
  * checked before generic Shopify because it looks like Shopify while behaving nothing like it.
  */
 export function detectPlatform(html: string, url?: string): Detection {
@@ -181,7 +181,7 @@ export function detectPlatform(html: string, url?: string): Detection {
  if (has(/square\.site|squareup\.com|weebly/i, "square")) {
   return { platform: "square", confidence: 0.8, framework, theme, shell, signals };
  }
- // Anchored signatures only. An earlier `mage\/` matched inside "image/" — so every page with
+ // Anchored signatures only. An earlier `mage\/` matched inside "image/", so every page with
  // `type="image/png"` was detected as Magento. Substring probes need a real boundary.
  if (has(/\bMagento\b|data-mage-init|mage-init|static\/version\d+\/frontend|Mage\.Cookies/, "magento")) {
   return { platform: "magento", confidence: 0.8, framework, theme, shell, signals };
@@ -196,7 +196,7 @@ export function detectPlatform(html: string, url?: string): Detection {
 }
 
 /** A seller-facing explanation for a site we can't import automatically. Says what's true and what
- *  they can do instead — never a bare failure. */
+ *  they can do instead, never a bare failure. */
 export function declineMessage(d: Detection): string | null {
  if (d.platform === "wix") {
   return "Wix builds its pages in the browser and doesn't publish a product feed we can read, so we can't import this one automatically. You can upload your inventory as a CSV and build your storefront here instead.";
@@ -209,7 +209,7 @@ export function declineMessage(d: Detection): string | null {
   return "This storefront runs on Shopify behind a custom frontend. Paste your .myshopify.com address (or connect your store) and we'll import the full catalog from there.";
  }
  if (d.platform === "wordpress") {
-  return "This is a WordPress site without WooCommerce, so there's no product feed to import. We can still bring the design over — add your inventory by CSV or by hand.";
+  return "This is a WordPress site without WooCommerce, so there's no product feed to import. We can still bring the design over. Add your inventory by CSV or by hand.";
  }
  return null;
 }

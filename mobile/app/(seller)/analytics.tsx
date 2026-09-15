@@ -10,7 +10,7 @@ import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 
 // An overview, not a report.
 //
-// One number she came for, three counts, and what sold. No axes, no date pickers, no drill-down —
+// One number she came for, three counts, and what sold. No axes, no date pickers, no drill-down,
 // that is the desk's job. The mockups draw a sparkline; it is omitted rather than faked, because a
 // chart with no scale is decoration and this screen is meant to be read in two seconds.
 
@@ -51,7 +51,7 @@ export default function AnalyticsScreen() {
   });
 
   // Profit is the web's one definition (profit-core.ts), read off the suite's margin section. Its
-  // window is the same one Home shows — 30 days — whatever the takings chips say, so the two agree.
+  // window is the same one Home shows, 30 days. Whatever the takings chips say, so the two agree.
   const profit = useQuery({
     queryKey: ["store", "suite", "margin", "30d"],
     queryFn: () => apiGet<{ margin?: MarginSection }>("/api/store/analytics/suite?sections=margin&period=30d"),
@@ -73,7 +73,7 @@ export default function AnalyticsScreen() {
       ) : (
         <>
           <Text style={{ fontFamily: fonts.serif, fontSize: 34, color: colors.text, marginTop: spacing.md }}>
-            {d ? formatMoney(d.revenueCents, currency) : "—"}
+            {d ? formatMoney(d.revenueCents, currency) : "-"}
           </Text>
           <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2 }}>
             Taken this period
@@ -81,9 +81,9 @@ export default function AnalyticsScreen() {
           </Text>
 
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
-            <Cell label="ORDERS" value={d ? String(d.orders) : "—"} />
-            <Cell label="AVERAGE" value={d ? formatMoney(d.aovCents, currency) : "—"} />
-            <Cell label="LIVE" value={d ? String(d.inventory.active) : "—"} />
+            <Cell label="ORDERS" value={d ? String(d.orders) : "-"} />
+            <Cell label="AVERAGE" value={d ? formatMoney(d.aovCents, currency) : "-"} />
+            <Cell label="LIVE" value={d ? String(d.inventory.active) : "-"} />
           </View>
 
           <Text style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }}>

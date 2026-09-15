@@ -2,7 +2,7 @@
 // Everything an appointment sends.
 //
 // One module, because a booking has three audiences and they are easy to half-build: the CUSTOMER
-// (a confirmation they can find again), the STORE (a to-do — someone is coming, or is waiting on an
+// (a confirmation they can find again), the STORE (a to-do: someone is coming, or is waiting on an
 // answer), and the store's own EMAIL FLOWS (whatever they wrote themselves, fired through the same
 // automation engine as every other trigger).
 //
@@ -17,7 +17,7 @@ import type { AppointmentSettings } from "./settings-core";
 
 const DIARY_URL = osAdminUrl("/appointments");
 
-/** "Thursday, 11 September" — the store's clock, which is the only one either party is thinking in. */
+/** "Thursday, 11 September": the store's clock, which is the only one either party is thinking in. */
 export function longDate(day: string): string {
  return new Date(`${day}T00:00:00Z`).toLocaleDateString("en-US", {
   weekday: "long", month: "long", day: "numeric", timeZone: "UTC",
@@ -37,7 +37,7 @@ const esc = (s: string) => s.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;
 
 /**
  * The variables a store can drop into its own appointment emails. Kept in one place so the
- * settings screen can list exactly what will work — an automation that silently fills {{when}}
+ * settings screen can list exactly what will work. An automation that silently fills {{when}}
  * with nothing is worse than one that never offered it.
  */
 export const APPOINTMENT_VARS = ["name", "store", "date", "time", "when", "type", "note"] as const;
@@ -90,11 +90,11 @@ export async function notifyAppointmentBooked(
     ? `Thanks for asking for a time with ${name}. Here's what you've requested:`
     : `You're booked in with ${name}. Here are the details:`,
    "",
-   `${a.kind} — ${when(a)}`,
+   `${a.kind}: ${when(a)}`,
    ...(a.note ? ["", `You told us: ${a.note}`] : []),
    "",
    pending
-    ? "We'll email you the moment it's confirmed — your slot is held until then."
+    ? "We'll email you the moment it's confirmed. Your slot is held until then."
     : "See you then. Just reply to this email if anything changes.",
    ...(a.depositCents > 0
     ? ["", settings.depositCredits
@@ -104,7 +104,7 @@ export async function notifyAppointmentBooked(
   ];
   await sendStoreBrandedTransactional(storeSlug, {
    to: a.customerEmail,
-   subject: pending ? `Your appointment request — ${longDate(a.day)}` : `You're booked: ${when(a)}`,
+   subject: pending ? `Your appointment request: ${longDate(a.day)}` : `You're booked: ${when(a)}`,
    body: lines.join("\n"),
   }).catch((e) => console.error("[appointments] customer confirmation failed", a.id, e));
  }
@@ -117,7 +117,7 @@ export async function notifyAppointmentBooked(
    html: `<p><b>${who}</b> ${pending ? "asked for" : "booked"} <b>${esc(a.kind)}</b> on <b>${esc(when(a))}</b>.</p>
    ${a.customerEmail ? `<p>${esc(a.customerEmail)}${a.customerPhone ? ` · ${esc(a.customerPhone)}` : ""}</p>` : ""}
    ${a.note ? `<p><i>“${esc(a.note)}”</i></p>` : ""}
-   ${a.depositCents > 0 ? `<p>Deposit ${money(a.depositCents)} — ${a.depositPaid ? "paid" : "not yet paid"}.</p>` : ""}
+   ${a.depositCents > 0 ? `<p>Deposit ${money(a.depositCents)}: ${a.depositPaid ? "paid" : "not yet paid"}.</p>` : ""}
    <p>${ownerAlertButton(DIARY_URL, pending ? "Approve or decline" : "Open your schedule")}</p>`,
   });
  }
@@ -125,7 +125,7 @@ export async function notifyAppointmentBooked(
  await fireFlows(storeSlug, "appointment_booked", a);
 }
 
-/** The store answered. Only the customer needs this one — the store is the one who just clicked. */
+/** The store answered. Only the customer needs this one. The store is the one who just clicked. */
 export async function notifyAppointmentDecision(
  storeSlug: string,
  a: Appointment,
@@ -135,7 +135,7 @@ export async function notifyAppointmentDecision(
  const name = await storeName(storeSlug).catch(() => storeSlug);
  const confirmed = status === "booked";
  const body = confirmed
-  ? [`Hi ${a.customerName || "there"},`, "", `${name} has confirmed your appointment:`, "", `${a.kind} — ${when(a)}`, "", "See you then. Reply to this email if you need to move it."].join("\n")
+  ? [`Hi ${a.customerName || "there"},`, "", `${name} has confirmed your appointment:`, "", `${a.kind}: ${when(a)}`, "", "See you then. Reply to this email if you need to move it."].join("\n")
   : [`Hi ${a.customerName || "there"},`, "", `${name} can't make ${when(a)} after all, so that appointment has been cancelled.`, "", "Reply to this email and we'll find another time."].join("\n");
 
  await sendStoreBrandedTransactional(storeSlug, {
@@ -164,7 +164,7 @@ export async function notifyAppointmentReminder(storeSlug: string, a: Appointmen
    "",
    `A quick reminder about your appointment with ${name}:`,
    "",
-   `${a.kind} — ${when(a)}`,
+   `${a.kind}: ${when(a)}`,
    "",
    "Reply to this email if you need to move it.",
   ].join("\n"),
@@ -174,7 +174,7 @@ export async function notifyAppointmentReminder(storeSlug: string, a: Appointmen
 }
 
 /**
- * The note after a visit — "the black slip you loved is still here".
+ * The note after a visit. "the black slip you loved is still here".
  *
  * Written by the store, but the pieces come from what was actually recorded on the day, so the
  * seller doesn't have to remember which six things someone tried. Sent in the store's brand, like
@@ -188,7 +188,7 @@ export async function sendVisitFollowUp(
  if (!a.customerEmail) return false;
  const name = await storeName(storeSlug).catch(() => storeSlug);
  const price = (c: number | null, cur: string | null) =>
-  c == null ? "" : ` — $${Math.round(c / 100).toLocaleString()}${cur && cur.toUpperCase() !== "USD" ? ` ${cur.toUpperCase()}` : ""}`;
+  c == null ? "" : `: $${Math.round(c / 100).toLocaleString()}${cur && cur.toUpperCase() !== "USD" ? ` ${cur.toUpperCase()}` : ""}`;
  const list = opts.items
   .filter((i) => i.title)
   .map((i) => `· ${i.title}${price(i.priceCents, i.currency)}`);

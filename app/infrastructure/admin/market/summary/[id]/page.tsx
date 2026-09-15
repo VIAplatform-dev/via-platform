@@ -45,7 +45,7 @@ function SummaryInner() {
  {d.orders.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-stone-400">No sales.</p>}
  {d.orders.map((o) => <div key={o.id} className={`flex items-center gap-3 px-3 py-2.5 ${o.status === "refunded" ? "opacity-50" : ""}`}><Thumb src={o.itemImage} alt="" size={36} /><span className="min-w-0 flex-1 truncate text-[13.5px] text-stone-900">{o.itemTitle}</span><span className="text-[11px] text-stone-400">{o.tender === "cash" ? "cash" : "card"}</span><span className="text-[14px] font-semibold">{money(o.amountCents)}</span></div>)}
  </div>
- <p className="mb-2 mt-5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Pack it up — {d.unsold.count} left · {money(d.unsold.valueCents)}</p>
+ <p className="mb-2 mt-5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Pack it up. {d.unsold.count} left · {money(d.unsold.valueCents)}</p>
  <div className="divide-y divide-stone-100 rounded-2xl border border-stone-200 bg-white">
  {d.unsold.items.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-stone-400">Everything sold. 🎉</p>}
  {d.unsold.items.map((i) => <div key={i.id} className="flex items-center gap-3 px-3 py-2.5"><Thumb src={i.image} alt="" size={36} /><span className="min-w-0 flex-1 truncate text-[13.5px] text-stone-900">{i.title}</span><span className="text-[14px] font-semibold">{money(i.priceCents, i.currency)}</span></div>)}

@@ -144,7 +144,7 @@ function formatRevenue(n: number): string {
 }
 
 function formatRevenueShort(n: number): string {
- if (n === 0) return "—";
+ if (n === 0) return "-";
  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
@@ -257,7 +257,7 @@ type CollabsPartnership = {
 export default function DeepAnalyticsPage() {
  const [range, setRange] = useState<DateRange>("all");
  // Which attribution model the table sorts by, and which one reads as primary.
- // Both column groups stay visible — the toggle changes emphasis and ordering,
+ // Both column groups stay visible. The toggle changes emphasis and ordering,
  // because the whole point is being able to compare them.
  const [touchModel, setTouchModel] = useState<"first" | "last">("first");
  const [tab, setTab] = useState<Tab>("overview");
@@ -287,7 +287,7 @@ export default function DeepAnalyticsPage() {
  fetchData(range);
  }, [range, fetchData]);
 
- // Auto-refresh every 30 seconds (silent — no loading spinner)
+ // Auto-refresh every 30 seconds (silent, no loading spinner)
  useEffect(() => {
  const interval = setInterval(() => fetchData(range, true), 30_000);
  return () => clearInterval(interval);
@@ -397,7 +397,7 @@ export default function DeepAnalyticsPage() {
  />
  <StatCard
  label="Total Commission"
- value={data.kpis.totalCommission ? formatRevenue(data.kpis.totalCommission) : "—"}
+ value={data.kpis.totalCommission ? formatRevenue(data.kpis.totalCommission) : "-"}
  sub="All time · 7/5/3% tiers"
  href="/admin/conversions"
  />
@@ -408,11 +408,11 @@ export default function DeepAnalyticsPage() {
      Two attribution models side by side, because they disagree and the
      disagreement is the point.
 
-     FIRST TOUCH — the earliest real channel this customer ever arrived
+     FIRST TOUCH: the earliest real channel this customer ever arrived
      through. Same rule the customer list uses, so the two pages agree.
      Answers "what brought them to VYA at all".
 
-     LAST TOUCH — the click that carried them to the order, else their most
+     LAST TOUCH: the click that carried them to the order, else their most
      recent visit. This is what the panel used to show, and all it showed.
      Answers "what closed the sale".
 
@@ -425,7 +425,7 @@ export default function DeepAnalyticsPage() {
  <div style={{ marginBottom: 36 }}>
  <SectionTitle>Source Attribution</SectionTitle>
 
- {/* Group header — which columns belong to which model */}
+ {/* Group header, which columns belong to which model */}
  {/* 164px, not 152px: each group spans TWO 76px data columns PLUS the 12px gap
      between them. At 152px the group headers drifted 24px left of the columns they
      label, so "First touch" sat over the last-touch orders column. */}
@@ -573,7 +573,7 @@ export default function DeepAnalyticsPage() {
  <StoresTable stores={data.topStores} />
  </div>
 
- {/* Buyer Cohort Retention removed — the same chart, from the same
+ {/* Buyer Cohort Retention removed. The same chart, from the same
      /api/admin/cohort-retention endpoint, is on /admin/summary. */}
 
  {/* ── Conversions ──────────────────────────────────────────────── */}
@@ -617,7 +617,7 @@ export default function DeepAnalyticsPage() {
  </div>
 
  {/* The full order table used to render here as well. It is the same data as
-     /admin/conversions, which has filtering and the unmatched queue — the three
+     /admin/conversions, which has filtering and the unmatched queue. The three
      cards above already link into it, so the second copy was noise. */}
  <Link href="/admin/conversions?filter=all" style={{ fontSize: 12, color: GRAY, textDecoration: "none", borderBottom: `1px solid ${BORDER}`, paddingBottom: 1 }}>
  View full order history &rarr;
@@ -752,7 +752,7 @@ function CollabsTab() {
  setRevenueSyncMsg(
  recorded > 0
  ? `${recorded} new conversion${recorded !== 1 ? "s" : ""} recorded${retro > 0 ? ` · ${retro} retro-matched` : ""}`
- : `Up to date — no new conversions${retro > 0 ? ` · ${retro} retro-matched` : ""}`
+ : `Up to date, no new conversions${retro > 0 ? ` · ${retro} retro-matched` : ""}`
  );
  }
  } catch (e) {
@@ -1184,7 +1184,7 @@ function StoresTable({ stores }: { stores: TopStore[] }) {
  <tbody>
  {stores.map((s, i) => (
  <tr key={s.store ?? i} style={{ backgroundColor: i % 2 === 0 ? BG_CARD : BG_HOVER }}>
- <td style={{ ...cellStyle, fontWeight: 600 }}>{s.store ?? "—"}</td>
+ <td style={{ ...cellStyle, fontWeight: 600 }}>{s.store ?? "-"}</td>
  <td style={{ ...cellStyle, textAlign: "right", fontWeight: 600 }}>{formatRevenueShort(s.revenue)}</td>
  <td style={{ ...cellStyle, textAlign: "right" }}>{s.conversions.toLocaleString()}</td>
  <td style={{ ...cellStyle, textAlign: "right" }}>{s.clicks.toLocaleString()}</td>

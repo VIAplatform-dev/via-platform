@@ -1,20 +1,20 @@
 // ───────────────────────────────────────────────────────────────────────────
 // What each plan can send.
 //
-// The line is NOT "marketing vs transactional" and not cost. Sending is cheap — a few hundredths of
-// a cent an email — so nobody is being metered because email is expensive.
+// The line is NOT "marketing vs transactional" and not cost. Sending is cheap: a few hundredths of
+// a cent an email, so nobody is being metered because email is expensive.
 //
 // The line is **who chose to send it**:
 //
-//   AUTOMATIC — an order confirmation, a shipping notice, an abandoned basket, a new-arrivals
+//   AUTOMATIC: an order confirmation, a shipping notice, an abandoned basket, a new-arrivals
 //   digest. Each fires because a SHOPPER did something, to someone who just interacted with the
 //   shop. Low complaint risk, high value, and the thing that makes a small shop work at all.
 //   Every plan gets these, including free.
 //
-//   CAMPAIGNS — a shop composes something and sends it to her whole list at once. This is the one
+//   CAMPAIGNS: a shop composes something and sends it to her whole list at once. This is the one
 //   with real risk attached: it goes to people who didn't just ask for anything, and complaints
 //   land on VYA's sending domain, where they degrade delivery for every other store. Metered by
-//   plan — not to ration a cheap resource, but because a store paying monthly is a store we have a
+//   plan, not to ration a cheap resource, but because a store paying monthly is a store we have a
 //   relationship with, and that relationship is the actual protection.
 //
 // Numbers live here so changing them is a one-line edit rather than a search.
@@ -26,12 +26,12 @@ import type { TierId } from "./plans";
 export const CAMPAIGNS_PER_MONTH: Record<TierId, number | null> = {
  starter: 0,
  // One a week. A resale shop's rhythm is the weekly drop, and a store that can't announce its own
- // drop will announce it somewhere else — taking its list, and its numbers, with it.
+ // drop will announce it somewhere else. Taking its list, and its numbers, with it.
  studio: 4,
  atelier: null,
 };
 
-/** A store with no live plan — free, or a lapsed subscription. */
+/** A store with no live plan. Free, or a lapsed subscription. */
 export const FREE_CAMPAIGNS_PER_MONTH = 0;
 
 export function campaignAllowance(tier: TierId | null | undefined): number | null {
@@ -57,7 +57,7 @@ export function maySendCampaign(tier: TierId | null | undefined, sentThisMonth: 
   return {
    ok: false,
    upgrade: true,
-   // Says what she CAN do, not only what she can't — a store on Starter is still sending the emails
+   // Says what she CAN do, not only what she can't. A store on Starter is still sending the emails
    // that make her money, and shouldn't read this as "email is off".
    reason: "Sending a campaign to your whole list is on Studio and Pro. Your order emails, abandoned baskets and new-arrivals emails keep sending on every plan.",
   };

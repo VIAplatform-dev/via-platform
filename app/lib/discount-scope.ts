@@ -1,8 +1,8 @@
 // WHO a discount is for, and WHAT it comes off.
 //
 // A code used to be one number: X% off whatever the total was, for anyone, on anything. The two
-// things a seller actually asks for are narrower — "20% off the dresses" and "50% off for people who
-// haven't bought from me in six months" — and neither was expressible.
+// things a seller actually asks for are narrower. "20% off the dresses" and "50% off for people who
+// haven't bought from me in six months", and neither was expressible.
 //
 // The arithmetic lives here, pure and away from any database, because it decides what a buyer is
 // charged and four separate places have to agree on it: the code box the buyer types into, single
@@ -12,7 +12,7 @@
 /** One thing in the bag. `itemId` is what a product-scoped code is matched against. */
 export type OrderLine = { itemId: string; amountCents: number };
 
-/** Who may use a code. `lapsed` includes someone who has never bought — a shop asking for people who
+/** Who may use a code. `lapsed` includes someone who has never bought. A shop asking for people who
  *  "haven't bought in six months" means them too. */
 export type DiscountAudience = "all" | "new" | "lapsed";
 
@@ -29,7 +29,7 @@ export type DiscountRule = {
 export type DiscountOutcome = {
  offCents: number;
  freeShipping: boolean;
- /** What the code was allowed to act on — the whole subtotal, or just the named pieces. */
+ /** What the code was allowed to act on. The whole subtotal, or just the named pieces. */
  eligibleCents: number;
  /** Set when the code is valid for this store but does nothing for THIS order. */
  refusal: string | null;
@@ -50,7 +50,7 @@ export function eligibleLines(rule: DiscountRule, lines: OrderLine[]): OrderLine
  *
  * A product-scoped code is worked out on the pieces it names and nothing else: 20% off a £100 dress
  * is £20, whatever else is in the bag. A code that names pieces none of which are in the bag is
- * refused rather than silently applied to zero — "it did nothing" and "it isn't for these pieces"
+ * refused rather than silently applied to zero. "it did nothing" and "it isn't for these pieces"
  * look identical on a receipt and only one of them is honest.
  */
 export function computeOrderDiscount(rule: DiscountRule, lines: OrderLine[]): DiscountOutcome {
@@ -71,7 +71,7 @@ export function computeOrderDiscount(rule: DiscountRule, lines: OrderLine[]): Di
   return { offCents: off, freeShipping: false, eligibleCents, refusal: null };
  }
  if (rule.kind === "fixed") {
-  // Capped at what the code may act on, never at the whole order — a £25-off-dresses code cannot
+  // Capped at what the code may act on, never at the whole order. A £25-off-dresses code cannot
   // eat into the bag sitting next to it.
   const off = Math.min(eligibleCents, Math.max(0, Math.round(v * 100)));
   return { offCents: off, freeShipping: false, eligibleCents, refusal: null };
@@ -84,7 +84,7 @@ export function computeOrderDiscount(rule: DiscountRule, lines: OrderLine[]): Di
  *
  * `lastOrderAt` is null for someone who has never ordered. Kept separate from the arithmetic above so
  * the rule can be tested without a database, and so the same rule answers the buyer's code box and
- * the payment itself — those two disagreeing is how a shopper gets quoted one price and charged another.
+ * the payment itself: those two disagreeing is how a shopper gets quoted one price and charged another.
  */
 export function audienceAllows(
  rule: DiscountRule,
@@ -103,7 +103,7 @@ export function audienceAllows(
    ? { ok: false, refusal: "That code is for a first order." }
    : { ok: true, refusal: null };
  }
- // lapsed — never bought counts, which is what "haven't bought in six months" means to a shop.
+ // lapsed, never bought counts, which is what "haven't bought in six months" means to a shop.
  if (!everBought) return { ok: true, refusal: null };
  const days = Math.max(1, Math.round(rule.lapsedDays ?? 180));
  const cutoff = new Date(now.getTime() - days * 86_400_000);

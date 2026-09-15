@@ -6,7 +6,7 @@ import { getBetaReadiness } from "@/app/lib/beta-readiness";
 
 export const dynamic = "force-dynamic";
 
-// GET ?days=30 — cross-store AI-intake accuracy (admin only). Where the model is
+// GET ?days=30: cross-store AI-intake accuracy (admin only). Where the model is
 // weak (which fields get corrected, top brand confusions, price calibration).
 export async function GET(request: NextRequest) {
  if (!isAdminRequest(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

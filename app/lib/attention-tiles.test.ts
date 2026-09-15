@@ -8,7 +8,7 @@ import { homeTiles, HOME_TILE_COUNT, type Tile } from "./attention-tiles.ts";
 
 const t = (id: string, count: number): Tile => ({ id: id as Tile["id"], label: id, count, href: `/${id}` });
 
-// Everything Home can show, all non-zero — the ordering is what's under test.
+// Everything Home can show, all non-zero. The ordering is what's under test.
 const all = (counts: Partial<Record<string, number>>): Tile[] =>
  (["toShip", "offers", "drafts", "liveListings", "unanswered24h", "pickupsWaiting", "holdsToday", "payoutsDue", "crossListingFailed", "noPhoto", "unpriced", "lowConfidence", "costMissing", "aging"] as const)
   .map((id) => t(id, counts[id] ?? 0));

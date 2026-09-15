@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { stripThemeBackgroundOverrides as strip } from "./theme-css.ts";
 
 // The "why is my hero still white when my theme is tan" bug: custom CSS pinned a section background,
-// overriding the palette. The strip must neutralize that so the theme always wins — automatically.
+// overriding the palette. The strip must neutralize that so the theme always wins. Automatically.
 
 test("removes a hardcoded section background so the theme shows through", () => {
  const out = strip(".vya-hero{background:#ffffff;padding:40px}");

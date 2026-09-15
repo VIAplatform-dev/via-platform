@@ -1,9 +1,9 @@
 // Read-only. Which email signs in to which store, and why.
 //
 // The workspace resolves the acting store in this order (app/lib/storeAuth.ts):
-//   1. ?store=<slug>          — only with the owner's admin cookie
-//   2. the signed-in SESSION  — store_users first, then the hardcoded storeContactEmails map
-//   3. the admin cookie       — falls back to via-admin
+//   1. ?store=<slug> only with the owner's admin cookie
+//   2. the signed-in SESSION: store_users first, then the hardcoded storeContactEmails map
+//   3. the admin cookie: falls back to via-admin
 //
 // Step 2 beating step 3 is the trap: while a browser holds ANY seller session, the owner cannot act
 // as via-admin, whichever email they signed in with. Signing out is what makes the owner the owner.
@@ -20,7 +20,7 @@ const forgetAt = argv.indexOf("--forget");
 const FORGET = forgetAt >= 0 ? (argv[forgetAt + 1] || "").trim().toLowerCase() : null;
 
 const users = await sql`SELECT store_slug, email, role, created_at FROM store_users ORDER BY created_at`;
-console.log(`\nstore_users — every self-onboarded login (${users.length})\n`);
+console.log(`\nstore_users. Every self-onboarded login (${users.length})\n`);
 if (!users.length) console.log("   (none)");
 for (const u of users) {
  const [pages] = await sql`SELECT count(*)::int AS n FROM site_captures WHERE store_slug = ${u.store_slug}`;
@@ -30,7 +30,7 @@ for (const u of users) {
 }
 
 const accounts = await sql`SELECT slug, name, owner_email, created_at FROM store_accounts ORDER BY created_at`;
-console.log(`\nstore_accounts — every store created through onboarding (${accounts.length})\n`);
+console.log(`\nstore_accounts. Every store created through onboarding (${accounts.length})\n`);
 if (!accounts.length) console.log("   (none)");
 for (const a of accounts) console.log(`   ${a.slug.padEnd(28)} ${String(a.name).padEnd(24)} ${a.owner_email}`);
 
@@ -50,7 +50,7 @@ if (!mine.length) process.exit(0);
 for (const m of mine) {
  const [pages] = await sql`SELECT count(*)::int AS n FROM site_captures WHERE store_slug = ${m.store_slug}`;
  if (pages.n > 0) {
-  console.error(`\nREFUSING: ${m.store_slug} has ${pages.n} captured pages — that is a real site, not test data.`);
+  console.error(`\nREFUSING: ${m.store_slug} has ${pages.n} captured pages. That is a real site, not test data.`);
   process.exit(1);
  }
 }
@@ -59,5 +59,5 @@ if (!WRITE) { console.log("\nDry run. Add --write to remove these logins."); pro
 await sql`DELETE FROM store_users WHERE lower(email) = ${FORGET}`;
 const left = await sql`SELECT store_slug FROM store_users WHERE lower(email) = ${FORGET}`;
 console.log(left.length === 0
- ? `\nRemoved. ${FORGET} no longer signs in to any store — sign out and back in, and that browser is the owner again.`
+ ? `\nRemoved. ${FORGET} no longer signs in to any store. Sign out and back in, and that browser is the owner again.`
  : `\nWARNING: ${left.length} row(s) remain.`);

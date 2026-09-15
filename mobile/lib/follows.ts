@@ -6,7 +6,7 @@ import { apiGet, apiPost } from "./api";
 
 // Following a store.
 //
-// This one is keyed on the DEVICE, not the account — /api/mobile/follows takes a `deviceId`, and it
+// This one is keyed on the DEVICE, not the account. /api/mobile/follows takes a `deviceId`, and it
 // exists to drive push notifications ("Ange Archive just listed something"), which are a property of
 // a phone rather than a login. That is also why it needs a stable id of our own making.
 //

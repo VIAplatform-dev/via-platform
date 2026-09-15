@@ -1,12 +1,12 @@
-// Splitting one payment across several pieces. Pure — no I/O.
+// Splitting one payment across several pieces. Pure, no I/O.
 //
 // "These 20 cost £340" is how she actually buys; a per-piece cost is something she works out later,
 // if ever. Writing a cost onto every piece is what lets the margin report count them, and the split
-// has to add up to the penny — anything else is a number she can't reconcile with her bank
+// has to add up to the penny. Anything else is a number she can't reconcile with her bank
 // statement. The phone mirrors this in mobile/lib/seller/cost-split.ts.
 //
-// This is all that remains of lot-core.ts. Lots — a batch's source, its acquired date and the lot id
-// tying it together — were removed; the arithmetic stayed, because bulk cost entry ("these 20 cost
+// This is all that remains of lot-core.ts. Lots: a batch's source, its acquired date and the lot id
+// tying it together: were removed; the arithmetic stayed, because bulk cost entry ("these 20 cost
 // £340, divide it") is a separate feature from recording where they came from.
 
 /**

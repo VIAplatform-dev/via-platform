@@ -51,7 +51,7 @@ function estimateRevenue(commission: number): number {
  *
  * One-time import: reads the cached Collabs partnership data and saves all
  * existing orders as conversion records so they appear in the main analytics.
- * Safe to run multiple times — uses ON CONFLICT DO NOTHING.
+ * Safe to run multiple times. Uses ON CONFLICT DO NOTHING.
  */
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   const rawCollabs = await getSetting("collabs_data");
   if (!rawCollabs) {
-    return NextResponse.json({ error: "No Collabs data cached — run a Collabs sync first" }, { status: 400 });
+    return NextResponse.json({ error: "No Collabs data cached. Run a Collabs sync first" }, { status: 400 });
   }
 
   const partnerships = JSON.parse(rawCollabs) as Array<{

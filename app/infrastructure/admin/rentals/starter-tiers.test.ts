@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { starterTiers } from "./RentalPanel.tsx";
+import { starterTiers } from "./rental-tiers.ts";
 
 test("a priced piece gets a rental ladder that can actually be saved", () => {
  // The bug: the starter was three lengths at zero, saving drops anything unpriced, so turning

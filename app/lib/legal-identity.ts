@@ -11,7 +11,7 @@
 // WHAT GOES WHERE, and why they differ:
 //   · A RECEIPT is a document from a business to its customer. The legal name, company number and
 //     VAT number belong at the foot of it, as they do on every other invoice anyone receives.
-//   · A CUSTOMS FORM is a declaration to a government. It takes a TAX identifier — and a company
+//   · A CUSTOMS FORM is a declaration to a government. It takes a TAX identifier, and a company
 //     registration number is not one. Sending a Companies House number in a tax_id field is not a
 //     near-miss, it is a wrong answer on a legal document, so only the VAT number travels there.
 
@@ -36,7 +36,7 @@ export function customsSigner(identity: LegalIdentity, fallbackName: string): st
 /**
  * The exporter's tax identifier for a customs declaration, or null.
  *
- * VAT only, deliberately — see the note above about company numbers. Spaces are stripped because
+ * VAT only, deliberately: see the note above about company numbers. Spaces are stripped because
  * carriers reject "GB 123 4567 89" while accepting the same number closed up.
  */
 export function customsTaxId(identity: LegalIdentity): { number: string; type: "VAT" } | null {
@@ -46,7 +46,7 @@ export function customsTaxId(identity: LegalIdentity): { number: string; type: "
 }
 
 /**
- * The line at the foot of a receipt — "Blummier Ltd · Company 09123456 · VAT GB123456789".
+ * The line at the foot of a receipt. "Blummier Ltd · Company 09123456 · VAT GB123456789".
  *
  * Empty when the store has filled none of it in, so nothing prints a lonely separator or the word
  * "undefined" on a customer's receipt. The trading name is not repeated when it IS the legal name.

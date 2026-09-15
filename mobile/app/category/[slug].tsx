@@ -14,7 +14,7 @@ import ProductGrid from "../../components/ProductGrid";
 import type { Product } from "../../lib/types";
 import { colors } from "../../lib/theme";
 
-// A category slice. There is no category endpoint — the feed takes a `categories` filter, which is
+// A category slice. There is no category endpoint. The feed takes a `categories` filter, which is
 // what the shipped app used. The category is LOCKED into every query here rather than being a chip
 // in the sheet: this page is that category, and offering to un-tick it would empty the screen.
 

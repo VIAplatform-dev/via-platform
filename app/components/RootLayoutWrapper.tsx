@@ -18,7 +18,7 @@ export function MainWrapper({ children, bare }: { children: React.ReactNode; bar
  const pathname = usePathname();
  // `bare` = a store's own origin, where no VYA header is rendered at all, so offsetting for one
  // would push the seller's site down by 56px of nothing. Passed from the server layout, which is
- // the only place the Host is known — see the note there.
+ // the only place the Host is known. See the note there.
  // Homepage hero is full-bleed under the transparent header; no top offset there.
  const noOffset = bare || isStandalone(pathname) || pathname === "/";
  return <main className={noOffset ? "" : "pt-[56px]"}>{children}</main>;

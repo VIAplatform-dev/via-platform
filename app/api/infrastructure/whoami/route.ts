@@ -16,14 +16,14 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
  // Local dev (`next dev`) → always the owner workspace, so localhost never bounces to the signup
  // wizard. NODE_ENV is "production" on Vercel prod AND preview deployments, so this only ever
- // applies to a developer's own machine — it can't leak to the live site.
+ // applies to a developer's own machine. It can't leak to the live site.
  // ...but a REAL signed-in seller wins over the shortcut, or the seller flow can never be tested
  // locally: every localhost request came back as the owner, so onboarding was unreachable and
  // "Create my store" could only ever fail.
  if (process.env.NODE_ENV === "development") {
   const devSession = await auth().catch(() => null);
   // `dev: true` marks this as the SHORTCUT talking, not a real sign-in. It matters because the
-  // proxy gates /admin/* on an actual cookie or session and does not honour this — so a caller that
+  // proxy gates /admin/* on an actual cookie or session and does not honour this, so a caller that
   // treated the shortcut as a genuine identity would send someone to a page the proxy immediately
   // sends back, forever. The seller sign-in reads this flag; the workspace layout ignores it.
   if (!devSession?.user?.email) return NextResponse.json({ admin: true, slug: "via-admin", dev: true });
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
  // Signed-in partner: resolve their store (session email → store_users / static map).
  const slug = await resolveStoreSlug(request);
  // `email` on every answer, not just the onboarding one. A seller could not see which address she
- // was signed in with anywhere in the workspace — and with two accounts (a personal one and the
+ // was signed in with anywhere in the workspace, and with two accounts (a personal one and the
  // shop's) that is the first thing you need when something is missing from a screen.
  if (slug && slug !== "via-admin") {
   const storeName = await getStoreProfile(slug).then((p) => p.displayName).catch(() => slug);
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
  //
  // A store has two records of who owns it: the store_users row (access) and the store_accounts row
  // (the account itself, written at signup). /api/store/onboarding checks BOTH before it will let
- // anyone create a store — this gate checked only the first, so the two could disagree about the
+ // anyone create a store. This gate checked only the first, so the two could disagree about the
  // same person. When they did, the disagreement was invisible and total: whoami said "no store",
  // the workspace sent her to the wizard, the wizard asked onboarding, onboarding found her account
  // and refused to make a second one, and she was left circling a signup flow for a shop she
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
   await addStoreUser(account.slug, session.user.email, "owner").catch(() => {}); /* allow-swallow: reporting the store matters more than repairing the row */
   // `staff` belongs on THIS answer too. Leaving it off was a real bug: a VYA person whose access
   // row had gone missing came back through the repair path with staff undefined, so the onboarding
-  // gate read her as an ordinary seller with a shop and bounced her to Home — the exact symptom
+  // gate read her as an ordinary seller with a shop and bounced her to Home. The exact symptom
   // reported. Every path that can describe a signed-in person has to describe them the same way.
   const repairedName = await getStoreProfile(account.slug).then((p) => p.displayName).catch(() => account.slug);
   return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff, email: session.user.email, storeName: repairedName });

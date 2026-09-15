@@ -7,11 +7,11 @@ import { listStorefrontItems } from "@/app/lib/db/inventory";
 
 export const dynamic = "force-dynamic";
 
-// POST { key } — render a built-in automation so a seller can read it before switching it on.
+// POST { key }: render a built-in automation so a seller can read it before switching it on.
 //
 // Rendered by the SAME builders the sends use (automationEmailHtml / newArrivalsEmailHtml), with
 // the store's real brand and a real piece from its inventory. A flow a seller cannot read before
-// turning on is one she turns on and hopes about — and a preview drawn by different code than the
+// turning on is one she turns on and hopes about, and a preview drawn by different code than the
 // send is worse than none, which the campaign composer proved at length.
 //
 // The wording here mirrors automation-engine.ts. Where it drifts, this is the copy to correct.
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
  ]);
 
  // A real piece, so she is reading her own shop rather than a lorem-ipsum one. Falls back to a
- // stand-in for a store with nothing published yet — the layout is still what she needs to see.
+ // stand-in for a store with nothing published yet. The layout is still what she needs to see.
  const items = seller ? await listStorefrontItems(seller.id).catch(() => []) : [];
  const first = items[0];
  const piece = first
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
    ok: true,
    subject,
    // This flow drafts rather than sends, so the preview is of the draft she would be handed.
-   note: "This one writes a draft and leaves it on Your emails — you check it and send.",
+   note: "This one writes a draft and leaves it on Your emails. You check it and send.",
    html: newArrivalsEmailHtml({
     storeName: fromName,
     intro: `${count} new ${count === 1 ? "piece" : "pieces"} just landed.`,

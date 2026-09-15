@@ -17,7 +17,7 @@ export function normalizeCode(v: string | null | undefined): string {
 /**
  * The value to send, or null when the box is empty.
  *
- * A percentage is whole and capped at 100 — "110% off" is a refund with extra steps. A fixed amount
+ * A percentage is whole and capped at 100. "110% off" is a refund with extra steps. A fixed amount
  * is left as typed (minor units are the server's business) beyond refusing something negative.
  */
 export function discountValueFromText(v: string | null | undefined, kind: DiscountKind): number | null {
@@ -42,7 +42,7 @@ export function describeDiscount(d: {
       : d.value != null
         ? `${d.value} off`
         : "Discount");
-  // Zero uses is worth saying — it is the answer to "is this code working?" — but only once a code
+  // Zero uses is worth saying, it is the answer to "is this code working?", but only once a code
   // is real. `used` absent means the server didn't count, which is not the same as nobody using it.
   return typeof d.used === "number" ? `${what} · ${d.used} used` : what;
 }

@@ -15,10 +15,9 @@ import { perDayTiers, perDayRate } from "@/app/lib/rentals/availability-core";
 // takes the booking calendar off the storefront.
 //
 // Two modes, because a seller shouldn't have to publish a piece before deciding to rent it. With an
-// itemId it saves itself. Without one — on the Add listing screen, where the piece doesn't exist yet
-// — it holds the terms and hands them up, and the parent writes them the moment the item has an id.
+// itemId it saves itself. Without one, on the Add listing screen, where the piece doesn't exist yet
+// it holds the terms and hands them up, and the parent writes them the moment the item has an id.
 
-type Tier = { days: number; cents: number };
 type Terms = {
  itemId: string; tiers: Tier[]; replacementCents: number | null;
  fitsSizes: string | null; alsoForSale: boolean;
@@ -38,29 +37,26 @@ const toCents = (v: string) => {
 };
 
 /** What a store starts from when it first rents a piece: a short, a week, a month. */
-const STARTER: Tier[] = [{ days: 4, cents: 0 }, { days: 7, cents: 0 }, { days: 28, cents: 0 }];
 
 /**
  * Opening prices for a piece nobody has priced yet, from what it sells for.
  *
- * The starter ladder was three lengths at zero, and saving filters out anything unpriced — so
+ * The starter ladder was three lengths at zero, and saving filters out anything unpriced, so
  * turning Renting on and pressing Save always failed with "give at least one length a price". The
  * toggle looked broken because nothing it could save existed yet.
  *
  * The proportions are the ordinary shape of rental pricing: a few days is a fraction of retail, a
  * month is most of the way to it. A starting point to argue with, not a recommendation.
  */
-export function starterTiers(priceCents: number | null | undefined): Tier[] {
- const p = Math.round(Number(priceCents) || 0);
- if (p <= 0) return STARTER;
- const at = (pct: number) => Math.max(100, Math.round((p * pct) / 100 / 100) * 100); // to the nearest pound/dollar, never zero
- return [{ days: 4, cents: at(15) }, { days: 7, cents: at(20) }, { days: 28, cents: at(40) }];
-}
+import { starterTiers, STARTER, type Tier } from "./rental-tiers.ts";
+// Re-exported so anything that imported them from the panel keeps working.
+export { starterTiers, STARTER, type Tier };
+
 
 export type TermsDraft = { tiers: Tier[]; replacementCents: number | null; fitsSizes: string | null; alsoForSale: boolean };
 
 export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
- /** Omitted while the listing is still being created — the panel then reports upward instead of saving. */
+ /** Omitted while the listing is still being created. The panel then reports upward instead of saving. */
  itemId?: string;
  priceCents?: number | null;
  onDraftChange?: (draft: TermsDraft | null) => void;
@@ -70,7 +66,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
  const [on, setOn] = useState(false);
  const [tiers, setTiers] = useState<Tier[]>(STARTER);
  // "Per day" or named lengths. A daily rate is stored as a tier per allowed day (perDayTiers), so
- // nothing downstream knows the difference — but a seller who priced per day should reopen the
+ // nothing downstream knows the difference, but a seller who priced per day should reopen the
  // piece and see her rate, not twenty-five generated rows.
  const [perDay, setPerDay] = useState(false);
  const [rate, setRate] = useState("");
@@ -98,7 +94,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
     setMarket(dollars(t.replacementCents));
     setAlsoForSale(t.alsoForSale !== false);
    } else if (priceCents) {
-    // Nothing set yet — seed the market value from what the piece sells for.
+    // Nothing set yet: seed the market value from what the piece sells for.
     setMarket(dollars(priceCents));
    }
   })();
@@ -107,9 +103,9 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
 
  const dirty = () => { setSaved(false); setErr(null); };
 
- // In deferred mode the parent owns persistence, so it needs the current answer at all times —
+ // In deferred mode the parent owns persistence, so it needs the current answer at all times,
  // including "not renting this", which is a real answer and not the same as having said nothing.
- // The ladder this piece is actually priced at, whichever way it was entered. ONE definition —
+ // The ladder this piece is actually priced at, whichever way it was entered. ONE definition,
  // the draft path and the direct save both read it, because when they each had their own the two
  // disagreed the moment per-day pricing existed.
  const pricedTiers = useMemo(() => (
@@ -163,14 +159,14 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
   setOn(false); setSaved(false);
  }
 
- // Rentals off for the whole store — say so once, rather than offering a switch that does nothing.
+ // Rentals off for the whole store, say so once, rather than offering a switch that does nothing.
  if (settings && !settings.enabled) {
   return (
    <div className="mt-5 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
     {/* ONE SENTENCE, NOT THREE COLUMNS.
         
         `flex` on the <p> made every text node its own flex item, so on a phone the sentence broke
-        into three stacked columns — "Renting is off for your store." | "Turn it on in Settings" |
+        into three stacked columns. "Renting is off for your store." | "Turn it on in Settings" |
         "to rent pieces out." The icon is the only thing that wants to be a flex item; the words
         want to be a paragraph. */}
     <div className="flex items-start gap-2">
@@ -214,7 +210,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
      <div>
       <label className="mb-1.5 block text-[12px] font-medium text-stone-500">
        What it costs to rent
-       {settings && <span className="font-normal text-stone-400"> — your store allows {settings.minDays}–{settings.maxDays} days</span>}
+       {settings && <span className="font-normal text-stone-400">, your store allows {settings.minDays}–{settings.maxDays} days</span>}
       </label>
       {/* Two ways to price the same thing. Pickle-style flat rate, or the named lengths a shop
           that discounts a long booking actually wants. */}
@@ -241,7 +237,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
         <span className="text-[12.5px] text-stone-500">a day</span>
         {settings && toCents(rate) > 0 && (
          <span className="ml-2 text-[11.5px] text-stone-400">
-          {settings.minDays} days · ${dollars(toCents(rate) * settings.minDays)} — {settings.maxDays} days · ${dollars(toCents(rate) * settings.maxDays)}
+          {settings.minDays} days · ${dollars(toCents(rate) * settings.minDays)}: {settings.maxDays} days · ${dollars(toCents(rate) * settings.maxDays)}
          </span>
         )}
        </div>
@@ -286,7 +282,7 @@ export default function RentalPanel({ itemId, priceCents, onDraftChange }: {
       <p className="mt-2 text-[11.5px] leading-relaxed text-stone-400">
        {perDay
         ? `A customer pays the rate for each day they book. Bookings run ${settings?.minDays ?? 1}–${settings?.maxDays ?? 30} days.`
-        : "A customer pays the cheapest length that covers their dates — five days pays your seven-day price. Longer than your longest length can’t be booked."}
+        : "A customer pays the cheapest length that covers their dates. Five days pays your seven-day price. Longer than your longest length can’t be booked."}
       </p>
      </div>
 

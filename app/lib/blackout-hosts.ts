@@ -2,7 +2,7 @@
  * What would stop serving the day a seller cancels Shopify.
  *
  * The blackout gate blocks these and reloads the page: whatever disappears is what the shopper
- * would lose. Getting the list wrong in either direction makes the gate lie —
+ * would lose. Getting the list wrong in either direction makes the gate lie,
  *
  *   too narrow, and assets that WOULD die pass the gate. The seller's own domain is the example:
  *   blummier.com is her Shopify custom domain, and not blocking it scored 15 of 23 stores as
@@ -11,10 +11,10 @@
  *   too wide, and healthy stores are reported broken. That is the bug this module exists to end:
  *   the rule matched "myshopify.com" and "/cdn/" anywhere in the URL STRING, so
  *   `instafeed.nfcube.com/cdn/instafeed.css` and `cdn.nfcube.com/instafeed.js?shop=x.myshopify.com`
- *   were aborted — an Instagram widget app with no connection to Shopify at all. That single
+ *   were aborted. An Instagram widget app with no connection to Shopify at all. That single
  *   mistake accounted for 115 of 213 "lost images" and 6 of 7 "lost videos" across four stores.
  *
- * So the decision is made on the HOST, and only on the host — with ONE path-shaped exception, our
+ * So the decision is made on the HOST, and only on the host, with ONE path-shaped exception, our
  * own `/cdn/` proxy, explained on isProxiedFromSeller() below.
  */
 
@@ -45,7 +45,7 @@ const under = (host: string, domain: string) => host === domain || host.endsWith
  * So the gate could not see it. It never blocks our own host, our /cdn proxy answered 200 because
  * her shop was still up, and a page whose stylesheet is fetched through it was scored as surviving
  * cancellation. On tesselizabethvintage that stylesheet is 86KB of the design that makes the site
- * look like hers — it would have gone dark on the day the gate exists to predict.
+ * look like hers. It would have gone dark on the day the gate exists to predict.
  *
  * A blocked /cdn request is exactly what her cancelled shop would produce for it, which is the
  * whole point of the exercise.
@@ -57,12 +57,12 @@ function isProxiedFromSeller(url: string): boolean {
 /**
  * @param url        the request the page is making.
  * @param sellerHost the seller's own domain (her Shopify custom domain), or null if unknown.
- * @param ourHost    the host WE are serving the store from — never blocked (except /cdn/, above),
+ * @param ourHost    the host WE are serving the store from, never blocked (except /cdn/, above),
  *                   or nothing loads.
  */
 export function blocksAtCancellation(url: string, sellerHost: string | null, ourHost: string | null): boolean {
  const host = hostOf(url);
- // Not a network request we can judge — data:, blob:, or malformed. Never block it.
+ // Not a network request we can judge. Data:, blob:, or malformed. Never block it.
  if (!host) return false;
  if (ourHost && under(host, ourHost.replace(/^www\./, "").toLowerCase().split(":")[0])) {
   return isProxiedFromSeller(url);

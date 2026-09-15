@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
 const storeName = (slug: string) => stores.find((s) => s.slug === slug)?.name || slug;
 
-// One-click unsubscribe (RFC 8058) — Gmail/Yahoo POST here from the List-Unsubscribe header.
+// One-click unsubscribe (RFC 8058): Gmail/Yahoo POST here from the List-Unsubscribe header.
 // Store-scoped: only flips this store's marketing consent for this email.
 export async function POST(request: NextRequest) {
  const v = verifyUnsubToken(request.nextUrl.searchParams.get("t"));

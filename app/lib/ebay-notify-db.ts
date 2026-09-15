@@ -53,7 +53,7 @@ async function ensure() {
 
 // ── Where eBay must reach us ────────────────────────────────────────────────────────────────────
 
-/** The destination endpoint — one exact string, used both to answer the challenge and to register. */
+/** The destination endpoint: one exact string, used both to answer the challenge and to register. */
 export function notifyEndpoint(): string {
  return process.env.EBAY_NOTIFY_ENDPOINT || `${BASE_URL}/api/webhooks/ebay`;
 }

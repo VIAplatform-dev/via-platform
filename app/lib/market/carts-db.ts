@@ -4,7 +4,7 @@ import { neon } from "@neondatabase/serverless";
 // keeps three carts going and pays them off one at a time. Carts live on the server (not the phone)
 // so they survive a closed tab and show up on every device the seller has open.
 //
-// Lines are stored as JSONB — the same shape the Confirm/Cart screens already pass around. The
+// Lines are stored as JSONB. The same shape the Confirm/Cart screens already pass around. The
 // server re-validates every line when the checkout actually starts, so this is a scratchpad, never
 // a source of truth for price or availability.
 
@@ -63,7 +63,7 @@ export async function getCart(sellerId: string, id: string): Promise<MarketCart 
  return rows[0] ? row(rows[0]) : null;
 }
 
-/** Next cart, numbered after the highest this session has seen — numbers never get reused, so
+/** Next cart, numbered after the highest this session has seen. Numbers never get reused, so
  *  "Cart 3" means the same cart all afternoon even after Cart 1 and 2 have been paid off. */
 export async function createCart(sellerId: string, sessionId: string): Promise<MarketCart> {
  await ensureMarketCartTables();

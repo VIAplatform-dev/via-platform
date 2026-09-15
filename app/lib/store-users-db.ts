@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 
 // Who can log into a given store's Owner Workspace (getvya.ai/admin). One store can
-// have several users (owner + staff); one email normally belongs to a single store —
+// have several users (owner + staff); one email normally belongs to a single store,
 // stores aren't tied together, so we never merge a person across stores. This table is
 // the DYNAMIC, self-serve replacement for the hardcoded `storeContactEmails` map: a store
 // that signs up gets a row here, and email→store resolution consults it (see storeAuth).
@@ -56,7 +56,7 @@ function userRow(r: Record<string, unknown>): StoreUser {
   storeSlug: r.store_slug as string,
   email: r.email as string,
   role: ((r.role as StoreRole) || "staff"),
-  // null, not [], when nothing was ever chosen — the two mean different things.
+  // null, not [], when nothing was ever chosen. The two mean different things.
   permissions: Array.isArray(raw) ? (raw as Area[]) : null,
   createdAt: String(r.created_at),
  };
@@ -94,7 +94,7 @@ export async function listStoreUsers(storeSlug: string): Promise<StoreUser[]> {
 
 /**
  * The store an email is signed in as. Returns the store slug for a self-onboarded user, or null.
- * If a person somehow belongs to more than one store, the store they OWN wins, then the oldest —
+ * If a person somehow belongs to more than one store, the store they OWN wins, then the oldest,
  * a stable single answer, since the workspace acts as one store at a time.
  */
 export async function storeSlugForEmail(email: string): Promise<string | null> {
@@ -114,7 +114,7 @@ export async function storeSlugForEmail(email: string): Promise<string | null> {
  * storeSlugForEmail() below answers the same question with LIMIT 1, which is the right answer for
  * "sign her in somewhere" and the wrong one for "which shops are hers". A person who helps at two
  * shops was silently dropped into whichever one the ORDER BY picked, with nothing on screen naming
- * it and no way to move — this is what lets the workspace ask instead of guess.
+ * it and no way to move. This is what lets the workspace ask instead of guess.
  */
 export async function storesForEmail(email: string): Promise<{ storeSlug: string; role: StoreRole }[]> {
  const e = normEmail(email);

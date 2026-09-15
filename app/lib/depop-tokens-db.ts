@@ -3,8 +3,8 @@ import { neon } from "@neondatabase/serverless";
 // Per-seller Depop credentials.
 //
 // Originally built for the partner Selling API (partner-gated via partner@depop.com), which would
-// give us a Bearer token. That route is closed to us for now — Cloudflare blocks a server-side
-// login — so the credential this table actually holds is a SESSION captured on the seller's phone,
+// give us a Bearer token. That route is closed to us for now. Cloudflare blocks a server-side
+// login, so the credential this table actually holds is a SESSION captured on the seller's phone,
 // where the login looks genuine to Depop. `access_token` stores whichever we have; depop.ts decides
 // how to present it. Mirrors the eBay token store so the cross-lister treats them the same way.
 
@@ -57,7 +57,7 @@ export async function getDepopTokens(storeSlug: string): Promise<DepopTokens | n
 }
 
 /**
- * Every store with a Depop credential on file — what the sold-sync cron iterates.
+ * Every store with a Depop credential on file. What the sold-sync cron iterates.
  *
  * Mirrors listEbayConnectedStores. Expired sessions are NOT filtered out here: a session whose
  * recorded expiry has passed may still work (Depop's real lifetime is one of the things we're trying

@@ -3,7 +3,7 @@ import { resolveSettings, type RentalSettings } from "./settings-core";
 import { blockedBand, fromDateRange, toDateRange, type Span, type Tier } from "./availability-core";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Rentals — storage.
+// Rentals: storage.
 //
 // Four tables. The decision rules live next door in settings-core / availability-core,
 // pure and tested; this file is only persistence and the one thing that CANNOT be
@@ -75,7 +75,7 @@ export async function ensureRentalTables(): Promise<void> {
  await sql`CREATE INDEX IF NOT EXISTS idx_rental_bookings_item ON rental_bookings (item_id, status)`;
  // WHO rented it, and where it went.
  //
- // The checkout collects all of this and puts it in the payment's metadata — and then the webhook
+ // The checkout collects all of this and puts it in the payment's metadata, and then the webhook
  // only flipped the status, so it was gone the moment the payment settled. A store with a piece out
  // couldn't see whose name was on it, couldn't email them, and couldn't post them a return label,
  // because nothing on the booking said where the piece was.
@@ -84,7 +84,7 @@ export async function ensureRentalTables(): Promise<void> {
   "ship_line1 TEXT", "ship_line2 TEXT", "ship_city TEXT", "ship_state TEXT", "ship_zip TEXT", "ship_country TEXT",
   "delivery TEXT", "return_label_url TEXT", "return_tracking TEXT", "return_label_cents INTEGER",
   // What the CARRIER says, kept beside what the settings guessed. The turnaround numbers block the
-  // calendar (they have to — the booking is made before anything ships), but once a return label has
+  // calendar (they have to: the booking is made before anything ships), but once a return label has
   // been scanned the carrier knows more than an estimate made weeks ago, and the store should be
   // told the real date rather than the assumed one.
   "return_carrier TEXT", "return_tracking_status TEXT", "return_tracking_eta DATE", "return_tracking_at TIMESTAMPTZ",
@@ -195,7 +195,7 @@ export async function removeItemTerms(itemId: string): Promise<void> {
 
 /**
  * Who owns a piece, and under which storefront. Storefront callers have an item id and nothing
- * else — no admin session to resolve a store from — so context comes from the item itself.
+ * else, no admin session to resolve a store from, so context comes from the item itself.
  */
 export async function ownerOfItem(itemId: string): Promise<{ sellerId: string; storeSlug: string } | null> {
  const rows = await db()`SELECT i.seller_id, s.slug FROM items i JOIN sellers s ON s.id = i.seller_id
@@ -219,14 +219,14 @@ export type Booking = {
  priceCents: number | null; shipBy: string | null; dueBack: string | null;
  returnedAt: string | null; expiresAt: string | null;
  lateFeeCents: number; damageCents: number; createdAt: string;
- /** Who has it, and where it went. Written when the payment settles — see confirmBookingPaid. */
+ /** Who has it, and where it went. Written when the payment settles. See confirmBookingPaid. */
  renterName?: string | null; renterEmail?: string | null; renterPhone?: string | null;
  delivery?: "ship" | "pickup";
  ship?: { line1: string; line2: string | null; city: string; state: string; zip: string; country: string } | null;
  returnLabelUrl?: string | null; returnTracking?: string | null;
  /** The carrier's own account of the return leg. Null until a label exists and has been checked. */
  returnCarrier?: string | null; trackingStatus?: string | null; trackingEta?: string | null; trackingAt?: string | null;
- /** Joined for the seller's queue — a list of uuids is not a working screen. */
+ /** Joined for the seller's queue. A list of uuids is not a working screen. */
  title?: string | null; image?: string | null;
 };
 
@@ -274,7 +274,7 @@ function bookingRow(r: any): Booking {
  };
 }
 
-/** The bands a piece is already spoken for — feeds the date picker and quoting. */
+/** The bands a piece is already spoken for. Feeds the date picker and quoting. */
 export async function takenBands(itemId: string): Promise<Span[]> {
  await ensureRentalTables();
  const rows = await db()`SELECT blocked FROM rental_bookings
@@ -312,7 +312,7 @@ export type NewBooking = {
  * a store that lengthens its cleaning turnaround next week must not silently
  * move the dates of rentals already out with customers.
  *
- * Returns null when the constraint refuses — the caller shows "those dates just
+ * Returns null when the constraint refuses. The caller shows "those dates just
  * went", which is the truth, rather than an error.
  */
 export async function createBooking(b: NewBooking): Promise<Booking | null> {
@@ -348,14 +348,14 @@ export async function setBookingStatus(id: string, status: BookingStatus, patch?
 /**
  * Payment landed: the dates are now really theirs.
  *
- * Guarded to held/requested so a replayed webhook — Stripe sends the same event more than once —
+ * Guarded to held/requested so a replayed webhook, Stripe sends the same event more than once,
  * can't drag a rental that's already out with a customer back to `booked`. Returns the booking when
  * this call is the one that confirmed it, null when there was nothing left to do.
  */
 export async function confirmBookingPaid(id: string, paymentRef?: string | null, renter?: RenterDetails | null): Promise<Booking | null> {
  await ensureRentalTables();
  // COALESCE on every renter field so a replayed webhook can't blank details that are already
- // there — and so a booking the store filled in by hand isn't overwritten by a thinner payload.
+ // there, and so a booking the store filled in by hand isn't overwritten by a thinner payload.
  const r = renter ?? {};
  const rows = await db()`UPDATE rental_bookings SET
    status = 'booked', expires_at = NULL,
@@ -433,8 +433,8 @@ export type NewRequest = {
  * Log an application to rent.
  *
  * Whether it holds the dates is the STORE'S choice, not ours. When it does, the
- * hold is a real booking row in `requested` — so the exclusion constraint covers
- * it and two stylists cannot both be approved for the same week — and it expires,
+ * hold is a real booking row in `requested`, so the exclusion constraint covers
+ * it and two stylists cannot both be approved for the same week, and it expires,
  * so one unanswered enquiry can't sit on a gown indefinitely.
  *
  * `holds_dates` is snapshotted onto the row: changing the setting later must not
@@ -475,7 +475,7 @@ export async function listRequests(sellerId: string, statuses?: RequestStatus[])
 
 /**
  * The store says yes, optionally at its own price. If the request wasn't holding
- * the dates, approval takes them now — and can still lose, because someone may
+ * the dates, approval takes them now, and can still lose, because someone may
  * have booked them while the store was deciding.
  */
 export async function approveRequest(id: string, sellerId: string, opts: { quotedCents?: number | null; settings: RentalSettings }): Promise<{ request: RentalRequest; booking: Booking } | null> {
@@ -508,7 +508,7 @@ export async function declineRequest(id: string, sellerId: string): Promise<bool
   WHERE id = ${id} AND seller_id = ${sellerId} AND status IN ('new','approved') RETURNING booking_id`;
  if (!rows[0]) return false;
  const bookingId = (rows[0] as any).booking_id;
- // Declining must free the dates immediately — that's the point of declining.
+ // Declining must free the dates immediately. That's the point of declining.
  if (bookingId) await db()`UPDATE rental_bookings SET status = 'cancelled', updated_at = now() WHERE id = ${bookingId}`;
  return true;
 }
@@ -552,7 +552,7 @@ export async function listOverdue(today: string): Promise<OverdueRental[]> {
  * Record what lateness has cost so far.
  *
  * The total is RECOMPUTED from days late, never incremented. A cron that runs twice, retries after a
- * timeout, or gets redeployed mid-run would otherwise charge a customer twice for the same day —
+ * timeout, or gets redeployed mid-run would otherwise charge a customer twice for the same day,
  * and this is money, so the operation has to be safe to repeat rather than merely unlikely to.
  */
 export async function setLateFee(id: string, cents: number): Promise<boolean> {
@@ -564,7 +564,7 @@ export async function setLateFee(id: string, cents: number): Promise<boolean> {
  return rows.length > 0;
 }
 
-/** Rental applications waiting on an answer — one number for the sidebar. */
+/** Rental applications waiting on an answer. One number for the sidebar. */
 export async function countPending(sellerId: string): Promise<{ requests: number; total: number }> {
  await ensureRentalTables();
  const [r] = await db()`SELECT count(*)::int AS n FROM rental_requests WHERE seller_id = ${sellerId} AND status = 'new'` as any[];

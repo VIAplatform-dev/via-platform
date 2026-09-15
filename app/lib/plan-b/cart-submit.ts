@@ -12,7 +12,7 @@
 // which is why it is a tested pure function rather than a condition buried in a route.
 //
 // An audit of the stored captures found this exact form on 16 of 18 Shopify stores, and on 7 of them
-// the drawer carrying it is in the header of EVERY page — so this is the main way a shopper on a
+// the drawer carrying it is in the header of EVERY page, so this is the main way a shopper on a
 // hosted storefront reaches checkout.
 
 export type CartSubmit =
@@ -24,7 +24,7 @@ type Field = unknown;
 
 const asList = (v: Field): string[] => (Array.isArray(v) ? v.map(String) : v == null ? [] : [String(v)]);
 
-/** A quantity of exactly zero is a removal. Anything unparseable is not — an empty or junk value
+/** A quantity of exactly zero is a removal. Anything unparseable is not. An empty or junk value
  *  must never be read as "remove this line". */
 function isZero(raw: string): boolean {
  const t = raw.trim();
@@ -45,7 +45,7 @@ export function cartSubmitAction(body: Record<string, Field>): CartSubmit {
 
  const removeLines: number[] = [];
 
- // Positional form: updates[]=1&updates[]=0 — the nth value is the nth cart line, 1-based.
+ // Positional form: updates[]=1&updates[]=0: the nth value is the nth cart line, 1-based.
  asList(body?.["updates[]"]).forEach((v, i) => { if (isZero(v)) removeLines.push(i + 1); });
 
  // Indexed form: updates[2]=0. Themes use one or the other, never both.

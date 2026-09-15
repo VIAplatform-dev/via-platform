@@ -24,7 +24,7 @@ import { SelectRow, MultiSelectRow } from "../../../components/seller/Select";
 
 // One piece, reached by tapping anything in Inventory.
 //
-// Photos big, price and state together, views and saves as the only analytics that belong here —
+// Photos big, price and state together, views and saves as the only analytics that belong here,
 // the rest is the Analytics screen's job. Three things she does to a piece from the counter: fix
 // a detail, keep it back for someone, or mark it sold. All three are here; none opens the desktop.
 
@@ -54,7 +54,7 @@ type Item = {
   collections?: string[] | null;
   /** Set on a scheduled draft; the publish-scheduled cron flips it live at this time. */
   publishAt?: string | null;
-  /** Marketplaces this piece is meant for. Stored here, pushed at publish — never from the phone. */
+  /** Marketplaces this piece is meant for. Stored here, pushed at publish, never from the phone. */
   crossListChannels?: string[] | null;
   consignorId?: number | null;
   flaws?: string[] | null;
@@ -91,7 +91,7 @@ export default function PieceScreen() {
   const [measureForm, setMeasureForm] = useState<Partial<Record<MeasurementKey, string>> | null>(null);
   const [measuring, setMeasuring] = useState(false);
   // Photos: null until she touches them, so an untouched Save never rewrites the set. Same rule as
-  // measurements — the difference between "she left them alone" and "she cleared them" matters here
+  // measurements. The difference between "she left them alone" and "she cleared them" matters here
   // more than anywhere else, because the images ARE the listing.
   const [photos, setPhotos] = useState<string[] | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -113,7 +113,7 @@ export default function PieceScreen() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   // Still on screen? An exit save finishes after this component is gone, and touching state then is
-  // a warning and a leak. The query cache is safe to write to — it outlives the screen.
+  // a warning and a leak. The query cache is safe to write to. It outlives the screen.
   const onScreen = useRef(true);
   useEffect(() => () => { onScreen.current = false; }, []);
   // One write at a time. Tapping Done and immediately swiping back would otherwise send the same
@@ -121,7 +121,7 @@ export default function PieceScreen() {
   const inFlight = useRef(false);
 
   // THIS PIECE, not the inventory it sits in. This used to fetch every item the store has and pick
-  // one out of the list — 12.5 MB on the largest store here, downloaded to open one dress, and the
+  // one out of the list. 12.5 MB on the largest store here, downloaded to open one dress, and the
   // same list the Inventory screen had already loaded in its lighter form. One piece comes whole:
   // description, measurements, collections and whose piece it is, which a list does not carry.
   const q = useQuery({
@@ -134,7 +134,7 @@ export default function PieceScreen() {
     queryFn: () => apiGet<{ holds: Hold[] }>("/api/store/holds"),
     enabled: !!storeSlug,
   });
-  // The store's unit for measurements — inches for a US ship-from, cm elsewhere (as Review reads it).
+  // The store's unit for measurements. Inches for a US ship-from, cm elsewhere (as Review reads it).
   const collections = useQuery({
     queryKey: ["store", "collections"],
     queryFn: () => apiGet<{ collections: { id: string; title: string }[] }>("/api/store/collections?all=1"),
@@ -146,7 +146,7 @@ export default function PieceScreen() {
     enabled: !!storeSlug,
   });
   // A piece is rentable exactly when terms exist for it. 404 is the ordinary answer for "not
-  // rentable", not an error — so it resolves to null rather than throwing a red screen.
+  // rentable", not an error, so it resolves to null rather than throwing a red screen.
   const rental = useQuery({
     queryKey: ["store", "rental-terms", id],
     queryFn: () => apiGet<{ terms?: { tiers: { days: number; cents: number }[]; replacementCents: number | null; alsoForSale?: boolean } | null }>(`/api/store/rentals/terms/${id}`)
@@ -169,7 +169,7 @@ export default function PieceScreen() {
   const unit = unitFor({ country: shipping.data?.shipFrom?.country, currency: shipping.data?.currency ?? item?.currency });
 
   // Awaited by the save path, so the fresh row is in hand BEFORE the local edits are dropped.
-  // Clearing first — which is what this screen used to do — shows the pre-edit values for as long
+  // Clearing first, which is what this screen used to do. Shows the pre-edit values for as long
   // as the refetch takes, and a field that flickers back to its old text reads as a failed save.
   const refresh = async () => {
     await Promise.all([
@@ -223,7 +223,7 @@ export default function PieceScreen() {
   };
 
   /**
-   * THE WHOLE SAVE, callable from anywhere — including from a screen that is already unmounting.
+   * THE WHOLE SAVE, callable from anywhere, including from a screen that is already unmounting.
    *
    * It is not a mutation body because the most important time it runs is on the way out: react-query
    * tears an observer down with its component, and a callback that fires after that is a callback
@@ -231,7 +231,7 @@ export default function PieceScreen() {
    * below only wraps it so the Done button has something to show a spinner from.
    *
    * NOTHING HERE CHANGES THE PIECE'S STATUS. A draft stays a draft; a live listing stays live. An
-   * auto-save is for the words and the numbers — taking a listing off the storefront is a decision,
+   * auto-save is for the words and the numbers. Taking a listing off the storefront is a decision,
    * and a decision has to be made on purpose.
    */
   async function persist() {
@@ -245,9 +245,9 @@ export default function PieceScreen() {
       if (renting !== null || terms !== null) {
         if (isRentable && rentProblem) {
           // The one part that can be half-finished. Everything else is already saved, so say
-          // exactly what did not go rather than failing the lot — the words and the price are
+          // exactly what did not go rather than failing the lot. The words and the price are
           // worth more than the rental tiers she was still typing.
-          if (onScreen.current) setError(`Saved — except the rental prices. ${rentProblem}`);
+          if (onScreen.current) setError(`Saved. Except the rental prices. ${rentProblem}`);
         } else if (isRentable) {
           await apiPut(`/api/store/rentals/terms/${id}`, termsPayload(rentForm, true));
         } else {
@@ -271,14 +271,14 @@ export default function PieceScreen() {
    * LEAVING THE SCREEN IS THE SAVE.
    *
    * The Save button is gone. It was the only way out that kept anything, and everything else a
-   * phone does to a screen — the back chevron, the swipe from the left edge, the hardware back,
-   * tapping through to Consignors to add someone — threw the edit away without a word. On a laptop
+   * phone does to a screen. The back chevron, the swipe from the left edge, the hardware back,
+   * tapping through to Consignors to add someone. Threw the edit away without a word. On a laptop
    * that costs a moment; on a phone, where leaving a screen is a gesture you make without deciding
    * to, it costs the description she just typed with one hand on a bus.
    *
    * The blur cleanup fires for all of those, and for an unmount, which is why the write is a plain
    * function rather than a mutation. What it CANNOT do is tell her about a failure she has already
-   * walked away from — the screen is gone and this app has no toast. She would find the old text
+   * walked away from: the screen is gone and this app has no toast. She would find the old text
    * when she next opened the piece. Worth knowing; still better than losing every edit every time.
    */
   const onExit = useRef<() => void>(() => {});
@@ -295,7 +295,7 @@ export default function PieceScreen() {
   });
 
   // The whole inventory comes down on first open (1,400 pieces with photos is a few seconds on a
-  // cold start). A blank screen for that long reads as broken — say that it is loading.
+  // cold start). A blank screen for that long reads as broken, say that it is loading.
   if (q.isPending) return <SellerScreen title="Piece" back><ActivityIndicator color={colors.accent} style={{ marginTop: spacing.xxl }} /></SellerScreen>;
   if (!item) {
     return (
@@ -334,7 +334,7 @@ export default function PieceScreen() {
   // The three that can be set here but only ACT at publish.
   const scheduledAt = when !== undefined ? when : (item.publishAt ? new Date(item.publishAt) : null);
   const chosenChannels = channels ?? (Array.isArray(item.crossListChannels) ? item.crossListChannels : []);
-  // Which box it ships in. There is no `packaging` column — only L/W/H are stored — so the
+  // Which box it ships in. There is no `packaging` column, only L/W/H are stored, so the
   // current choice is read back FROM those numbers; otherwise every edit would quietly reset a
   // chosen large box to the suggestion. See lib/seller/packaging.ts.
   // Renting: what the piece has today, unless she has touched it this session.
@@ -351,14 +351,14 @@ export default function PieceScreen() {
   });
   // ONLY THE THREE THAT ARE ACTUALLY WIRED UP. The route returns every marketplace VYA knows
   // about, including seven still marked "soon", and this screen was drawing all ten as if they
-  // were choices — so a seller could switch on Poshmark or Grailed and nothing would ever happen.
+  // were choices, so a seller could switch on Poshmark or Grailed and nothing would ever happen.
   const platforms = liveCrossListPlatforms(crossList.data?.platforms ?? []);
   const chosenConsignor = consignor !== undefined ? consignor : (item.consignorId ?? null);
   const isDraft = item.status === "draft";
   const chosen = cols ?? (Array.isArray(item.collections) ? item.collections : []);
   const shots = photos ?? (Array.isArray(item.images) ? item.images : []);
 
-  /** Camera or library — a piece with no photo is usually one sitting right in front of her.
+  /** Camera or library: a piece with no photo is usually one sitting right in front of her.
    *  Uploaded immediately: the route stores URLs, never bytes. */
   async function addPhotos() {
     // One definition of the cap (listing-fields.ts), matching what the routes actually store.
@@ -378,10 +378,10 @@ export default function PieceScreen() {
   }
 
   /**
-   * FILL WITH AI — the add-listing page's button, on a piece that already exists.
+   * FILL WITH AI: the add-listing page's button, on a piece that already exists.
    *
    * The listing flow has always been able to read a photograph; the editor never could. So a piece
-   * that arrived thin — a Market Mode quick list, a Shopify import, anything typed at a stall —
+   * that arrived thin, a Market Mode quick list, a Shopify import, anything typed at a stall,
    * could only be finished by hand, field by field, even though the photographs were sitting right
    * there at the top of this very screen.
    *
@@ -395,7 +395,7 @@ export default function PieceScreen() {
    * single worst thing this button could do.
    */
   async function fillWithAI() {
-    if (shots.length === 0) { setError("Add a photo first — it reads the photographs."); return; }
+    if (shots.length === 0) { setError("Add a photo first. It reads the photographs."); return; }
     setError(null);
     setFilledNote(null);
     setFilling(true);
@@ -469,7 +469,7 @@ export default function PieceScreen() {
 
       {mode === "edit" ? (
         <View style={{ marginTop: spacing.lg }}>
-          {/* Photos first, because they are the listing. Tap one to make it the cover — the first
+          {/* Photos first, because they are the listing. Tap one to make it the cover. The first
               image is what every grid, the storefront and the shopper's search result show, and it
               was previously only changeable on the web. ✕ removes. */}
           <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.md }}>
@@ -520,7 +520,7 @@ export default function PieceScreen() {
               </Text>
             ) : (
               <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>
-                Fills the empty fields only — anything you have written is left alone, and the price
+                Fills the empty fields only. Anything you have written is left alone, and the price
                 is never touched.
               </Text>
             )}
@@ -546,7 +546,7 @@ export default function PieceScreen() {
             />
           ))}
 
-          {/* SHIPS IN — the web's one question instead of the phone's three boxes, and a row
+          {/* SHIPS IN: the web's one question instead of the phone's three boxes, and a row
               instead of seven chips. Choosing a preset writes its L/W/H onto the piece, which is
               exactly what the web does; the line underneath shows the size and the packed weight so
               nothing is decided out of sight. */}
@@ -559,7 +559,7 @@ export default function PieceScreen() {
               onChange={(key) => {
                 const b = packagingById(key);
                 if (!b) return;
-                // The weight comes with the box — unless she weighed it herself. A hand-typed
+                // The weight comes with the box, unless she weighed it herself. A hand-typed
                 // weight is a measurement; a box picked afterwards must not overwrite it.
                 const hers = current("weightOz").trim();
                 const wasStandard = hers === "" || hers === String(weightForPackaging(currentPacking));
@@ -578,12 +578,12 @@ export default function PieceScreen() {
             ) : null}
           </View>
 
-          {/* Measurements: the category's template, kept compact — one row, opening the fields (as Review). */}
+          {/* Measurements: the category's template, kept compact. One row, opening the fields (as Review). */}
           {measureKeys.length > 0 ? (
             <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ width: 92, fontSize: 14, color: colors.textMuted }}>Measurements</Text>
-                <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{measurementsLine || "—"}</Text>
+                <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{measurementsLine || "-"}</Text>
                 <Pressable hitSlop={8} onPress={() => setMeasuring(!measuring)}>
                   <Text style={{ fontSize: 14, color: colors.accent, fontWeight: "600" }}>{measuring ? "Done" : "Change"}</Text>
                 </Pressable>
@@ -598,7 +598,7 @@ export default function PieceScreen() {
                           value={measureValues[k] ?? ""}
                           onChangeText={(v) => setMeasureForm({ ...measureValues, [k]: v.replace(/[^0-9.]/g, "") })}
                           keyboardType="decimal-pad"
-                          placeholder="—"
+                          placeholder="-"
                           placeholderTextColor={colors.textDim}
                           style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600", paddingVertical: spacing.xs }}
                         />
@@ -610,7 +610,7 @@ export default function PieceScreen() {
               ) : null}
             </View>
           ) : null}
-          {/* Collections — the same grouping the storefront and the web editor use. Titles, not ids:
+          {/* Collections: the same grouping the storefront and the web editor use. Titles, not ids:
               the route creates one that doesn't exist yet, so the box inside the sheet is both pick
               and create. A store with twenty collections drew twenty chips here. */}
           <MultiSelectRow
@@ -623,7 +623,7 @@ export default function PieceScreen() {
             createPlaceholder="New collection"
           />
 
-          {/* WHEN IT GOES LIVE. Drafts only — the cron that flips a schedule looks at drafts, so
+          {/* WHEN IT GOES LIVE. Drafts only: the cron that flips a schedule looks at drafts, so
               offering this on a live piece would be offering something that cannot happen. */}
           {isDraft ? (
             <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
@@ -662,7 +662,7 @@ export default function PieceScreen() {
             </View>
           ) : null}
 
-          {/* WHOSE PIECE IT IS — asked whether or not anybody has been added yet.
+          {/* WHOSE PIECE IT IS. Asked whether or not anybody has been added yet.
               
               This section used to appear only once a store had at least one consignor, which is
               exactly backwards: a shop takes its first consigned piece BEFORE it has a consignor
@@ -689,12 +689,12 @@ export default function PieceScreen() {
             />
             <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>
               {(consignors.data?.consignors ?? []).length === 0
-                ? "Nobody added yet — open this to add the person who brought it in, and their split."
+                ? "Nobody added yet: open this to add the person who brought it in, and their split."
                 : "Their cut comes from the split on their record. A piece that has already sold keeps the consignor it sold under."}
             </Text>
           </View>
 
-          {/* CROSS-LISTING. Stored here, pushed when the piece publishes — never from the phone. */}
+          {/* CROSS-LISTING. Stored here, pushed when the piece publishes, never from the phone. */}
           {platforms.length > 0 ? (
             <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
               <Text style={{ fontSize: 14, color: colors.textMuted }}>Also list on</Text>
@@ -725,8 +725,8 @@ export default function PieceScreen() {
           ) : null}
 
           {/* RENT IT OUT. A piece is rentable exactly when terms exist for it, so this is a switch
-              and a short price list rather than a form. The lengths are VYA's three — a long
-              weekend, a week, a month — and an unpriced one is simply not offered. Opening prices
+              and a short price list rather than a form. The lengths are VYA's three. A long
+              weekend, a week, a month, and an unpriced one is simply not offered. Opening prices
               are suggested from what the piece sells for, using the same proportions as the web,
               because three empty boxes and a Save that fails is how the toggle used to feel. */}
           <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
@@ -773,7 +773,7 @@ export default function PieceScreen() {
             ) : null}
           </View>
 
-          {/* Done, not Save — the changes are already going whether or not this is tapped, and a
+          {/* Done, not Save: the changes are already going whether or not this is tapped, and a
               button that promises to do something that has happened anyway is a button that teaches
               her to distrust the screen. Discard is the one that changes the outcome, so it says
               what it does rather than "Cancel". */}
@@ -787,7 +787,7 @@ export default function PieceScreen() {
             {save.isPending
               ? "Saving…"
               : dirty
-                ? `Changes save themselves when you leave${isDraft ? " — it stays a draft until you list it" : ""}.`
+                ? `Changes save themselves when you leave${isDraft ? ": it stays a draft until you list it" : ""}.`
                 : savedAt
                   ? "Saved."
                   : "Changes save themselves when you leave."}
@@ -847,7 +847,7 @@ export default function PieceScreen() {
         <Text style={{ fontSize: 13, color: colors.text, marginTop: spacing.md }}>{error}</Text>
       ) : null}
 
-      {/* Flaws — the list shoppers see under Condition; Edit changes it as one comma-separated line. */}
+      {/* Flaws: the list shoppers see under Condition; Edit changes it as one comma-separated line. */}
       {flaws.length > 0 && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
           <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>FLAWS</Text>
@@ -856,7 +856,7 @@ export default function PieceScreen() {
           ))}
         </View>
       ) : null}
-      {/* Beyond the grade and the tape measure — both print on the product page; Edit changes them. */}
+      {/* Beyond the grade and the tape measure. Both print on the product page; Edit changes them. */}
       {item.conditionNote && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
           <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>CONDITION NOTE</Text>

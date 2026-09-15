@@ -2,12 +2,12 @@ import { neon } from "@neondatabase/serverless";
 import { getPriceAccuracy, wilson95, type PriceScore, type PriceAccuracy } from "./eval-price";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Beta readiness — the go/no-go scorecard.
+// Beta readiness. The go/no-go scorecard.
 //
 // The three dimensions that gate rollout (your call): BRAND, PRICE, SPECIFIC PIECE.
 // Each must clear 95% in the segments that matter, with enough data behind it to
 // believe the number. We use the LOWER bound of a 95% confidence interval vs the gate,
-// so we only call "pass" when we're statistically confident the true rate clears 95% —
+// so we only call "pass" when we're statistically confident the true rate clears 95%,
 // not when a lucky small sample happens to. Honest by construction.
 //
 //   • PRICE      → graded against REAL sold prices (eval-price). Available now.
@@ -22,7 +22,7 @@ function db() {
 }
 
 export const BETA_GATE = 0.95; // 95% bar
-export const BETA_MIN_N = 30; // below this, a dimension is "insufficient" — no verdict on noise
+export const BETA_MIN_N = 30; // below this, a dimension is "insufficient", no verdict on noise
 
 export type DimVerdict = {
  dimension: "brand" | "price" | "specific";
@@ -41,9 +41,9 @@ function verdictFrom(dimension: DimVerdict["dimension"], label: string, correct:
  : rate != null && rate >= BETA_GATE ? "close"
  : "fail";
  const note = verdict === "insufficient"
- ? `Only ${n} graded — need ≥${BETA_MIN_N} to call it. ${source}`
+ ? `Only ${n} graded. Need ≥${BETA_MIN_N} to call it. ${source}`
  : verdict === "pass" ? `Confidently ≥95%. ${source}`
- : verdict === "close" ? `Point estimate clears 95% but the sample's too small to be sure — grade more. ${source}`
+ : verdict === "close" ? `Point estimate clears 95% but the sample's too small to be sure. Grade more. ${source}`
  : `Below the 95% bar. ${source}`;
  return { dimension, label, n, correct, pct: n ? Math.round((correct / n) * 100) : null, ci95: ci, verdict, note };
 }
@@ -60,7 +60,7 @@ async function goldenDimVerdicts(): Promise<{ brand: DimVerdict; specific: DimVe
  const latest = rows[0]?.result;
  const ranAt = rows[0]?.ran_at ? new Date(rows[0].ran_at).toISOString() : null;
  const field = (f: string) => (Array.isArray(latest?.fields) ? latest.fields.find((x: any) => x.field === f) : null);
- const src = ranAt ? `From the golden exam (${latest?.sample ?? "?"} items).` : "No golden exam has run yet — curate the golden set and run it.";
+ const src = ranAt ? `From the golden exam (${latest?.sample ?? "?"} items).` : "No golden exam has run yet. Curate the golden set and run it.";
  const b = field("brand"), s = field("specific");
  return {
  brand: verdictFrom("brand", "Brand ID", Number(b?.correct || 0), Number(b?.total || 0), src),

@@ -44,16 +44,16 @@ function parseImages(product: DBProduct): string[] {
 }
 
 /**
- * Derive the best size for a product. The SELLER'S OWN DESCRIPTION wins — what
+ * Derive the best size for a product. The SELLER'S OWN DESCRIPTION wins. What
  * they wrote about fit/size is trusted over the listing title and the raw
  * Shopify variant size. Priority:
- * 0. Seller US fit note in description — "runs true to a 6", "fits like a 6.5"
- * 1. Tagged/labeled/marked size in description — "Tagged size: EU 38"
- * 2. Any explicit size in the description — "Size: 4", "EU 38", "fits XS"
- * 3. Title extraction — size written in the listing title (e.g. "Dress – M")
- * 4. Non-generic DB size — Shopify variant (numeric / EU/UK prefixed)
+ * 0. Seller US fit note in description. "runs true to a 6", "fits like a 6.5"
+ * 1. Tagged/labeled/marked size in description. "Tagged size: EU 38"
+ * 2. Any explicit size in the description. "Size: 4", "EU 38", "fits XS"
+ * 3. Title extraction: size written in the listing title (e.g. "Dress – M")
+ * 4. Non-generic DB size: Shopify variant (numeric / EU/UK prefixed)
  * 5. Measurements fallback (bust/waist → S/M/L)
- * 6. Generic DB size (S/M/L) — last resort
+ * 6. Generic DB size (S/M/L): last resort
  *
  * Exported so it can be used by server components that work directly with DBProduct
  * (NewArrivalsSection, new-arrivals page, account favorites, etc.)
@@ -61,9 +61,9 @@ function parseImages(product: DBProduct): string[] {
 // Some stores write the size as a bare token on the first non-empty line of the
 // description ("38 1/2" for a shoe, "8" or "M" for clothing) with no "Size:" label.
 // Bare numbers are normally skipped to avoid false positives (a "2001" in a title is
-// a year), but a SHORT first line that IS just a size — and in shoe range for
-// footwear — is almost certainly the real size.
-// Squarespace (and some Shopify) descriptions are HTML — often entity-encoded
+// a year), but a SHORT first line that IS just a size, and in shoe range for
+// footwear: is almost certainly the real size.
+// Squarespace (and some Shopify) descriptions are HTML. Often entity-encoded
 // ("&lt;p&gt;38&lt;/p&gt;"). Decode entities, turn block tags into line breaks (so a size on
 // its own paragraph becomes its own line), and strip the rest. Plain text passes through.
 function htmlToText(html: string | null | undefined): string | null {
@@ -84,7 +84,7 @@ function extractLeadingSizeFromDescription(description: string | null | undefine
  const isShoe = SHOE_RE.test(title) || SHOE_RE.test(inferCategoryFromTitle(title));
  // Many stores put the size on its own line/paragraph with no "Size:" label. Scan the first
  // few lines for a bare size token; for shoes accept the footwear range AND look a few lines
- // in (the size often isn't line 1 — e.g. "sunflower & star details" then "37").
+ // in (the size often isn't line 1. E.g. "sunflower & star details" then "37").
  for (const line of lines.slice(0, isShoe ? 4 : 1)) {
  if (line.length > 8) continue;
  const norm = line.replace("½", " 1/2");
@@ -103,7 +103,7 @@ function extractLeadingSizeFromDescription(description: string | null | undefine
 
 export function deriveSize(product: DBProduct): string | null {
  const result = deriveSizeInner(product);
- // Shoes NEVER use letter sizes (S/M/L) — footwear is numeric, and a letter here
+ // Shoes NEVER use letter sizes (S/M/L): footwear is numeric, and a letter here
  // is almost always a stray clothing tag/variant or a false-positive description
  // match (e.g. the "M" in "Size: Marked 36"). Prefer a real numeric size from the
  // title; only show nothing if there genuinely isn't one.
@@ -118,28 +118,28 @@ export function deriveSize(product: DBProduct): string | null {
 function deriveSizeInner(product: DBProduct): string | null {
  const dbSize = product.size && isValidSizeValue(product.size) ? product.size : null;
  const isGenericDb = dbSize != null && GENERIC_CLOTHING_SIZE.test(dbSize);
- // Descriptions can be HTML (esp. Squarespace) — clean to text once so every extractor
+ // Descriptions can be HTML (esp. Squarespace): clean to text once so every extractor
  // below reads the actual words, not the "<p>" tags.
  const desc = htmlToText(product.description);
 
- // 0. Explicit seller US fit note ("runs true to a 6", "fits like a 6.5") — the
+ // 0. Explicit seller US fit note ("runs true to a 6", "fits like a 6.5"). The
  // seller telling a US buyer what to order, so it beats a marked EU tag size.
  const fitSize = extractFitSizeFromDescription(desc);
  if (fitSize) return fitSize;
 
- // 0b. Explicit seller LETTER fit ("Best Fit M - XL") — same authority: the
+ // 0b. Explicit seller LETTER fit ("Best Fit M - XL"). Same authority: the
  // seller's stated fit wins over a marked numeric/IT tag, so we show "M-XL"
  // (which filters under M, L and XL) instead of converting IT 54 → "US 18".
  const fitLetter = extractFitLetterFromDescription(desc);
  if (fitLetter) return fitLetter;
 
  // 0c. Explicit US size from a conversion table the seller wrote ("UK 10 / EU 40 /
- // US 6"). The seller's own US number is authoritative — it beats formula-converting
+ // US 6"). The seller's own US number is authoritative. It beats formula-converting
  // the EU/UK tag (generic EU−32 would wrongly show US 8 for this EU 40 = US 6 piece).
  const usConversion = extractUSConversionFromDescription(desc);
  if (usConversion) return usConversion;
 
- // 1. Tagged/labeled/marked size in description — most authoritative (actual garment tag)
+ // 1. Tagged/labeled/marked size in description. Most authoritative (actual garment tag)
  // Must run before title/DB to prevent "Size: Large [store bucket]" from winning
  // over "Tagged size: XS [actual tag]" that appears later in the description.
  const taggedSize = extractTaggedSizeFromDescription(desc);
@@ -152,30 +152,30 @@ function deriveSizeInner(product: DBProduct): string | null {
  if (sizeFromDesc) return sizeFromDesc;
 
  // 2b. A bare size written as the first line of the description ("38 1/2", "8",
- // "M") — many stores label it this way with no "Size:" prefix. Beats the title.
+ // "M"): many stores label it this way with no "Size:" prefix. Beats the title.
  const leadingSize = extractLeadingSizeFromDescription(desc, product.title);
  if (leadingSize) return leadingSize;
 
- // 3. Title — explicit size in the listing title
+ // 3. Title: explicit size in the listing title
  const sizeFromTitle = extractSizeFromTitle(product.title);
  if (sizeFromTitle) return sizeFromTitle;
 
- // 4. Non-generic DB size (Shopify variant — numeric, EU/UK prefixed)
+ // 4. Non-generic DB size (Shopify variant: numeric, EU/UK prefixed)
  if (dbSize && !isGenericDb) return dbSize;
 
  // 5. Generic DB size (S/M/L variant the store set) as last resort.
  // NOTE: we deliberately do NOT infer a size from measurements (bust/waist →
- // S/M/L). If the seller never stated a size, we add none — vintage sizing is
+ // S/M/L). If the seller never stated a size, we add none. Vintage sizing is
  // too inconsistent to guess, and a wrong size loses sales.
  return dbSize;
 }
 
 /**
- * The size shoppers actually SEE and FILTER by — deriveSize, then converted to a
+ * The size shoppers actually SEE and FILTER by. DeriveSize, then converted to a
  * US label the same way the product page displays it (so "IT 38" → "US 2",
  * "EU 36" → "US 4", a clothing "40" → "US 8"). Letter sizes, already-US sizes,
  * and ranges pass through unchanged. This is the single source for the size on
- * cards, grids, and the size_keys index — keeping "what you see" === "what you
+ * cards, grids, and the size_keys index. Keeping "what you see" === "what you
  * filter". Without this the grid filtered the raw tag (38) while the page showed
  * the conversion (US 2), so the item never matched a US-size filter.
  */
@@ -192,7 +192,7 @@ function transformDBProduct(product: DBProduct, overrideMap?: Map<string, string
  return {
  id: `${product.store_slug}-${product.id}`,
  title: product.title,
- // An AI/admin correction wins over the title inference — the same rule store pages and
+ // An AI/admin correction wins over the title inference. The same rule store pages and
  // the public API already used. This path (category pages, brand pages, collections, the
  // homepage) used to ignore the override table entirely, so a category fixed in the admin
  // stayed wrong on every page built from getInventory().

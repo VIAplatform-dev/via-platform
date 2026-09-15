@@ -5,7 +5,7 @@
 // browser. That has already happened once.
 //
 // A naive extractor with a non-greedy regex stops at the first backtick-semicolon INSIDE the script
-// and reports a syntax error on a perfectly good file — which is worse than no check, because it
+// and reports a syntax error on a perfectly good file, which is worse than no check, because it
 // cries wolf. This walks to the real closing backtick and undoes the template-literal escaping, so
 // what gets parsed is what the browser will actually run.
 //

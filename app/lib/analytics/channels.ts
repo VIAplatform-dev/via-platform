@@ -6,8 +6,8 @@
  * are rows in `cross_listing_sales` with a `platform`; her pre-VYA history is `imported_orders` with
  * a `source`. Three words for one idea.
  *
- * ONE LABEL ON EVERY SALE. "Where did this come from" is the question a seller actually asks — is
- * Depop worth the 10%, is the market stall worth the Saturday — and it is the same question whether
+ * ONE LABEL ON EVERY SALE. "Where did this come from" is the question a seller actually asks. Is
+ * Depop worth the 10%, is the market stall worth the Saturday, and it is the same question whether
  * the answer is Depop or her old Shopify. That is also why imported history needs no special
  * treatment in the dashboard: Shopify is not "an import", it is a channel she used to sell through.
  * It appears next to Depop, labelled, and the reader can draw their own conclusion.
@@ -31,7 +31,7 @@ const LABELS: Record<ChannelKey, string> = {
  other: "Other",
 };
 
-/** What a seller reads. Unknown keys get their own name back rather than "Other" — a channel we
+/** What a seller reads. Unknown keys get their own name back rather than "Other". A channel we
  *  added and forgot to label here should look like itself, not like a bug. */
 export function channelLabel(key: string): string {
  const k = String(key || "").trim().toLowerCase();
@@ -39,18 +39,18 @@ export function channelLabel(key: string): string {
  return k ? k.charAt(0).toUpperCase() + k.slice(1) : LABELS.other;
 }
 
-/** `orders.channel` — her storefront, or a sale rung up in person. */
+/** `orders.channel`: her storefront, or a sale rung up in person. */
 export function fromOrderChannel(channel: string | null | undefined, tender?: string | null): ChannelKey {
  const c = String(channel || "").trim().toLowerCase();
  if (c === "market" || c === "pos" || c === "in-person") return "in-person";
- // A cash tender means somebody stood in front of her, whatever the channel column says — the two
+ // A cash tender means somebody stood in front of her, whatever the channel column says. The two
  // disagreed on old rows written before `channel` existed.
  if (String(tender || "").toLowerCase() === "cash") return "in-person";
  if (c === "online" || c === "storefront" || c === "") return "storefront";
  return normalise(c);
 }
 
-/** `imported_orders.source` — the shop she was on before. */
+/** `imported_orders.source`: the shop she was on before. */
 export function fromImportSource(source: string | null | undefined): ChannelKey {
  const s = String(source || "").trim().toLowerCase();
  // "csv" and "" say only that it was a file; the honest label for that is that she brought it over.
@@ -58,7 +58,7 @@ export function fromImportSource(source: string | null | undefined): ChannelKey 
  return normalise(s);
 }
 
-/** `cross_listing_sales.platform` — a marketplace. */
+/** `cross_listing_sales.platform`: a marketplace. */
 export function fromPlatform(platform: string | null | undefined): ChannelKey {
  return normalise(String(platform || "").trim().toLowerCase());
 }
@@ -75,7 +75,7 @@ function normalise(k: string): ChannelKey {
 
 export type ChannelTotal = { channel: ChannelKey; label: string; revenueCents: number; orders: number };
 
-/** Revenue and orders per channel, biggest first — the answer to "is Depop worth it". */
+/** Revenue and orders per channel, biggest first. The answer to "is Depop worth it". */
 export function rollUp(rows: { channel: ChannelKey; amountCents: number }[]): ChannelTotal[] {
  const by = new Map<ChannelKey, ChannelTotal>();
  for (const r of rows || []) {

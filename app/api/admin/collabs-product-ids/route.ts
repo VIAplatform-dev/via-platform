@@ -10,7 +10,7 @@ const CORS_HEADERS = {
 };
 
 // This route is listed in middleware PUBLIC_ROUTES (so it can serve a cross-origin CORS caller),
-// which means the middleware admin gate does NOT cover it — it MUST self-authenticate. The
+// which means the middleware admin gate does NOT cover it. It MUST self-authenticate. The
 // collabs-link generation now runs fully server-side (admin + cron generate-collabs-links), so
 // this legacy read endpoint requires the standard admin credential.
 function isAuthorized(request: NextRequest): boolean {

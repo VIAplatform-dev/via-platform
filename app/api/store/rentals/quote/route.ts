@@ -5,7 +5,7 @@ import { rentableItem, spanFrom, today, notFound, bad } from "../_shared";
 
 export const dynamic = "force-dynamic";
 
-// Price a specific set of dates. The same function runs again when money is taken —
+// Price a specific set of dates. The same function runs again when money is taken,
 // a quote the shopper was shown is never trusted on the way back in.
 
 export async function POST(request: NextRequest) {

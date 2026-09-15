@@ -16,7 +16,7 @@ test("the challenge answer is sha256(challengeCode + verificationToken + endpoin
  const code = "abc123", token = "v".repeat(32), endpoint = "https://vyaplatform.com/api/webhooks/ebay";
  const expected = createHash("sha256").update(code + token + endpoint).digest("hex");
  assert.equal(challengeResponse(code, token, endpoint), expected);
- // Order matters — eBay rejects any other concatenation.
+ // Order matters. EBay rejects any other concatenation.
  assert.notEqual(challengeResponse(code, token, endpoint), createHash("sha256").update(token + code + endpoint).digest("hex"));
 });
 
@@ -35,7 +35,7 @@ test("a verification token is 32–80 characters of [A-Za-z0-9_-], nothing else"
 function signedDelivery(body: string, digest = "SHA1") {
  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
  const signature = sign(digest.toLowerCase(), Buffer.from(body), privateKey).toString("base64");
- // eBay's getPublicKey returns the SPKI DER as bare base64 — no PEM armour.
+ // eBay's getPublicKey returns the SPKI DER as bare base64, no PEM armour.
  const key = publicKey.export({ type: "spki", format: "der" }).toString("base64");
  const header = Buffer.from(JSON.stringify({ kid: "kid-1", signature, alg: "ecdsa", digest })).toString("base64");
  return { header, key };
@@ -192,7 +192,7 @@ test("a store matched by sku, listing id or eBay user wins outright", () => {
  assert.deepEqual(chooseStores({ matched: ["scottie", "scottie"], connected: ["scottie"], saleTopic: true }), { slugs: ["scottie"], how: "matched" });
 });
 
-test("an unmatched sale on a small fleet syncs every connected store — what the cron does hourly, done now", () => {
+test("an unmatched sale on a small fleet syncs every connected store. What the cron does hourly, done now", () => {
  // The payload shape is not fully published; until the first real delivery pins it down, a sale
  // must still arrive in seconds. A few getOrders calls is the price, the same the cron pays.
  assert.deepEqual(chooseStores({ matched: [], connected: ["a", "b", "c"], saleTopic: true }), { slugs: ["a", "b", "c"], how: "broadcast" });
@@ -209,7 +209,7 @@ test("a non-sale topic never syncs anyone, matched or not", () => {
  assert.deepEqual(chooseStores({ matched: [], connected: ["a"], saleTopic: false }), { slugs: [], how: "none" });
 });
 
-test("the sync looks back two hours from now — wide enough to cover eBay's retries, narrow enough to be cheap", () => {
+test("the sync looks back two hours from now. Wide enough to cover eBay's retries, narrow enough to be cheap", () => {
  const now = Date.parse("2026-09-07T12:00:00.000Z");
  assert.equal(syncWindowSince(now), "2026-09-07T10:00:00.000Z");
 });
@@ -218,7 +218,7 @@ test("the sync looks back two hours from now — wide enough to cover eBay's ret
 
 test("the state line says on-since and how long ago the last delivery was, or that setup is needed", () => {
  const now = Date.parse("2026-09-07T12:00:00.000Z");
- assert.equal(describeNotifyState({ since: null, lastReceivedAt: null, now }), "off — run setup");
+ assert.equal(describeNotifyState({ since: null, lastReceivedAt: null, now }), "off: run setup");
  assert.equal(describeNotifyState({ since: "2026-09-01T09:00:00.000Z", lastReceivedAt: null, now }), "on since 1 Sep 2026 · nothing received yet");
  assert.equal(describeNotifyState({ since: "2026-09-01T09:00:00.000Z", lastReceivedAt: "2026-09-07T11:57:00.000Z", now }), "on since 1 Sep 2026 · last received 3m ago");
  assert.equal(describeNotifyState({ since: "2026-09-01T09:00:00.000Z", lastReceivedAt: "2026-09-07T11:59:50.000Z", now }), "on since 1 Sep 2026 · last received just now");

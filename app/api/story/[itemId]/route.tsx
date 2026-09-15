@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 // An inventory item id is a UUID; a marketplace product id is "{store-slug}-{digits}".
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Instagram Story card generator — 1080×1920 (9:16) PNG for any product.
+// Instagram Story card generator. 1080×1920 (9:16) PNG for any product.
 //
 // GET /api/story/{store-slug}-{id}          → the card
 // GET /api/story/{store-slug}-{id}?cta=...   → override the call-to-action text
@@ -49,12 +49,12 @@ export async function GET(
  let imageUrl: string | null = null;
  try {
   if (UUID_RE.test(itemId)) {
-   // OS inventory item (one-of-one) — the item a store publishes to its own storefront.
+   // OS inventory item (one-of-one): the item a store publishes to its own storefront.
    const item = await getItem(itemId);
    const first = item?.images?.[0];
    if (first) imageUrl = await fetchAsDataUri(first);
   } else {
-   // Marketplace product — composite "{store-slug}-{id}".
+   // Marketplace product: composite "{store-slug}-{id}".
    const m = itemId.match(/^(.+)-(\d+)$/);
    const dbId = m ? parseInt(m[2], 10) : NaN;
    if (!isNaN(dbId)) {

@@ -22,7 +22,7 @@ test("a resized text element keeps its width too", () => {
  assert.match($("h2").attr("style") || "", /width:\s*60%/);
 });
 
-test("height is refused — a captured layout sets its own, and overriding one squashes the photo", () => {
+test("height is refused. A captured layout sets its own, and overriding one squashes the photo", () => {
  const { img } = ids();
  const $ = cheerio.load(applyEdits(PAGE, { imgStyles: [{ id: img, style: "height:20px;width:45%;" }] }));
  const style = $("img").attr("style") || "";

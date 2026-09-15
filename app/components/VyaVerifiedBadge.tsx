@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 /**
- * VYA Verified badge — shown next to store name on store pages.
+ * VYA Verified badge: shown next to store name on store pages.
  * Deep red circle with cream checkmark, links to /trust.
  */
 export default function VyaVerifiedBadge({ className = "" }: { className?: string }) {

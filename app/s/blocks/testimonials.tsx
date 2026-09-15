@@ -1,4 +1,4 @@
-// Reviews — social proof, four ways. Quotes and names are repeated content (ITEM_SCHEMAS.testimonials),
+// Reviews: social proof, four ways. Quotes and names are repeated content (ITEM_SCHEMAS.testimonials),
 // so every layout gets add/delete/reorder from the same panel editor, and each quote and name is
 // editable straight on the canvas.
 import { FreeField, emptyHint, type EditKit } from "./kit";
@@ -39,7 +39,7 @@ function TestimonialsCards({ kit }: { kit: EditKit }) {
 
 // ── single ──────────────────────────────────────────────────────────────────────────────────────
 // One review at display size. A single quote given real scale carries more weight than three set
-// small — the right choice when a store has one review it's genuinely proud of.
+// small: the right choice when a store has one review it's genuinely proud of.
 function TestimonialsSingle({ kit }: { kit: EditKit }) {
  const { ctx } = kit;
  const items = kit.items(S);

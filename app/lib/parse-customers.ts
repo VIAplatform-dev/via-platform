@@ -1,6 +1,6 @@
 // Flexible customer-list parser. Sellers export from all kinds of systems
 // (Shopify, Square, Mailchimp, Klaviyo, a plain list), so we don't assume a fixed
-// format — we sniff the delimiter, detect an email/name/phone column from the
+// format: we sniff the delimiter, detect an email/name/phone column from the
 // header when there is one, and otherwise pull any email-looking token per line.
 
 export type ParsedCustomer = { email: string; name: string | null; phone: string | null };

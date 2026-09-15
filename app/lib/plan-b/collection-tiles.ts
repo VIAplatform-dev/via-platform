@@ -3,13 +3,13 @@
 // WHY. Product grids have been live since the mirror began (site-capture.ts, injectLiveGrids): add,
 // reprice or sell a piece in the portal and her site reflects it with no re-crawl. The row of
 // COLLECTION tiles above them stayed frozen at whatever the crawl photographed. So a seller could
-// create a collection in VYA, fill it, give it a cover photo — and her own storefront still showed
+// create a collection in VYA, fill it, give it a cover photo, and her own storefront still showed
 // the three categories her old Shopify site happened to have on capture day, with no way to add one,
 // remove one, or change the picture. She clicked a tile in the editor and got a text box.
 //
-// WHAT THIS DOES. Finds those tile rows structurally — the exact shape productGrids() already
+// WHAT THIS DOES. Finds those tile rows structurally. The exact shape productGrids() already
 // identifies in order to REFUSE it ("a collection list is structurally identical to a product grid
-// but its links point at /collections/, not /products/") — and refills each one from her real
+// but its links point at /collections/, not /products/"), and refills each one from her real
 // collections, keeping every scrap of the theme's markup: its classes, its aspect ratio, its
 // caption styling. Same rule as the product grids, for the same reason: never invent markup, reuse
 // the theme's, or the row stops looking like her shop.
@@ -20,7 +20,7 @@ import type { Element as DomElement } from "domhandler";
 export type CollectionTile = { title: string; slug: string; imageUrl?: string | null };
 
 /** Chrome that is a list of links by nature. Replacing a menu with collection tiles is the failure
- *  this guards against — the same names productGrids() screens out, for the same reason. */
+ *  this guards against: the same names productGrids() screens out, for the same reason. */
 const CHROME_RE = /pagination|breadcrumb|menu|nav|social|footer|header|announcement/;
 
 /** Does this child look like a collection TILE: a picture you click, with a caption. */
@@ -68,7 +68,7 @@ export function collectionTileGrids($: cheerio.CheerioAPI): DomElement[] {
  * Where a tile's name is written.
  *
  * A heading wins outright when the theme uses one. Otherwise it's the first leaf that carries words
- * — never a wrapper, so writing the name can't wipe out the picture that shares the tile with it,
+ * never a wrapper, so writing the name can't wipe out the picture that shares the tile with it,
  * and never the second leaf, which is where themes put "12 items" or "Shop now".
  */
 function captionEl($: cheerio.CheerioAPI, $tile: cheerio.Cheerio<DomElement>): cheerio.Cheerio<DomElement> {
@@ -107,18 +107,18 @@ function tileHandle($: cheerio.CheerioAPI, el: DomElement): string | null {
  *
  * AUGMENT, NEVER REPLACE. The first version of this emptied the row and rebuilt it from her VYA
  * collections. On a real store that was destructive: her collections carried no cover photos yet, so
- * every rebuilt tile fell back to the first captured tile's picture — one piece of stock clip-art
- * repeated down a page that had held her own photography — and her VYA collection names ("Collection
+ * every rebuilt tile fell back to the first captured tile's picture. One piece of stock clip-art
+ * repeated down a page that had held her own photography, and her VYA collection names ("Collection
  * 3", "Commission - 3%") replaced the curated captions. A row of her real, photographed collections
  * is the thing being edited here; it is never ours to throw away because a newer list exists.
  *
  * So: a captured tile stays exactly where it is, keeping its picture and its wording, and only takes
  * on a cover photo she has actually chosen. A collection with no tile on the page appears as a new
- * one — but only once it HAS a cover photo, because a tile cloned from a neighbour would be showing
+ * one, but only once it HAS a cover photo, because a tile cloned from a neighbour would be showing
  * a shopper somebody else's picture under this collection's name.
  *
  * @param base   path the storefront is mounted at ("" on the seller's own domain, "/site/{slug}" on a
- *               VYA origin) — an absolute /collections/… href would leave her site on ours.
+ *               VYA origin): an absolute /collections/… href would leave her site on ours.
  * @param uncapped may the row grow past the number of tiles the theme drew. True for the collections
  *               index, whose job is to list everything; false anywhere else, where the tile count is
  *               a layout decision and overflowing it is the "251 slides in a 3-slide carousel" bug.

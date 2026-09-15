@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Where the piece actually is, from the carrier rather than from a guess.
 //
-// The turnaround settings are ESTIMATES — "getting it back takes 2 days" — and they do two jobs at
+// The turnaround settings are ESTIMATES, "getting it back takes 2 days", and they do two jobs at
 // once: they block the calendar so nothing double-books, and they tell the store when to expect a
 // piece home. The first job needs an estimate, because the booking is made before anything ships.
 // The second doesn't: once a return label has been scanned, the carrier knows more than the setting
@@ -9,7 +9,7 @@
 // number in Settings assumed weeks ago.
 //
 // So: estimates block the calendar, tracking corrects the expectation. This file is the correcting
-// part, and it is pure — a status string and two dates in, a stage and a sentence out.
+// part, and it is pure. A status string and two dates in, a stage and a sentence out.
 // ───────────────────────────────────────────────────────────────────────────
 
 /** What the carrier told us, normalised. Shippo and EasyPost agree on these words. */
@@ -34,11 +34,11 @@ export type Stage =
 
 export type RentalWhereabouts = {
  stage: Stage;
- /** One line for the seller. Never speculative — it says what is known and who says so. */
+ /** One line for the seller. Never speculative: it says what is known and who says so. */
  line: string;
  /** The date to expect it, carrier first, then the rental's own due date. */
  expected: string | null;
- /** True when the carrier's estimate is LATER than the due date — the store's calendar is wrong. */
+ /** True when the carrier's estimate is LATER than the due date. The store's calendar is wrong. */
  runningLate: boolean;
 };
 
@@ -68,7 +68,7 @@ export function whereabouts(b: TrackedBooking, today: string): RentalWhereabouts
  const eta = day(b.trackingEta);
  const status = carrierStatus(b.trackingStatus);
 
- // Already home. The store marking it back is the last word — it's holding the piece.
+ // Already home. The store marking it back is the last word. It's holding the piece.
  if (b.returnedAt || b.status === "closed") {
   return { stage: "back", line: "Back with you.", expected: null, runningLate: false };
  }
@@ -81,7 +81,7 @@ export function whereabouts(b: TrackedBooking, today: string): RentalWhereabouts
   // is physically back and still blocking the calendar.
   return {
    stage: "back",
-   line: "The carrier says it's been delivered back to you — check it in to free up the dates.",
+   line: "The carrier says it's been delivered back to you. Check it in to free up the dates.",
    expected: null,
    runningLate: false,
   };
@@ -103,7 +103,7 @@ export function whereabouts(b: TrackedBooking, today: string): RentalWhereabouts
  if (status === "FAILURE") {
   return {
    stage: "coming-back",
-   line: "The carrier has flagged a problem with the return — worth chasing.",
+   line: "The carrier has flagged a problem with the return. Worth chasing.",
    expected: eta || due,
    runningLate: true,
   };
@@ -129,7 +129,7 @@ export function whereabouts(b: TrackedBooking, today: string): RentalWhereabouts
 /**
  * Should we ask the carrier about this one?
  *
- * Only for pieces that are out and have a label, and at most once an hour — carriers rate-limit,
+ * Only for pieces that are out and have a label, and at most once an hour. Carriers rate-limit,
  * and a rental moves on the scale of days.
  */
 export function needsRefresh(b: TrackedBooking, now: number, minMs = 60 * 60 * 1000): boolean {

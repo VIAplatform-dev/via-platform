@@ -38,8 +38,8 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
  // Store policies: WHAT THE SELLER WROTE first, then what VYA recorded at onboarding.
  //
  // This served the hardcoded text from app/lib/stores.ts and nothing else, so a seller could
- // rewrite her policies in Settings → Policies and the app's product page — which reads this
- // route — would still show the paragraph VYA typed for her when she joined.
+ // rewrite her policies in Settings → Policies and the app's product page, which reads this
+ // route: would still show the paragraph VYA typed for her when she joined.
  //
  // `authenticity` has no seller-editable field yet, so it stays curated; it is VYA's claim about
  // how the shop is vetted rather than the shop's promise to a buyer.

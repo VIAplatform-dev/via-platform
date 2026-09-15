@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { FLYERS, flyerBySlug, flyerSource, isFlyerSlug, flyerPaths, flyerDestination } from "./flyers.ts";
 
 test("every printed slug resolves to a flyer", () => {
- // If one of these ever stops resolving, a printed QR code becomes a dead link — and unlike a
+ // If one of these ever stops resolving, a printed QR code becomes a dead link, and unlike a
  // broken button, we cannot fix the paper.
  for (const slug of ["vintage", "trendsetter", "not-shein", "fashion-clone", "emma-stolen-bag", "postcard"]) {
   assert.ok(flyerBySlug(slug), `${slug} must resolve`);
@@ -22,7 +22,7 @@ test("slugs are matched case-insensitively and trimmed", () => {
  assert.equal(flyerBySlug(" not-shein ")?.slug, "not-shein");
 });
 
-test("the Fendi flyer carries BOTH its printed lines — the setup and the punchline", () => {
+test("the Fendi flyer carries BOTH its printed lines. The setup and the punchline", () => {
  const emma = flyerBySlug("emma-stolen-bag");
  assert.match(emma!.headline, /Fendi baguette/);
  assert.match(emma!.subhead, /I have proof/);
@@ -81,7 +81,7 @@ test("an unknown slug still yields a safe destination rather than undefined", ()
 
 test("every destination is a relative path", () => {
  // Auth.js rejects a cross-origin callbackUrl, so an absolute URL here would silently downgrade
- // the whole sign-in hop to /login — and put a brand-new member back on the waitlist.
+ // the whole sign-in hop to /login, and put a brand-new member back on the waitlist.
  for (const f of FLYERS) {
   const d = flyerDestination(f.slug);
   assert.ok(d.startsWith("/") && !d.startsWith("//"), `${f.slug} destination must be a relative path`);

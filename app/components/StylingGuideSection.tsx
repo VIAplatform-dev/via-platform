@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { STYLING_LOOKS } from "@/app/lib/stylingGuide";
 
-// Homepage "Styling Guide" — an auto-scrolling lookbook you can ALSO scroll by
+// Homepage "Styling Guide": an auto-scrolling lookbook you can ALSO scroll by
 // hand. A real overflow-x scroll container is nudged forward each frame; manual
 // scroll / hover pauses the drift and it resumes shortly after. Content + looped
 // copy give a seamless loop. Photos aren't clickable; only the item names link.

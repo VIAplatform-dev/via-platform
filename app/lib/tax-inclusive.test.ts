@@ -6,7 +6,7 @@ import {
 } from "./tax-inclusive.ts";
 
 test("the US and Canada show prices before tax", () => {
- // Canada is the one people get wrong — it looks European but prices are pre-tax like the US.
+ // Canada is the one people get wrong. It looks European but prices are pre-tax like the US.
  assert.equal(pricesIncludeTaxFor("US"), false);
  assert.equal(pricesIncludeTaxFor("CA"), false);
 });
@@ -78,7 +78,7 @@ test("a zero rate or a zero amount splits harmlessly", () => {
  assert.deepEqual(splitInclusive(0, 20), { netCents: 0, taxCents: 0 });
 });
 
-test("grossFromNet is the inverse — what to display to still net your number", () => {
+test("grossFromNet is the inverse. What to display to still net your number", () => {
  assert.equal(grossFromNet(16667, 20), 20000);
  assert.equal(grossFromNet(10000, 0), 10000);
 });

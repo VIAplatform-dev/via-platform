@@ -1,4 +1,4 @@
-# Imported-site builder — Steps 2 to 5
+# Imported-site builder: Steps 2 to 5
 
 Design, 2026-09-11. No code yet. Phased: the owner tests each step in the running app before the next starts.
 
@@ -64,7 +64,7 @@ The goal: a seller who imported her site edits it the way she would in Shopify o
    - It never returns anything inside the header/footer regions (Shopify `.shopify-section-group-header-group|footer-group`, `#shopify-section-header|footer`, top-level `header`/`footer`; Squarespace `header#header`, `#footer-sections`).
    - On Squarespace it uses `.page-section` inside `#sections`/`.region`.
 
-   Only the stored page is ever numbered, so no saved data carries old numbers. The risk is an editor tab that is already open. `prepareEditMode` writes `__VYA_EDIT.numbering = 2`, the save sends it, and `/api/store/capture/edit` answers a mismatch with **409 "Your editor is out of date — reload"** and writes nothing.
+   Only the stored page is ever numbered, so no saved data carries old numbers. The risk is an editor tab that is already open. `prepareEditMode` writes `__VYA_EDIT.numbering = 2`, the save sends it, and `/api/store/capture/edit` answers a mismatch with **409 "Your editor is out of date. Reload"** and writes nothing.
 2. **Hide, don't delete, captured sections.** The X on a captured section sends `{sec, hidden: true}`. The server sets `data-vya-hidden="1"`, and `injectCss` always adds `[data-vya-hidden]{display:none!important}`. In the editor, hidden sections show greyed out with a **Show** button. "Delete permanently" is a second, confirmed action. When a section really is removed, `applySectionEdits` first moves its `<style>`/`<link>` into `<head>`, the same way `fillGrid` treats leftover cards. That fixes the "kept section went blank" spike finding. VYA-added blocks still delete outright.
 3. **Undo that survives save.**
    - `versionsToDrop` keeps the newest 3 versions of any kind, plus the newest crawl, plus the **newest 10 `edit` versions**. Estimate: gz ≈ 80 KB/page, so 10 × edited pages is a few MB per store.
@@ -75,7 +75,7 @@ The goal: a seller who imported her site edits it the way she would in Shopify o
 
 ---
 
-## Step 2 — "Add product grid" in the site's own card
+## Step 2: "Add product grid" in the site's own card
 
 **What she gets.** A **Product grid** entry in Layout, and a **+** between any two sections. The grid shows a chosen collection's live pieces in her theme's card. It has settings for: collection, how many (1–20, the Studio's `MAX_FEATURED`), desktop columns 1–6, mobile columns 1–2, image shape (Theme / Portrait / Square / Landscape), and card style (Theme card / Simple).
 
@@ -85,7 +85,7 @@ The goal: a seller who imported her site edits it the way she would in Shopify o
   { v:1, sourcePath, platform:"shopify"|"squarespace",
     cardHtml,          // one card, style/link/script removed (fillGrid's clone source)
     gridEl:{tag,attrs},// the grid container, children removed
-    shell:[{tag,attrs}],// wrappers from the section root down to the grid's parent — keeps .page-width/.content-wrapper
+    shell:[{tag,attrs}],// wrappers from the section root down to the grid's parent. Keeps .page-width/.content-wrapper
     css,               // <style> text on the source page that the home page lacks, capped 300 KB
     price:{decimals,showCode}, labels:{add,sold} }
   ```
@@ -190,7 +190,7 @@ Stores: `test-import` (Dawn), `test-import-2`, `sourcedbyscottie` (Palo Alto). S
 
 ---
 
-## Step 3 — Pages panel
+## Step 3: Pages panel
 
 **What she gets.** A **Pages** rail tab with the list shaped like Shopify's navigation + pages screens:
 - **In your menu**, in menu order, draggable
@@ -238,7 +238,7 @@ The chrome-borrowing logic in [fallback-cart-page.ts](../../../app/lib/fallback-
 ### Editor
 - Pages tab replaces the thumbnail strip's ordering. `store_page_order` stays readable but is no longer written.
 - Drag within "In your menu" → `PUT menu`.
-- Hidden rows are greyed and marked "Hidden — shoppers get Page not found".
+- Hidden rows are greyed and marked "Hidden. Shoppers get Page not found".
 - Rename opens a small dialog: page title + menu label, and says the URL stays the same.
 - `EDITOR_JS`: on a hidden page, a thin bar reads "This page is hidden from shoppers · Show". Nothing else changes.
 
@@ -269,7 +269,7 @@ The chrome-borrowing logic in [fallback-cart-page.ts](../../../app/lib/fallback-
 ### Risks
 - **Hiding a page that the footer, a banner or a collection tile links to.** Mitigation: the `linkedFrom` warning. Shoppers get a clean 404, not a broken layout.
 - **Theme JS indexes menu items** (mega-menus). Mitigation: reorder and remove whole item elements only; never rewrite item internals.
-- **Signature drift after a re-crawl** → menu edits stop applying. Mitigation: the panel shows "Your menu changed since you last edited it — review", with a one-click re-learn.
+- **Signature drift after a re-crawl** → menu edits stop applying. Mitigation: the panel shows "Your menu changed since you last edited it. Review", with a one-click re-learn.
 
 ### Tests
 - `detectMenus`: fixtures from Horizon (gianna), Dawn, Palo Alto, Squarespace. Two copies grouped as one menu; footer lists separated.
@@ -289,7 +289,7 @@ The chrome-borrowing logic in [fallback-cart-page.ts](../../../app/lib/fallback-
 
 ---
 
-## Step 4 — Header & footer: edit once, for all pages
+## Step 4: Header & footer: edit once, for all pages
 
 **What she gets.** A **Header & footer** rail tab.
 - Header: announcement bar (show/hide, text, link), logo (upload, width slider 60–300 px), menu editor (Step 3 items plus one level of children, destination picker page / collection / URL), icons (search, account show/hide; cart always shown), colour set.
@@ -301,7 +301,7 @@ The chrome-borrowing logic in [fallback-cart-page.ts](../../../app/lib/fallback-
 ### Data
 Reserved rows, which live and die with the capture:
 - `/__vya/chrome/header`, `/__vya/chrome/footer`: `{v:1, html, sourcePath, markers:{active:[classes]}, signature, shared:true, adoptedAt}`
-- History comes from `keepVersion` (reason `edit`, keep 20 — see Foundations).
+- History comes from `keepVersion` (reason `edit`, keep 20. See Foundations).
 - `site_pages.chrome = 'own'` marks a page that keeps its own copy.
 
 **Region extraction** `extractChromeRegions($)`:
@@ -391,7 +391,7 @@ Applied in the catch-all route, the product route, the cart fallback (on the bor
 
 ---
 
-## Step 5 — Site-wide text size + a small section library styled from the site
+## Step 5: Site-wide text size + a small section library styled from the site
 
 **What she gets.**
 - In Design: **Heading size** (80–130 %, steps of 5) and **Body text size** (85–120 %), in the same panel as the existing fonts (her site's fonts listed first).

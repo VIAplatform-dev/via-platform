@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { colors, fonts, spacing } from "../../lib/theme";
 
-// Replying to a customer, as the store. Same thread as the buyer's screen, opposite side — which is
+// Replying to a customer, as the store. Same thread as the buyer's screen, opposite side, which is
 // why "mine" flips to the store sender here.
 
 type Message = { id: number; sender: string; body: string; createdAt: string };

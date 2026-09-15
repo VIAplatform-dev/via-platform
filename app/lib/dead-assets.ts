@@ -1,7 +1,7 @@
 /**
  * Assets that are gone from the seller's own site, and are not coming back.
  *
- * shop-vintage-charm's pages reference 704 files that no longer exist on her store — old theme
+ * shop-vintage-charm's pages reference 704 files that no longer exist on her store. Old theme
  * images and the uploads of a blog app she has since removed. `/images/arrow.jpg` 404s on her live
  * homepage right now. Every fleet run tried all 704 again, spent about 23 minutes doing it, failed
  * all 704 again, and reported the store INCOMPLETE. It converged on nothing, for ever.
@@ -15,7 +15,7 @@
 /** Did the seller's own server tell us, definitively, that this file is not there? */
 export function isPermanentlyGone(status: number | null | undefined): boolean {
  if (!status) return false; // no answer is not an answer
- // 404/410 — not found, or knowingly removed. 401/403 — she has locked it, and asking again from
+ // 404/410, not found, or knowingly removed. 401/403: she has locked it, and asking again from
  // the same place will not unlock it. Everything else, including 429 and every 5xx, is temporary.
  return status === 404 || status === 410 || status === 401 || status === 403;
 }

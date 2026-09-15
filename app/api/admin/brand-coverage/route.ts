@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// GET /api/admin/brand-coverage?limit=50 — across all events, what % resolve to a
+// GET /api/admin/brand-coverage?limit=50: across all events, what % resolve to a
 // known canonical brand, plus the highest-volume UNRESOLVED titles to expand the
 // alias map. Read-only. (Run build-events first so events.title + canonical brand
 // are populated.)

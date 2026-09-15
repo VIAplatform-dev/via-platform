@@ -1,6 +1,6 @@
 // Size parsing, split out of shopifyClient.ts.
 //
-// These are pure string helpers with no I/O, but they used to live beside the Shopify API client —
+// These are pure string helpers with no I/O, but they used to live beside the Shopify API client,
 // which imports safe-url, which imports node:dns. That dragged `dns/promises` into the browser
 // bundle through inventory.ts -> loadStoreProducts.ts -> YouMightLikeClient.tsx and broke the build.
 // Same pure/IO split as metrics.ts vs market-metrics-db.ts.
@@ -8,7 +8,7 @@
 const SIZE_VALUE_PATTERN = `(?:US|UK|EU|IT)?\\s*\\d[\\d.]*|XS|S|M|L|XL|XXL|2XL|3XL|XXXL|OS|OSFM|One\\s+Size`;
 // Matches sizes that are ONLY generic clothing letters (not numeric, not EU/UK etc.)
 export const GENERIC_CLOTHING_SIZE = /^(XS|S|M|L|XL|XXL|2XL|3XL|XXXL|OS|OSFM|One\s+Size)$/i;
-// Full-string size validator — used to reject color/other values stored as size
+// Full-string size validator: used to reject color/other values stored as size
 const SIZE_VALUE_REGEX = new RegExp(`^(${SIZE_VALUE_PATTERN})$`, "i");
 // Exported so other modules can validate DB-stored sizes (e.g. reject "Gold", "Black")
 export function isValidSizeValue(val: string): boolean {
@@ -99,7 +99,7 @@ const WORD_SIZE_MAP: Record<string, string> = {
  * Extracts an explicit US fit size the seller calls out as how the item actually
  * wears, e.g. "runs true to a 6", "true to size 6", "fits like a 6",
  * "best fits a 6.5", "best fits US 2-4". This is the seller's real-world fit
- * guidance and is treated as the most authoritative DISPLAY size — it beats a
+ * guidance and is treated as the most authoritative DISPLAY size. It beats a
  * marked EU tag size because it tells a US buyer what to actually order.
  *
  * Handles ranges ("US 2-4", "2 to 4"). An explicit "US" lets it match without an
@@ -116,11 +116,11 @@ export function extractFitSizeFromDescription(description: string | null): strin
  const patterns = [
  // "(runs) true to (a/size)? (us)? N(-M)?"
  new RegExp(`\\btrue\\s+to\\s+(?:(?:a|size)\\s+)*(?:us\\s*)?${RANGE}`, "i"),
- // "(best) fits/runs/wears (like)? (a/size)? US N(-M)?" — explicit US, filler optional
+ // "(best) fits/runs/wears (like)? (a/size)? US N(-M)?": explicit US, filler optional
  new RegExp(`\\b(?:best\\s+)?(?:fits?|runs?|wears?)\\s+(?:best\\s+)?(?:like\\s+)?(?:a\\s+|size\\s+)?us\\s*${RANGE}`, "i"),
  // "(best) fits/runs/wears like a N(-M)?"
  new RegExp(`\\b(?:fits?|runs?|wears?)\\s+(?:best\\s+)?like\\s+a\\s+(?:us\\s*)?${RANGE}`, "i"),
- // "(best) fits/runs/wears a/size N(-M)?" — require a/size (1 or 2) when there's no "US"
+ // "(best) fits/runs/wears a/size N(-M)?": require a/size (1 or 2) when there's no "US"
  new RegExp(`\\b(?:best\\s+)?(?:fits?|runs?|wears?)\\s+(?:like\\s+)?(?:(?:a|size)\\s+){1,2}(?:us\\s*)?${RANGE}`, "i"),
  ];
  const valid = (s: string) => { const n = parseFloat(s); return n >= 1 && n <= 49; };
@@ -137,7 +137,7 @@ export function extractFitSizeFromDescription(description: string | null): strin
 /**
  * Extracts an explicit US size the seller listed in a size-conversion table, e.g.
  * "UK 10 / EU 40 / US 6". The seller's own US number is authoritative for a US buyer
- * and beats formula-converting the EU/UK tag — the generic "EU − 32" rule would turn
+ * and beats formula-converting the EU/UK tag. The generic "EU − 32" rule would turn
  * this designer's EU 40 into US 8, but she states US 6. Only trusted when a UK/EU/IT/
  * FR/DE size sits alongside it, so stray text like "ships from US in 2 days" can't match.
  */
@@ -154,20 +154,20 @@ export function extractUSConversionFromDescription(description: string | null): 
 }
 
 /**
- * Extracts a LETTER fit the seller explicitly states — "Best Fit M - XL",
+ * Extracts a LETTER fit the seller explicitly states. "Best Fit M - XL",
  * "fits like a large", "Fit: M-L", "best fits medium to large". Returns a single
  * letter ("L") or a range ("M-XL"), normalized + uppercased. Like the numeric
  * fit note this is the seller's own fit guidance, so it must beat a marked
  * numeric/IT tag (which would otherwise be CONVERTED to a US number the seller
- * never stated, e.g. IT 54 → "US 18"). Conservative on purpose — only clear
- * "best fit / fits like a / fit:" phrasings — so we never guess a size.
+ * never stated, e.g. IT 54 → "US 18"). Conservative on purpose, only clear
+ * "best fit / fits like a / fit:" phrasings, so we never guess a size.
  */
 export function extractFitLetterFromDescription(description: string | null): string | null {
  if (!description) return null;
  const text = description.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ");
  // Longest tokens first so "medium" wins over "m", "large" over "l", etc.
  const TOK = `extra\\s+small|extra\\s+large|x-?large|xx-?large|small|medium|large|xxxl|xxl|xl|xs|s|m|l`;
- // (?![a-z]) after each token stops a bare letter matching the START of a word —
+ // (?![a-z]) after each token stops a bare letter matching the START of a word,
  // e.g. "Fit: Labeled IT" must not read the "L" of "Labeled" as size Large.
  const re = new RegExp(
  `\\b(?:best\\s+fits?|fits?\\s+like\\s+a|fit\\s*:)\\s+(?:a\\s+|size\\s+)?(${TOK})(?![a-z])(?:\\s*(?:[-\\u2013\\u2014/]|to)\\s*(${TOK})(?![a-z]))?`,
@@ -229,7 +229,7 @@ export function extractTaggedSizeFromDescription(description: string | null): st
 /**
  * Extracts a size from product description HTML using all available heuristics.
  * For highest-priority extraction (tagged/labeled/marked keywords), use
- * extractTaggedSizeFromDescription instead — it won't be fooled by an earlier
+ * extractTaggedSizeFromDescription instead: it won't be fooled by an earlier
  * "Size: Large [store bucket]" before "Tagged size: XS [actual tag]".
  */
 export function extractSizeFromDescription(description: string | null): string | null {
@@ -255,7 +255,7 @@ export function extractSizeFromDescription(description: string | null): string |
  const parenMatch = parenRe.exec(text);
  if (parenMatch) return parenMatch[1].trim();
 
- // 2. Full word size — requires colon after bare "size" to avoid freeform matches
+ // 2. Full word size: requires colon after bare "size" to avoid freeform matches
  // ("size large" in narrative text, "I'd recommend size large" etc.)
  const wordRe = new RegExp(
  `(?:(?:${STRICT_KW})\\s*:?|size\\s*:)\\s*(extra\\s+small|extra\\s+large|x-?large|xx-?large|small|medium|large)(?:\\s|$|[^a-z])`,
@@ -268,7 +268,7 @@ export function extractSizeFromDescription(description: string | null): string |
  }
 
  // 3. Abbreviated size after strict label or "size:" (with colon). The trailing
- // (?![a-z]) stops a letter size matching the FIRST letter of a word — e.g.
+ // (?![a-z]) stops a letter size matching the FIRST letter of a word. E.g.
  // "Size: Marked 36" must not return "M" (the M of "Marked"); it falls through
  // so the real "36" is found from the title/elsewhere.
  const re = new RegExp(
@@ -278,12 +278,12 @@ export function extractSizeFromDescription(description: string | null): string |
  const match = re.exec(text);
  if (match) return match[1].trim();
 
- // 3b. "Size 39." / "Size 38.5" — bare "size" + space + numeric (no colon needed; low false-positive)
+ // 3b. "Size 39." / "Size 38.5". Bare "size" + space + numeric (no colon needed; low false-positive)
  const bareNumericRe = /\bsize\s+((?:US|UK|EU|IT)?\s*\d[\d.]*)\.?(?:\s|$)/i;
  const bareNumericMatch = bareNumericRe.exec(text);
  if (bareNumericMatch) return bareNumericMatch[1].trim();
 
- // 3c. "Size XS," / "Size M." — bare "size" + space + letter abbreviation (no colon)
+ // 3c. "Size XS," / "Size M.". Bare "size" + space + letter abbreviation (no colon)
  const bareLetterRe = new RegExp(`\\bsize\\s+(${SIZE_VALUE_PATTERN})(?:[,.]|\\s|$)`, "i");
  const bareLetterMatch = bareLetterRe.exec(text);
  if (bareLetterMatch) return bareLetterMatch[1].trim();
@@ -293,7 +293,7 @@ export function extractSizeFromDescription(description: string | null): string |
  const euStandaloneMatch = euStandaloneRe.exec(text);
  if (euStandaloneMatch) return euStandaloneMatch[1].trim();
 
- // 5. Fallback: "fits XS", "best fits M" — (?![a-z]) so "fits Marked"/"fits like"
+ // 5. Fallback: "fits XS", "best fits M". (?![a-z]) so "fits Marked"/"fits like"
  // can't match the leading letter of the next word.
  const fitsRe = new RegExp(`(?:best\\s+)?fits?\\s+(${SIZE_VALUE_PATTERN})(?![a-z])`, "i");
  const fitsMatch = fitsRe.exec(text);

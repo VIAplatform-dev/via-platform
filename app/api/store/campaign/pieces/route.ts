@@ -5,7 +5,7 @@ import { listStorefrontItems } from "@/app/lib/db/inventory";
 
 export const dynamic = "force-dynamic";
 
-// GET — the pieces a seller can put in an email. Live listings only: an email that links to
+// GET: the pieces a seller can put in an email. Live listings only: an email that links to
 // something already sold is worse than one piece short.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);

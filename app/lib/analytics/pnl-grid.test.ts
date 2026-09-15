@@ -11,7 +11,7 @@ const e = (date: string, rowKey: string, amountCents: number, direction: "in" | 
  ({ date, rowKey, amountCents, direction, imported });
 
 test("months run from the first entry to the last with no gaps", () => {
- // An empty month is information — a shop wants to see the quiet one.
+ // An empty month is information. A shop wants to see the quiet one.
  assert.deepEqual(monthSpan([e("2026-01-05", "revenue", 1, "in"), e("2026-04-02", "revenue", 1, "in")]),
   ["2026-01", "2026-02", "2026-03", "2026-04"]);
 });
@@ -44,7 +44,7 @@ test("costs are negative and revenue positive, so the column adds up on its own"
  assert.deepEqual(g.rows.find((r) => r.key === "net")!.cells, [8_000]);
 });
 
-test("a line with nothing in it still shows — two months can't be compared otherwise", () => {
+test("a line with nothing in it still shows. Two months can't be compared otherwise", () => {
  const g = buildGrid([e("2026-01-05", "revenue", 100, "in")], ROWS);
  assert.ok(g.rows.some((r) => r.key === "expenses"));
  assert.deepEqual(g.rows.find((r) => r.key === "expenses")!.cells, [0]);

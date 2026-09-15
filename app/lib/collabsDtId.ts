@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 /**
  * Extracts and caches a product's Shopify Collabs `dt_id` value so we can
  * skip the `collabs.shop` intermediate redirect and route buyers straight
- * to the store's cart URL — preserving Collabs attribution AND giving
+ * to the store's cart URL. Preserving Collabs attribution AND giving
  * single-click checkout UX.
  *
  * Confirmed working: a URL like `https://store.com/cart/{variantId}:1?dt_id=X`
@@ -58,7 +58,7 @@ async function fetchDtIdFromCollabsLink(collabsLink: string, hops = 5): Promise<
  // Follow the Location header
  const location = res.headers.get("location");
  if (!location) {
-  // No more redirects — try parsing dt_id from the current URL one last time
+  // No more redirects. Try parsing dt_id from the current URL one last time
   return direct;
  }
  // Resolve relative URLs against the previous one
@@ -102,8 +102,8 @@ export async function getDtIdForProduct(productId: number): Promise<string | nul
 /**
  * Pre-resolve and cache the `dt_id` for products that have a collabs_link but no cached dt_id yet,
  * so checkout NEVER depends on a live collabs.shop fetch at click time (which could fail or, on a
- * multi-item cart, drop attribution). Run from the collabs-link generation cron — which also fires
- * right after each store sync — so a product's dt_id is warm within moments of getting its link.
+ * multi-item cart, drop attribution). Run from the collabs-link generation cron, which also fires
+ * right after each store sync, so a product's dt_id is warm within moments of getting its link.
  * Newest links first. Returns how many were resolved.
  */
 export async function backfillDtIds(limit = 250): Promise<{ resolved: number; attempted: number }> {

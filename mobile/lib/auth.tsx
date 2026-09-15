@@ -10,13 +10,13 @@ import type { User } from "./types";
 // Two ways in, both recovered from the shipped build: an emailed magic link, and Google. Whichever
 // is used, the API hands back a JWT which is the only credential the app keeps.
 //
-// WHERE THE TOKEN LIVES. SecureStore — the iOS keychain — not AsyncStorage. The token is a bearer
+// WHERE THE TOKEN LIVES. SecureStore, the iOS keychain, not AsyncStorage. The token is a bearer
 // credential for someone's account and their order history; AsyncStorage is a plaintext file in the
 // app container.
 //
 // WHY `me` RUNS ON LAUNCH. /api/mobile/auth/me returns a freshly renewed token on every call, so
 // calling it at startup both validates the stored token and extends it. A token that has actually
-// expired fails here, once, quietly — instead of failing later as an unexplained empty feed.
+// expired fails here, once, quietly. Instead of failing later as an unexplained empty feed.
 
 const TOKEN_KEY = "vya.auth.token";
 
@@ -25,11 +25,11 @@ type AuthState = {
   token: string | null;
   /** The store this account administers, when the email matches a store contact. */
   storeSlug: string | null;
-  /** True until the stored token has been read and checked — hold navigation until then. */
+  /** True until the stored token has been read and checked. Hold navigation until then. */
   loading: boolean;
   /** Development build with dev-login configured: the sign-in screen is bypassed. */
   devMode: boolean;
-  /** Re-read the session — after creating a store, so `storeSlug` stops being null. */
+  /** Re-read the session, after creating a store, so `storeSlug` stops being null. */
   refresh: () => Promise<void>;
   requestMagicLink: (email: string) => Promise<void>;
   verifyMagicLink: (token: string) => Promise<string | null>;
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!stored) {
           // Expo Go can't receive the emailed link (it isn't registered for the vya:// scheme), so
           // in development we mint a session directly instead of showing a form that cannot be
-          // completed. Release builds never reach this — see lib/devAuth.ts.
+          // completed. Release builds never reach this. See lib/devAuth.ts.
           const dev = await devLogin();
           if (dev) {
             setStoreSlug(dev.storeSlug ?? null);
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const requestMagicLink = useCallback(async (email: string) => {
     // In development the API signs a token immediately rather than sending mail, so honour it if
-    // it comes back — otherwise this just sends the email and the callback route finishes the job.
+    // it comes back: otherwise this just sends the email and the callback route finishes the job.
     const r = await apiPost<{ ok: boolean; token?: string; user?: User }>("/api/mobile/auth/magic-link/request", { email });
     if (r.token && r.user) await applyToken(r.token, r.user);
   }, [applyToken]);

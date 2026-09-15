@@ -24,7 +24,7 @@ function QuickInner() {
  const router = useRouter();
  const camRef = useRef<HTMLInputElement>(null);
  // Mid-sale (came from the basket's "Add another item"): the only outcome that makes sense is
- // "add this new item to the sale" — no separate checkout/cash/just-list choice.
+ // "add this new item to the sale", no separate checkout/cash/just-list choice.
  const adding = useSearchParams().get("add") === "1" || readCart().length > 0;
  const [photo, setPhoto] = useState<string | null>(null);
  const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -61,11 +61,11 @@ function QuickInner() {
  setImageUrl(r.data.imageUrl);
  const d = r.data.draft;
  if (d) { setF((o) => ({ ...o, title: d.title || o.title, brand: d.brandConfidence >= 0.75 ? (d.brand || "") : o.brand, size: d.size || o.size, category: d.category || o.category, condition: d.condition || o.condition, era: d.era || o.era, material: d.material || o.material, description: d.description || o.description })); setHint(d.priceHint); }
- else if (r.data.notConfigured) setErr("AI isn't set up on this server — fill in the fields by hand.");
+ else if (r.data.notConfigured) setErr("AI isn't set up on this server. Fill in the fields by hand.");
  setPhase("form");
  }
 
- // Manual mode: the photo is optional and never goes to the AI — just stored for the listing.
+ // Manual mode: the photo is optional and never goes to the AI, just stored for the listing.
  async function onManualPhoto(files: FileList | null) {
  const file = files?.[0]; if (!file) return;
  setErr(null); setUploading(true);
@@ -92,7 +92,7 @@ function QuickInner() {
  if (d) {
  setF({ title: d.title || "", brand: d.brandConfidence >= 0.75 ? (d.brand || "") : "", price: "", size: d.size || "", category: d.category || "", condition: d.condition || "", era: d.era || "", material: d.material || "", description: d.description || "" });
  setHint(d.priceHint);
- } else if (r.data.notConfigured) setErr("AI isn't set up on this server — fill in the fields by hand.");
+ } else if (r.data.notConfigured) setErr("AI isn't set up on this server. Fill in the fields by hand.");
  setPhase("form");
  } catch { setErr("Couldn't read that photo."); setPhase("start"); }
  }
@@ -100,7 +100,7 @@ function QuickInner() {
  async function create(startCheckout: "qr" | "cash" | null) {
  if (mode === "manual" && !f.title.trim()) { setErr("Give it a name."); return; }
  if (!(Number(f.price) > 0)) { setErr("Enter a price."); return; }
- if (uploading) { setErr("Photo is still saving — one second."); return; }
+ if (uploading) { setErr("Photo is still saving. One second."); return; }
  setBusy(startCheckout ?? "list"); setErr(null);
  const r = await api<{ item: { id: string }; checkout: { id: string; tender: string } | null }>("/api/store/market/quick-list/create", { method: "POST", body: JSON.stringify({ ...f, price: Number(f.price), imageUrl, startCheckout, clientKey: newClientKey() }) });
  setBusy(null);
@@ -127,7 +127,7 @@ function QuickInner() {
  </button>
  <button type="button" onClick={() => { setMode("ai"); camRef.current?.click(); }} className="flex w-full items-center gap-4 rounded-3xl border border-stone-200 bg-white p-5 text-left text-stone-900 active:scale-[0.99]">
  <Sparkles size={28} className="shrink-0 text-[#5D0F17]" />
- <span><span className="block text-[18px] font-semibold">AI listing from a photo</span><span className="block text-[13px] text-stone-500">Snap it — brand, title and details get drafted. You set the price.</span></span>
+ <span><span className="block text-[18px] font-semibold">AI listing from a photo</span><span className="block text-[13px] text-stone-500">Snap it: brand, title and details get drafted. You set the price.</span></span>
  </button>
  </div>
  </>
@@ -148,13 +148,13 @@ function QuickInner() {
  {uploading ? "Saving photo…" : photo ? <button onClick={() => camRef.current?.click()} className="underline">{mode === "ai" ? "Retake" : "Change photo"}</button> : "Add a photo (optional)"}
  {mode === "manual" && (carried
  ? <p className="mt-1 text-[12px] text-stone-400">Photo from your search is attached. <button onClick={aiFromCarried} disabled={uploading} className="font-semibold text-[#5D0F17] underline">Let AI fill it in</button></p>
- : <p className="mt-1 text-[12px] text-stone-400">Manual listing — you can fill in details later.</p>)}
+ : <p className="mt-1 text-[12px] text-stone-400">Manual listing. You can fill in details later.</p>)}
  </div>
  </div>
  {mode === "manual" && <label className="block"><span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Name</span><input autoFocus value={f.title} onChange={(e) => set("title", e.target.value)} placeholder="e.g. Levi's 501 jeans, 32" className={`mt-1 ${input}`} /></label>}
  <label className="block"><span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Price</span>
  <div className="mt-1 flex items-center gap-2 rounded-xl border border-stone-300 bg-white px-3 focus-within:border-stone-900"><span className="text-[24px] font-semibold text-stone-400">$</span><input autoFocus={mode === "ai"} inputMode="decimal" value={f.price} onChange={(e) => set("price", e.target.value)} placeholder={hint ? String(hint) : "0"} className="min-h-[56px] w-full bg-transparent text-[28px] font-semibold outline-none" /></div>
- {hint && !f.price && <button onClick={() => set("price", String(hint))} className="mt-1 text-[12px] text-stone-500">AI suggests ${hint} — tap to use</button>}
+ {hint && !f.price && <button onClick={() => set("price", String(hint))} className="mt-1 text-[12px] text-stone-500">AI suggests ${hint}: tap to use</button>}
  </label>
  {mode === "ai" && <label className="block"><span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Title</span><input value={f.title} onChange={(e) => set("title", e.target.value)} className={`mt-1 ${input}`} /></label>}
  {mode === "ai" && <label className="block"><span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">Brand</span><input value={f.brand} onChange={(e) => set("brand", e.target.value)} placeholder="Unbranded" className={`mt-1 ${input}`} /></label>}

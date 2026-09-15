@@ -4,7 +4,7 @@ import { getStoreAnalytics } from "@/app/lib/store-analytics-db";
 
 export const dynamic = "force-dynamic";
 
-// GET ?days=30|90|all — the acting store's own business analytics.
+// GET ?days=30|90|all: the acting store's own business analytics.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

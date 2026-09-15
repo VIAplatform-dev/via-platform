@@ -31,7 +31,7 @@ const TITLE_COLOR_WORDS = [
 // One-time: clear the stored vision colour for products whose TITLE has no colour
 // word, so the next backfill re-reads them with the hint-aware prompt (the old
 // prompt coloured the whole image and could pick a model's other garment). Items
-// WITH a colour word in the title are left alone — colorOf ignores their vision
+// WITH a colour word in the title are left alone. ColorOf ignores their vision
 // value anyway. Returns how many were queued for re-colouring.
 export async function resetTitlelessImageColors(): Promise<{ reset: number }> {
  const sql = db();
@@ -49,7 +49,7 @@ export async function resetTitlelessImageColors(): Promise<{ reset: number }> {
 
 export async function backfillImageColors(limit: number): Promise<BackfillResult> {
  const sql = db();
- // Safe on first run — columns may not exist yet.
+ // Safe on first run. Columns may not exist yet.
  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_color TEXT`;
  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_color_at TIMESTAMPTZ`;
 

@@ -17,10 +17,10 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// POST /api/admin/build-events?full=1 — run the events ETL on demand.
+// POST /api/admin/build-events?full=1: run the events ETL on demand.
 // full=1 rebuilds the whole history (use once to backfill); otherwise incremental.
 // dryRun=1 computes the quality-filter breakdown (bots/internal/bursts) WITHOUT
-// writing — pair with full=1 to see what % of ALL current events would be filtered.
+// writing. Pair with full=1 to see what % of ALL current events would be filtered.
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  const sp = new URL(request.url).searchParams;

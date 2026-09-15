@@ -8,7 +8,7 @@ type Offer = {
  storeSlug: string; itemId: string | null; itemTitle: string | null;
  listPriceCents: number; amountCents: number;
  status: "pending" | "accepted" | "declined" | "expired" | "withdrawn";
- lastActor: "buyer" | "store"; binding: boolean;
+ lastActor: "buyer" | "store"; binding: boolean; paid?: boolean;
 };
 
 const money = (c: number) => `$${Math.round(c / 100).toLocaleString()}`;
@@ -52,7 +52,7 @@ export default function OfferPage() {
 
  const buyersTurn = offer.status === "pending" && offer.lastActor === "store";
  const waiting = offer.status === "pending" && offer.lastActor === "buyer";
- // A binding offer checks out at the AGREED price — the token is what unlocks it (and what lets
+ // A binding offer checks out at the AGREED price. The token is what unlocks it (and what lets
  // this buyer past the reservation the store's acceptance placed on the piece). A non-binding
  // one is just a promise, so send them back to the piece on the store's own storefront to buy at
  // list; only fall back to the marketplace page if the store has no storefront handle.
@@ -74,8 +74,20 @@ export default function OfferPage() {
  {offer.status === "accepted" ? (
  <>
  <p className="text-[13px] font-medium text-emerald-700">✓ Accepted at {money(offer.amountCents)}</p>
- <p className="mt-1 text-[13px] text-black/60">{offer.binding ? "Complete your purchase at the agreed price." : "The seller will honor this price."}</p>
- {offer.itemId && <a href={buyHref} className="mt-3 inline-block bg-[#5D0F17] text-[#FFFDF8] text-[11px] uppercase tracking-[0.15em] px-6 py-3 hover:bg-[#5D0F17]/85 transition">Buy now</a>}
+ <p className="mt-1 text-[13px] text-black/60">{offer.paid
+          /* Charged against the card she authorised when she made the offer. */
+          ? "Paid with the card you gave. Nothing else to do."
+          : offer.binding
+          /* Binding, but the charge didn't go through: an expired card, or not enough in the
+             account. The shop is holding the piece rather than losing the sale over it, and she
+             pays here instead. Telling her she has paid would cost her the piece a week later. */
+          ? "We couldn't take the card you gave. The piece is held for you, so finish up here."
+          /* THE HALF A BUYER ACTUALLY NEEDS. This said only "the seller will honor this price",
+             which is true and leaves out the part that costs her the piece: on a shop that has not
+             switched binding on, accepting holds nothing, and somebody else can buy it while she
+             thinks about it. */
+          : "The seller has agreed this price. The piece is still on sale until you pay for it."}</p>
+ {offer.itemId && !offer.paid && <a href={buyHref} className="mt-3 inline-block bg-[#5D0F17] text-[#FFFDF8] text-[11px] uppercase tracking-[0.15em] px-6 py-3 hover:bg-[#5D0F17]/85 transition">Buy now</a>}
  </>
  ) : offer.status === "declined" ? (
  <p className="text-[13px] text-black/60">The seller passed on this offer. The piece is still available at {money(offer.listPriceCents)}.</p>
@@ -86,7 +98,7 @@ export default function OfferPage() {
  ) : buyersTurn ? (
  <>
  <p className="text-[13px] font-medium text-black">The seller countered at {money(offer.amountCents)}</p>
- <p className="mt-1 text-[12px] text-black/50">Your last offer was lower — accept their price, counter back, or pass.</p>
+ <p className="mt-1 text-[12px] text-black/50">Your last offer was lower. Accept their price, counter back, or pass.</p>
  </>
  ) : (
  <p className="text-[13px] text-black/60">Your offer of <b>{money(offer.amountCents)}</b> is with the seller. We’ll email you the moment they respond.</p>

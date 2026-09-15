@@ -3,7 +3,7 @@ import { ensureAnalyticsViews } from "./views";
 import { deltaPct, type ResolvedPeriod, type Window } from "./period";
 
 // ───────────────────────────────────────────────────────────────────────────
-// Analytics — engagement, traffic and attribution.
+// Analytics: engagement, traffic and attribution.
 //
 // The funnel (views → favourites → checkout starts → purchases) with the
 // drop-off between every pair of steps, where visitors came from, and which of
@@ -11,7 +11,7 @@ import { deltaPct, type ResolvedPeriod, type Window } from "./period";
 //
 // Attribution note: one-of-one inventory makes item-level attribution exact in a
 // way it never is for a normal shop. A piece sells once, so the last session
-// that touched THAT piece before it sold is the session that sold it — no
+// that touched THAT piece before it sold is the session that sold it, no
 // probabilistic splitting required. Channel comes from joining that session back
 // to `store_visits`, which classified its entry source on arrival.
 // ───────────────────────────────────────────────────────────────────────────
@@ -20,7 +20,7 @@ export type FunnelStep = {
  step: "view" | "favorite" | "checkout_start" | "purchase";
  label: string;
  count: number;
- /** Share of the step above — the drop-off read. */
+ /** Share of the step above. The drop-off read. */
  ofPreviousPct: number;
  /** Share of the top of the funnel. */
  ofTopPct: number;
@@ -38,7 +38,7 @@ export type ChannelRow = {
 export type EngagementMetrics = {
  sessions: number;
  pageviews: number;
- /** Sessions that saw exactly one page — they arrived and left without going deeper. */
+ /** Sessions that saw exactly one page. They arrived and left without going deeper. */
  bounceRatePct: number;
  pagesPerSession: number;
  funnel: FunnelStep[];
@@ -51,7 +51,7 @@ export type EngagementMetrics = {
  trafficByType: { type: string; sessions: number; sharePct: number }[];
  topSources: { source: string; type: string; sessions: number }[];
  topPages: { path: string; type: string; title: string | null; views: number; visitors: number }[];
- /** The first page of each session — what people actually land on. */
+ /** The first page of each session. What people actually land on. */
  landingPages: { path: string; title: string | null; sessions: number }[];
  /** Phone / tablet / desktop split. Only counts visits recorded since device capture shipped. */
  devices: { device: string; sessions: number; sharePct: number }[];
@@ -67,7 +67,7 @@ export type EngagementMetrics = {
  unattributedOrders: number;
  /**
   * Share of the period's sales that could be traced to a session at all. Low
-  * coverage means the channel table below is a sample, not the whole story —
+  * coverage means the channel table below is a sample, not the whole story,
   * the UI should say so rather than let a seller read it as complete.
   */
  attributionCoveragePct: number;
@@ -140,7 +140,7 @@ export async function getEngagementMetrics(sellerId: string, slug: string, perio
     WHERE store_slug = ${slug} AND timestamp >= ${current.startISO} AND timestamp < ${current.endISO}
     GROUP BY 1, 2 ORDER BY 4 DESC LIMIT 12
    `.catch(() => []),
-   // The first page of each session — where people actually enter the store.
+   // The first page of each session, where people actually enter the store.
    sql`
     WITH entry AS (
      SELECT DISTINCT ON (session_id) session_id, path, title
@@ -184,7 +184,7 @@ export async function getEngagementMetrics(sellerId: string, slug: string, perio
      AND city IS NOT NULL AND city <> ''
     GROUP BY 1 ORDER BY 4 DESC LIMIT 10
    `.catch(() => []),
-   // What shoppers typed into the store's own search — demand the catalog may not answer yet.
+   // What shoppers typed into the store's own search. Demand the catalog may not answer yet.
    sql`
     SELECT lower(query) AS query, COUNT(*)::int AS n FROM store_searches
     WHERE store_slug = ${slug} AND created_at >= ${current.startISO} AND created_at < ${current.endISO}

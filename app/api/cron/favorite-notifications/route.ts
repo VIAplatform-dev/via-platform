@@ -23,7 +23,7 @@ export async function GET(request: Request) {
  try {
  const candidates = await getFavoriteNotificationCandidates();
 
- // Group all qualifying products by user — one email per user, never one per product
+ // Group all qualifying products by user. One email per user, never one per product
  const byUser = new Map<string, typeof candidates>();
  for (const c of candidates) {
  const existing = byUser.get(c.user_id) ?? [];

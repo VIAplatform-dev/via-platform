@@ -31,7 +31,7 @@ test("order is still the order she left them in", () => {
  assert.deepEqual($("section").map((_i, e) => $(e).attr("data-x")).get(), ["b", "a"]);
 });
 
-test("her own markup comes home intact — a form is still a form, a style is still a style", () => {
+test("her own markup comes home intact. A form is still a form, a style is still a style", () => {
  // The strict sanitiser we use for pasted markup unwraps forms and drops inline <style>; running it
  // over her own captured section would degrade the section every time she nudged something in it.
  const rich = `<section data-x="a"><style>.c{color:red}</style><form action="/subscribe"><input name="email"><button>Join</button></form></section>`;

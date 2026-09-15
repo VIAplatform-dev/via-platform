@@ -6,8 +6,8 @@ type ThemeBlock = { id: string; type: string; props: Record<string, string>; sty
 const cap = (s: string | undefined, n: number) => String(s ?? "").slice(0, n);
 // Custom sections are the "build anything" escape hatch, in two flavours, both handled at this one
 // write chokepoint (covers the editor, the design API, and the AI):
-//  • inline  — static markup rendered into the page. XSS-sensitive, so scrub to the safe allowlist.
-//  • sandbox — full HTML+CSS+JS rendered inside an isolated sandboxed iframe (SandboxEmbed). It
+//  • inline: static markup rendered into the page. XSS-sensitive, so scrub to the safe allowlist.
+//  • sandbox: full HTML+CSS+JS rendered inside an isolated sandboxed iframe (SandboxEmbed). It
 //    can't touch the store, so the JS is kept as-is; we only bound its size.
 function scrubBlocks(blocks?: ThemeBlock[]): ThemeBlock[] | undefined {
  if (!Array.isArray(blocks)) return blocks;
@@ -49,11 +49,15 @@ export type StorefrontSettings = {
  customDomain: string | null;
  theme: StorefrontTheme | null; // extracted design (fonts/colors/logo)
  // Which storefront is live: the imported copy of their site, or the design they built. Null on
- // stores that predate storefront versions — serving then falls back to the old capture check.
+ // stores that predate storefront versions. Serving then falls back to the old capture check.
  serveMode: "imported" | "built" | null;
  // Can her shoppers save pieces? Off until she turns it on: a heart on every card is a promise
  // that someone will come back for the piece, and that is the seller's call to make, not ours.
  wishlistEnabled: boolean;
+ // Whether her product pages carry "Ships to … · Shipping from $X · All sales final". Off until she
+ // turns it on: it appeared the moment a shipping address was saved, so every storefront quoted
+ // postage in the shop's name that the shop never agreed to say. See storefront-product-notes.ts.
+ productNotesEnabled: boolean;
  updatedAt?: string;
 };
 
@@ -86,6 +90,7 @@ function ensureTable(): Promise<void> {
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS theme_prev JSONB`;
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS serve_mode TEXT`;
  await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS wishlist_enabled BOOLEAN NOT NULL DEFAULT FALSE`;
+ await sql`ALTER TABLE storefront_settings ADD COLUMN IF NOT EXISTS product_notes_enabled BOOLEAN NOT NULL DEFAULT FALSE`;
  })().catch((e) => {
  tableReady = null; // allow retry on transient failure
  throw e;
@@ -108,6 +113,7 @@ function rowToSettings(r: any): StorefrontSettings {
  theme: (r.theme as StorefrontTheme) ?? null,
  serveMode: r.serve_mode === "imported" || r.serve_mode === "built" ? r.serve_mode : null,
  wishlistEnabled: r.wishlist_enabled === true,
+ productNotesEnabled: r.product_notes_enabled === true,
  updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : undefined,
  };
 }
@@ -130,7 +136,7 @@ export async function revertStorefrontTheme(storeSlug: string): Promise<boolean>
  return rows.length > 0;
 }
 
-/** Remove a store's storefront entirely — settings, theme, pages, handle, publish state. A clean
+/** Remove a store's storefront entirely. Settings, theme, pages, handle, publish state. A clean
  *  slate: the public handle stops resolving and the editor reopens blank. Idempotent. */
 /**
  * Record which storefront is live. Written by publishVersion; read by serving so a built design can
@@ -157,13 +163,27 @@ export async function setWishlistEnabled(storeSlug: string, on: boolean): Promis
  await sql`UPDATE storefront_settings SET wishlist_enabled = ${on}, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
 }
 
+/**
+ * Turn the shipping-and-returns note on her product pages on or off.
+ *
+ * Starts off for every store, including the ones that had it. It was never a choice anybody made:
+ * saving a ship-from address so labels could be bought also published a postage quote to shoppers.
+ * A price on a public page is a promise, and "from $8" is a floor. The buyer across the country
+ * pays more. The seller decides whether her site says it.
+ */
+export async function setProductNotesEnabled(storeSlug: string, on: boolean): Promise<void> {
+ await ensureTable();
+ const sql = neon(getDatabaseUrl());
+ await sql`UPDATE storefront_settings SET product_notes_enabled = ${on}, updated_at = NOW() WHERE store_slug = ${storeSlug}`;
+}
+
 export async function deleteStorefront(storeSlug: string): Promise<void> {
  await ensureTable();
  const sql = neon(getDatabaseUrl());
  await sql`DELETE FROM storefront_settings WHERE store_slug = ${storeSlug}`;
 }
 
-/** Public lookup for the storefront page — only enabled rows resolve. */
+/** Public lookup for the storefront page, only enabled rows resolve. */
 export async function getStorefrontByHandle(handle: string): Promise<StorefrontSettings | null> {
  await ensureTable();
  const sql = neon(getDatabaseUrl());
@@ -172,7 +192,7 @@ export async function getStorefrontByHandle(handle: string): Promise<StorefrontS
  return rows.length ? rowToSettings(rows[0]) : null;
 }
 
-/** Preview lookup — resolves a handle even when the storefront is off (owner
+/** Preview lookup: resolves a handle even when the storefront is off (owner
  * preview). The public page only uses this with ?preview and shows a ribbon. */
 export async function getStorefrontByHandleAny(handle: string): Promise<StorefrontSettings | null> {
  await ensureTable();
@@ -182,7 +202,7 @@ export async function getStorefrontByHandleAny(handle: string): Promise<Storefro
  return rows.length ? rowToSettings(rows[0]) : null;
 }
 
-/** Editor lookup — returns the row for a store regardless of enabled state. */
+/** Editor lookup: returns the row for a store regardless of enabled state. */
 export async function getStorefrontBySlug(storeSlug: string): Promise<StorefrontSettings | null> {
  await ensureTable();
  const sql = neon(getDatabaseUrl());

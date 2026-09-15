@@ -1,8 +1,8 @@
 // The P&L as a spreadsheet: months across the top, lines down the side.
 //
 // The existing Profit & loss is one column for one period, which answers "how did this quarter go"
-// and nothing else. A shop keeps its books to see the shape of a year — which months carry it, when
-// costs jumped, whether last March beat this one — and that is a grid, which is why every seller
+// and nothing else. A shop keeps its books to see the shape of a year, which months carry it, when
+// costs jumped, whether last March beat this one, and that is a grid, which is why every seller
 // already has one in Excel.
 //
 // Pure, so the arithmetic can be tested and so the same numbers can be rendered on screen and
@@ -10,7 +10,7 @@
 
 export type MoneyDirection = "in" | "out";
 
-/** One dated amount — from her own imported sheet, or from VYA's records. */
+/** One dated amount, from her own imported sheet, or from VYA's records. */
 export type LedgerEntry = {
  date: string;          // yyyy-mm-dd
  rowKey: string;        // which P&L line it belongs to
@@ -33,7 +33,7 @@ export type Grid = {
  months: string[];
  monthLabels: string[];
  rows: GridRow[];
- /** Months holding BOTH imported rows and VYA's own — where a figure could be counted twice. */
+ /** Months holding BOTH imported rows and VYA's own, where a figure could be counted twice. */
  overlapMonths: string[];
 };
 
@@ -47,7 +47,7 @@ export function monthLabel(m: string): string {
  return `${MONTH_NAMES[i] ?? mo} ${String(y).slice(2)}`;
 }
 
-/** Every month from the earliest entry to the latest, with no gaps — an empty month is information. */
+/** Every month from the earliest entry to the latest, with no gaps. An empty month is information. */
 export function monthSpan(entries: LedgerEntry[]): string[] {
  const ms = entries.map((e) => monthOf(e.date)).filter(Boolean).sort();
  if (!ms.length) return [];
@@ -67,7 +67,7 @@ export function monthSpan(entries: LedgerEntry[]): string[] {
  * Build the grid.
  *
  * `rowOrder` fixes which lines appear and in what order, so a month with no shipping labels still
- * shows the row — a line that vanishes when it's zero makes two months impossible to compare.
+ * shows the row: a line that vanishes when it's zero makes two months impossible to compare.
  */
 export function buildGrid(
  entries: LedgerEntry[],
@@ -98,7 +98,7 @@ export function buildGrid(
   return { key: r.key, label: r.label, direction: r.direction, cells, total: cells.reduce((a, b) => a + b, 0) };
  });
 
- // The closing line, computed from the rows above rather than from the entries again — one sum, so
+ // The closing line, computed from the rows above rather than from the entries again. One sum, so
  // the column can never disagree with what is printed above it.
  const net = months.map((_m, i) => rows.reduce((s, r) => s + r.cells[i], 0));
  rows.push({ key: "net", label: "Net profit", direction: "net", cells: net, total: net.reduce((a, b) => a + b, 0) });

@@ -42,7 +42,7 @@ export type CategorySlug = keyof typeof categoryMap;
 export type CategoryLabel = (typeof categoryMap)[CategorySlug];
 
 // Slugs that fall under the "Clothing" display category
-// Note: "other-clothing" is intentionally excluded — items that don't match
+// Note: "other-clothing" is intentionally excluded. Items that don't match
 // a specific clothing keyword should not pollute the clothing category page.
 export const clothingSlugs = new Set<CategorySlug>([
  "tops", "sweaters", "coats-jackets", "pants", "jeans",

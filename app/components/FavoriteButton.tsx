@@ -119,7 +119,7 @@ export default function FavoriteButton({
  onClick={handleClick}
  aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
  // The heart sits on a product photo the whole card links to, so a near-miss doesn't do
- // nothing — it opens the product. The circle stays 32/40px because that is the design;
+ // nothing. It opens the product. The circle stays 32/40px because that is the design;
  // the TOUCH target is grown to 44 with a transparent pseudo-element instead, which costs
  // no layout and no visual change. `relative` on the wrapper keeps it anchored.
  className={`relative inline-flex items-center justify-center transition-all duration-200 before:absolute before:content-[''] ${

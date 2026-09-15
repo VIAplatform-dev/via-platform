@@ -17,7 +17,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// GET /api/admin/listing-quality?store=<slug> — products missing size /
+// GET /api/admin/listing-quality?store=<slug> products missing size /
 // measurements / description / image, plus a per-store summary.
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

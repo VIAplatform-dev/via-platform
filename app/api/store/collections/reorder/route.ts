@@ -5,7 +5,7 @@ import { reorderCollections } from "@/app/lib/db/collections";
 
 export const dynamic = "force-dynamic";
 
-// POST { order: string[] } — the seller's own order for her collections, top to bottom.
+// POST { order: string[] }: the seller's own order for her collections, top to bottom.
 //
 // This is not decoration: a "shop by collection" row on her storefront has room for however many
 // tiles her theme drew, so WHICH collections appear there is exactly this order.

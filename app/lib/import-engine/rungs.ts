@@ -2,14 +2,14 @@
 //
 // Each rung is tried in turn and the first that returns products wins, so a platform we know well
 // uses its own clean feed while an unknown one still imports through generic signals. Nothing here
-// is Shopify-specific — Shopify is just one rung among several (see store-import.ts for its feed
+// is Shopify-specific: Shopify is just one rung among several (see store-import.ts for its feed
 // and Squarespace's).
 //
-//   1. native feed        — the platform publishes structured products (Shopify, Squarespace, Woo)
-//   2. sitemap + JSON-LD  — no feed, but every product page carries schema.org markup
+//   1. native feed. The platform publishes structured products (Shopify, Squarespace, Woo)
+//   2. sitemap + JSON-LD, no feed, but every product page carries schema.org markup
 //                           (BigCommerce, Webflow, most custom server-rendered stores)
-//   3. embedded state     — the page is a JS app but ships its data inline (Remix/Next/Nuxt)
-//   4. decline            — nothing readable; say so and offer CSV / a platform connection
+//   3. embedded state: the page is a JS app but ships its data inline (Remix/Next/Nuxt)
+//   4. decline: nothing readable; say so and offer CSV / a platform connection
 //
 // Every fetch goes through safeFetch (SSRF guard + per-hop redirect revalidation) and is bounded,
 // so one huge catalog can't turn a single import into thousands of outbound requests.
@@ -20,8 +20,8 @@ import type { ImportedProduct } from "../store-import.ts";
 import { looksLikeBotChallenge, type PlatformId } from "./detect.ts";
 
 // The same browser User-Agent the site capture uses. A bare "VYA-Importer/1.0" is blocked outright
-// (403) by common WordPress/Cloudflare bot rules — including on a store whose own public Store API
-// serves the data fine to a normal client — so an honest-but-unknown UA just makes imports fail for
+// (403) by common WordPress/Cloudflare bot rules, including on a store whose own public Store API
+// serves the data fine to a normal client, so an honest-but-unknown UA just makes imports fail for
 // sellers importing their OWN shop. If a site still refuses, we decline and say so rather than
 // trying to work around the block.
 const UA = {
@@ -45,7 +45,7 @@ export class BlockedByStoreError extends Error {
 }
 const LIMITS = {
  sitemapUrls: 400, // product URLs we'll follow from a sitemap
- concurrency: 4, // parallel fetches against ONE store — polite, and enough to be quick
+ concurrency: 4, // parallel fetches against ONE store. Polite, and enough to be quick
  pageTimeoutMs: 12000,
  maxBytesPerPage: 2_000_000,
 };
@@ -69,13 +69,13 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 async function fetchTextCapped(url: string, opts?: { flagBlocks?: boolean }): Promise<string | null> {
  try {
   const r = await safeFetch(url, { headers: UA, signal: AbortSignal.timeout(LIMITS.pageTimeoutMs) });
-  // 403/429 mean "we see you and we're saying no" — distinct from a 404, and worth surfacing.
+  // 403/429 mean "we see you and we're saying no". Distinct from a 404, and worth surfacing.
   if (opts?.flagBlocks && (r.status === 403 || r.status === 429)) throw new BlockedByStoreError(r.status, url);
   if (!r.ok) return null;
   const text = await r.text();
   // A bot-protection interstitial can arrive with a 200 (see looksLikeBotChallenge). Treating it as
   // page content meant the ladder read no products and blamed the seller's platform instead of
-  // saying the store is refusing us — the difference between "we can't import this" and a fixable
+  // saying the store is refusing us. The difference between "we can't import this" and a fixable
   // "your site is blocking automated requests".
   if (looksLikeBotChallenge(text)) { if (opts?.flagBlocks) throw new BlockedByStoreError(r.status, url); return null; }
   return text.length > LIMITS.maxBytesPerPage ? text.slice(0, LIMITS.maxBytesPerPage) : text;
@@ -86,7 +86,7 @@ async function fetchTextCapped(url: string, opts?: { flagBlocks?: boolean }): Pr
 }
 
 // ── Rung 1b: WooCommerce ────────────────────────────────────────────────────────────────────
-// Woo ships a PUBLIC Store API (no key) that is as clean as Shopify's feed — names, prices with an
+// Woo ships a PUBLIC Store API (no key) that is as clean as Shopify's feed. Names, prices with an
 // explicit currency code and minor-unit exponent, images, stock, and variation ids. It's the single
 // biggest coverage win outside Shopify, and it was never wired up.
 
@@ -146,7 +146,7 @@ export async function fetchWooProducts(origin: string, max = 1500): Promise<Impo
 // ── Rung 2: sitemap + JSON-LD ───────────────────────────────────────────────────────────────
 // For platforms with no public feed. Product pages almost always carry schema.org Product markup
 // (search engines require it), so the sitemap tells us WHICH pages are products and the JSON-LD on
-// each tells us what they contain. Slower than a feed — one request per product — hence the caps.
+// each tells us what they contain. Slower than a feed, one request per product. Hence the caps.
 
 /** Where each platform publishes its product URLs. Tried in order; the first that parses wins. */
 export function sitemapCandidates(origin: string, platform: PlatformId): string[] {
@@ -167,7 +167,7 @@ const locsIn = (xml: string) => [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m
 /** Collect product URLs from a store's sitemap(s), following one level of sitemap-index nesting. */
 export async function discoverProductUrls(origin: string, platform: PlatformId, max = LIMITS.sitemapUrls): Promise<string[]> {
  // Path-shape heuristic for GENERIC sitemaps only. Plenty of platforms (BigCommerce especially)
- // publish products at the site root — "/1950s-silk-dress/" — so requiring a "/products/" segment
+ // publish products at the site root, "/1950s-silk-dress/", so requiring a "/products/" segment
  // found nothing at all on those stores.
  const looksLikeProduct = (u: string) => /\/(products?|shop|item|listing)\//i.test(u);
  const isProductSitemap = (u: string) => /type=products?|product[-_]sitemap|sitemap[-_]products?/i.test(u);
@@ -262,7 +262,7 @@ export function productFromJsonLd(html: string, pageUrl: string): ImportedProduc
   description: typeof product.description === "string" ? product.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : null,
   available,
   sourcePlatform: "jsonld",
-  // Prefer the page's own path as identity — it's stable and unique where a SKU may be absent.
+  // Prefer the page's own path as identity. It's stable and unique where a SKU may be absent.
   sourceId: sku || new URL(pageUrl).pathname.replace(/\/+$/, "").split("/").pop() || null,
   sourceUrl: pageUrl,
  };

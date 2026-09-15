@@ -4,7 +4,7 @@ import { markCrossListing, upsertCrossListingStats, platformByKey } from "@/app/
 
 export const dynamic = "force-dynamic";
 
-// The extension reports back from the seller's own logged-in marketplace session — both after it
+// The extension reports back from the seller's own logged-in marketplace session. Both after it
 // lists an item (so the cross-listings board reflects reality and delist-on-sale knows where the
 // item lives) AND when it reads engagement off the seller's own pages (likes, offers, views), which
 // flow into the unified stats the dashboard rolls up. One item per call; either or both payloads.
@@ -24,13 +24,13 @@ export async function POST(request: NextRequest) {
  // Default to Depop (the first extension channel); accept any known marketplace key.
  const platform = body.platform && platformByKey(body.platform) ? body.platform : "depop";
 
- // Listing status (optional — only when this report is about a list/publish).
+ // Listing status (optional, only when this report is about a list/publish).
  if (body.status) {
  const status = body.status === "listed" ? "listed" : body.status === "pending" ? "pending" : "error";
  await markCrossListing(slug, body.itemId, platform, status, body.url ?? null);
  }
 
- // Engagement (optional — only when this report carries scraped stats).
+ // Engagement (optional, only when this report carries scraped stats).
  if (body.stats && typeof body.stats === "object") {
  await upsertCrossListingStats(slug, body.itemId, platform, body.stats);
  }

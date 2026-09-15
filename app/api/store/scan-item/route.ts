@@ -29,7 +29,7 @@ function parseDataUrl(url: string): VisionImage | null {
 
 // POST /api/store/scan-item  body: { images: string[] (data URLs), window?: "7d"|"30d" }
 // Identifies the item by photo, then returns the same privacy-gated demand
-// verdict the text search gives — for the brand, category, and era it detects.
+// verdict the text search gives, for the brand, category, and era it detects.
 export async function POST(request: NextRequest) {
  // ...Any: the listing flow calls this from the phone with a bearer JWT, not a web session.
  const storeSlug = await resolveStoreSlugAny(request);

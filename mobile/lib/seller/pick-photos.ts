@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 // Getting photos onto a piece, from the two places they come from.
 //
 // "+ Add" opened the library and nothing else. On the one device she actually photographs stock
-// with, the camera was unreachable — so a piece with no picture could only be fixed by leaving the
+// with, the camera was unreachable, so a piece with no picture could only be fixed by leaving the
 // app, shooting it in Camera, coming back, and finding it again in the roll.
 //
 // The camera goes FIRST in the sheet. A piece without a photo is almost always a piece sitting in
@@ -53,8 +53,8 @@ async function ensure(source: PickSource): Promise<boolean> {
 /**
  * Photo URIs, from the camera or the library, capped at `remaining`.
  *
- * Returns [] for every ordinary "no" — dismissed the sheet, denied permission, cancelled the
- * picker — so a caller never has to tell those apart. It only throws if the picker itself breaks.
+ * Returns [] for every ordinary "no". Dismissed the sheet, denied permission, cancelled the
+ * picker, so a caller never has to tell those apart. It only throws if the picker itself breaks.
  *
  * The camera returns exactly one shot; iOS has no multi-capture. That is fine: she takes one,
  * it appears, she taps Add again. The library is where multi-select belongs.

@@ -4,10 +4,10 @@ import { neon } from "@neondatabase/serverless";
 
 export const dynamic = "force-dynamic";
 
-// Read-only SerpApi call log — OUR ground truth. Every serp() call runs recordSerp() into the
+// Read-only SerpApi call log. OUR ground truth. Every serp() call runs recordSerp() into the
 // api_costs table, so this shows exactly when we last actually hit SerpApi and how often, INDEPENDENT
 // of SerpApi's own dashboard. Also reports whether the fetcher is enabled + a SAFE fingerprint (hash,
-// never the key) of the SERPAPI_API_KEY in THIS environment — run it locally and on prod and compare
+// never the key) of the SERPAPI_API_KEY in THIS environment. Run it locally and on prod and compare
 // the fingerprints: if they differ, local and prod use different SerpApi accounts (which explains a
 // dashboard that looks idle while the other account is doing the pulls).
 //   /api/admin/serp-log
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
    env: {
     serpapiEnabled: process.env.SERPAPI_ENABLED === "true",
     serpapiKeySet: Boolean(key),
-    // A hash, NOT the key — same key → same fingerprint, so you can compare local vs prod safely.
+    // A hash, NOT the key. Same key → same fingerprint, so you can compare local vs prod safely.
     serpapiKeyFingerprint: key ? crypto.createHash("sha256").update(key).digest("hex").slice(0, 12) : null,
    },
    totalCalls: s?.total_calls ?? 0,

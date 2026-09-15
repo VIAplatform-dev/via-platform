@@ -6,7 +6,7 @@ import { computeReadiness } from "@/app/lib/market/readiness-core";
 
 export const dynamic = "force-dynamic";
 
-// GET — the Market Setup checklist.
+// GET: the Market Setup checklist.
 export async function GET(request: NextRequest) {
  const acting = await actingSeller(request);
  if (!acting) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

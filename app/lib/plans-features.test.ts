@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TIERS, addedFeaturesForTier, featuresForTier, type Feature } from "./plans.ts";
 
-// What each tier ADDS over the one below it — the emphasis on the plan cards, so a seller comparing
+// What each tier ADDS over the one below it. The emphasis on the plan cards, so a seller comparing
 // three near-identical lists can see what upgrading actually buys.
 //
 // plans.ts invites editing ("move features between tiers to shape what each plan is worth"), so these
@@ -11,7 +11,7 @@ import { TIERS, addedFeaturesForTier, featuresForTier, type Feature } from "./pl
 
 const byOrder = [...TIERS].sort((a, b) => a.order - b.order);
 
-test("the lowest tier adds nothing — there is no tier below it to gain anything over", () => {
+test("the lowest tier adds nothing. There is no tier below it to gain anything over", () => {
  assert.deepEqual(addedFeaturesForTier(byOrder[0].id), []);
 });
 

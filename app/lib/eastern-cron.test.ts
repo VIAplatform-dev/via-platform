@@ -23,7 +23,7 @@ test("during daylight time the 21:00 UTC slot sends and the 22:00 slot stands do
  assert.equal(shouldSendAtFivePmEastern("0 22 * * 2", SUMMER_2200), false);
 });
 
-test("during standard time it is the other way round — no manual change in November", () => {
+test("during standard time it is the other way round, no manual change in November", () => {
  assert.equal(shouldSendAtFivePmEastern("0 21 * * 2", WINTER_2100), false);
  assert.equal(shouldSendAtFivePmEastern("0 22 * * 2", WINTER_2200), true);
 });
@@ -44,7 +44,7 @@ test("a manual trigger is never blocked", () => {
  assert.equal(shouldSendAtFivePmEastern(undefined, SUMMER_2200), true);
 });
 
-test("a schedule we did not register is left alone — including a stale one from an old deployment", () => {
+test("a schedule we did not register is left alone, including a stale one from an old deployment", () => {
  // This is exactly the 11 AM Eastern job that two abandoned Vercel projects were still running.
  assert.equal(shouldSendAtFivePmEastern("0 15 * * 2", new Date("2026-08-25T15:00:00Z")), true);
  assert.equal(shouldSendAtFivePmEastern("0 20 * * 2", new Date("2026-08-25T20:00:00Z")), true);

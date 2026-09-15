@@ -74,7 +74,7 @@ test("a full page means there is more to fetch", async () => {
 });
 
 test("a store with more collections than we will ever read says so", async () => {
- // A cap still exists so one pathological store cannot pin a fleet run open — but hitting it is
+ // A cap still exists so one pathological store cannot pin a fleet run open, but hitting it is
  // recorded, not silent. Silence is what made 25 look like "we read them all".
  const slugs = Array.from({ length: 5 }, (_, i) => `c${i}`);
  const { fetch, calls } = store(Object.fromEntries(slugs.map((s) => [s, [["x"]]])));
@@ -84,7 +84,7 @@ test("a store with more collections than we will ever read says so", async () =>
  // …and they count as UNREAD, not as read-and-empty. A caller uses `incomplete` to decide whose
  // membership must be preserved rather than overwritten; a collection we never asked about is the
  // clearest case there is. It was reported only to a console.log, so 2nd Street's 461 collections
- // past the ceiling were indistinguishable from 461 collections she had emptied — and the pass
+ // past the ceiling were indistinguishable from 461 collections she had emptied, and the pass
  // that files membership would have unfiled every piece held in them.
  assert.ok(r.incomplete.includes("c3") && r.incomplete.includes("c4"), "past the ceiling = unread");
 });
@@ -96,7 +96,7 @@ test("a piece in two collections is recorded in both", async () => {
 });
 
 // ── when the store says stop ──────────────────────────────────────────────────────────────────────
-// blummier answers 11 of her 76 collections with HTTP 429 — and they are every collection from
+// blummier answers 11 of her 76 collections with HTTP 429, and they are every collection from
 // "ralph-lauren" to the end of the alphabet. We read in alphabetical order, so what actually happens
 // is her store puts up a wall two thirds of the way through and we bounce off it for the rest of the
 // run. The unread ones are not bad collections; they are wherever we happened to be when it said stop.
@@ -153,7 +153,7 @@ test("the slow-down has a ceiling, so one rude store cannot stall a run for ever
 
 // ── a collection bigger than we will read ────────────────────────────────────────────────────────
 // chill-boutique's catch-all holds 1,789 pieces; we filed 1,500 and said nothing. The ceiling was
-// six pages of 250, and hitting it was recorded as a COMPLETE read — so the shortfall looked like
+// six pages of 250, and hitting it was recorded as a COMPLETE read, so the shortfall looked like
 // the seller's drift rather than our own limit.
 
 test("a collection bigger than the ceiling is reported, not silently truncated", async () => {
@@ -185,7 +185,7 @@ test("the default ceiling reaches past the biggest collection in the fleet", asy
 
 // ── the ORDER the seller put her collection in ───────────────────────────────────────────────────
 // Membership answers "which pieces"; it threw away "in what order", and the order was then read off
-// the copy we took of the collection page on capture day — a photograph, never refreshed. A homepage
+// the copy we took of the collection page on capture day. A photograph, never refreshed. A homepage
 // rail is the most volatile part of a shop, so within days it is showing yesterday's pieces in
 // yesterday's order. The feed we already page through IS the seller's order; keeping it costs
 // nothing extra.
@@ -197,7 +197,7 @@ test("the seller's own order is kept, not just the membership", async () => {
 });
 
 test("the order survives a collection that takes more than one page", async () => {
- // Page one is full, so there is a page two — and page two's pieces come AFTER page one's.
+ // Page one is full, so there is a page two, and page two's pieces come AFTER page one's.
  const first = Array.from({ length: 250 }, (_, i) => `p${i}`);
  const { fetch } = store({ big: [first, ["tail-a", "tail-b"]] });
  const r = await readCollectionMembership(["big"], { fetchPage: fetch, wait: noWait });
@@ -224,7 +224,7 @@ test("a piece listed twice in a collection appears once, at its first position",
 
 test("her feed's availability is kept, not discarded", () => {
  // Whether a seller keeps sold pieces in a collection is written all over the pages we already
- // fetch — and we threw it away, exactly as we threw away the ORDER before that. Two features
+ // fetch, and we threw it away, exactly as we threw away the ORDER before that. Two features
  // running on data that was in our hands the whole time.
  const pages: Record<string, CollectionProduct[][]> = {
   keeps: [[{ handle: "a", variants: [{ available: true }] }, { handle: "b", variants: [{ available: false }] }]],
@@ -257,8 +257,8 @@ test("a product with no variants counts as unavailable, not as absent", () => {
 
 test("a read that runs out of time stops cleanly and keeps what it got", async () => {
  // Only the CRAWL was ever time-budgeted. This read had no clock at all: on 2nd Street's shop it
- // ran for 25 minutes against 761 collections and returned nothing, because a throw — or an
- // invocation killed at maxDuration — loses everything it had already read. Production caps a
+ // ran for 25 minutes against 761 collections and returned nothing, because a throw, or an
+ // invocation killed at maxDuration. Loses everything it had already read. Production caps a
  // function at 300s, so on a store this size the step could never finish, ever.
  //
  // A deadline it stops AT is different from a timeout that kills it: the collections already read
@@ -280,7 +280,7 @@ test("a read that runs out of time stops cleanly and keeps what it got", async (
  for (const s of slugs.slice(calls.length)) assert.ok(r.incomplete.includes(s), `${s} marked unread`);
 });
 
-test("no budget means no deadline — the read behaves exactly as it did", async () => {
+test("no budget means no deadline. The read behaves exactly as it did", async () => {
  const slugs = ["a", "b", "c"];
  const { fetch, calls } = store(Object.fromEntries(slugs.map((s) => [s, [["x-" + s]]])));
  const r = await readCollectionMembership(slugs, { fetchPage: fetch, wait: noWait });

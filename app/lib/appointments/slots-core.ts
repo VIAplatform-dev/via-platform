@@ -1,12 +1,12 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Appointment slots — the scheduling maths, pure and unit-tested.
+// Appointment slots. The scheduling maths, pure and unit-tested.
 //
 // A DIFFERENT question from rental availability, and conflating the two is the
 // mistake to avoid. Rental availability asks "is this dress free that week?" and
 // is per item. This asks "can someone come at 2pm on Thursday?" and is per store,
 // bounded by opening hours and how many people the shop can see at once.
 //
-// Times are the store's own clock. No timezone conversion happens here — a shop
+// Times are the store's own clock. No timezone conversion happens here. A shop
 // that opens at 11 opens at 11, and the day it belongs to is the day it's on.
 // ───────────────────────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ export type Settings = Pick<AppointmentSettings, "openingHours" | "blackoutDates
 export type Booked = { day: Day; start: Time };
 
 /**
- * The windows a store is open on one day. Several are allowed — a shop that shuts
+ * The windows a store is open on one day. Several are allowed. A shop that shuts
  * for lunch has two, and nothing here assumes otherwise.
  */
 export function windowsOn(day: Day, hours: OpeningWindow[]): OpeningWindow[] {
@@ -72,7 +72,7 @@ export function slotsOn(day: Day, s: Settings, booked: Booked[] = []): Slot[] {
  for (const w of windowsOn(day, s.openingHours)) {
   const close = minutes(w.end);
   // The APPOINTMENT has to finish before closing; the gap after it does not. A shop that shuts at
-  // six can still see someone at 17:15 for forty-five minutes and tidy up afterwards — refusing
+  // six can still see someone at 17:15 for forty-five minutes and tidy up afterwards. Refusing
   // that slot would be enforcing a tidy-up against a door that is already locked.
   for (let m = minutes(w.start); m + size <= close; m += size + gap) {
    const start = clock(m);
@@ -83,7 +83,7 @@ export function slotsOn(day: Day, s: Settings, booked: Booked[] = []): Slot[] {
  return out.sort((a, b) => (a.start < b.start ? -1 : 1));
 }
 
-/** Slots across a run of days — what a booking page renders. */
+/** Slots across a run of days. What a booking page renders. */
 export function slotsBetween(from: Day, to: Day, s: Settings, booked: Booked[] = [], maxDays = 60): Slot[] {
  if (!isDay(from) || !isDay(to)) return [];
  const out: Slot[] = [];

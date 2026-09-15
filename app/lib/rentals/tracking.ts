@@ -1,7 +1,7 @@
 // Ask the carrier about the rentals that are out, and remember what it said.
 //
 // Deliberately thin: the DECIDING is in tracking-core (pure, tested), and this only does the parts
-// that touch the network and the database. Failure is never fatal — a screen that can't reach a
+// that touch the network and the database. Failure is never fatal. A screen that can't reach a
 // carrier falls back to the booking's own dates, which is exactly what it showed before any of
 // this existed.
 import { listBookings, setRentalTracking, type Booking } from "./rentals-db";
@@ -29,7 +29,7 @@ export async function refreshStoreTracking(sellerId: string): Promise<number> {
  const out = await listBookings(sellerId, ["out", "booked", "overdue"] as never).catch(() => []);
  const due = out.filter((b) => needsRefresh(b as never, Date.now()));
  // A handful at a time. A studio with sixty pieces out shouldn't turn one page load into sixty
- // carrier calls — the rest are picked up on the next load, and nothing here is time-critical.
+ // carrier calls. The rest are picked up on the next load, and nothing here is time-critical.
  const batch = due.slice(0, 12);
  const done = await Promise.all(batch.map((b) => refreshOne(b).catch(() => false)));
  return done.filter(Boolean).length;

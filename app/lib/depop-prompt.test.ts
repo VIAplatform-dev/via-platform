@@ -13,7 +13,7 @@ test("a store building from scratch is asked, and can act on the answer", () => 
 test("a store that brought its own website over is never asked", () => {
  // Her products came in with the site. Asking about Depop reads as VYA not knowing what it just did.
  assert.deepEqual(depopPrompt(state({ hasCapturedSite: true })), { show: false, why: "imported-site" });
- // And that holds however new she is — it is the first thing checked.
+ // And that holds however new she is. It is the first thing checked.
  assert.equal(depopPrompt(state({ hasCapturedSite: true, extensionInstalled: false })).show, false);
 });
 
@@ -21,7 +21,7 @@ test("once something has come over from Depop, the question is answered by event
  assert.deepEqual(depopPrompt(state({ alreadyImported: true })), { show: false, why: "already-imported" });
 });
 
-test("no means no — not no for now", () => {
+test("no means no, not no for now", () => {
  // "My products aren't on Depop" is an answer. Re-asking next week is how a prompt becomes noise.
  assert.deepEqual(depopPrompt(state({ dismissed: true })), { show: false, why: "answered" });
 });

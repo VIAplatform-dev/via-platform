@@ -1,7 +1,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 // Booking links that can be shown as a SCHEDULE rather than a link.
 //
-// A shop pasting its Calendly shouldn't send shoppers to a different website to pick a time —
+// A shop pasting its Calendly shouldn't send shoppers to a different website to pick a time,
 // every hand-off loses people. The big scheduling tools all support being framed, so where we can
 // recognise one we show the real calendar in place; where we can't, we fall back to a button, which
 // is the honest outcome for an arbitrary URL that may refuse to be framed.
@@ -21,7 +21,7 @@ function withParam(url: string, key: string, value: string): string {
 /**
  * Turn a booking link into something framable, or null when we don't recognise it.
  *
- * Null is not a failure — it means "show the button instead", which is right for a URL whose site
+ * Null is not a failure. It means "show the button instead", which is right for a URL whose site
  * may well send X-Frame-Options and leave a shopper staring at an empty box.
  */
 export function bookingEmbed(rawUrl: string | null | undefined): BookingEmbed | null {
@@ -53,7 +53,7 @@ export function bookingEmbed(rawUrl: string | null | undefined): BookingEmbed | 
   return null; // a personal calendar URL isn't a booking page
  }
 
- // Acuity / Squarespace Scheduling — both frame, and both are common with small shops.
+ // Acuity / Squarespace Scheduling. Both frame, and both are common with small shops.
  if (host === "app.acuityscheduling.com" || host.endsWith(".as.me") || host.endsWith(".acuityscheduling.com")) {
   return { provider: "acuity", src: url, minHeight: 800 };
  }

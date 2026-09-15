@@ -1,4 +1,4 @@
-// EasyPost shipping aggregator — the migration target from Shippo (see the shipping-provider decision).
+// EasyPost shipping aggregator: the migration target from Shippo (see the shipping-provider decision).
 // Implements the SAME interface as shippo.ts (getRates / buyLabel / voidLabel) so ship-provider.ts can
 // swap between them with zero call-site churn. Gated by EASYPOST_API_KEY, so it's dormant until the key
 // is set AND SHIP_PROVIDER=easypost. Per-store sub-accounts (Forge "Child Users") are stubbed here until
@@ -22,7 +22,7 @@ function authHeader(apiKey: string): string {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// apiKey overrides the platform key — pass a store's Child-User key to act as that sub-account.
+// apiKey overrides the platform key. Pass a store's Child-User key to act as that sub-account.
 async function ep(path: string, method: "GET" | "POST", body?: any, apiKey?: string): Promise<any | null> {
  const key = apiKey || process.env.EASYPOST_API_KEY;
  if (!key) return null;
@@ -59,7 +59,7 @@ function toEpCustoms(d: CustomsDeclaration) {
   // The seller's VAT registration, when she gave us one. EasyPost takes it on the customs info
   // as a tax identifier; omitted entirely when absent, never sent blank.
   ...(d.exporterTaxId ? { customs_info_tax_ids: [{ entity: "SENDER", tax_id: d.exporterTaxId.number, tax_id_type: "VAT" }] } : {}),
-  // Null means the seller owes an AES filing we can't invent — send nothing rather than a false one.
+  // Null means the seller owes an AES filing we can't invent. Send nothing rather than a false one.
   ...(d.eelPfc ? { eel_pfc: d.eelPfc } : {}),
   customs_items: d.lines.map((l) => ({
    description: l.description,
@@ -86,11 +86,11 @@ export async function getRates(from: ShipAddress, to: ShipAddress, parcel: Parce
   // all. It goes on at CREATION, not at purchase, because buying references this shipment by id.
   // DDP needs BOTH: the incoterm goes on the customs paperwork, and duty_payment tells the carrier
   // whose account to bill. DHL Express reads the incoterm alone, but FedEx and UPS bill the
-  // RECEIVER unless duty_payment says otherwise — which would hand the buyer a bill at the door on
+  // RECEIVER unless duty_payment says otherwise, which would hand the buyer a bill at the door on
   // an order whose store promised duties were covered.
   ...(customs ? { customs_info: toEpCustoms(customs) } : {}),
   // ONE options object, not two. label_format/label_size decide what comes out of her printer
-  // (see label-format-core.ts) and must survive a customs declaration being present — an earlier
+  // (see label-format-core.ts) and must survive a customs declaration being present. An earlier
   // shape put options inside the customs branch, so a domestic parcel got no format at all.
   options: {
    ...labelOptionsFor(printer),
@@ -129,7 +129,7 @@ export async function buyLabel(rateId: string, apiKey?: string): Promise<Purchas
   trackingNumber: String(bought.tracking_code || ""),
   trackingUrl: bought.tracker?.public_url || null,
   costCents: Math.round(parseFloat(bought.selected_rate?.rate || "0") * 100),
-  transactionId: String(bought.id || ""), // the shipment id — used to refund/void the label
+  transactionId: String(bought.id || ""), // the shipment id: used to refund/void the label
  };
 }
 
@@ -144,7 +144,7 @@ export async function voidLabel(transactionId: string, apiKey?: string): Promise
 /**
  * Create an EasyPost Child User (per-store sub-account) under the platform account. Requires Forge to be
  * enabled on the account. Returns the child's id + its production API key (which is how you then act as
- * that sub-account when buying labels). Dormant until Forge is on — DO NOT rely on this until the
+ * that sub-account when buying labels). Dormant until Forge is on. DO NOT rely on this until the
  * child-auth + FlexRate flow is verified against a Forge-enabled account.
  */
 export async function createChildUser(name: string): Promise<{ id: string; apiKey: string | null } | null> {

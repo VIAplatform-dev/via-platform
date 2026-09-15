@@ -1,16 +1,16 @@
-// Named storefront versions — the storage. Rules and naming live in storefront-versions.ts.
+// Named storefront versions. The storage. Rules and naming live in storefront-versions.ts.
 //
 // TWO TABLES, because the two kinds of storefront are stored very differently:
 //   • a BUILT version is one JSONB blob (the studio design), so it sits on the version row itself;
 //   • an IMPORTED version is one row PER PAGE of captured HTML, some of them close to a megabyte,
-//     so those go in their own table keyed by version — the same shape as site_captures.
+//     so those go in their own table keyed by version. The same shape as site_captures.
 //
 // THE INVARIANT: the live storefront is always also a version row. `syncPublished` writes the live
 // state back to whichever row is published before anything else moves, so a publish is a swap
 // between two rows and there is no moment where a storefront exists only in site_captures or only
 // in storefront_settings. That is what makes "I want to start again but keep my old site" safe.
 //
-// Self-healing DDL (CREATE TABLE IF NOT EXISTS), like the other store_* tables — no migration step.
+// Self-healing DDL (CREATE TABLE IF NOT EXISTS), like the other store_* tables, no migration step.
 
 import { neon } from "@neondatabase/serverless";
 import type { StorefrontTheme } from "./store-import";
@@ -103,7 +103,7 @@ async function liveKind(storeSlug: string): Promise<VersionKind> {
  * Copy the live storefront into a version row (replacing whatever that row held).
  *
  * For an imported version this is an INSERT…SELECT straight across from site_captures, so the HTML
- * never travels through this process — some of these pages are near a megabyte and a store can have
+ * never travels through this process. Some of these pages are near a megabyte and a store can have
  * a hundred of them.
  */
 async function writeLiveInto(storeSlug: string, versionId: string, kind: VersionKind): Promise<void> {
@@ -178,7 +178,7 @@ export async function renameVersion(storeSlug: string, id: string, name: string)
  return rows.length > 0;
 }
 
-/** Delete a draft. The published one is refused here as well as in the UI — it's the live shop. */
+/** Delete a draft. The published one is refused here as well as in the UI. It's the live shop. */
 export async function deleteVersion(storeSlug: string, id: string): Promise<boolean> {
  await ensureTables();
  const sql = db();
@@ -192,7 +192,7 @@ export async function deleteVersion(storeSlug: string, id: string): Promise<bool
  * Make a version live.
  *
  * Order matters and is the whole safety argument: the outgoing storefront is written back to its
- * own row FIRST, so if anything below fails the seller has lost nothing — the old storefront is
+ * own row FIRST, so if anything below fails the seller has lost nothing. The old storefront is
  * still a version she can publish again.
  */
 export async function publishVersion(storeSlug: string, id: string): Promise<boolean> {
@@ -214,7 +214,7 @@ export async function publishVersion(storeSlug: string, id: string): Promise<boo
    SELECT ${storeSlug}, path, html, source_url FROM storefront_version_pages WHERE version_id = ${id}
    ON CONFLICT (store_slug, path) DO UPDATE SET html = EXCLUDED.html, source_url = EXCLUDED.source_url`;
  } else {
-  // A built storefront must not be shadowed by leftover captured pages — serving asks the published
+  // A built storefront must not be shadowed by leftover captured pages. Serving asks the published
   // version now, but /site/{slug} still reads site_captures directly, so clear them here too. They
   // are safe in their own version row, which is the point of doing step 1 first.
   await sql`DELETE FROM site_captures WHERE store_slug = ${storeSlug}`;
@@ -252,7 +252,7 @@ export async function snapshotAsDraft(storeSlug: string, name?: string): Promise
  * A specific version's built design, and a way to write back to it.
  *
  * This is what lets a seller work on a draft WITHOUT publishing it. The editor used to read and
- * write the live theme only, so opening a draft meant making it live first — which is fine for a
+ * write the live theme only, so opening a draft meant making it live first, which is fine for a
  * quick swap and useless for a two-week project you don't want customers seeing.
  *
  * Imported versions are not editable this way: their content is captured HTML per page, not a

@@ -23,7 +23,7 @@ const OPTIONS = {
 const EMPTY: TasteProfile = { vibes: [], sizes: [], categories: [], designers: [], colors: [], eras: [] };
 const isTaken = (p: TasteProfile) => p.vibes.length + p.sizes.length + p.categories.length + p.designers.length + p.colors.length + p.eras.length > 0;
 
-// GET — the user's saved taste profile + all the option sets for the quiz.
+// GET: the user's saved taste profile + all the option sets for the quiz.
 export async function GET(request: Request) {
  if (!(await isApprovedRequest(request))) return NextResponse.json({ error: "Approval required", needsApproval: true }, { status: 403 });
  const userId = getMobileUserId(request);
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
  }
 }
 
-// POST — save any subset of taste dimensions. Body: { vibes?, sizes?, categories?,
+// POST: save any subset of taste dimensions. Body: { vibes?, sizes?, categories?,
 // designers?, colors?, eras? }. Designers are validated against the catalog.
 export async function POST(request: Request) {
  const userId = getMobileUserId(request);

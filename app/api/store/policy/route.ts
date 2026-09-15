@@ -5,14 +5,14 @@ import { payoutScheduleNotice, syncPayoutSchedule } from "@/app/lib/payout-sched
 
 export const dynamic = "force-dynamic";
 
-// GET — the acting store's return/refund policy.
+// GET: the acting store's return/refund policy.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  return NextResponse.json({ ok: true, policy: await getRefundPolicy(slug) });
 }
 
-// POST { refundsEnabled?, returnWindowDays?, policyText? } — update it.
+// POST { refundsEnabled?, returnWindowDays?, policyText? }: update it.
 export async function POST(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   policyText: b?.policyText !== undefined ? b.policyText : undefined,
  });
  // The payout hold follows the window they just set: lengthen the policy and the money waits
- // longer; go final-sale and they're paid as fast as Stripe allows. Best-effort — a Stripe hiccup
+ // longer; go final-sale and they're paid as fast as Stripe allows. Best-effort: a Stripe hiccup
  // must not lose the seller their policy edit (see syncPayoutSchedule).
  const schedule = await syncPayoutSchedule(slug).catch(() => null);
  return NextResponse.json({

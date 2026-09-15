@@ -1,4 +1,4 @@
-// Flaws on a piece, as a list. Pure — no I/O.
+// Flaws on a piece, as a list. Pure, no I/O.
 //
 // The intake model has always returned `flaws[]`; the listing only ever had a condition word and
 // a description to bury them in. A list that prints under Condition is what a secondhand buyer
@@ -7,7 +7,7 @@
 export const MAX_FLAWS = 12;
 export const MAX_FLAW_LENGTH = 140;
 
-// "none", "no flaws", "n/a" — the model's way of saying the list is empty, and not a flaw.
+// "none", "no flaws", "n/a". The model's way of saying the list is empty, and not a flaw.
 const NOTHING = /^(none|n\/?a|nil|no (visible )?(flaws?|defects?|damage)( (seen|noted|visible))?|-)$/i;
 
 /**
@@ -34,7 +34,7 @@ export function normalizeFlaws(raw: unknown, condition?: string | null): string[
  return out;
 }
 
-/** The editors take one flaw per line, or a comma-separated line — whichever she types. */
+/** The editors take one flaw per line, or a comma-separated line. Whichever she types. */
 export function flawsFromText(text: string, condition?: string | null): string[] {
  const parts = /\n/.test(text) ? text.split(/\n/) : text.split(",");
  return normalizeFlaws(parts, condition);

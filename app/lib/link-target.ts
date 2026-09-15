@@ -3,7 +3,7 @@
 // The storefront editor shows a link as a URL in a text box, which is the one thing a seller can't
 // read. She clicks CLOTHING in her nav, sees "#", and to reach that page she scrolls a strip of
 // eighty thumbnails looking for the word. This answers the question the box doesn't: the link points
-// at THIS page of yours — here's a button.
+// at THIS page of yours. Here's a button.
 //
 // Kept out of the editor component so it can be tested without a browser, and reused by any panel
 // that renders a link (nav items, collection tiles, buttons, footers).
@@ -17,7 +17,7 @@ export type LinkTarget =
  | { kind: "missing"; path: string }
  /** Leaves her site. */
  | { kind: "external"; href: string; host: string }
- /** "#", empty, javascript: — a link that goes nowhere. */
+ /** "#", empty, or a javascript: URL. A link that goes nowhere. */
  | { kind: "none" };
 
 const norm = (p: string) => {
@@ -46,7 +46,7 @@ function findPage(path: string, pages: string[]): string | null {
 /**
  * The nav item that says "Clothing" and links to "#" is a dropdown parent: the real page exists, the
  * anchor just never carried its address. Matching on the visible words is a guess, so it is only ever
- * a fallback for a link with no usable URL, and only on an exact name — never a prefix.
+ * a fallback for a link with no usable URL, and only on an exact name, never a prefix.
  */
 function findByName(label: string, pages: string[]): string | null {
  const want = key(label);
@@ -88,7 +88,7 @@ export function resolveLinkTarget(
  } else if (raw.startsWith("/")) {
   path = raw;
  } else {
-  // "collections/children" — relative, and we have no base to resolve it against reliably.
+  // "collections/children": relative, and we have no base to resolve it against reliably.
   path = `/${raw}`;
  }
 

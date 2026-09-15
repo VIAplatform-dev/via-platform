@@ -10,7 +10,7 @@ export const maxDuration = 25;
 // pipeline the real import uses (captureSite): strip all JS (which also removes JS-driven newsletter/
 // cookie popups), inline the theme's CSS, surface lazy images and force the opacity:0 "reveal-on-JS"
 // content visible, and drop Shopify chrome. The result is a faithful, self-contained, scrollable
-// HTML+CSS clone served same-origin with no scripts to run — rendered in a script-less sandboxed
+// HTML+CSS clone served same-origin with no scripts to run. Rendered in a script-less sandboxed
 // iframe. Server-rendered themes (most Shopify) come through 1:1; a pure-JS SPA may render sparse,
 // the same honest limitation the real import has. We then neutralize links/forms so the preview
 // can't navigate away, and hide any leftover HTML popup overlay.
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const cap = await captureSite(origin, { rewriteLink: () => "#" });
   capturedHtml = cap.html;
  } catch {
-  return html(errorDoc("Couldn’t reach that site — it may block previews."));
+  return html(errorDoc("Couldn’t reach that site. It may block previews."));
  }
 
  // Neutralize anything that could navigate the preview away (external links captureSite left absolute,

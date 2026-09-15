@@ -5,7 +5,7 @@
 // carry a tier, and the verdict is simply the worst tier present:
 //   blocking  → fail   (missing/extra products, wrong prices, page dead, no way to reach items)
 //   degrading → warn   (photos/video/logo lost, a collection off, a page not captured)
-//   cosmetic  → pass   (order, nav, count labels — noted, never gating)
+//   cosmetic  → pass   (order, nav, count labels. Noted, never gating)
 // Messages are written for the seller: no "blackout", "Shopify", "cdn" or "parity" in them.
 
 export type Tier = "blocking" | "degrading" | "cosmetic";
@@ -15,15 +15,15 @@ export type Verdict = "pass" | "warn" | "fail" | "unknown";
 export type ParityReport = {
  catalog: {
   sourceProducts: number; ourItems: number; missingHere: number; extraHere: number; availabilityMismatch: number;
-  /** In stock and priced on her site, but she has no photo of it — nobody can render a card. */
+  /** In stock and priced on her site, but she has no photo of it. Nobody can render a card. */
   missingNoPhoto?: number;
   /** Sold, or not for sale. Left out on purpose; never a fault. */
   soldOrUnlisted?: number;
   platform?: string;
   productParityPct: number | null; collections: number; collectionsExact: number; collectionsMissingHere: string[]; collectionsOff: string[];
-  /** Collections we could not read from the seller's site — excluded from the comparison above. */
+  /** Collections we could not read from the seller's site. Excluded from the comparison above. */
   collectionsUnread?: string[];
-  /** Collections whose served page disagrees with our own filing — our bug, not the seller's. */
+  /** Collections whose served page disagrees with our own filing. Our bug, not the seller's. */
   collectionsInflated?: string[];
   /** Product pages sampled, and those advertising a price the cart would not charge. */
   priceChecked?: number; priceStale?: string[]; priceUnstated?: number;
@@ -54,7 +54,7 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
  if (parity) {
   const c = parity.catalog;
   // The catalogue, price, collection and sold-status checks all read Shopify's public feeds, so on
-  // any other platform they produce nothing at all — and a store with no findings reads as passing.
+  // any other platform they produce nothing at all, and a store with no findings reads as passing.
   // That is how vintage-boutique-style became the fleet's only PASS: nothing looked at it. Three of
   // twenty-three stores are in this state (two Squarespace, one unrecognised). Say so instead.
   if (c.platform && c.platform !== "shopify") {
@@ -62,7 +62,7 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
   }
   if (c.missingHere > 0) add("blocking", `${n(c.missingHere, "product")} on your site ${c.missingHere === 1 ? "is" : "are"} missing here.`);
   // Her photo, not our import. Every one of these is in stock and priced on her own site with no
-  // image attached, so no shop — hers or ours — can show it. Told plainly, and never blocking.
+  // image attached, so no shop, hers or ours. Can show it. Told plainly, and never blocking.
   if ((c.missingNoPhoto ?? 0) > 0) {
    const k = c.missingNoPhoto as number;
    add("degrading", `${n(k, "product")} on your site ${k === 1 ? "has" : "have"} no photo, so ${k === 1 ? "it cannot" : "they cannot"} be shown here. Adding ${k === 1 ? "an image" : "images"} on your own site fixes ${k === 1 ? "it" : "them"}.`);
@@ -73,13 +73,13 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
    if (s.error) { add("blocking", "This page did not load.", page); continue; }
    const titles = shortfall(s.titlesPresent);
    // NOTHING TO COMPARE is not the same as COULD NOT COMPARE. "0/0" says her page listed no
-   // products — hachi-archive's homepage is a lookbook, and a product page's only product links are
+   // products. Hachi-archive's homepage is a lookbook, and a product page's only product links are
    // its recommendations strip. When every other signal on the page agrees, both sides showed the
    // same thing: nothing. Saying "we couldn't compare the products" there reports a failure of ours
    // that did not happen, on a page that matches exactly.
    //
-   // A page that ALSO differs elsewhere is a different matter — an empty grid beside missing
-   // headings may well be a page we read badly — so that is still reported.
+   // A page that ALSO differs elsewhere is a different matter. An empty grid beside missing
+   // headings may well be a page we read badly, so that is still reported.
    if (/^0\/0$/.test(s.titlesPresent ?? "")) {
     const elsewhere = shortfall(s.headingsPresent) + shortfall(s.navPresent) + shortfall(s.pricesPresent);
     if (elsewhere > 0) add("degrading", "We couldn’t compare the products on this page.", page);
@@ -94,11 +94,11 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
    // A price can only be "wrong" for a product that is shown here; prices absent because the
    // product is absent (a recommendations strip we do not mirror) are the titles finding below.
    //
-   // DEGRADING, not blocking — this is a diff of every money-shaped string on two pages, and it
+   // DEGRADING, not blocking. This is a diff of every money-shaped string on two pages, and it
    // cannot establish the thing "blocking" claims. Her pages are not the same twice, so a price can
    // be present on one read and gone on the next: loved-again was graded 14 of 15 while a hand
    // check found all fourteen of her prices on ours. On chill-boutique the "missing prices" were
-   // the prices of pieces her homepage curates and ours does not — one difference counted twice.
+   // the prices of pieces her homepage curates and ours does not. One difference counted twice.
    //
    // "Your store shows the wrong price" is the most alarming thing this report can say to a seller
    // and the most expensive to be wrong about. It belongs to priceStale below, which compares the
@@ -138,7 +138,7 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
    if (isErr(normal) || isErr(b)) { add("blocking", "This page did not load.", page); continue; }
    // Losing EVERY product on a page is the failure this exists for. Losing some is not the same
    // thing: thenicheshop renders 40 tiles normally and 35 with the platform cut off, 14 of them
-   // different, because a filter app injects extras — and every piece that drops out is active and
+   // different, because a filter app injects extras, and every piece that drops out is active and
    // sits in four to six other collections. Nothing stops working; the page lists a different
    // selection. Reporting that as broken links was false, and it was the store's only blocker.
    if (normal.productLinks > 0 && b.productLinks === 0) {
@@ -162,7 +162,7 @@ export function gradeStore(input: { parity: ParityReport | null; blackout: Black
 /**
  * The *kind* of a finding, for the census: the same problem on two stores must group together, so
  * counts become N, quoted examples drop, and singular/plural collapse. Page identity is kept only as
- * its type (home / collection / product) — "photos lost on the home page" is a different problem
+ * its type (home / collection / product). "photos lost on the home page" is a different problem
  * from "photos lost on a product page" (chrome strip vs. gallery), and both are engine problems.
  */
 export function findingKind(f: Finding): string {

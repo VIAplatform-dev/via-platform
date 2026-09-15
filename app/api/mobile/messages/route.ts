@@ -19,7 +19,7 @@ function getSql() {
  return neon(url);
 }
 
-/** GET /api/mobile/messages — the signed-in customer's conversations. */
+/** GET /api/mobile/messages. The signed-in customer's conversations. */
 export async function GET(request: Request) {
  const userId = getMobileUserId(request);
  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 
  const message = await postMessage(conv.id, "customer", clipped);
 
- // Notify the store — email + push, both best-effort.
+ // Notify the store: email + push, both best-effort.
  const user = await getUserById(userId).catch(() => null);
  const customerName = user?.name ?? user?.email ?? null;
  try {

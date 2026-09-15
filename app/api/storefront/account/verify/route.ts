@@ -5,20 +5,20 @@ import { signShopperToken, shopperCookieOptions, SHOPPER_COOKIE } from "@/app/li
 import { upsertShopper } from "@/app/lib/store-customers-db";
 
 /**
- * GET ?token=… — the link from the email. Signs the shopper in to THIS store and sends them home.
+ * GET ?token=… the link from the email. Signs the shopper in to THIS store and sends them home.
  *
  * The store comes from the host and the link names the store it was issued for; both must agree, so
  * forwarding a sign-in email cannot hand anyone an account at a different seller's shop.
  *
  * Signing in makes someone that seller's customer and nothing else. It does not create a VYA
- * account, and it does not subscribe them to anything — the seller can ask for that separately.
+ * account, and it does not subscribe them to anything. The seller can ask for that separately.
  */
 export const dynamic = "force-dynamic";
 
 /**
  * A RELATIVE Location, for the same reason the cart's submit route uses one: request.url is the
  * server's view of the request, not the seller's domain (locally it comes back as localhost:3000),
- * so redirecting through it walks the shopper off the store origin — and the shopper cookie set on
+ * so redirecting through it walks the shopper off the store origin, and the shopper cookie set on
  * this very response is scoped to that origin, so they would arrive signed out. The browser
  * resolves a relative Location against the page it is already on, which cannot leave the origin.
  */

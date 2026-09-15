@@ -1,7 +1,7 @@
 // Variant id → VYA item. The bridge that lets a Shopify theme's own Add-to-cart button work.
 //
 // The theme posts the id it was captured with (a Shopify variant id). Every imported item carries
-// its source identity — `sourceId` (the product handle/id) and `variants[].sourceVariantId` — so the
+// its source identity, `sourceId` (the product handle/id) and `variants[].sourceVariantId`, so the
 // mapping already exists in the data; this is just the query for it.
 //
 // Matching is on SOURCE IDENTITY, never title, for the same reason the importer is: on one-of-one
@@ -19,7 +19,7 @@ const SELLABLE = SELLABLE_STATUSES;
 /**
  * The item a theme's variant id refers to, scoped to one seller.
  *
- * Checks, in order: the item's own source id (the common case — a one-of-one product whose single
+ * Checks, in order: the item's own source id (the common case: a one-of-one product whose single
  * variant we keyed by handle), then the variants array (size runs, e.g. Unique Vintage's 227
  * multi-size products), then the VYA item id itself so our own markup keeps working.
  */

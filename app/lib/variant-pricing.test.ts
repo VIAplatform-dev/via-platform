@@ -2,25 +2,25 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isRentalOption, pickBuyVariant, withoutRentalOptions, sizeFromOptionLabel, rentalTiersFromOptions } from "./variant-pricing.ts";
 
-// Real listings from venusvintage.co, a rental shop. Every piece carries three options — 3 Day
-// Rental, 7 Day Rental, Purchase — and the shop leaves an option at $0.00 to mean "not offered".
+// Real listings from venusvintage.co, a rental shop. Every piece carries three options. 3 Day
+// Rental, 7 Day Rental, Purchase, and the shop leaves an option at $0.00 to mean "not offered".
 // Their theme hides $0 options; the importer read whichever option came FIRST, so 116 of their 135
 // pieces arrived unpriced and were skipped, and the Dior slingbacks were listed at their $22 rental.
 
 type V = { id: number; title: string; price: string };
 const read = (v: V) => ({ label: v.title, price: Number(v.price) });
 
-const boots: V[] = [ // Dolce & Gabbana S/S 2004 Red Cowboy Stiletto Boots — the page says "Rent: $150" and has no Buy
+const boots: V[] = [ // Dolce & Gabbana S/S 2004 Red Cowboy Stiletto Boots. The page says "Rent: $150" and has no Buy
  { id: 1, title: "3 Day Rental", price: "0.00" },
  { id: 2, title: "7 Day Rental", price: "150.00" },
  { id: 3, title: "Purchase", price: "0.00" },
 ];
-const mules: V[] = [ // Prada Yellow Ribbon Satin Bow Mules — "Rent: $75, Buy: $380"
+const mules: V[] = [ // Prada Yellow Ribbon Satin Bow Mules. "Rent: $75, Buy: $380"
  { id: 1, title: "3 Day Rental", price: "0.00" },
  { id: 2, title: "7 Day Rental", price: "75.00" },
  { id: 3, title: "Purchase", price: "380.00" },
 ];
-const slingbacks: V[] = [ // Christian Dior Pink Leather Logo Slingback Heels — options listed in a different order
+const slingbacks: V[] = [ // Christian Dior Pink Leather Logo Slingback Heels. Options listed in a different order
  { id: 1, title: "3 Day Rental", price: "22.00" },
  { id: 2, title: "Purchase", price: "540.00" },
  { id: 3, title: "7 Day Rental", price: "80.00" },
@@ -28,7 +28,7 @@ const slingbacks: V[] = [ // Christian Dior Pink Leather Logo Slingback Heels �
 
 test("a rent-only piece has no buy price, even though a rental option is priced", () => {
  const pick = pickBuyVariant(boots, read);
- assert.equal(pick.price, null, "the $150 is a rental price — selling the boots for $150 would be wrong");
+ assert.equal(pick.price, null, "the $150 is a rental price. Selling the boots for $150 would be wrong");
  assert.equal(pick.variant, null);
  assert.equal(pick.rentOnly, true);
 });
@@ -104,7 +104,7 @@ test("the slingbacks' ladder is unaffected by option order", () => {
  assert.deepEqual(rentalTiersFromOptions(slingbacks, read), [{ days: 3, cents: 2200 }, { days: 7, cents: 8000 }]);
 });
 
-test("a $0 rental option contributes no tier — it is not offered", () => {
+test("a $0 rental option contributes no tier. It is not offered", () => {
  assert.deepEqual(rentalTiersFromOptions([{ id: 1, title: "3 Day Rental", price: "0.00" }], read), []);
 });
 
@@ -112,7 +112,7 @@ test("an ordinary (non-rental) listing has no rental ladder at all", () => {
  assert.deepEqual(rentalTiersFromOptions([{ id: 1, title: "Default Title", price: "120.00" }], read), []);
 });
 
-test("a rental label with no day count is not a tier — nothing to charge per day for", () => {
+test("a rental label with no day count is not a tier. Nothing to charge per day for", () => {
  assert.deepEqual(rentalTiersFromOptions([{ id: 1, title: "Weekend Rental", price: "60.00" }], read), []);
 });
 

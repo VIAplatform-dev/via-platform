@@ -7,7 +7,7 @@ test("a piece the seller's own platform reported sold out says so", () => {
 });
 
 test("a piece that merely disappeared does not claim to have sold", () => {
- // We cannot tell a sale from a deletion or an unpublish — the seller's site says only that it is
+ // We cannot tell a sale from a deletion or an unpublish. The seller's site says only that it is
  // gone. blummier's nine were all dead links on her own store. Saying "Sold" asserts a sale we have
  // no evidence for.
  assert.equal(unavailableLabel("vanished"), "No longer available");
@@ -35,7 +35,7 @@ test("the sweep records that it inferred, not that it was told", () => {
  assert.equal(reasonForVanished(), "vanished");
 });
 
-test("a held piece stays on the shelf, unbuyable, badged On hold — never Sold", () => {
+test("a held piece stays on the shelf, unbuyable, badged On hold, never Sold", () => {
  assert.equal(unavailableLabel("on_hold"), "On hold");
  assert.deepEqual(storefrontAvailability({ status: "reserved", unavailableReason: null }), { available: false, unavailableReason: "on_hold" });
  // A reserved row never carries a recorded reason; even if one leaked in, the hold wins.

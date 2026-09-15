@@ -112,7 +112,7 @@ function extractSizeFromText(text: string | null): string | null {
 
 /**
  * Checks if a product appears to be sold out based on title or tags.
- * Variant stock is only trusted when the store actually tracks inventory —
+ * Variant stock is only trusted when the store actually tracks inventory,
  * detected at the caller level via `trustVariantStock`.
  */
 function isSoldOut(item: SquarespaceItem, trustVariantStock: boolean): boolean {
@@ -132,7 +132,7 @@ function isSoldOut(item: SquarespaceItem, trustVariantStock: boolean): boolean {
  if (soldPatterns.some((p) => p.test(title))) return true;
  if (tags.some((t) => soldPatterns.some((p) => p.test(t)))) return true;
 
- // Variant stock check — only meaningful for stores that actually track inventory.
+ // Variant stock check, only meaningful for stores that actually track inventory.
  // Some Squarespace stores leave qtyInStock at 0 across the board and rely on the
  // title/tags to indicate sold status. Trusting qtyInStock there would hide every product.
  if (trustVariantStock) {
@@ -210,7 +210,7 @@ export async function parseSquarespaceJSON(
 
  // Detect whether the store actually tracks variant inventory.
  // If every variant across the entire catalog has qtyInStock === 0 and !unlimited,
- // the store isn't using inventory tracking — fall back to title/tag sold detection only.
+ // the store isn't using inventory tracking. Fall back to title/tag sold detection only.
  const trustVariantStock = allItems.some((item) =>
  (item.variants || []).some((v) => v.unlimited || (v.qtyInStock ?? 0) > 0)
  );
@@ -239,7 +239,7 @@ export async function parseSquarespaceJSON(
  if (!path) continue;
  const externalUrl = path.startsWith("http") ? path : `${baseUrl}${path}`;
 
- // Image URLs — gallery sub-items (items[].assetUrl) are proper image URLs.
+ // Image URLs. Gallery sub-items (items[].assetUrl) are proper image URLs.
  // item.assetUrl can be a non-image container URL on some Squarespace stores,
  // so always prefer gallery images and only fall back to assetUrl if empty.
  const galleryUrls = (item.items || [])
@@ -253,7 +253,7 @@ export async function parseSquarespaceJSON(
 
  // Product description (HTML body from Squarespace). Some stores leave the
  // collection excerpt empty (just placeholder <p> tags) and keep the real text
- // on the product page — fetch that page's body when there's nothing usable here.
+ // on the product page. Fetch that page's body when there's nothing usable here.
  let description = item.body || item.excerpt || null;
  if (!htmlHasText(description)) {
  const fetched = await fetchSquarespaceProductBody(externalUrl);
@@ -262,9 +262,9 @@ export async function parseSquarespaceJSON(
 
  // Extract size. Priority mirrors the Shopify sync: a SPECIFIC size (numeric /
  // EU / UK) always beats a GENERIC letter. A "size-m" tag must NOT override a real
- // size in the title — e.g. shoes titled "...Mules (37.5)" were getting a bogus
+ // size in the title. E.g. shoes titled "...Mules (37.5)" were getting a bogus
  // "M" from a tag. Use the shared title extractor (it reads bare parentheticals
- // like "(37.5)", which extractSizeFromText — needing the word "size" — misses).
+ // like "(37.5)", which extractSizeFromText, needing the word "size". Misses).
  const sizeFromTags = extractSizeFromTags(item.tags || []);
  const tagsGeneric = !!sizeFromTags && GENERIC_CLOTHING_SIZE.test(sizeFromTags);
  const sizeFromTitle = extractSizeFromTitle(title) ?? extractSizeFromText(title);

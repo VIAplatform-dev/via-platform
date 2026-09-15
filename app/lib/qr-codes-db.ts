@@ -3,7 +3,7 @@ import { ensureSchema } from "./db-setup.ts";
 import { normalizeQrCode, isAllowedDestination } from "./qr-codes.ts";
 
 // The printed QR codes themselves. In Neon rather than in code so a card already in someone's
-// hand can be repointed — change the row, the next scan goes somewhere else, no deploy.
+// hand can be repointed. Change the row, the next scan goes somewhere else, no deploy.
 //
 // The scans those codes produce live in qr-scans-db.ts. Kept apart on purpose: this table is
 // tiny, hand-edited and read on every scan; that one only ever grows.
@@ -60,7 +60,7 @@ export function forgetCachedQrCodes(): void {
 /**
  * The destination for a scanned code, or null if there is nothing usable to send them to.
  *
- * Null covers every "do not trust this" case — no such code, deactivated, or a destination
+ * Null covers every "do not trust this" case, no such code, deactivated, or a destination
  * that is not on the allowlist. The caller falls back to the homepage rather than failing,
  * because a printed code must never dead-end.
  */
@@ -93,7 +93,7 @@ export async function listQrCodes(): Promise<QrCodeRow[]> {
 }
 
 /**
- * Create or repoint a code. Rejects a destination outside the allowlist outright — the point
+ * Create or repoint a code. Rejects a destination outside the allowlist outright. The point
  * of failing here is that a bad destination never reaches the table at all, so nobody has to
  * notice it later.
  */

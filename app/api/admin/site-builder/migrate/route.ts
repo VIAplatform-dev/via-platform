@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 // Most of this schema is self-healing DDL that runs on first use. That rule is wrong here: the dev
 // server points at the PRODUCTION database, so "created on first request" means a developer opening
 // a page runs DDL against live stores. So the builder's tables are created only from here, only by an
-// admin, and only when asked — and every feature that needs them fails soft until then (a seller sees
+// admin, and only when asked, and every feature that needs them fails soft until then (a seller sees
 // "not switched on yet"; a shopper's page is served exactly as it always was).
 //
 // Idempotent: CREATE TABLE IF NOT EXISTS. Running it twice does nothing the second time.

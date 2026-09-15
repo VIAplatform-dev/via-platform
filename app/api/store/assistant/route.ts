@@ -6,14 +6,14 @@ import { loadThread, saveThread, clearThread, type ThreadMessage } from "@/app/l
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// GET — load the saved conversation so the chat survives refreshes/sessions.
+// GET: load the saved conversation so the chat survives refreshes/sessions.
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
  return NextResponse.json({ messages: await loadThread(slug) });
 }
 
-// DELETE — start a fresh chat (clears the saved thread; long-term memory is kept).
+// DELETE: start a fresh chat (clears the saved thread; long-term memory is kept).
 export async function DELETE(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
  try {
  const { reply, actions } = await runAssistant(slug, messages, { page: typeof body?.page === "string" ? body.page : undefined });
- // Persist the visible thread (plain text turns only — not the tool-call internals).
+ // Persist the visible thread (plain text turns only, not the tool-call internals).
  // Image turns become a short text trace ("[image] <caption>") so a reloaded chat reads sensibly.
  const asText = (content: unknown): string => {
  if (typeof content === "string") return content;
@@ -55,6 +55,6 @@ export async function POST(request: NextRequest) {
  return NextResponse.json({ reply, actions });
  } catch (e) {
  console.error("assistant error:", e);
- return NextResponse.json({ error: "The assistant hit an error — try again." }, { status: 500 });
+ return NextResponse.json({ error: "The assistant hit an error. Try again." }, { status: 500 });
  }
 }

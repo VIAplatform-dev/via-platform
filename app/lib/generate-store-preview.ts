@@ -4,11 +4,11 @@ import { STOREFRONT_TEMPLATES, getTemplate } from "./storefront-templates";
 // Powers the landing-page "Describe it → build my store" trial. Turns a one-sentence shop
 // description into a storefront PREVIEW: an AI-written name + tagline and one of VYA's REAL
 // storefront templates (so the look matches what a seller actually gets). It does NOT pull
-// products from the live catalog — a prospective seller's preview shouldn't show other stores'
+// products from the live catalog. A prospective seller's preview shouldn't show other stores'
 // real inventory; the storefront renders empty product slots until they add their own. Read-only.
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const MODEL = AI_MODELS.voice; // fast/cheap (Haiku) — the trial should feel instant
+const MODEL = AI_MODELS.voice; // fast/cheap (Haiku): the trial should feel instant
 
 export type StorePreview = {
  storeName: string;
@@ -34,8 +34,8 @@ async function anthropic(body: unknown): Promise<string | null> {
  return (j?.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("") || null;
 }
 
-// If the seller stated a store name in their description, honour it verbatim — don't invent one.
-// Handles "The Vintage Guild — …", "Name: …", 'called "X"', and quoted names.
+// If the seller stated a store name in their description, honour it verbatim. Don't invent one.
+// Handles "The Vintage Guild. …", "Name: …", 'called "X"', and quoted names.
 function extractStatedName(desc: string): string | null {
  const s = desc.trim();
  let m = s.match(/^["'“]?([A-Z][^—–:|]{1,38}?)["'”]?\s*[—–:|]\s/);

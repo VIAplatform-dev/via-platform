@@ -41,7 +41,7 @@ test("content hash changes when images change", () => {
  );
 });
 
-test("content hash is currency-aware — same number, different currency is NOT the same listing", () => {
+test("content hash is currency-aware. Same number, different currency is NOT the same listing", () => {
  // The bug this guards: 627 GBP and 627 USD are different prices, and a re-sync must notice.
  assert.notEqual(productContentHash(base()), productContentHash(base({ currency: "USD" })));
 });
@@ -56,7 +56,7 @@ test("content hash survives a formatted-price-only product (legacy sources)", ()
 
 test("two distinct one-of-one pieces sharing a title hash differently when their images differ", () => {
  // Vintage stores really do list two different garments under the same name. Title alone can't
- // tell them apart — this is why matching keys on sourceId, and why the hash includes images.
+ // tell them apart: this is why matching keys on sourceId, and why the hash includes images.
  const a = base({ sourceId: "levis-501-a", images: ["https://cdn/a.jpg"] });
  const b = base({ sourceId: "levis-501-b", images: ["https://cdn/b.jpg"] });
  assert.notEqual(productContentHash(a), productContentHash(b));
@@ -73,14 +73,14 @@ test("a product matches the row with its own source id", () => {
  assert.equal(priorForProduct(A, byIdentity, new Map())?.id, "item-a");
 });
 
-test("the SECOND same-titled piece is not mistaken for the first — it is a different bag", () => {
+test("the SECOND same-titled piece is not mistaken for the first. It is a different bag", () => {
  const byIdentity = new Map([["shopify:louis-vuitton-mini-papillon-pouch", row("item-a", "louis-vuitton-mini-papillon-pouch")]]);
  // byTitle deliberately holds only identity-less rows (see priorForProduct), so B finds nothing
  // and is imported as its own listing instead of overwriting A.
  assert.equal(priorForProduct(B, byIdentity, new Map()), null);
 });
 
-test("a row with no source id is still adopted by title — the legacy case the fallback is for", () => {
+test("a row with no source id is still adopted by title. The legacy case the fallback is for", () => {
  const byTitle = new Map([["louis vuitton mini papillon pouch", row("legacy-1", null)]]);
  assert.equal(priorForProduct(A, new Map(), byTitle)?.id, "legacy-1");
 });
@@ -103,7 +103,7 @@ test("a collection that reads EMPTY while we hold members is treated as unread, 
  assert.deepEqual(unreadCollectionSlugs({ readCount, storedCount }), ["shop"]);
 });
 
-test("a genuinely empty collection we hold nothing for is NOT flagged — no permanent false warning", () => {
+test("a genuinely empty collection we hold nothing for is NOT flagged, no permanent false warning", () => {
  const readCount = new Map([["dresses", 94]]);
  const storedCount = new Map([["dresses", 94], ["brand-new-empty", 0]]);
  assert.deepEqual(unreadCollectionSlugs({ readCount, storedCount }), []);
@@ -127,21 +127,21 @@ test("a fetch failure and an empty read are reported once, not twice", () => {
  assert.deepEqual(out, ["shop"], "shop is unread for both reasons but listed once");
 });
 
-test("a complete read of every collection preserves nothing — the normal path still writes", () => {
+test("a complete read of every collection preserves nothing. The normal path still writes", () => {
  const readCount = new Map([["shop", 1324], ["dresses", 94]]);
  const storedCount = new Map([["shop", 1324], ["dresses", 94]]);
  assert.deepEqual(unreadCollectionSlugs({ readCount, storedCount }), []);
 });
 
 
-// The behaviour those tests pinned — a piece returning from sold, an availability disagreement, a
-// missing fingerprint — is now covered by the updateNeeded tests below, without needing a rule of
+// The behaviour those tests pinned. A piece returning from sold, an availability disagreement, a
+// missing fingerprint: is now covered by the updateNeeded tests below, without needing a rule of
 // its own: all three show up as a changed field in the write.
 
 
 test("a markdown starting or ending changes the fingerprint", () => {
  // The fingerprint decides whether a re-sync bothers to update a listing. It covered name, price,
- // currency, sold state, images and size — not the compare-at price. So when we started capturing
+ // currency, sold state, images and size, not the compare-at price. So when we started capturing
  // markdowns, every existing item was skipped as "unchanged" and no markdown was ever recorded:
  // we-thieves re-synced 168 items, updated 0, and reported 0 pieces on sale while her own site was
  // running a sale.
@@ -158,8 +158,8 @@ test("a markdown starting or ending changes the fingerprint", () => {
 // The content fingerprint is a hand-maintained list of fields: name, price, currency, sold state,
 // photos, size. Anything not on the list is invisible to it, so when we start caring about something
 // new, every existing listing is skipped as "unchanged" and the feature silently does nothing. That
-// has now happened four times — resurrected pieces, sale prices, the photo markers, and the original
-// stuck-sold bug — and each time the fix looked shipped.
+// has now happened four times. Resurrected pieces, sale prices, the photo markers, and the original
+// stuck-sold bug, and each time the fix looked shipped.
 //
 // So the question changes from "has the source changed?" (which needs a list) to "would this write
 // change anything?" (which cannot miss a field, because it compares the write itself).
@@ -194,7 +194,7 @@ test("photos and variants are compared by value, not by reference", () => {
 });
 
 test("only the fields being written are compared", () => {
- // The prior row carries columns the importer never touches — a seller's own edits, timestamps.
+ // The prior row carries columns the importer never touches. A seller's own edits, timestamps.
  // Comparing those would make every listing look changed for ever.
  const prior = { title: "Silk Slip", priceCents: 18000, updatedAt: new Date(), sellerNote: "hers" };
  assert.equal(updateNeeded(prior, { title: "Silk Slip", priceCents: 18000 }), false);
@@ -222,12 +222,12 @@ test("a real change inside a variant is still caught", () => {
  assert.equal(updateNeeded(prior, { variants: [{ priceCents: 100, size: "M", available: false }] }), true);
 });
 
-test("array order still matters — it is the order a shopper sees", () => {
+test("array order still matters. It is the order a shopper sees", () => {
  assert.equal(updateNeeded({ images: ["a.jpg", "b.jpg"] }, { images: ["b.jpg", "a.jpg"] }), true);
 });
 
 // ── which order a collection is shown in ─────────────────────────────────────────────────────────
-// The order used to come off the captured copy of /collections/{slug} — crush-edit's rail still led
+// The order used to come off the captured copy of /collections/{slug}: crush-edit's rail still led
 // with three sold Guccis and a Dior months after the seller had put an LV Looping first. The live
 // feed already tells us her order; the capture is only the answer of last resort.
 
@@ -276,7 +276,7 @@ test("nothing to order leaves the collection alone", () => {
 });
 
 test("a live order that matches none of our items falls back to the capture", () => {
- // Only when the live list resolves to nothing at all — otherwise live always wins.
+ // Only when the live list resolves to nothing at all. Otherwise live always wins.
  const plan = plannedCollectionOrder({ live: ["not-ours"], captured: ["dior-saddle"], members });
  assert.deepEqual(plan, { ids: ["i-dior"], source: "captured" });
 });

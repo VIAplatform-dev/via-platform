@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, fonts, radius } from "../../../lib/portal-theme";
 import { useDraft } from "../../../lib/seller/draft";
 import { flawsFromLine, flawsToLine, costFromText, CONDITION_GRADES, type ConditionGrade } from "../../../lib/seller/intake-shape";
-import { publishListing } from "../../../lib/seller/intake";
+import { publishListing, draftListing } from "../../../lib/seller/intake";
+import { fillDraftBlanks, describeFilled } from "../../../lib/seller/fill";
+import { filledFields } from "../../../lib/seller/listing";
 import { formatMoney } from "../../../lib/seller/home";
 import { parcelEstimateFrom, defaultParcelFor, tierForWeight, parcelMismatch, describeParcel } from "../../../lib/seller/parcel";
 import { floorMissFor, describeFloorMiss } from "../../../lib/seller/price-floor";
@@ -16,7 +18,7 @@ import { apiGet, apiPatch, apiPost } from "../../../lib/api";
 import { useAuth } from "../../../lib/auth";
 import { useQuery } from "@tanstack/react-query";
 
-// Review — a handful of rows, each with what VYA decided and a way to disagree.
+// Review: a handful of rows, each with what VYA decided and a way to disagree.
 //
 // Price shows how many comparable sales it read, because a number with no reasoning behind it is
 // one she will override every time. "14 comps" is the difference between a guess and a finding.
@@ -24,7 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 // disagrees with what the piece looks like, and Measurements opens the category's template.
 //
 // This screen is also the ONLY place the pricing floor can be checked on the phone. Loading prices
-// the piece before Review, and what she paid is typed here — so the price is set while the cost is
+// the piece before Review, and what she paid is typed here, so the price is set while the cost is
 // still unknown and nothing earlier could have compared the two. Price and Cost are adjacent rows
 // here, which makes this the first and last moment both numbers exist. See lib/seller/price-floor.ts.
 
@@ -52,7 +54,7 @@ export default function ReviewScreen() {
     queryFn: () => apiGet<{ platforms: { key: string; name: string }[] }>("/api/store/cross-listing"),
     enabled: !!storeSlug,
   });
-  // The store's unit for measurements — inches for a US ship-from, cm elsewhere.
+  // The store's unit for measurements. Inches for a US ship-from, cm elsewhere.
   const shipping = useQuery({ queryKey: ["store", "shipping"], queryFn: () => apiGet<{ currency?: string; shipFrom?: { country?: string | null } | null }>("/api/store/shipping"), enabled: !!storeSlug });
   const currency = me.data?.currency ?? "USD";
   const unit = unitFor({ country: shipping.data?.shipFrom?.country, currency: shipping.data?.currency ?? currency });
@@ -77,6 +79,8 @@ export default function ReviewScreen() {
   const [consignor, setConsignor] = useState<number | null>(null);
   const [channels, setChannels] = useState<string[]>([]);
   const [saving, setSaving] = useState<null | "active" | "draft">(null);
+  const [filling, setFilling] = useState(false);
+  const [filledNote, setFilledNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Ships as: the AI's parcel when it made one, else the category's default (lib/seller/parcel.ts).
@@ -98,19 +102,71 @@ export default function ReviewScreen() {
   // and blurring the row is this screen's version of landing.
   const showFloorMiss = floorMiss && minMarkupBps !== null && floorKey !== floorSettled && editing !== "cost" && editing !== "price";
 
-  // Typed as one shape so `note` exists on every row — a union would make it present on Price
+  // Typed as one shape so `note` exists on every row. A union would make it present on Price
   // only, which TypeScript rightly refuses to read off the others.
-  const rows: { key: keyof typeof fields; label: string; value?: string; note?: string | null }[] = [
+  //
+  // EVERY FIELD, NOT SEVEN. This screen showed brand, price, cost, condition, flaws, category and
+  // the parcel, so a piece listed from the phone could never be given a title, a size, an era, a
+  // material, a colour or a description without reopening it in Inventory afterwards. Those six
+  // are the ones a shopper actually reads, and the pricer takes era and material as inputs.
+  const rows: { key: keyof typeof fields; label: string; value?: string; note?: string | null; multiline?: boolean }[] = [
+    { key: "title", label: "Title", value: fields.title },
     { key: "brand", label: "Brand", value: fields.brand },
     // Price is held in cents and formatted here; the row edits it back through priceCents.
     { key: "price", label: "Price", value: priceCents !== null ? formatMoney(priceCents, currency) : undefined, note: compsCount ? `${compsCount} comps` : null },
-    // What she paid — optional, hers alone, and the one number the profit report cannot do without.
+    // What she paid: optional, hers alone, and the one number the profit report cannot do without.
     { key: "cost", label: "Cost", value: fields.cost?.trim() || undefined },
     { key: "condition", label: "Condition", value: fields.condition },
     { key: "flaws", label: "Flaws", value: flawsToLine(fields.flaws) || undefined },
     { key: "category", label: "Category", value: fields.category },
+    { key: "size", label: "Size", value: fields.size },
+    { key: "era", label: "Era", value: fields.era },
+    { key: "material", label: "Material", value: fields.material },
+    { key: "colour", label: "Colour", value: fields.colour },
     { key: "weightOz", label: "Ships as", value: describeParcel(tier, typedWeight ?? estimate.weightOz), note: typedWeight == null ? (estimate.source === "ai" ? "estimated" : "by category") : null },
+    // Last, and the only one that gets more than a line: it is the longest thing she writes and a
+    // one-line box makes it look like a field rather than the paragraph it is.
+    { key: "description", label: "Description", value: fields.description, multiline: true },
   ];
+  /**
+   * FILL WITH AI, here as well as on Details and on the piece editor.
+   *
+   * Details offers it before anything is typed, which is the wrong moment for the seller who fills
+   * a few rows herself and then wants the rest: she has already chosen "I'll fill it in" and this
+   * was the one screen in the flow with no way back to it. The editor has had this button for a
+   * while; the form on the way IN did not.
+   *
+   * THE RULE IS THE EDITOR'S, HELD BY A TEST. Everything already written goes up as `filled`. The
+   * route does not spend a pass generating what it is given, and the answer only ever lands in an
+   * empty row. Her words are never replaced. See lib/seller/fill.ts.
+   *
+   * It does not touch the price. On Details the AI path prices as it drafts because there is no
+   * price yet; by this screen there is one, and it is on the row above her thumb.
+   */
+  async function fillWithAI() {
+    if (imageUrls.length === 0) { setError("Add a photo first. It reads the photographs."); return; }
+    setError(null);
+    setFilledNote(null);
+    setFilling(true);
+    try {
+      const known = filledFields({
+        title: fields.title, brand: fields.brand, era: fields.era, material: fields.material,
+        colour: fields.colour, size: fields.size, category: fields.category,
+        condition: fields.condition, conditionNote: fields.conditionNote, description: fields.description,
+      });
+      const { fields: drafted } = await draftListing(imageUrls, known);
+      const { fields: next, filled } = fillDraftBlanks(drafted, fields);
+      setFields(next);
+      // The measurement form is separate state, so a category arriving here changes which template
+      // is asked for: the boxes she has already filled stay filled, the new template adds its own.
+      setFilledNote(describeFilled(filled));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't read the photos. Try again.");
+    } finally {
+      setFilling(false);
+    }
+  }
+
   const commitFlaws = () => {
     if (flawsLine !== null) setFields({ ...fields, flaws: flawsFromLine(flawsLine) });
     setFlawsLine(null);
@@ -144,7 +200,7 @@ export default function ReviewScreen() {
           ...(channels.length ? { channels } : {}),
         });
         // A SCHEDULED PIECE IS NOT PUBLISHED NOW. "List it" with a time set means "put it out then",
-        // so it stays a draft and the publish-scheduled cron flips it — publishing here as well
+        // so it stays a draft and the publish-scheduled cron flips it. Publishing here as well
         // would put it live immediately and leave a schedule that had already happened.
         if (status === "active" && !when) await apiPost(`/api/store/items/${itemId}`, { action: "publish" });
       } else {
@@ -184,9 +240,23 @@ export default function ReviewScreen() {
         ))}
       </View>
 
-      <Text style={{ fontFamily: fonts.serif, fontSize: 24, color: colors.text, marginTop: spacing.xl }}>
-        {fields.title ?? "New piece"}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, marginTop: spacing.xl }}>
+        <Text style={{ flex: 1, fontFamily: fonts.serif, fontSize: 24, color: colors.text }} numberOfLines={2}>
+          {fields.title ?? "New piece"}
+        </Text>
+        <Pressable
+          disabled={filling || saving !== null}
+          onPress={() => void fillWithAI()}
+          style={{ backgroundColor: colors.chip, borderRadius: radius, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, opacity: filling ? 0.6 : 1 }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text }}>
+            {filling ? "Reading…" : "Fill with AI"}
+          </Text>
+        </Pressable>
+      </View>
+      {filledNote ? (
+        <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 17 }}>{filledNote}</Text>
+      ) : null}
 
       <View style={{ marginTop: spacing.lg }}>
         {rows.map((r) => (
@@ -206,22 +276,23 @@ export default function ReviewScreen() {
                   onChangeText={(v) => {
                     if (r.key === "flaws") setFlawsLine(v);
                     else if (r.key === "price") {
-                      // Typed in whole currency, stored in cents — the same units the pricer used.
+                      // Typed in whole currency, stored in cents. The same units the pricer used.
                       const n = Number(v.replace(/[^0-9.]/g, ""));
                       setPriceCents(Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null);
                     } else if (r.key === "weightOz") setFields({ ...fields, weightOz: v.replace(/[^0-9]/g, "") });
                     else if (r.key === "cost") setFields({ ...fields, cost: v.replace(/[^0-9.]/g, "") });
                     else setFields({ ...fields, [r.key]: v });
                   }}
+                  multiline={r.multiline}
                   keyboardType={r.key === "price" || r.key === "weightOz" || r.key === "cost" ? "numeric" : "default"}
-                  placeholder={r.key === "flaws" ? "scuffed toe, light pilling — comma-separated" : r.key === "weightOz" ? `${estimate.weightOz} oz packed` : r.key === "cost" ? "what you paid" : undefined}
+                  placeholder={r.key === "flaws" ? "scuffed toe, light pilling. Comma-separated" : r.key === "weightOz" ? `${estimate.weightOz} oz packed` : r.key === "cost" ? "what you paid" : r.key === "description" ? "How it looks, how it fits, where it came from…" : undefined}
                   placeholderTextColor={colors.textDim}
                   onBlur={() => { if (r.key === "flaws") commitFlaws(); setEditing(null); }}
                   style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }}
                 />
               ) : (
-                <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>
-                  {r.value || "—"}
+                <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={r.multiline ? 2 : 1}>
+                  {r.value || "-"}
                 </Text>
               )}
               {r.note ? (
@@ -253,7 +324,7 @@ export default function ReviewScreen() {
                 <TextInput
                   value={fields.conditionNote ?? ""}
                   onChangeText={(v) => setFields({ ...fields, conditionNote: v })}
-                  placeholder="Condition note — light wear to the sole…"
+                  placeholder="Condition note: light wear to the sole…"
                   placeholderTextColor={colors.textDim}
                   style={{ marginTop: spacing.sm, fontSize: 14, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.xs }}
                 />
@@ -262,7 +333,7 @@ export default function ReviewScreen() {
               <Text style={{ fontSize: 12, color: colors.textMuted, marginLeft: 92, marginTop: 2 }} numberOfLines={2}>{fields.conditionNote}</Text>
             ) : null}
 
-            {/* Price: below what she decided she must make on it. Warned, never silently rewritten —
+            {/* Price: below what she decided she must make on it. Warned, never silently rewritten,
                 a price she has seen is a decision, and this only undoes one made before the cost was. */}
             {r.key === "price" && showFloorMiss && floorMiss && minMarkupBps !== null ? (
               <View style={{ marginLeft: 92, marginTop: spacing.sm, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md }}>
@@ -289,12 +360,12 @@ export default function ReviewScreen() {
           </View>
         ))}
 
-        {/* Measurements: the category's template, kept compact — one row, opening the fields. */}
+        {/* Measurements: the category's template, kept compact. One row, opening the fields. */}
         {measureKeys.length > 0 ? (
           <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Text style={{ width: 92, fontSize: 14, color: colors.textMuted }}>Measurements</Text>
-              <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{measurementsLine || "—"}</Text>
+              <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }} numberOfLines={1}>{measurementsLine || "-"}</Text>
               <Pressable hitSlop={8} onPress={() => setMeasuring(!measuring)}>
                 <Text style={{ fontSize: 14, color: colors.accent, fontWeight: "600" }}>{measuring ? "Done" : "Change"}</Text>
               </Pressable>
@@ -309,7 +380,7 @@ export default function ReviewScreen() {
                         value={measureForm[k] ?? ""}
                         onChangeText={(v) => setMeasureForm({ ...measureForm, [k]: v.replace(/[^0-9.]/g, "") })}
                         keyboardType="decimal-pad"
-                        placeholder="—"
+                        placeholder="-"
                         placeholderTextColor={colors.textDim}
                         style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600", paddingVertical: spacing.xs }}
                       />
@@ -323,7 +394,7 @@ export default function ReviewScreen() {
         ) : null}
       </View>
 
-      {/* When it goes out, whose it is, and where else it lands — the three things the web asks at
+      {/* When it goes out, whose it is, and where else it lands. The three things the web asks at
           publish time and the phone never did. */}
       <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xl }}>GOES LIVE</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
@@ -348,7 +419,7 @@ export default function ReviewScreen() {
       </View>
       {when ? (
         <Text style={{ fontSize: 12, color: colors.positive, marginTop: spacing.xs }}>
-          {describeSchedule(when)} — it waits in Drafts until then.
+          {describeSchedule(when)}: it waits in Drafts until then.
         </Text>
       ) : null}
 

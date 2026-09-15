@@ -5,7 +5,7 @@ import path from "node:path";
 import { runImport, type CrawlOutcome, type ImportDeps } from "./run-import.ts";
 import { collectWarnings, initialSteps, isResumable, isStalled, reportLine, withStep, type CrawlState, type Step } from "./report.ts";
 
-// The step machine, tested with fakes — no database, no network, no store. What's asserted here is
+// The step machine, tested with fakes, no database, no network, no store. What's asserted here is
 // exactly what makes an import VISIBLE: that a failing step is reported rather than returning zeros,
 // that an interrupted crawl resumes instead of restarting, and that the seller gets a readable line.
 
@@ -23,7 +23,7 @@ test("report line pluralises, and hides warnings only when there are none", () =
  assert.equal(reportLine({ pages: 0, products: 0, collections: 0 }, ["x"]), "0 pages · 0 products · 0 collections · 1 warning");
 });
 
-test("zero counts are KEPT — '0 products' is the signal, not something to hide", () => {
+test("zero counts are KEPT. '0 products' is the signal, not something to hide", () => {
  assert.match(reportLine({ pages: 12, products: 0, collections: 0 }, []), /0 products/);
 });
 
@@ -95,7 +95,7 @@ test("a clean import reports every count and finishes done", async () => {
 
 test("a failed PRODUCT import is reported, not silently zeroed", async () => {
  // The old code did `.catch(() => ({ added: 0, … }))` here, so a crash and an empty store produced
- // an identical response. The design capture is still worth keeping — but the seller must be told.
+ // an identical response. The design capture is still worth keeping, but the seller must be told.
  const { deps: d } = deps({ importItems: async () => { throw new Error("database unreachable"); } });
  const r = await runImport(job(), d);
  assert.equal(r.status, "done", "the site capture still succeeded");
@@ -151,9 +151,9 @@ test("resuming AFTER the crawl finished does not re-enter the crawler", async ()
  assert.equal(r.counts.products, 2, "the remaining steps still ran");
 });
 
-test("a job whose crawl finished is still resumable — work remains after the crawl", () => {
+test("a job whose crawl finished is still resumable. Work remains after the crawl", () => {
  assert.equal(isResumable({ status: "paused", crawl: { queue: [], done: ["/"], paths: ["/"] } }), true);
- assert.equal(isResumable({ status: "paused", crawl: null }), false, "nothing captured yet — a retry is a fresh import");
+ assert.equal(isResumable({ status: "paused", crawl: null }), false, "nothing captured yet. A retry is a fresh import");
 });
 
 test("crawl progress is persisted DURING the crawl, so a kill mid-page loses almost nothing", async () => {
@@ -213,7 +213,7 @@ test("a store with no readable products is told to upload a CSV", async () => {
   importItems: async () => ({ added: 0, updated: 0, unchanged: 0, skipped: 0, removed: 0 }),
  });
  const r = await runImport(job(), d);
- assert.match(r.warnings.join(" "), /upload a CSV or connect your platform/);
+ assert.match(r.warnings.join(" "), /Upload a CSV or connect your platform/);
 });
 
 test("steps record how long they took", async () => {

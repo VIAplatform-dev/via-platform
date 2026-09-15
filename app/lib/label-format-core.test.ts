@@ -15,7 +15,7 @@ test("a regular printer asks for no size, so the carrier's sheet default stands"
   assert.deepEqual(labelOptionsFor("sheet"), { label_format: "PDF" });
 });
 
-test("PDF either way — never ZPL", () => {
+test("PDF either way, never ZPL", () => {
   // ZPL prints pixel-perfect on a Zebra and is unreadable gibberish in Mail, Files and every phone
   // viewer. A seller who opened it would think the label had failed.
   for (const p of ["thermal", "sheet"] as const) {

@@ -15,7 +15,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!tok && tok === crypto.createHash("sha256").update(pw).digest("hex");
 }
 
-// POST [?store=slug] — one-time backfill: pull flat measurements out of the DESCRIPTION into the
+// POST [?store=slug]: one-time backfill: pull flat measurements out of the DESCRIPTION into the
 // structured `measurements` field, for items imported before the extractor existed. Idempotent
 // (skips items that already have measurements, and only writes when it finds some). Optional ?store=.
 export async function POST(request: NextRequest) {

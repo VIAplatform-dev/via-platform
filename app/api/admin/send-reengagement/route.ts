@@ -81,9 +81,9 @@ async function getApprovedNeverLoggedIn(): Promise<{ email: string; firstName: s
 /**
  * POST /api/admin/send-reengagement
  *
- * { testEmail: "you@example.com" } — test send only, not tracked
- * { preview: true } — returns counts without sending
- * { send: true } — sends only to people who haven't received this campaign
+ * { testEmail: "you@example.com" }: test send only, not tracked
+ * { preview: true }: returns counts without sending
+ * { send: true }: sends only to people who haven't received this campaign
  */
 export async function POST(request: NextRequest) {
  if (!isAuthorized(request)) {
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
  );
  }
 
- // Test send — not tracked so it won't block the real send later
+ // Test send, not tracked so it won't block the real send later
  if (testEmail) {
  const { sent, failed } = await sendReengagementEmail([{ email: testEmail, firstName: null }]);
  return NextResponse.json({ success: true, test: true, testEmail, sent, failed });

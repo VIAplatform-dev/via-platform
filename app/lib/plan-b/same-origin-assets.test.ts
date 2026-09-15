@@ -7,7 +7,7 @@ const ORIGIN = "https://angearchive.com";
 
 // A browser-verified failure, not a hypothetical: a sweep of all 22 hosted storefronts found 39
 // cross-origin scripts on this store, 35 of them ES modules. Modules REQUIRE CORS headers, the
-// seller's own domain does not send them for our origin, and Chrome refuses every one — so the
+// seller's own domain does not send them for our origin, and Chrome refuses every one, so the
 // theme's entire JavaScript never runs. Add to cart is then a button with nothing bound to it.
 const PAGE = `<html><head>
  <script src="https://angearchive.com/cdn/shop/t/1/assets/quick-add.js?v=1020" type="module"></script>
@@ -28,7 +28,7 @@ test("theme scripts on the store's own domain become same-origin", () => {
  assert.equal(src, "/cdn/shop/t/1/assets/quick-add.js?v=1020", "must go through VYA's /cdn proxy");
 });
 
-test("the query string survives — theme assets are fingerprinted by it", () => {
+test("the query string survives. Theme assets are fingerprinted by it", () => {
  assert.match(out(), /already-relative\.js/);
  assert.match(out(), /quick-add\.js\?v=1020/);
 });
@@ -50,7 +50,7 @@ test("images on the store's own domain come through the proxy as well", () => {
  assert.equal($("img").attr("src"), "/cdn/shop/files/photo.jpg?v=2");
 });
 
-// Only /cdn/ — that is the one path shape the proxy knows how to serve. Rewriting anything else
+// Only /cdn/ that is the one path shape the proxy knows how to serve. Rewriting anything else
 // would point the browser at a VYA route that has no idea what to do with it.
 test("leaves paths the proxy cannot serve alone", () => {
  const page = `<html><body><script src="https://angearchive.com/apps/reviews/widget.js"></script></body></html>`;
@@ -140,9 +140,9 @@ test("inline scripts that mention the domain outside /cdn are left alone", () =>
  assert.match(sameOriginAssets(page, ORIGIN), /https:\/\/angearchive\.com\/products\/x/);
 });
 
-test("a data: URI in a srcset survives untouched — its own commas are not separators", () => {
+test("a data: URI in a srcset survives untouched. Its own commas are not separators", () => {
  // A srcset is comma-separated, but a data: URI CONTAINS a comma. Splitting on commas cut
- // `data:image/svg+xml;utf8,<svg…>` in half and rejoining with ", " put a space after the comma —
+ // `data:image/svg+xml;utf8,<svg…>` in half and rejoining with ", " put a space after the comma,
  // which in a srcset separates a URL from its descriptor, so the candidate became nonsense. The
  // browser prefers srcset over src, so our correctly re-hosted `src` was never used: 29 images on
  // every bag-crush product page rendered blank and the thumbnail strip collapsed to a sliver.

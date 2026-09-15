@@ -6,10 +6,10 @@ import { notifyStoreOfMessage } from "@/app/lib/message-notify";
 export const dynamic = "force-dynamic";
 
 // A buyer's PER-STORE inbox, opened by a signed magic-link token (store + email). Everything
-// is scoped to that (store, email) pair — the token can only ever see this buyer's own threads
+// is scoped to that (store, email) pair: the token can only ever see this buyer's own threads
 // with this one store.
 
-// GET ?token= — all of this buyer's conversations with the store, with messages.
+// GET ?token= all of this buyer's conversations with the store, with messages.
 export async function GET(request: NextRequest) {
  const auth = verifyBuyerToken(request.nextUrl.searchParams.get("token"));
  if (!auth) return NextResponse.json({ error: "This link has expired." }, { status: 401 });
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
  return NextResponse.json({ ok: true, storeSlug: auth.storeSlug, email: auth.email, conversations });
 }
 
-// POST { token, conversationId, body } — the buyer replies in a thread they own.
+// POST { token, conversationId, body }. The buyer replies in a thread they own.
 export async function POST(request: NextRequest) {
  const body = (await request.json().catch(() => ({}))) as { token?: string; conversationId?: number; body?: string };
  const auth = verifyBuyerToken(body.token);
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
  if (!conv) return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
 
  await addMessage(conv.id, "buyer", text.slice(0, 5000));
- // Nudge the store their buyer replied (email + optional text) — same path as a new message.
+ // Nudge the store their buyer replied (email + optional text). Same path as a new message.
  notifyStoreOfMessage(auth.storeSlug, { itemTitle: conv.itemTitle, buyerName: conv.buyerName, message: text.slice(0, 5000), conversationId: conv.id }).catch(() => {});
  return NextResponse.json({ ok: true });
 }

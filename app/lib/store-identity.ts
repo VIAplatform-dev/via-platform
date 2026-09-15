@@ -2,9 +2,9 @@
  * One email per store, connected to everything. Pure.
  *
  * THREE RECORDS CLAIM TO KNOW WHO OWNS A SHOP, and they drifted:
- *   · store_accounts.owner_email — written at signup. The account.
- *   · store_users (role owner)   — who may sign in and work on it. The access.
- *   · sellers.email              — the shop's own address: reply-to on its emails, the contact on
+ *   · store_accounts.owner_email: written at signup. The account.
+ *   · store_users (role owner), who may sign in and work on it. The access.
+ *   · sellers.email: the shop's own address: reply-to on its emails, the contact on
  *                                  its shipping labels, what Mailchimp is told.
  *
  * An audit of 17 stores found 12 not joined up. Two distinct failures, and they are not the same
@@ -14,7 +14,7 @@
  *   their emails fall back to whatever the static map has. Ownership is agreed; the shop simply has
  *   no address of its own. Filling it from the agreed owner is unambiguous.
  *
- *   ORPHANED. A shop has a real owner address in sellers.email — evan@vangie.co, and four more —
+ *   ORPHANED. A shop has a real owner address in sellers.email, evan@vangie.co, and four more,
  *   and the only ACCESS row belongs to whoever onboarded it. So the shop's actual owner cannot sign
  *   in to her own shop. That is not a data tidy: granting access is a decision, and this module
  *   reports it rather than fixing it.
@@ -29,7 +29,7 @@ export type StoreRecords = {
 
 export type Finding =
  | { slug: string; kind: "ok" }
- /** Ownership is agreed and sellers.email is missing or different — safe to set. */
+ /** Ownership is agreed and sellers.email is missing or different. Safe to set. */
  | { slug: string; kind: "set-seller-email"; to: string; from: string | null }
  /** A real address on the shop that grants no access. Reported, never fixed automatically. */
  | { slug: string; kind: "orphaned-owner"; address: string; hasAccess: string | null }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, PageHeader, Button, inputCls } from "../ui";
 import { useStoreBase } from "../nav-base";
 
-// "Bring your site over" — capture the seller's existing site (every page,
+// "Bring your site over". Capture the seller's existing site (every page,
 // pixel-for-pixel) and host it on VYA, then swap in VYA's commerce backend.
 // Sellers with NO existing site build one from the Storefront builder instead.
 // Import is a ONE-TIME step: once a seller has a captured site, re-importing would
@@ -41,15 +41,15 @@ function liveLine(job: Job | null): string {
  // "596 so far" is a number with no end in sight. The queue is the only denominator we have, and it
  // is honest: it GROWS as the crawl finds more links, hence "about". A seller who can see 596 of
  // about 2,200 knows to go and do something else; one who only sees 596 concludes it is stuck.
- if (running?.name === "crawl") return left > 0 ? `Copying your pages — ${pages} of about ${pages + left}` : `Copying your pages — ${pages} so far`;
+ if (running?.name === "crawl") return left > 0 ? `Copying your pages. ${pages} of about ${pages + left}` : `Copying your pages. ${pages} so far`;
  if (running) return STEP_LABEL[running.name] || "Working…";
- if (job.status === "paused") return `Picking up where it stopped — ${pages} pages so far`;
+ if (job.status === "paused") return `Picking up where it stopped. ${pages} pages so far`;
  return "Working…";
 }
 
 // How long to say it will take, which depends entirely on the site.
 //
-// "This takes a minute or two" is true of a 39-page shop and a flat lie for a 2,200-page one — and a
+// "This takes a minute or two" is true of a 39-page shop and a flat lie for a 2,200-page one, and a
 // seller on hour two of a promised two minutes doesn't wait, she presses import again. On a store
 // that already has a capture, that is the destructive path. So the estimate follows the queue.
 const BIG_SITE_PAGES = 200; // roughly where "a minute or two" stops being true
@@ -57,9 +57,9 @@ const BIG_SITE_PAGES = 200; // roughly where "a minute or two" stops being true
 function durationLine(job: Job | null): string {
  const total = (job?.counts?.pages || 0) + (job?.remaining || 0);
  if (total > BIG_SITE_PAGES) {
-  return `That's a big site — ${total.toLocaleString()} pages or so, which takes a while. You can leave this page: it keeps going, and picks itself up if it stops.`;
+  return `That's a big site. ${total.toLocaleString()} pages or so, which takes a while. You can leave this page: it keeps going, and picks itself up if it stops.`;
  }
- return "Copying every page and importing your products — this takes a minute or two. You can leave this page; it keeps going.";
+ return "Copying every page and importing your products. This takes a minute or two. You can leave this page; it keeps going.";
 }
 
 const MAX_RESUMES = 40; // a hard stop, so a job that can't progress can't loop forever
@@ -67,7 +67,7 @@ const MAX_RESUMES = 40; // a hard stop, so a job that can't progress can't loop 
 export default function BringYourSitePage() {
  const base = useStoreBase();
  // Arriving from onboarding after a failed import? The reason and the URL ride in on the query
- // string — read them as INITIAL state rather than setting state from an effect (which would
+ // string. Read them as INITIAL state rather than setting state from an effect (which would
  // trigger a second render pass for something known before the first one).
  const qp = (k: string) => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get(k));
  const [capUrl, setCapUrl] = useState(() => qp("url") || "");
@@ -115,7 +115,7 @@ export default function BringYourSitePage() {
     r = await fetch("/api/store/capture", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(i === 0 ? body : { resume: true }) });
    } catch {
     // The request died (a killed invocation, a dropped connection). That is NOT proof the import
-    // failed — the job keeps its own state — so ask the server what actually happened before
+    // failed, the job keeps its own state, so ask the server what actually happened before
     // telling the seller anything. Reporting "Capture failed" here was exactly the confusion
     // this milestone exists to remove.
     const s = await readStatus().catch(() => null);
@@ -161,13 +161,13 @@ export default function BringYourSitePage() {
 
  return (
   <div className="mx-auto max-w-2xl px-6 py-10 sm:px-8">
-   <PageHeader title="Bring your site over" subtitle="We host your exact site — every page, pixel-for-pixel — on VYA, then switch the backend to VYA commerce. Keep your design; swap Shopify." />
+   <PageHeader title="Bring your site over" subtitle="We host your exact site, every page, pixel-for-pixel, on VYA, then switch the backend to VYA commerce. Keep your design; swap Shopify." />
 
    {alreadyImported ? (
-    // One-time import already done — send them to editing, not a re-crawl.
+    // One-time import already done. Send them to editing, not a re-crawl.
     <Card className="border-emerald-200 bg-emerald-50/40 p-6">
      <p className="text-[15px] font-semibold text-emerald-800">Your site is already on VYA</p>
-     <p className="mt-1 text-[13px] text-stone-600">You brought your site over — edit any page (text, photos, and section order) from your storefront. Importing is a one-time step, so it won’t re-crawl and undo your edits.</p>
+     <p className="mt-1 text-[13px] text-stone-600">Your site is here. Edit any page from your storefront: text, photos and section order. Nothing re-imports over your changes.</p>
      <div className="mt-4 flex flex-wrap gap-2">
       <Button onClick={() => { window.location.href = `${base}/storefront`; }}>Edit your pages</Button>
       {status.url && <Button variant="secondary" onClick={() => { window.open(status.url as string, "_blank"); }}>View your site ↗</Button>}
@@ -195,10 +195,10 @@ export default function BringYourSitePage() {
     </Card>
    ) : (
     <Card className="p-6">
-     {status.isAdmin && status.captured > 0 && <p className="mb-3 text-[12px] text-amber-700">Admin: this store already has a captured site — re-importing replaces it and discards edits.</p>}
+     {status.isAdmin && status.captured > 0 && <p className="mb-3 text-[12px] text-amber-700">Admin: this store already has a captured site. Re-importing replaces it and discards edits.</p>}
      {interrupted && (
       <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3">
-       <p className="text-[12px] text-amber-800">An earlier import stopped part-way ({job!.counts.pages} pages copied, {job!.remaining} to go). It resumes on its own shortly — or continue it now.</p>
+       <p className="text-[12px] text-amber-800">An earlier import stopped part-way ({job!.counts.pages} pages copied, {job!.remaining} to go). It resumes on its own shortly, or continue it now.</p>
        <Button className="mt-2" onClick={() => bringSiteOver(true)}>Continue import</Button>
       </div>
      )}
@@ -208,7 +208,7 @@ export default function BringYourSitePage() {
      </div>
      {capBusy && (
       <div className="mt-2.5">
-       {/* Live, not a static "this takes a minute" — a stalled import used to look identical to a working one. */}
+       {/* Live, not a static "this takes a minute". A stalled import used to look identical to a working one. */}
        <p className="text-[12px] text-stone-600">{liveLine(job)}</p>
        <p className="mt-0.5 text-[11px] text-stone-400">{durationLine(job)}</p>
       </div>

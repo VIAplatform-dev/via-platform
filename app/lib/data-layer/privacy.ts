@@ -1,12 +1,12 @@
 // ───────────────────────────────────────────────────────────────────────────
-// Data Layer — privacy guardrail (pure + tested).
+// Data Layer: privacy guardrail (pure + tested).
 //
-// Sellers may NEVER see another individual store's numbers — only aggregated,
+// Sellers may NEVER see another individual store's numbers, only aggregated,
 // anonymized, market-level signal. `market_metrics` is already aggregated across
 // stores, but a segment built from too few stores/transactions could effectively
 // expose one store. This gate enforces the floor (config PRIVACY, default 5/5):
 //   • fewer than N STORES        → the segment is hidden entirely (returns null)
-//   • fewer than N TRANSACTIONS  → price + sell-through are blanked to null ("—"),
+//   • fewer than N TRANSACTIONS  → price + sell-through are blanked to null ("-"),
 //                                  while the (engagement-based) demand signal stays
 // Per-store identity is never carried into the seller-facing shape at all.
 // ───────────────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ export type PublicSegment = {
  priceMedian: number | null;
  priceP75: number | null;
  activeSupply: number; // aggregate in-stock count across stores (not store-identifying)
- storeCount: number; // always ≥ minStores — safe to surface as "across N stores"
+ storeCount: number; // always ≥ minStores. Safe to surface as "across N stores"
  hasPriceData: boolean; // false → price/sell-through suppressed for privacy
 };
 

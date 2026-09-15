@@ -18,7 +18,7 @@ test("the drawer and its script go in before </body>", () => {
 
 test("the seller's markup is otherwise untouched", () => {
  const out = injectWishlist(page, opts);
- // Everything before </body> is exactly what came in — the heart is added by the browser, so the
+ // Everything before </body> is exactly what came in. The heart is added by the browser, so the
  // page a shopper is served has none of our markup inside her theme.
  assert.equal(out.slice(0, out.indexOf("<style>")), page.slice(0, page.indexOf("</body>")));
  assert.ok(!out.includes('class="vya-heart"'), "hearts are placed at runtime, not baked into her HTML");
@@ -37,7 +37,7 @@ test("injecting twice does nothing the second time", () => {
 });
 
 test("a shop name cannot break out of the script", () => {
- // Seller-entered, and it lands inside a <script>, where HTML entities do NOT decode — so the HTML
+ // Seller-entered, and it lands inside a <script>, where HTML entities do NOT decode, so the HTML
  // escaper is the wrong tool there and JSON.stringify alone is not enough either.
  //
  // The property that matters is that no "<" from the name reaches the HTML parser: everything after
@@ -47,7 +47,7 @@ test("a shop name cannot break out of the script", () => {
  const embedded = out.slice(out.indexOf("SHOP="), out.indexOf("SHOP=") + 80);
  assert.ok(!embedded.includes("<"), "no raw < survives into the script");
  assert.match(embedded, /\\u003c\/script>\\u003cimg/, "both < are escaped");
- // And the block really is still open afterwards — the </script> that ends it is ours.
+ // And the block really is still open afterwards. The </script> that ends it is ours.
  assert.equal(out.split("</script>").length, 2);
 });
 
@@ -82,7 +82,7 @@ test("a signed-out shopper is asked to sign in, not failed silently", () => {
 
 test("the piece they reached for is saved once they have signed in", () => {
  const out = injectWishlist(page, opts);
- // The sign-in is a link in an EMAIL, which opens in a new tab — so this must survive the hop.
+ // The sign-in is a link in an EMAIL, which opens in a new tab, so this must survive the hop.
  // sessionStorage is per-tab and would drop the piece silently.
  assert.match(out, /localStorage\.setItem\("vya-wl-pending"/);
  assert.match(out, /localStorage\.removeItem\("vya-wl-pending"\)/);
@@ -125,7 +125,7 @@ test("her own favourites link opens the drawer where she has one", () => {
  // own type, where her shoppers already look.
  assert.match(out, /function bindHers\(\)/);
  assert.match(out, /data-vya-wishlist-open/);
- // Never the account link — telling those two apart is the whole point of favourites-icon.ts.
+ // Never the account link. Telling those two apart is the whole point of favourites-icon.ts.
  assert.match(out, /customer_authentication/, "account links are excluded");
 });
 
@@ -133,13 +133,13 @@ test("a shop with no favourites link still gets somewhere to look", () => {
  const out = injectWishlist(page, opts);
  assert.match(out, /function mountFab\(\)/);
  assert.match(out, /if\(!hers\)mountFab\(\)/);
- // And it only appears once something is saved — no control for an empty list.
+ // And it only appears once something is saved, no control for an empty list.
  assert.match(out, /fab\.className=n>0\?"on":""/);
 });
 
 test("the injected script is valid JavaScript", () => {
  // THE TEST THAT CAUGHT A REAL ONE. This file writes JavaScript inside a template literal, where
- // "\\/" is just "/" — so a regex escaped once became `if(//account|…`, a line comment, and the
+ // "\\/" is just "/", so a regex escaped once became `if(//account|…`, a line comment, and the
  // whole wishlist stopped parsing in every browser. Nothing else here would have noticed: the
  // markup was present, the strings all matched, and the feature was simply dead.
  const out = injectWishlist(page, opts);

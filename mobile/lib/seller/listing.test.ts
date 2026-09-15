@@ -10,7 +10,7 @@ test("a row with brand and cost is ready", () => {
   assert.equal(rowReadiness(row({ brand: "Gucci", cost: "120" })), "ready");
 });
 
-test("a row with neither still needs her — the AI would only be guessing", () => {
+test("a row with neither still needs her. The AI would only be guessing", () => {
   // The pricer takes brand as an input. Nothing in the old interface ever asked for it, so it
   // guessed at something she could simply have typed, and the comps were worse for it.
   assert.equal(rowReadiness(row()), "needs-you");
@@ -56,6 +56,6 @@ test("only fields she actually typed are sent as `filled`", () => {
   assert.deepEqual(filledFields({ brand: "Prada", era: "", cost: "140" }), { brand: "Prada", cost: "140" });
 });
 
-test("filled is an empty object when she typed nothing — not a set of empty strings", () => {
+test("filled is an empty object when she typed nothing, not a set of empty strings", () => {
   assert.deepEqual(filledFields({ brand: "", era: "   " }), {});
 });

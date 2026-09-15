@@ -1,7 +1,7 @@
 // The fonts a seller's own site is set in, read back out of the CSS we captured.
 //
 // WHY. The storefront's font picker offers a curated list of Google families. None of them is the
-// face her shop is actually set in, so the one font she definitely wants — her own — was the one
+// face her shop is actually set in, so the one font she definitely wants, her own. Was the one
 // option the dropdown didn't have. Her stylesheet already names it, and (for a captured site) her
 // @font-face rules and the files they point at came over with it, so choosing it needs nothing we
 // don't already hold.
@@ -40,7 +40,7 @@ export type DetectedFont = { family: string; declared: number; face: boolean };
 /**
  * Every font family the captured CSS names, most-used first.
  *
- * `face: true` means the stylesheet also carries an @font-face for it — the face itself came over,
+ * `face: true` means the stylesheet also carries an @font-face for it. The face itself came over,
  * so picking it renders in the real thing rather than a fallback. Those sort ahead of families that
  * are only ever named, which on most themes are the system-stack leftovers.
  */
@@ -50,7 +50,7 @@ export function detectSiteFonts(css: string, limit = 12): DetectedFont[] {
  const counts = new Map<string, number>();
  const faces = new Set<string>();
 
- // @font-face { font-family: X } — the faces the site actually ships.
+ // @font-face { font-family: X }: the faces the site actually ships.
  for (const m of src.matchAll(/@font-face\s*\{[^}]*?font-family\s*:\s*([^;}]+)/gi)) {
   const name = clean(m[1].split(",")[0]);
   if (usable(name)) faces.add(name.toLowerCase());

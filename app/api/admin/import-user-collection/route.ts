@@ -25,7 +25,7 @@ function isAuthorized(request: NextRequest): boolean {
  return !!token && token === hashPassword(adminPassword);
 }
 
-// GET /api/admin/import-user-collection?email=... — list a user's personal
+// GET /api/admin/import-user-collection?email=... list a user's personal
 // collections (id, name, itemCount) so the admin UI can pick which to import.
 export async function GET(request: NextRequest) {
  if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 //
 // Copies the products from a user's personal collection (user_collection_items)
 // into an editorial VYA collection (editors_picks under targetSlug). Idempotent
-// — re-running just skips items already added.
+// re-running just skips items already added.
 //
 // If the user has several collections and `match`/`sourceCollectionId` don't
 // pin one down, it returns the list so you can pick the right id.
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
  else
  return NextResponse.json({
   needsChoice: true,
-  message: "Multiple collections matched — re-call with sourceCollectionId.",
+  message: "Multiple collections matched. Re-call with sourceCollectionId.",
   collections: source.map((c) => ({ id: c.id, name: c.name, itemCount: c.itemCount })),
  });
  }

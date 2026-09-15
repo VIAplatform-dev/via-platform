@@ -5,7 +5,7 @@
 //
 // EVERY STEP NOW HAS A PHONE SCREEN. It did not used to: returns and domain opened the web
 // workspace in a browser, and payments landed on a Payouts screen that could only tell her to go to
-// a desktop — so the checklist that exists to get a store trading sent her away from the app three
+// a desktop, so the checklist that exists to get a store trading sent her away from the app three
 // times out of six. `href` is still carried for the web's own use; the phone no longer reads it.
 
 export type SetupStepId = "ship_from" | "payments" | "shipping" | "first_listing" | "returns" | "domain";
@@ -46,7 +46,7 @@ export type PhoneRoute =
  *
  * `ship_from` is the one that still answers null: the address a parcel leaves from lives in the
  * shipping settings, and until that screen exists a tap has nowhere to land. Returning null is how
- * the caller knows to fall back — better than pointing at a screen that cannot do the job.
+ * the caller knows to fall back. Better than pointing at a screen that cannot do the job.
  */
 export function phoneRouteFor(step: Pick<SetupStep, "id">): PhoneRoute | null {
   if (step.id === "first_listing") return "/(seller)/list";

@@ -34,7 +34,7 @@ export async function attentionForStore(storeSlug: string, now = new Date()): Pr
   ...itemCounts(items, new Set(lowConfidenceIds), now),
   holdsToday,
   pickupsWaiting,
-  // Both inboxes: the storefront contact threads and the marketplace app's. One number — a buyer
+  // Both inboxes: the storefront contact threads and the marketplace app's. One number: a buyer
   // waiting is a buyer waiting, whichever door she came in by.
   unanswered24h: unansweredStorefront + unansweredMarketplace,
   payoutsDue,

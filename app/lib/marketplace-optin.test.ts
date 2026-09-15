@@ -13,7 +13,7 @@ test("a store is not on the marketplace until it says so", () => {
 test("what the seller is told it is doing", () => {
  assert.match(describeOptIn(DEFAULT_OPT_IN, 120), /stay on your own shop/);
  // On, but nothing listed yet: a decision, not a fault.
- assert.match(describeOptIn({ listed: true, decidedAt: null }, 0), /nothing to show yet/);
+ assert.match(describeOptIn({ listed: true, decidedAt: null }, 0), /Nothing to show yet/);
  assert.match(describeOptIn({ listed: true, decidedAt: null }, 1), /1 live piece is/);
  assert.match(describeOptIn({ listed: true, decidedAt: null }, 42), /42 live pieces are/);
 });

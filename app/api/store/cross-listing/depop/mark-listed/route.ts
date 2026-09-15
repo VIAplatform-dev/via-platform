@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 // Record that an item was listed on Depop.
 //
 // The extension posts the listing in the seller's own browser, where our server can't see it happen.
-// So the extension remembers which items it posted, and the dashboard — which IS signed into VYA —
+// So the extension remembers which items it posted, and the dashboard, which IS signed into VYA,
 // drains that list to here, marking each cross-listing "listed". That closes the loop: the inventory
 // now shows the piece is on Depop, and the sold-sync / delist bookkeeping has a row to work with.
 //

@@ -8,9 +8,9 @@ export const runtime = "nodejs";
 // Read-only. Measures how many NEW listings appear per month and across how many stores, so we can
 // derive "new items per active store per month" for the pricing model. Admin-gated by middleware.
 // Two sources:
-//   • products  — the marketplace catalog synced from the ~45 onboarded Shopify stores (created_at
+//   • products. The marketplace catalog synced from the ~45 onboarded Shopify stores (created_at
 //                 is set at sync time, so it ≈ when the store listed the piece; older rows are NULL).
-//   • items     — VYA-native seller-OS listings created through intake (the future subscription flow).
+//   • items. VYA-native seller-OS listings created through intake (the future subscription flow).
 function getSql() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
  if (!url) throw new Error("DATABASE_URL not set");

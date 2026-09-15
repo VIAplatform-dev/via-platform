@@ -6,8 +6,8 @@
  * move. The extension walks her own selling hub in her own browser and collects what is there; this
  * is the shape it arrives in and what it becomes.
  *
- * SOLD PIECES COME TOO, AND AS SOLD. They are not stock — relisting somebody's sold archive would
- * be the worst possible first impression — but they are her history, and history is what the
+ * SOLD PIECES COME TOO, AND AS SOLD. They are not stock. Relisting somebody's sold archive would
+ * be the worst possible first impression, but they are her history, and history is what the
  * analytics, the price engine and her own sense of what sells are built on. They arrive with their
  * status intact.
  *
@@ -48,7 +48,7 @@ const str = (v: unknown, max: number): string => (typeof v === "string" ? v.trim
 const orNull = (v: unknown, max: number): string | null => str(v, max) || null;
 
 /**
- * One collected listing, ready to store — or null when there is not enough of it to be an item.
+ * One collected listing, ready to store, or null when there is not enough of it to be an item.
  *
  * A title is the one thing with no sensible default: a piece called "" is unfindable in her own
  * inventory. Everything else may be absent, because Depop lets it be absent.
@@ -66,7 +66,7 @@ export function toItem(raw: DepopImportItem, maxImages: number): ReadyItem | nul
   ? raw.images.filter((u): u is string => typeof u === "string" && /^https?:\/\//i.test(u)).slice(0, maxImages)
   : [];
 
- // A NUMBER, NOT SOMETHING NUMBER-ISH. `Number("12.50")` is 12.5, which rounds to 13 — a $12.50
+ // A NUMBER, NOT SOMETHING NUMBER-ISH. `Number("12.50")` is 12.5, which rounds to 13. A $12.50
  // piece imported at thirteen cents, sitting in her drafts waiting to be published. A string here
  // would mean the collected shape had changed, and the safe reading of that is "no price yet".
  const cents = typeof raw.priceCents === "number" ? raw.priceCents : NaN;
@@ -106,10 +106,10 @@ export function prepare(raw: unknown, known: Set<string>, maxImages: number): Re
  return out;
 }
 
-/** "42 pieces, 9 of them already sold" — what the seller is told happened. */
+/** "42 pieces, 9 of them already sold". What the seller is told happened. */
 export function importSummary(created: number, sold: number): string {
- if (!created) return "Nothing new to bring over — everything on Depop is already in VYA.";
+ if (!created) return "Nothing new to bring over. Everything on Depop is already in VYA.";
  const pieces = `${created} ${created === 1 ? "piece" : "pieces"}`;
  if (!sold) return `${pieces} brought over from Depop, saved as drafts.`;
- return `${pieces} brought over from Depop — ${sold} of them already sold, kept as history.`;
+ return `${pieces} brought over from Depop. ${sold} of them already sold, kept as history.`;
 }

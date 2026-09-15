@@ -1,7 +1,7 @@
 # VYA mobile
 
 The VYA iOS app. Expo SDK 54, expo-router, TypeScript. It lives inside the website's repo at
-`mobile/` and talks to the same backend over HTTPS — there is no shared code between them.
+`mobile/` and talks to the same backend over HTTPS. There is no shared code between them.
 
 ## Getting started
 
@@ -13,7 +13,7 @@ npx expo start
 ```
 
 Scan the QR with Expo Go. If your machine and phone are on different networks, use
-`npx expo start --tunnel` instead — slower, but it does not care about the network.
+`npx expo start --tunnel` instead. Slower, but it does not care about the network.
 
 ### Signing in during development
 
@@ -21,7 +21,7 @@ Scan the QR with Expo Go. If your machine and phone are on different networks, u
 registered for the `vya://` scheme, so it never reaches the app.
 
 The backend has a route for exactly this. Copy `.env.local.example` to `.env.local` and fill in the
-admin password (ask Hana — it is `ADMIN_PASSWORD` from the web app's env):
+admin password (ask Hana: it is `ADMIN_PASSWORD` from the web app's env):
 
 ```
 EXPO_PUBLIC_DEV_LOGIN_EMAIL=you@example.com
@@ -32,7 +32,7 @@ The app then mints a real session on launch and goes straight in. Three things k
 anything shipped: `__DEV__` is false in release builds, `.env.local` is gitignored and never
 present on an EAS build machine, and the route itself demands the admin secret. See `lib/devAuth.ts`.
 
-Restart with `--clear` after changing env — Expo inlines these at bundle time.
+Restart with `--clear` after changing env. Expo inlines these at bundle time.
 
 ## Where things are
 
@@ -53,7 +53,7 @@ production; override with `EXPO_PUBLIC_API_BASE_URL` in `.env.local` to point so
 These are all real, all found the hard way, and none of them are obvious from the code.
 
 **Every route is behind the approval gate.** Including the ones called `public`. For the app, a
-valid login IS the approval — `isApprovedRequest` accepts any request carrying a verified Bearer
+valid login IS the approval. `isApprovedRequest` accepts any request carrying a verified Bearer
 token. Omit it and the feed returns 403, not an empty list. `lib/api.ts` attaches it to everything.
 
 **`POST /api/mobile/favorites` needs `favorited` sent explicitly.** The route reads
@@ -71,8 +71,8 @@ nothing. Everything goes through `lib/imageUrl.ts`.
 description. `lib/html.ts` turns it back into paragraphs.
 
 **`runtimeVersion` follows `version` in app.json.** Bump `version` and existing installs stop
-receiving OTA updates until they install a new binary. That is deliberate — a JS bundle expecting
-new native code would crash on an old build — but it is the thing that makes people think updates
+receiving OTA updates until they install a new binary. That is deliberate: a JS bundle expecting
+new native code would crash on an old build, but it is the thing that makes people think updates
 are broken.
 
 ## Shipping
@@ -95,24 +95,24 @@ npx eas-cli@latest submit --platform ios --latest
 Two things about builds:
 
 - The repo root has a `.easignore` that **whitelists** `mobile/` and excludes everything else.
-  Without it EAS archives the whole website — the first attempt uploaded 664 MB, the second 2.1 GB
+  Without it EAS archives the whole website. The first attempt uploaded 664 MB, the second 2.1 GB
   (over the limit) because a build cache slipped in. `.easignore` REPLACES `.gitignore` rather than
   adding to it, so anything generated has to be named there.
 - Submissions sit on Expo's **free-tier queue** and can take hours. The build itself is quick.
 
-Keep dependencies on what the SDK expects — `npx expo install --check`. Drift is not cosmetic:
+Keep dependencies on what the SDK expects. `npx expo install --check`. Drift is not cosmetic:
 `react-native-worklets` is a native module Reanimated links against, and a version the SDK was not
 built for is a runtime crash rather than a warning.
 
 ## Where this code came from
 
-The original source was lost — it existed on one machine, was never pushed, and no backup had it.
+The original source was lost. It existed on one machine, was never pushed, and no backup had it.
 What is here was rebuilt from the last EAS update published to the production channel: Hermes
 bytecode gives up its string table, which yielded the exact route tree, every API path and the app's
 own copy. Screenshots of the live app supplied the visual design.
 
 `~/dev/via-mobile-recovered-2026-06-30/` on Hana's machine holds the recovered bundle, the extracted
 strings and a `RECOVERY.md` describing what was found. Worth reading if something here looks
-arbitrary — it probably came from the shipped app rather than from taste.
+arbitrary: it probably came from the shipped app rather than from taste.
 
 Which is also the reason for the one rule that matters: **push.**

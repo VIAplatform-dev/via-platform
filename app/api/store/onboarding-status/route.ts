@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 // Has this store set up yet? Onboarded = storefront published OR has any listings. Plus the
 // "Set up your store" checklist (setup-core.ts) Home and the phone show until it is complete.
 //
-// The flags come from setup-status-db.ts, which the owner's setup funnel shares — so what a seller
+// The flags come from setup-status-db.ts, which the owner's setup funnel shares, so what a seller
 // sees on Home and what the owner counts across stores can never disagree.
 async function status(slug: string) {
  const [input, listings] = await Promise.all([setupInputFor(slug), getListingsByStore(slug, false).catch(() => [])]);
@@ -30,14 +30,14 @@ async function status(slug: string) {
 export async function GET(request: NextRequest) {
  const slug = await resolveStoreSlugAny(request);
  if (!slug) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
- // VYA's own people may walk the signup flow again — the wizard reads this instead of bouncing
+ // VYA's own people may walk the signup flow again. The wizard reads this instead of bouncing
  // them to the dashboard the moment they have a store. See app/api/store/onboarding/route.ts.
  const session = await auth().catch(() => null);
  const canRepeatOnboarding = isAdminEmail(session?.user?.email);
  return NextResponse.json({ ...(await status(slug)), canRepeatOnboarding });
 }
 
-// PUT { skip: "domain" } | { unskip: "domain" } — hide an OPTIONAL step from her checklist (or put
+// PUT { skip: "domain" } | { unskip: "domain" }: hide an OPTIONAL step from her checklist (or put
 // it back). Only optional steps can be skipped; a required one answers 400. Returns the same
 // payload as GET, recomputed, so the card can redraw from the response.
 export async function PUT(request: NextRequest) {

@@ -12,7 +12,7 @@ function baseUrl(request: Request) {
  return `${proto}://${host}`;
 }
 
-// The signed-in consignor connects their bank for direct deposit — Stripe Express onboarding.
+// The signed-in consignor connects their bank for direct deposit. Stripe Express onboarding.
 // Creates their connected account on first call, then returns a one-time onboarding URL.
 export async function POST(request: Request) {
  const email = getConsignorEmail(request);
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
  const acct = await stripePost("accounts", {
  type: "express",
  email: consignor.email || undefined,
- business_type: "individual", // a person, not a business — no website required
+ business_type: "individual", // a person, not a business, no website required
  business_profile: { product_description: "Sells secondhand fashion on consignment", mcc: "5931" },
  capabilities: { transfers: { requested: true } }, // receive transfers only
  metadata: { consignor_id: String(consignor.id), store_slug: consignor.storeSlug },

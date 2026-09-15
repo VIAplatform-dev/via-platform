@@ -676,7 +676,7 @@
   var tabs=[].slice.call(document.querySelectorAll('.vs-tab'));
   var assets=[].slice.call(document.querySelectorAll('.vs-asset'));
   var sds=[].slice.call(document.querySelectorAll('.vs-sd'));
-  var n=sds.length; // dynamic step count — was hardcoded 4, which hid the 5th capability
+  var n=sds.length; // dynamic step count: was hardcoded 4, which hid the 5th capability
   var view=document.querySelector('.vs-stepview'), track=document.querySelector('.vs-track');
   var cur=-1, BH=260, ticking=false;
   function isMobile(){ return window.matchMedia('(max-width:900px)').matches; }
@@ -731,7 +731,7 @@
 
 </script>
 <script>
-// Storefront capability — the panel showcases a real store rebuilt on VYA (static). No live JS.
+// Storefront capability: the panel showcases a real store rebuilt on VYA (static). No live JS.
 </script>
 <script>/*vsBuilderAnim*/(function(){if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;var stage=document.querySelector(".vs-mini-builder");if(!stage)return;var sws=[].slice.call(stage.querySelectorAll(".vb-sw"));var accDot=stage.querySelector(".vb-acc-dot"),accHex=stage.querySelector(".vb-acc-hex");if(sws.length<2||!accDot||!accHex)return;var cur=document.createElement("div");cur.className="vb-cursor";cur.innerHTML='<svg viewBox="0 0 15 18"><path d="M1 1 L1 15 L4.6 11.6 L7 17 L9.4 16 L7 10.7 L12 10.7 Z" fill="#141414" stroke="#fff" stroke-width="1"/></svg>';stage.appendChild(cur);var order=[2,5,3,0,4,1],idx=0;function moveTo(el,cb){var sr=stage.getBoundingClientRect(),er=el.getBoundingClientRect();cur.style.left=(er.left-sr.left+er.width*0.42)+"px";cur.style.top=(er.top-sr.top+er.height*0.42)+"px";setTimeout(cb,850);}function tap(el){cur.classList.add("down");setTimeout(function(){cur.classList.remove("down");},240);sws.forEach(function(x){x.classList.remove("on")});el.classList.add("on");var h=el.getAttribute("data-hex")||"#5D0F17";accDot.style.background=h;accHex.textContent=h;}function step(){var el=sws[order[idx%order.length]];moveTo(el,function(){tap(el);idx++;setTimeout(step,1050);});}setTimeout(step,700);})();</script>
 </body>

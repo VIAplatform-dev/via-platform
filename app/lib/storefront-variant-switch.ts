@@ -2,10 +2,10 @@
 //
 // The governing rule here is simple and worth stating plainly: **a layout switch never deletes
 // props.** It only ever ADDS or DERIVES what the destination layout needs. That single rule buys
-// three things at once —
+// three things at once,
 //   • switching back restores everything, because nothing was thrown away;
 //   • undo (the studio's design-wide snapshot stack) is exact, not approximate;
-//   • "we'll keep the first slide, the others won't show in this layout" is honest — the other
+//   • "we'll keep the first slide, the others won't show in this layout" is honest. The other
 //     slides are genuinely still there, not quietly destroyed.
 //
 // What it will NOT do is invent content. A destination field with nothing to derive from is left
@@ -16,14 +16,14 @@ import { variantsFor, normalizeVariant, variantSupports } from "./storefront-var
 import { ITEM_SCHEMAS, readItems, writeItems, type Item } from "./storefront-items.ts";
 
 // The concepts that carry across layouts. A heading is a heading whether it sits over a photo, beside
-// one, or on the first slide of a slideshow — so these keys map by NAME, in both directions.
+// one, or on the first slide of a slideshow, so these keys map by NAME, in both directions.
 const SHARED_KEYS = ["heading", "subtext", "cta", "image", "body", "price", "caption"] as const;
 
 function schemaFor(name?: string) {
  return name ? ITEM_SCHEMAS[name as keyof typeof ITEM_SCHEMAS] : undefined;
 }
 
-// What changes if the merchant commits this switch — shown BEFORE they do, so nothing is a surprise.
+// What changes if the merchant commits this switch. Shown BEFORE they do, so nothing is a surprise.
 export function switchNotes(block: Block, toVariant: string): string[] {
  const from = variantSupports(block.type, block.variant);
  const to = variantSupports(block.type, toVariant);
@@ -32,7 +32,7 @@ export function switchNotes(block: Block, toVariant: string): string[] {
  const toSchema = schemaFor(to.items);
  if (fromSchema && !toSchema) {
   const n = readItems(block.props, fromSchema).length;
-  if (n > 1) notes.push(`This layout shows one, so the first is kept — the other ${n - 1} stay saved and come back if you switch again.`);
+  if (n > 1) notes.push(`This layout shows one, so the first is kept. The other ${n - 1} stay saved and come back if you switch again.`);
  }
  if (toSchema && !fromSchema && !readItems(block.props, toSchema).length) {
   notes.push("Your current heading, text, button, and photo become the first item.");
@@ -47,7 +47,7 @@ export function switchNotes(block: Block, toVariant: string): string[] {
 // autosave and undo treat it like any other edit.
 export function applyVariant(block: Block, toVariant: string): Block {
  // Exact match, deliberately NOT resolveVariant's forgiving fallback. Rendering an unknown id as the
- // default is right — the storefront must never go blank. WRITING an unknown id as the default is
+ // default is right: the storefront must never go blank. WRITING an unknown id as the default is
  // not: a typo'd id would quietly rewrite a merchant's chosen layout as "bleed". So a destination we
  // don't recognize changes nothing at all.
  const toDef = variantsFor(block.type).find((v) => v.id === toVariant);
@@ -70,7 +70,7 @@ export function applyVariant(block: Block, toVariant: string): Block {
   if (any) props[toSchema.key] = writeItems([seed], toSchema);
  }
 
- // Repeated → singular: hoist the first item up into the fields this layout reads. Only fills gaps —
+ // Repeated → singular: hoist the first item up into the fields this layout reads. Only fills gaps,
  // a value the merchant already set at the section level wins over one derived from an item.
  if (fromSchema && fromSchema !== toSchema) {
   const [first] = readItems(props, fromSchema);
@@ -79,7 +79,7 @@ export function applyVariant(block: Block, toVariant: string): Block {
   }
  }
 
- // Structural defaults the destination needs (a split's image side, say) — never overwriting a value
+ // Structural defaults the destination needs (a split's image side, say), never overwriting a value
  // that's already there.
  for (const [k, v] of Object.entries(toDef.defaults || {})) {
   if (props[k] === undefined || props[k] === "") props[k] = v;

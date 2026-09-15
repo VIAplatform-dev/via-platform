@@ -4,7 +4,7 @@
 // (`deleteCaptures` wiping it is correct). The path is under /__vya/, which the serve route refuses and
 // the page list hides. No new table, so nothing has to be migrated before this works.
 //
-// When it is written — only ever by a seller action, never by a shopper request:
+// When it is written, only ever by a seller action, never by a shopper request:
 //  · the first save of a page that has a product grid on it (edit route → ensureGridKitSaved);
 //  · "Refresh card look" in the Grid panel (/api/store/capture/grid-kit).
 // A preview before that derives the kit in memory and does not store it.

@@ -1,4 +1,4 @@
-// The composer's layout, sanitised. Pure — no I/O, so it can be tested directly.
+// The composer's layout, sanitised. Pure, no I/O, so it can be tested directly.
 //
 // Both the preview and the send read a design through this, and a scheduled campaign reads one back
 // out of the database months later, so it has to survive junk without either path having to guess.
@@ -31,7 +31,7 @@ const str = (v: unknown, max: number): string | null => {
 };
 
 /**
- * A design from untrusted JSON — the composer's body, or a row read back out of the database.
+ * A design from untrusted JSON. The composer's body, or a row read back out of the database.
  * Everything is clamped here so neither the renderer nor the sender has to guess.
  */
 export function parseCampaignDesign(v: unknown): CampaignDesign {
@@ -63,7 +63,7 @@ export function parseCampaignDesign(v: unknown): CampaignDesign {
  * Do the pieces go in a titled band below the email, or stay inline in the layout's own block?
  *
  * A band is what lets one email carry eight pieces without reading as a dump, so a heading normally
- * moves them there. But Photo leads with `products[0]` and Grid IS a table built from them — empty
+ * moves them there. But Photo leads with `products[0]` and Grid IS a table built from them. Empty
  * their `products` and both blocks render nothing, so the two layouts whose whole identity is how
  * they show the pieces collapse into Standard the moment a heading is typed. Inline renders the
  * heading above them anyway, so those two keep their pieces.

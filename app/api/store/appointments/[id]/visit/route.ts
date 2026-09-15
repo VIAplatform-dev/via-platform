@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
 
 // One visit, in full: who came, what they handled, and every other time they've been in.
 //
-// The record is the point of taking appointments at all — someone comes in, tries six things and
+// The record is the point of taking appointments at all. Someone comes in, tries six things and
 // leaves, and without knowing which six the follow-up is "hope you enjoyed your visit".
 
 async function ownedAppointment(request: NextRequest, id: string) {
  const acting = await seller(request);
  if (!acting) return { error: unauthorized() as NextResponse };
  const appointment = await getAppointment(id);
- // Same 404 for "doesn't exist" and "isn't yours" — a store must not be able to probe for another
+ // Same 404 for "doesn't exist" and "isn't yours". A store must not be able to probe for another
  // store's bookings by id.
  if (!appointment || appointment.sellerId !== acting.seller.id) return { error: notFound() as NextResponse };
  return { acting, appointment };
@@ -35,13 +35,13 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ id: str
  return NextResponse.json({
   appointment,
   items,
-  // Their other visits, this one excluded — "have they been in before, and what happened".
+  // Their other visits, this one excluded. "have they been in before, and what happened".
   history: history.filter((h) => h.id !== id),
  });
 }
 
-// POST { itemId, outcome } — record a piece as tried / liked / bought.
-// POST { itemId, remove: true } — take it off the visit.
+// POST { itemId, outcome }: record a piece as tried / liked / bought.
+// POST { itemId, remove: true }, take it off the visit.
 export async function POST(request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
  const { id } = await ctx.params;
  const found = await ownedAppointment(request, id);

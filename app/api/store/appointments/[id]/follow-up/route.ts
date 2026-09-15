@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ id: st
  const message = typeof body.message === "string" ? body.message.slice(0, 2000) : "";
  if (!message.trim()) return bad("Write something to send.");
 
- // Only the pieces the seller ticked — a follow-up listing things they didn't look at reads worse
+ // Only the pieces the seller ticked. A follow-up listing things they didn't look at reads worse
  // than one that lists nothing.
  const only = Array.isArray(body.itemIds) ? new Set(body.itemIds.map(String)) : null;
  const items = (await listVisitItems(id)).filter((i) => !only || only.has(i.itemId));

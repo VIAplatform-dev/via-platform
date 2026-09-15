@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { classifyBrand } from "./unbranded-benchmark-db.ts";
+import { classifyBrand } from "./unbranded-benchmark-core.ts";
 
 test("classifyBrand separates unbranded / lesser-known / known", () => {
  // explicit no-brand markers → unbranded

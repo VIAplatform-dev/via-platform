@@ -3,7 +3,7 @@
  *
  * Re-scores the ALREADY-GRADED rows in price_eval_items by multiplying each stored prediction by a
  * constant and recomputing the same metrics the eval reports. Nothing is re-priced, no API is called,
- * and NOTHING IS WRITTEN — this only reads the table and prints arithmetic.
+ * and NOTHING IS WRITTEN. This only reads the table and prints arithmetic.
  *
  * The question it answers: if every prediction were simply scaled up, how much of the miss rate goes
  * away? If a flat multiplier recovers most of it, the pricer is reading the market with a consistent
@@ -22,7 +22,7 @@ const MODE = process.argv[2] || "title-ctx";
 const M = Number(process.argv[3] || 1.45);
 const WINDOW_DAYS = 120;
 
-// ── from eval-price.ts — keep in step with it ──
+// ── from eval-price.ts. Keep in step with it ──
 const MIN_ANSWER_CENTS = 1500;
 const TOL10_CENTS = 500;
 const TOL20_CENTS = 1000;
@@ -50,7 +50,7 @@ function score(rows: Row[], m: number): Scored {
   if (errPct <= 10 || absErr <= TOL10_CENTS) w10++;
   if (errPct <= 20 || absErr <= TOL20_CENTS) w20++;
   if (signedPct > 0) over++; else if (signedPct < 0) under++;
-  // The predicted RANGE scales with the midpoint — scoring a scaled point estimate against an
+  // The predicted RANGE scales with the midpoint. Scoring a scaled point estimate against an
   // unscaled band would compare two different calibrations.
   if (r.low_cents != null && r.high_cents != null) {
    banded++;
@@ -69,7 +69,7 @@ function score(rows: Row[], m: number): Scored {
  };
 }
 
-/** The multiplier that puts the MEDIAN prediction exactly on the sold price — the bias-zeroing scale. */
+/** The multiplier that puts the MEDIAN prediction exactly on the sold price. The bias-zeroing scale. */
 const biasZeroingM = (rows: Row[]): number | null =>
  median(rows.filter((r) => r.pred_cents && r.pred_cents > 0).map((r) => r.sold_cents / (r.pred_cents as number)));
 
@@ -83,17 +83,17 @@ function bestM(rows: Row[], lo = 1, hi = 3, step = 0.01): { m: number; w20Pct: n
  return best;
 }
 
-const pct = (v: number | null, d = 0) => (v == null ? "  — " : `${v.toFixed(d)}%`);
+const pct = (v: number | null, d = 0) => (v == null ? "-" : `${v.toFixed(d)}%`);
 const line = (label: string, s: Scored) =>
  console.log(
   `  ${label.padEnd(22)} n=${String(s.n).padStart(3)}  w20=${pct(s.w20Pct).padStart(5)}  w10=${pct(s.w10Pct).padStart(5)}` +
-  `  medErr=${pct(s.medErr).padStart(5)}  bias=${(s.medSigned == null ? "—" : `${s.medSigned >= 0 ? "+" : ""}${s.medSigned.toFixed(0)}%`).padStart(5)}` +
+  `  medErr=${pct(s.medErr).padStart(5)}  bias=${(s.medSigned == null ? "-" : `${s.medSigned >= 0 ? "+" : ""}${s.medSigned.toFixed(0)}%`).padStart(5)}` +
   `  low/high=${String(s.under).padStart(3)}/${String(s.over).padEnd(3)}  inBand=${pct(s.inBandPct).padStart(5)}`,
  );
 
 async function main() {
  const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
- if (!url) throw new Error("DATABASE_URL is not set — run with `npx tsx --env-file=.env.local`.");
+ if (!url) throw new Error("DATABASE_URL is not set. Run with `npx tsx --env-file=.env.local`.");
  const sql = neon(url);
  const cutoff = new Date(Date.now() - WINDOW_DAYS * 86400000).toISOString();
 
@@ -140,7 +140,7 @@ async function main() {
  for (const [name, list] of segs) {
   if (!list.length) continue;
   const z = biasZeroingM(list);
-  console.log(`\n  [${name}]  own bias-zeroing multiplier: ×${z ? z.toFixed(2) : "—"}`);
+  console.log(`\n  [${name}]  own bias-zeroing multiplier: ×${z ? z.toFixed(2) : "-"}`);
   line("  baseline", score(list, 1));
   line(`  ×${M.toFixed(2)}`, score(list, M));
   if (z) line(`  ×${z.toFixed(2)} (its own)`, score(list, z));
@@ -148,12 +148,12 @@ async function main() {
 
  // Per-tier, same question: a constant that suits $50 pieces may wreck $500 ones.
  console.log(`\n── by price tier (baseline → ×${M.toFixed(2)}) ──`);
- const tiers = [...new Set(rows.map((r) => r.tier || "—"))].sort();
+ const tiers = [...new Set(rows.map((r) => r.tier || "-"))].sort();
  for (const t of tiers) {
-  const list = rows.filter((r) => (r.tier || "—") === t);
+  const list = rows.filter((r) => (r.tier || "-") === t);
   const z = biasZeroingM(list);
   const b = score(list, 1), a = score(list, M);
-  console.log(`  ${t.padEnd(16)} n=${String(list.length).padStart(3)}  w20 ${pct(b.w20Pct).padStart(5)} → ${pct(a.w20Pct).padStart(5)}   bias ${pct(b.medSigned).padStart(6)} → ${pct(a.medSigned).padStart(6)}   own ×${z ? z.toFixed(2) : "—"}`);
+  console.log(`  ${t.padEnd(16)} n=${String(list.length).padStart(3)}  w20 ${pct(b.w20Pct).padStart(5)} → ${pct(a.w20Pct).padStart(5)}   bias ${pct(b.medSigned).padStart(6)} → ${pct(a.medSigned).padStart(6)}   own ×${z ? z.toFixed(2) : "-"}`);
  }
 
  // ── is the multiplier real, or fitted to this sample? ──

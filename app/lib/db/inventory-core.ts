@@ -1,11 +1,11 @@
 // ───────────────────────────────────────────────────────────────────────────
-// One-of-one inventory — pure logic (no DB), so the rules are unit-testable in
+// One-of-one inventory: pure logic (no DB), so the rules are unit-testable in
 // isolation. The DB-backed engine (inventory.ts) enforces these atomically.
 // ───────────────────────────────────────────────────────────────────────────
 
 export type ItemStatus = "draft" | "active" | "reserved" | "sold" | "removed";
 
-/** Default checkout hold — how long a reservation locks an item. */
+/** Default checkout hold: how long a reservation locks an item. */
 export const DEFAULT_RESERVATION_TTL_SECONDS = 600; // 10 minutes
 
 /** Allowed status transitions for a one-of-one item. */

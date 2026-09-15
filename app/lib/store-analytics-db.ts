@@ -5,7 +5,7 @@ import { countsAsSale, mergeByDay, mergeRecent } from "./analytics/imported-hist
 import { channelLabel, fromOrderChannel, fromImportSource, fromPlatform, rollUp, type ChannelKey, type ChannelTotal } from "./analytics/channels";
 
 // A store's OWN business analytics (its recommerce sales, inventory, customers, traffic)
-// — not its presence on the VYA marketplace. Everything is scoped to the seller behind
+// not its presence on the VYA marketplace. Everything is scoped to the seller behind
 // a store slug and wrapped defensively so a fresh store just shows zeros.
 
 function db() {
@@ -35,7 +35,7 @@ export type StoreAnalytics = {
  topViewed: RankedItem[];
  topFavorited: RankedItem[];
  topSearches: { query: string; count: number }[];
- /** Revenue and orders per channel — her shop, in person, Depop, the Shopify she came from. This
+ /** Revenue and orders per channel. Her shop, in person, Depop, the Shopify she came from. This
   *  is what "includes £X you brought over" became: a sale says where it came from, and history she
   *  imported is simply another channel rather than a footnote. See analytics/channels.ts.
   *  `brandsAreVyaOnly` because an imported order has a free-text title and no brand to group by. */
@@ -43,7 +43,7 @@ export type StoreAnalytics = {
  brandsAreVyaOnly: boolean;
 };
 
-// One definition of "sold" across every surface — see analytics/core.ts. (This
+// One definition of "sold" across every surface. See analytics/core.ts. (This
 // previously omitted "fulfilled", so a fulfilled order was missing from GMV here
 // while counting elsewhere.)
 const SOLD = SOLD_STATUSES;
@@ -51,7 +51,7 @@ const SOLD = SOLD_STATUSES;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export async function getStoreAnalytics(slug: string, days: number | null = 30): Promise<StoreAnalytics> {
  const sql = db();
- // Always a real cutoff — epoch for "all time" — so no conditional SQL fragments.
+ // Always a real cutoff, epoch for "all time", so no conditional SQL fragments.
  const cutoffMs = days ? Date.now() - days * 86400000 : 0;
  const cutoff = new Date(cutoffMs).toISOString();
  // Prior window of equal length, for period-over-period deltas (empty for all-time).
@@ -112,11 +112,11 @@ export async function getStoreAnalytics(slug: string, days: number | null = 30):
  // ── Sold on a marketplace ────────────────────────────────────────────────────────────────────
  //
  // Depop, eBay and Vestiaire sales live in their own table: the money went to her through them, so
- // there is no VYA order and no payout — just the fact that the piece went, and for how much.
+ // there is no VYA order and no payout, just the fact that the piece went, and for how much.
  //
  // EXCEPT platform 'vya'. The same endpoint records a row when a piece sells on VYA itself, and
  // that sale ALREADY exists in `orders`. Counting both would inflate her revenue with a duplicate
- // of her own storefront takings — the one number on this page nobody would think to doubt.
+ // of her own storefront takings. The one number on this page nobody would think to doubt.
  sql`SELECT c.price_cents, c.platform, c.sold_at,
   COALESCE(NULLIF(c.item_title, ''), NULLIF(i.title, ''), 'A piece') AS title
  FROM cross_listing_sales c LEFT JOIN items i ON i.id::text = c.item_id
@@ -126,7 +126,7 @@ export async function getStoreAnalytics(slug: string, days: number | null = 30):
  // ── Her history from before VYA ──────────────────────────────────────────────────────────────
  // Same windows, same shapes, from the table the CSV importer fills. A store that has imported
  // nothing gets empty arrays and every figure below is unchanged. Statuses are filtered in JS
- // rather than SQL because an export spells "refunded" a dozen ways — see countsAsSale.
+ // rather than SQL because an export spells "refunded" a dozen ways. See countsAsSale.
  sql`SELECT amount_cents, order_date, status, source FROM imported_orders
  WHERE store_slug = ${slug} AND order_date >= ${cutoff}`.catch(nil),
  sql`SELECT amount_cents, order_date, status FROM imported_orders
@@ -157,7 +157,7 @@ export async function getStoreAnalytics(slug: string, days: number | null = 30):
  const importedRevenueCents = sum(impSales);
  const importedOrders = impSales.length;
 
- // A marketplace sale has no status to filter — the row exists only because the piece sold.
+ // A marketplace sale has no status to filter. The row exists only because the piece sold.
  const mkt = (mktRows || []) as any[];
  const mktRevenueCents = mkt.reduce((n, r) => n + (Number(r.price_cents) || 0), 0);
 
@@ -194,7 +194,7 @@ export async function getStoreAnalytics(slug: string, days: number | null = 30):
  ]);
 
  // Buyers, new and returning, across both. Somebody who bought on Shopify in 2024 and again on VYA
- // last week is RETURNING — counting her as new is the single most flattering lie a dashboard can
+ // last week is RETURNING. Counting her as new is the single most flattering lie a dashboard can
  // tell a seller about her own business.
  const impBuyerRows = sales(impBuyers);
  const firstSeen = new Map<string, number>();

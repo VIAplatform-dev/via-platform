@@ -40,7 +40,7 @@ export async function POST(request: Request) {
  for (const pat of BANNED_PATTERNS) {
  if (pat.test(content)) {
   return NextResponse.json({
-  error: "Please keep conversation on platform — don't share contact info or payment details.",
+  error: "Please keep conversation on platform. Don't share contact info or payment details.",
   }, { status: 400 });
  }
  }
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
  if (userId) {
  const user = await getUserById(userId);
  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
- // Never expose the email local-part as a public name — fall back to a neutral handle.
+ // Never expose the email local-part as a public name. Fall back to a neutral handle.
  displayName = user.name?.trim() || `Member ${String(userId).slice(-4)}`;
  } else {
  const bodyName = (body?.displayName ?? "").toString().trim();

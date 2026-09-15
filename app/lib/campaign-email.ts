@@ -1,10 +1,10 @@
-// One campaign email, built once — for the preview, for the test send, for the real send, and for
+// One campaign email, built once, for the preview, for the test send, for the real send, and for
 // the cron that sends a scheduled one.
 //
 // It used to be two different builders. The composer's preview called storeEmailHtml with the
 // design, the eyebrow, the chosen pieces, the discount code, the link row and the background; the
 // SEND called campaignEmailHtml with a headline and a link and nothing else. So a seller laid out an
-// email with four photos, a button and a code, sent a test to herself, and got a plain paragraph —
+// email with four photos, a button and a code, sent a test to herself, and got a plain paragraph,
 // "test didnt look like this page". The composer's own comment claimed the two paths shared a
 // function, which is the kind of comment that stops anyone checking.
 //
@@ -67,7 +67,7 @@ export async function campaignRenderer(
   headline: d.headline,
   subhead: d.subhead,
   button: d.ctaLabel ? { label: d.ctaLabel, url: link } : null,
-  // Band or inline — see bandsPieces in campaign-design-core.ts.
+  // Band or inline: see bandsPieces in campaign-design-core.ts.
   products: band ? [] : products,
   productsHeading: d.productsHeading,
   sections: band

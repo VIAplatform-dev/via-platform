@@ -79,7 +79,7 @@ export async function setupNotifications(o: { stores?: string[] }, deps: SetupDe
     const upd = await deps.api(app, "PUT", `${NOTIFY}/destination/${destinationId}`, destBody);
     report.destination = upd.ok ? { id: destinationId, action: "re-enabled" } : { id: destinationId, action: "failed", error: ebayError(upd) };
    }
-  } else destinationId = null; // gone on eBay's side — create a new one
+  } else destinationId = null; // gone on eBay's side. Create a new one
  }
  if (!destinationId) {
   const made = await deps.api(app, "POST", `${NOTIFY}/destination`, destBody);
@@ -116,7 +116,7 @@ export async function setupNotifications(o: { stores?: string[] }, deps: SetupDe
  let allOk = true;
  for (const slug of stores) {
   const user = await deps.userToken(slug);
-  if (!user) { report.stores.push({ slug, action: "failed", subscriptionId: null, error: "No valid eBay token — the account is not connected, or its refresh failed. Reconnect eBay in Settings › Marketplaces." }); allOk = false; continue; }
+  if (!user) { report.stores.push({ slug, action: "failed", subscriptionId: null, error: "No valid eBay token. The account is not connected, or its refresh failed. Reconnect eBay in Settings › Marketplaces." }); allOk = false; continue; }
   const state = await deps.getState(slug);
   if (state?.subscriptionId) {
    const cur = await deps.api(user, "GET", `${NOTIFY}/subscription/${state.subscriptionId}`);
@@ -129,7 +129,7 @@ export async function setupNotifications(o: { stores?: string[] }, deps: SetupDe
     const en = await deps.api(user, "POST", `${NOTIFY}/subscription/${state.subscriptionId}/enable`);
     if (en.ok) { await deps.saveState(slug, { status: "active", lastError: null }); report.stores.push({ slug, action: "re-enabled", subscriptionId: state.subscriptionId }); continue; }
    }
-   // Otherwise: gone, or pointing at an old destination — subscribe afresh below.
+   // Otherwise: gone, or pointing at an old destination. Subscribe afresh below.
   }
   const made = await deps.api(user, "POST", `${NOTIFY}/subscription`, { topicId: NOTIFY_TOPIC, status: "ENABLED", destinationId, payload });
   if (made.ok && idFromLocation(made.location)) {
@@ -148,13 +148,13 @@ export async function setupNotifications(o: { stores?: string[] }, deps: SetupDe
     continue;
    }
   }
-  const hint = /permission|scope|insufficient|access denied/i.test(msg) ? " — her eBay connection predates the sell.fulfillment scope; ask her to reconnect eBay in Settings › Marketplaces, then run setup again." : "";
+  const hint = /permission|scope|insufficient|access denied/i.test(msg) ? ": her eBay connection predates the sell.fulfillment scope; ask her to reconnect eBay in Settings › Marketplaces, then run setup again." : "";
   await deps.saveState(slug, { status: "error", lastError: msg });
   report.stores.push({ slug, action: "failed", subscriptionId: state?.subscriptionId ?? null, error: msg + hint });
   allOk = false;
  }
  report.ok = allOk;
- if (!allOk) report.error = "One or more stores could not be subscribed — see stores[].error.";
+ if (!allOk) report.error = "One or more stores could not be subscribed. See stores[].error.";
  return report;
 }
 

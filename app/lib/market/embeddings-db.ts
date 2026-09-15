@@ -1,7 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { embedImages, isEmbeddingConfigured } from "@/app/lib/embeddings";
 
-// The photo index: one Voyage vector per item (first photo). Pilot-scale storage — JSON text scanned
+// The photo index: one Voyage vector per item (first photo). Pilot-scale storage: JSON text scanned
 // in JS per seller (a few hundred rows); pgvector when a seller passes ~5k items.
 
 function db() {

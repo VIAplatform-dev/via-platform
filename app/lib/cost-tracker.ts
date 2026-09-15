@@ -1,9 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Real API-cost tracker. Every paid call logs its ACTUAL cost — computed from the
+// Real API-cost tracker. Every paid call logs its ACTUAL cost. Computed from the
 // provider's own usage numbers (Anthropic + Voyage return token counts; SerpAPI is
-// per-search) — so "what does a listing cost" is measured, not estimated. Best-effort:
+// per-search), so "what does a listing cost" is measured, not estimated. Best-effort:
 // a logging failure must never break the request that made the call.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ export async function recordCost(e: Entry): Promise<void> {
   const sql = db();
   await sql`INSERT INTO api_costs (provider, operation, model, item_id, store_slug, input_tokens, output_tokens, units, cost_cents)
    VALUES (${e.provider}, ${e.operation ?? null}, ${e.model ?? null}, ${e.itemId ?? null}, ${e.storeSlug ?? null}, ${e.inputTokens ?? null}, ${e.outputTokens ?? null}, ${e.units ?? 1}, ${e.costCents})`;
- } catch { /* best-effort — never break a request over cost logging */ }
+ } catch { /* best-effort, never break a request over cost logging */ }
 }
 
 // ── Convenience wrappers used at each call site (one line each) ──

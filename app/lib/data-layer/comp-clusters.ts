@@ -4,10 +4,10 @@ import { quantile } from "./metrics";
 // ───────────────────────────────────────────────────────────────────────────
 // Sub-market clustering for demand-search comps.
 //
-// A wide brand — "Valentino" — isn't one market: Valentino Garavani (mainline), RED Valentino
+// A wide brand, "Valentino". Isn't one market: Valentino Garavani (mainline), RED Valentino
 // (diffusion), Mario Valentino (a DIFFERENT house), and Valentino fragrance all resell at their own
 // prices. Collapsing them into one median misleads every seller. Rather than filter (which assumes
-// which sub-market the seller wants — see [[automated-unbiased-data]]), we CLUSTER the live listings
+// which sub-market the seller wants. See [[automated-unbiased-data]]), we CLUSTER the live listings
 // into labeled segments each with its own price, and let the seller pick their tier. No assumptions,
 // nothing deleted; it just reflects how the market actually splits.
 // ───────────────────────────────────────────────────────────────────────────
@@ -22,15 +22,15 @@ const round2 = (n: number | null) => (n == null ? null : Math.round(n * 100) / 1
 /**
  * Cluster live eBay listings into the distinct sub-markets a reseller would price separately.
  * Returns [] when the LLM can't run, the sample is too small, or the market is homogeneous (a single
- * cluster) — so the caller only shows a breakdown when there's a real split worth surfacing.
+ * cluster), so the caller only shows a breakdown when there's a real split worth surfacing.
  */
 export async function clusterCompListings(query: string, listings: { title: string; price: number }[]): Promise<CompCluster[]> {
  const apiKey = process.env.ANTHROPIC_API_KEY;
  if (!apiKey || listings.length < 8) return [];
  const sample = listings.slice(0, 50);
  const numbered = sample.map((l, i) => `${i}. ${l.title.slice(0, 90)} ($${Math.round(l.price)})`).join("\n");
- const prompt = `These are active eBay resale listings for the search "${query}". A reseller prices distinct SUB-MARKETS separately. Assign EACH listing to a short cluster label a seller would price on its own — distinguish sub-brands (e.g. "Valentino Garavani" vs "Mario Valentino" vs "RED Valentino"), product lines, or non-apparel type ("fragrance", "accessories"). Keep labels consistent and few (2–6 total). Do NOT judge which is "real" — every sub-market is valid.
-Return ONLY a JSON array of strings — one label per listing, SAME length (${sample.length}) and order as the list:\n\n${numbered}`;
+ const prompt = `These are active eBay resale listings for the search "${query}". A reseller prices distinct SUB-MARKETS separately. Assign EACH listing to a short cluster label a seller would price on its own. Distinguish sub-brands (e.g. "Valentino Garavani" vs "Mario Valentino" vs "RED Valentino"), product lines, or non-apparel type ("fragrance", "accessories"). Keep labels consistent and few (2–6 total). Do NOT judge which is "real". Every sub-market is valid.
+Return ONLY a JSON array of strings. One label per listing, SAME length (${sample.length}) and order as the list:\n\n${numbered}`;
 
  const res = await fetch(ANTHROPIC_URL, {
   method: "POST",

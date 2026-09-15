@@ -14,7 +14,7 @@ test("Shopify's own hosts are blocked", () => {
  ]) assert.equal(block(u), true, u);
 });
 
-test("the seller's own domain is blocked — it is Shopify's too", () => {
+test("the seller's own domain is blocked. It is Shopify's too", () => {
  // blummier.com is her Shopify custom domain and stops serving the day she cancels. Fifteen of
  // twenty-three stores had assets passing the gate on their own domain that would die for real.
  assert.equal(block("https://blummier.com/cdn/shop/t/1/assets/theme.js"), true);
@@ -22,8 +22,8 @@ test("the seller's own domain is blocked — it is Shopify's too", () => {
 });
 
 test("a third party is NOT blocked because its path happens to contain /cdn/", () => {
- // THE BUG. `instafeed.nfcube.com/cdn/instafeed-17.7.0.css` is the Instagram widget app — nothing
- // to do with Shopify — and killing it accounted for 115 of the 213 "lost images" and 6 of the 7
+ // THE BUG. `instafeed.nfcube.com/cdn/instafeed-17.7.0.css` is the Instagram widget app. Nothing
+ // to do with Shopify, and killing it accounted for 115 of the 213 "lost images" and 6 of the 7
  // "lost videos" across four stores. Their storefronts were fine the whole time.
  assert.equal(block("https://instafeed.nfcube.com/cdn/instafeed-17.7.0.css"), false);
  assert.equal(block("https://cdn.nfcube.com/instafeed-d699680a.js"), false);
@@ -64,7 +64,7 @@ test("with no known seller domain, only Shopify's own hosts are blocked", () => 
 });
 
 // OUR OWN /cdn/ PROXY IS THE SELLER'S SHOP WEARING OUR HOSTNAME.
-// It fetches the file from her live site at request time, so it dies with her shop — but it is
+// It fetches the file from her live site at request time, so it dies with her shop, but it is
 // same-origin, so the gate used to wave it through and score the page as surviving.
 test("our /cdn proxy is blocked, because it is a round trip to her shop", () => {
  assert.equal(block("https://blummier.vyasites.test/cdn/shop/t/11/assets/base.css"), true);
@@ -76,6 +76,6 @@ test("everything else on our own host still loads", () => {
  assert.equal(block("https://blummier.vyasites.test/collections/all"), false);
  assert.equal(block("https://blummier.vyasites.test/api/storefront/account/orders"), false);
  assert.equal(block("https://blummier.vyasites.test/_next/static/chunk.js"), false);
- // Our re-hosted copies live on Blob, not behind the proxy — they survive and must not be blocked.
+ // Our re-hosted copies live on Blob, not behind the proxy. They survive and must not be blocked.
  assert.equal(block("https://q74gqbmcafgdbaxy.public.blob.vercel-storage.com/theme/x/a.js"), false);
 });

@@ -14,7 +14,7 @@ export const maxDuration = 300;
 //
 // Hourly rather than daily because the lead time is a store's own number: a shop that says
 // "two hours before" means two hours, and a once-a-day run can only ever mean "sometime yesterday".
-// `claimReminder` is the guard — a reminder is claimed before it is sent, so an overlapping run,
+// `claimReminder` is the guard. A reminder is claimed before it is sent, so an overlapping run,
 // a retry, or a redeploy mid-run can't send the same person the same email twice.
 //
 // Auth: CRON_SECRET, same as the other crons.
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
  // day, and nobody would notice reminders had stopped.
  const due = await listRemindable().catch((e) => { console.error("[cron/appointments] listRemindable failed", e); return []; });
 
- // One settings read per store, not per appointment — a shop with a full Saturday has one answer.
+ // One settings read per store, not per appointment. A shop with a full Saturday has one answer.
  const perStore = new Map<string, AppointmentSettings>();
  const now = Date.now();
  let sent = 0;
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
    const startsAt = Date.parse(`${a.day}T${a.start}:00Z`);
    if (!Number.isFinite(startsAt)) { skipped++; continue; }
-   // Not yet inside the window, or already past — a reminder after the fact is just noise.
+   // Not yet inside the window, or already past. A reminder after the fact is just noise.
    if (now < startsAt - s.reminderHours * 3_600_000 || now >= startsAt) { skipped++; continue; }
 
    if (!(await claimReminder(a.id))) { skipped++; continue; }

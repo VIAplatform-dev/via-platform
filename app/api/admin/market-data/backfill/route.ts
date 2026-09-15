@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
  // Clear previous backfill rows
  await sql`DELETE FROM sold_items WHERE source_id LIKE 'conv_%'`;
 
- // Insert from conversions — skip generic Shopify Collabs order names
+ // Insert from conversions. Skip generic Shopify Collabs order names
  const result = await sql`
  INSERT INTO sold_items (store_slug, store_name, product_id, title, final_price, currency, sold_at, source_id)
  SELECT
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
  AND LENGTH(item->>'productName') > 3
  `;
 
- // Enrich designer for backfill rows — prefer brand (vendor = designer) over product_type (category)
+ // Enrich designer for backfill rows. Prefer brand (vendor = designer) over product_type (category)
  await sql`
  UPDATE sold_items si
  SET designer = COALESCE(NULLIF(p.brand, ''), NULLIF(p.product_type, ''))

@@ -4,7 +4,7 @@ import { destinationFor } from "./signin-intent.ts";
 
 test("a store owner lands in her own app", () => {
  assert.deepEqual(destinationFor("hanas-store", "store"), { route: "/(seller)" });
- // Even if she came in through the shopper button — the address is what decides, not the wording.
+ // Even if she came in through the shopper button. The address is what decides, not the wording.
  assert.deepEqual(destinationFor("hanas-store", "shop"), { route: "/(seller)" });
  assert.deepEqual(destinationFor("hanas-store", null), { route: "/(seller)" });
 });

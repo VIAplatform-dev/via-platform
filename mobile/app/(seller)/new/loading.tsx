@@ -6,16 +6,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, fonts } from "../../../lib/portal-theme";
 import { useDraft } from "../../../lib/seller/draft";
 import { draftListing, priceListing, publishListing } from "../../../lib/seller/intake";
+import { filledFields } from "../../../lib/seller/listing";
 
 // Named steps, not a spinner.
 //
-// The work genuinely takes a while — a vision pass, a reverse-image search across frames, then a
-// comps computation — and a slow spinner is indistinguishable from a hung one. Naming the step
+// The work genuinely takes a while. A vision pass, a reverse-image search across frames, then a
+// comps computation, and a slow spinner is indistinguishable from a hung one. Naming the step
 // makes a slow run legible instead of worrying, and the line at the bottom tells her she can walk
 // away, which is the honest thing: the request is already in flight server-side.
 //
 // THE TIME QUOTED IS MEASURED, NOT GUESSED. A real production run took 24.7s for the draft and
-// 16.1s for the pricing — about forty seconds all in. The copy used to promise eight, which on
+// 16.1s for the pricing, about forty seconds all in. The copy used to promise eight, which on
 // this screen is the worst possible error: a seller who is told eight and waits forty concludes it
 // has hung and kills it, losing the paid call she just made. If these calls get faster, measure
 // again and lower the number; do not lower it hopefully.
@@ -40,8 +41,12 @@ export default function LoadingScreen() {
       try {
         const draft = await draftListing(imageUrls, typed);
         if (!alive) return;
-        // What she paid never comes back from intake — it is hers, carried through from Details.
-        const fields = { ...draft.fields, ...(typed.cost ? { cost: typed.cost } : {}) };
+        // What she paid never comes back from intake. It is hers, carried through from Details.
+        // WHAT SHE TYPED WINS. The intake route already prefers a filled value over its own guess
+        // for every field it knows about, but `cost` was re-applied here and nothing else was, so
+        // the merge quietly depended on the server never disagreeing. Re-applying all of them makes
+        // that explicit: a seller who told us the condition does not get told it back differently.
+        const fields = { ...draft.fields, ...filledFields(typed) };
         setFields(fields);
         setDone(1);
 
@@ -51,13 +56,13 @@ export default function LoadingScreen() {
           reverseTitles: draft.reverseTitles,
         });
         if (!alive) return;
-        // priceListing already returns the normalised { priceCents, compsCount } — the raw route
+        // priceListing already returns the normalised { priceCents, compsCount }: the raw route
         // answers { estimate: { suggestedCents, comps } } and nothing at a top-level `price`.
         setCompsCount(pricing.compsCount);
         setPriceCents(pricing.priceCents);
         setFields(fields);
         // Save it as a draft NOW, before she has seen Review. The copy below promises the piece
-        // "lands in Drafts" if she walks away, and until this line that was a lie — the fields lived
+        // "lands in Drafts" if she walks away, and until this line that was a lie. The fields lived
         // only in this screen's memory. Review then edits this row rather than creating another.
         // A failure here is not fatal: Review still has everything and will create the piece itself.
         const saved = await publishListing({ ...fields, imageUrls, priceCents: pricing.priceCents }, "draft").catch(() => null);
@@ -70,7 +75,7 @@ export default function LoadingScreen() {
       }
     })();
     return () => { alive = false; };
-    // Runs once for this piece — re-running would spend another paid pass.
+    // Runs once for this piece. Re-running would spend another paid pass.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,11 +115,11 @@ export default function LoadingScreen() {
 
       {error ? (
         <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.md }}>
-          {error} Your photos are saved — go back and try again, or save it as a draft.
+          {error} Your photos are saved. Go back and try again, or save it as a draft.
         </Text>
       ) : (
         <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.md, lineHeight: 19 }}>
-          Usually around half a minute — it reads the photos, then checks comparable sales. You can
+          Usually around half a minute. It reads the photos, then checks comparable sales. You can
           leave this; it finishes on its own and lands in Drafts.
         </Text>
       )}

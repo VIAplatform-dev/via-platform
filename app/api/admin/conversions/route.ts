@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const sql = neon(dbUrl);
   // "all", matching what the client defaults to. The two disagreed, and a hidden default that
   // shows fewer rows than the screen implies is how a conversion looks missing when it is only
-  // filtered — every Collabs row is written matched:true, so "unmatched" hides the normal case.
+  // filtered. Every Collabs row is written matched:true, so "unmatched" hides the normal case.
   const filter = request.nextUrl.searchParams.get("filter") ?? "all";
   const storeSlug = request.nextUrl.searchParams.get("store");
 
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
   });
 }
 
-// POST /api/admin/conversions — manually create a conversion record
+// POST /api/admin/conversions. Manually create a conversion record
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

@@ -54,7 +54,7 @@ test("a watch is filed under jewelry but isn't jewelry to customs", () => {
 });
 
 test("the title overrides even a confident category when it names something else", () => {
- // A wallet listed under handbags is a wallet — different heading, different duty.
+ // A wallet listed under handbags is a wallet. Different heading, different duty.
  assert.equal(hsCodeFor("handbags", "Gucci card holder"), "4202.31");
  assert.equal(hsCodeFor("coats-jackets", "Vintage fur coat"), "4303.10");
 });
