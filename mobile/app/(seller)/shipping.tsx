@@ -3,7 +3,7 @@ import { Text } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/portal-theme";
+import { colors, spacing, fonts, eyebrow } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ToggleRow, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
 import { ZONE_LABELS, ZONE_IDS, type ZoneId, type Zones, zonesWith, shipsAbroad, DUTY_OPTIONS } from "../../lib/seller/shipping";
@@ -135,7 +135,7 @@ export default function ShippingScreen() {
         <Loading />
       ) : (
         <>
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.lg }}>YOU SHIP FROM</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.lg, marginBottom: spacing.xs }}>YOU SHIP FROM</Text>
           <Field label="Name" value={s.shipFrom?.name ?? ""} onChangeText={(v) => editFrom({ name: v })} placeholder="Who's on the parcel" autoCapitalize="words" />
           <Field label="Street" value={s.shipFrom?.street1 ?? ""} onChangeText={(v) => editFrom({ street1: v })} autoCapitalize="words" />
           <Field label="Street 2" value={s.shipFrom?.street2 ?? ""} onChangeText={(v) => editFrom({ street2: v })} placeholder="Optional" autoCapitalize="words" />
@@ -155,7 +155,7 @@ export default function ShippingScreen() {
           {/* WHAT SHE PRINTS ON. The carrier returns its own default unless told otherwise, and for
               USPS that is an 8.5×11 sheet with the label in the top quarter. Useless on the 4×6
               thermal printer a resale shop actually owns, and impossible to crop on a phone. */}
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>LABELS</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl, marginBottom: spacing.xs }}>LABELS</Text>
           <ChoiceRow
             label="You print on"
             options={PRINTERS}
@@ -177,11 +177,11 @@ export default function ShippingScreen() {
               
               The warning is the part she can act on. The quote AND the label are both built from
               the size on the piece, so an understated parcel is re-rated after it ships. */}
-          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.xl, lineHeight: 19 }}>
+          <Text style={{ fontSize: 14.5, color: colors.textMuted, marginTop: spacing.xl, lineHeight: 21 }}>
             VYA works out the postage on every order and buys the label. Your buyer sees one price
             for their address at checkout, and it never comes out of your payout.
           </Text>
-          <Text style={{ fontSize: 13, color: colors.text, marginTop: spacing.sm, lineHeight: 19 }}>
+          <Text style={{ fontSize: 14.5, color: colors.text, marginTop: spacing.sm, lineHeight: 21 }}>
             Measure your pieces. A parcel bigger than the size on the piece is re-rated by the
             carrier after it ships, and that correction is charged back to you.
           </Text>
@@ -196,7 +196,7 @@ export default function ShippingScreen() {
             hint="Offer a faster delivery option at a higher price. Only if you can post same or next day."
           />
 
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>POSTAGE</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl, marginBottom: spacing.xs }}>POSTAGE</Text>
           <ChoiceRow
             label="Who pays"
             options={MODES}
@@ -225,7 +225,7 @@ export default function ShippingScreen() {
             hint={s.dispatchDays ? "Shown to buyers and used in your shipping policy." : "Leave blank and we won't promise a time for you."}
           />
 
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>WHERE YOU SHIP</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl, marginBottom: spacing.xs }}>WHERE YOU SHIP</Text>
           {ZONE_IDS.map((z: ZoneId) => (
             <ToggleRow
               key={z}
@@ -240,11 +240,11 @@ export default function ShippingScreen() {
           {/* NAMED, like the desktop. "A few destinations are never available" answers nothing;
               the seller wants to know which, and her alternative is a customer telling her. The
               list comes from the server so the phone cannot fall behind what checkout enforces. */}
-          <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 18 }}>
+          <Text style={{ fontSize: 13.5, color: colors.textDim, marginTop: spacing.sm, lineHeight: 20 }}>
             Some places are never available, whichever regions you tick. Not your call or ours:
           </Text>
           {(s.barred ?? []).map((group) => (
-            <Text key={group.label} style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, lineHeight: 18 }}>
+            <Text key={group.label} style={{ fontSize: 13.5, color: colors.textMuted, marginTop: 4, lineHeight: 20 }}>
               <Text style={{ color: colors.textDim }}>{group.label}: </Text>
               {group.places.join(", ")}
             </Text>
@@ -268,7 +268,7 @@ export default function ShippingScreen() {
             </>
           ) : null}
 
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>COLLECTION</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl, marginBottom: spacing.xs }}>COLLECTION</Text>
           <ToggleRow
             label="Let buyers collect in person"
             value={pickup.enabled}
@@ -294,7 +294,7 @@ export default function ShippingScreen() {
           {error ? <Notice>{error}</Notice> : null}
           {saved ? <Notice tone="good">Saved.</Notice> : null}
 
-          <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xl, lineHeight: 18 }}>
+          <Text style={{ fontSize: 13.5, color: colors.textDim, marginTop: spacing.xl, lineHeight: 20 }}>
             VYA prices each parcel for its size and where it is going.
           </Text>
         </>

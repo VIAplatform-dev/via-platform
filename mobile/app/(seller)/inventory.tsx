@@ -179,7 +179,7 @@ export default function InventoryScreen() {
       {/* WHY A PIECE SAYS "RESERVED". Shown only when one actually is, so it answers a question that
           is on the screen rather than sitting there as a permanent notice. */}
       {filter !== "collections" && anyReserved(visible) ? (
-        <View style={{ flexDirection: "row", gap: spacing.sm, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginBottom: spacing.sm }}>
+        <View style={{ flexDirection: "row", gap: spacing.sm, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.md, marginBottom: spacing.sm }}>
           <Feather name="info" size={14} color={colors.textMuted} style={{ marginTop: 1 }} />
           <Text style={{ flex: 1, fontSize: 12, color: colors.textMuted, lineHeight: 17 }}>{RESERVED_EXPLAINER}</Text>
         </View>

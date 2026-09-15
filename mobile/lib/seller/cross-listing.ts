@@ -65,18 +65,27 @@ function list(names: string[]): string {
 export type BoardRow = {
   itemId: string;
   title: string | null;
-  images?: string[] | null;
+  /** `image`, SINGULAR. The route has already picked the first photo (cross-listing-db.ts's
+   *  BoardRow). Reading `images[0]` here is why every thumbnail on the failures screen was a grey
+   *  square: the key does not exist, so it was always undefined and never errored. */
+  image?: string | null;
   priceCents?: number | null;
+  brand?: string | null;
   /** platform key → "listed" | "queued" | "error" | … */
   listings?: Record<string, string> | null;
+  /** platform key → the error the platform gave back, when it gave one. */
+  errors?: Record<string, string> | null;
 };
 
 export type FailedPiece = {
   itemId: string;
   title: string;
   image: string | null;
+  brand: string | null;
   /** The platform keys that errored on this piece. */
   platforms: string[];
+  /** What the platform actually said, where it said anything. Keyed by platform. */
+  reasons: Record<string, string>;
 };
 
 /**
@@ -98,11 +107,18 @@ export function failedPieces(board: BoardRow[], platforms: CrossListPlatform[]):
       .filter(([key]) => named.has(key))
       .map(([key]) => key);
     if (bad.length) {
+      const reasons: Record<string, string> = {};
+      for (const k of bad) {
+        const why = (row.errors ?? {})[k];
+        if (typeof why === "string" && why.trim()) reasons[k] = why.trim();
+      }
       out.push({
         itemId: row.itemId,
         title: row.title?.trim() || "Untitled piece",
-        image: row.images?.[0] ?? null,
+        image: row.image ?? null,
+        brand: row.brand?.trim() || null,
         platforms: bad,
+        reasons,
       });
     }
   }

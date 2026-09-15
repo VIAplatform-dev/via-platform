@@ -67,7 +67,7 @@ export function WhenPicker({ value, onChange }: { value: Date | null; onChange: 
         <Pressable hitSlop={10} onPress={() => setMonth(shiftMonth(month, -1))} accessibilityLabel="Previous month">
           <Feather name="chevron-left" size={20} color={colors.text} />
         </Pressable>
-        <Text style={{ flex: 1, textAlign: "center", fontFamily: fonts.serif, fontSize: 16, color: colors.text }}>
+        <Text style={{ flex: 1, textAlign: "center", fontFamily: fonts.medium, fontSize: 16, color: colors.text }}>
           {monthLabel(month)}
         </Text>
         <Pressable hitSlop={10} onPress={() => setMonth(shiftMonth(month, 1))} accessibilityLabel="Next month">

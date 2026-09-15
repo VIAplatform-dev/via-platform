@@ -32,7 +32,7 @@ const RANGES: { key: Range; label: string }[] = [
 
 function Cell({ label, value }: { label: string; value: string }) {
   return (
-    <View style={{ flex: 1, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.lg }}>
       <Text style={{ fontSize: 10, letterSpacing: 1.3, color: colors.textMuted }}>{label}</Text>
       <Text style={{ fontSize: 20, color: colors.text, fontWeight: "700", marginTop: spacing.sm }}>{value}</Text>
     </View>
@@ -86,7 +86,7 @@ export default function AnalyticsScreen() {
             <Cell label="LIVE" value={d ? String(d.inventory.active) : "-"} />
           </View>
 
-          <Text style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }}>
+          <Text style={{ fontFamily: fonts.medium, fontSize: 18, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }}>
             Profit · 30 days
           </Text>
           {profit.isError ? (
@@ -94,7 +94,7 @@ export default function AnalyticsScreen() {
           ) : profit.isPending ? (
             <Empty> </Empty>
           ) : net === null ? (
-            <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg }}>
+            <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.lg }}>
               <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600" }}>No cost on record</Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2, lineHeight: 18 }}>{noProfitPrompt(profit.data?.margin)}</Text>
             </View>
@@ -113,7 +113,7 @@ export default function AnalyticsScreen() {
             </View>
           )}
 
-          <Text style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }}>
+          <Text style={{ fontFamily: fonts.medium, fontSize: 18, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }}>
             Best this period
           </Text>
           {(d?.recentSales ?? []).length === 0 ? (

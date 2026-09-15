@@ -1,6 +1,6 @@
 import { Text, View, Pressable } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { colors, fonts, spacing, radius } from "../../lib/portal-theme";
+import { colors, fonts, spacing, radius, pill } from "../../lib/portal-theme";
 
 // "You're signed in, but there's no shop on that address."
 //
@@ -28,7 +28,7 @@ export default function NoStore() {
 
    <Pressable
     onPress={() => router.replace("/auth/store")}
-    style={{ marginTop: spacing.xl, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center" }}
+    style={{ marginTop: spacing.xl, backgroundColor: colors.accent, borderRadius: pill, paddingVertical: spacing.lg, alignItems: "center" }}
    >
     <Text style={{ color: colors.accentText, fontSize: 15, fontWeight: "500" }}>Try another address</Text>
    </Pressable>

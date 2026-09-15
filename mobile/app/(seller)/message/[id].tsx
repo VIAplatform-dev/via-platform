@@ -44,7 +44,7 @@ export default function MessageScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <SellerScreen title={conv?.buyerName ?? conv?.buyerEmail ?? "Message"} back>
         {conv?.itemTitle ? (
-          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginBottom: spacing.lg, flexDirection: "row", gap: spacing.md, alignItems: "center" }}>
+          <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.md, marginBottom: spacing.lg, flexDirection: "row", gap: spacing.md, alignItems: "center" }}>
             <View style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: colors.bgAlt }} />
             <Text style={{ fontSize: 14, color: colors.text, fontWeight: "600", flex: 1 }} numberOfLines={2}>
               {conv.itemTitle}

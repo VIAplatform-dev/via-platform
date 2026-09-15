@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/portal-theme";
+import { colors, spacing, fonts, eyebrow } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Loading } from "../../components/seller/Form";
 import { needsYouRows, type AttentionRow } from "../../lib/seller/attention";
@@ -59,7 +59,7 @@ export default function NotificationsScreen() {
           ].map((group) =>
             group.items.length ? (
               <View key={group.label} style={{ marginTop: spacing.lg }}>
-                <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginBottom: spacing.xs }}>
+                <Text style={{ ...eyebrow, marginBottom: spacing.xs }}>
                   {group.label}
                 </Text>
                 {group.items.map((r) => (

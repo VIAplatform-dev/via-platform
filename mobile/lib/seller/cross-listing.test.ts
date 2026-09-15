@@ -77,7 +77,7 @@ const PLATS: CrossListPlatform[] = [
 ];
 
 const row = (itemId: string, listings: Record<string, string>, title: string | null = itemId) =>
-  ({ itemId, title, images: [`${itemId}.jpg`], listings });
+  ({ itemId, title, image: `${itemId}.jpg`, listings });
 
 test("only pieces with an errored platform, and only the platforms that errored", () => {
   const out = failedPieces([
@@ -89,6 +89,7 @@ test("only pieces with an errored platform, and only the platforms that errored"
   assert.deepEqual(out.map((p) => p.itemId), ["a", "c"]);
   assert.deepEqual(out[0].platforms, ["depop"]);
   assert.deepEqual(out[1].platforms, ["ebay", "vestiaire"]);
+  // `image`, singular: reading images[0] is why every thumbnail was a grey square.
   assert.equal(out[0].image, "a.jpg");
 });
 
@@ -126,4 +127,23 @@ test("whether the phone can do anything at all about it", () => {
   assert.equal(needsDesktop(["depop", "vestiaire"], PLATS), true);
   assert.equal(needsDesktop(["ebay"], PLATS), false);
   assert.equal(needsDesktop(["ebay", "depop"], PLATS), false);
+});
+
+test("the reason the platform gave is carried through, where it gave one", () => {
+  const out = failedPieces([
+    { itemId: "a", title: "Fendi tote", image: "a.jpg",
+      listings: { ebay: "error", depop: "error" },
+      errors: { ebay: "Item specifics missing: Brand" } },
+  ], PLATS);
+  assert.deepEqual(out[0].reasons, { ebay: "Item specifics missing: Brand" });
+  // A platform that failed silently contributes no reason rather than an empty string, so the row
+  // can tell "eBay said why" apart from "eBay just failed".
+  assert.equal(out[0].reasons.depop, undefined);
+});
+
+test("a blank reason is not a reason", () => {
+  const out = failedPieces([
+    { itemId: "a", title: "x", image: null, listings: { ebay: "error" }, errors: { ebay: "   " } },
+  ], PLATS);
+  assert.deepEqual(out[0].reasons, {});
 });

@@ -5,7 +5,7 @@ import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
+import { colors, spacing, fonts, radius, eyebrow } from "../../lib/portal-theme";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { Loading } from "../../components/seller/Form";
 import {
@@ -40,7 +40,7 @@ function Section({ title, tone, items, today }: { title: string; tone?: "urgent"
   if (!items.length) return null;
   return (
     <View style={{ marginTop: spacing.xl }}>
-      <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: tone === "urgent" ? colors.accent : colors.textMuted, fontWeight: "700" }}>
+      <Text style={{ ...eyebrow, color: tone === "urgent" ? colors.accent : colors.textDim }}>
         {title.toUpperCase()}
       </Text>
       {items.map((b) => {
@@ -112,8 +112,8 @@ export default function RentalsScreen() {
         <Loading />
       ) : nothing ? null : (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl, marginTop: spacing.sm }}>
-            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>OUT NOW</Text>
+          <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.xl, marginTop: spacing.sm }}>
+            <Text style={{ ...eyebrow }}>OUT NOW</Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text, marginTop: spacing.sm }}>
               {day.out.length}
             </Text>
@@ -134,7 +134,7 @@ export default function RentalsScreen() {
       )}
 
       {/* Every piece with rental terms on it, whatever today looks like. */}
-      <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: nothing ? spacing.sm : spacing.xxl }}>
+      <Text style={{ ...eyebrow, marginTop: nothing ? spacing.sm : spacing.xxl }}>
         ITEMS FOR RENT
       </Text>
 

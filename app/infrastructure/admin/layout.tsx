@@ -72,7 +72,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  await new Promise((res) => setTimeout(res, 1200));
  const retry = await fetch("/api/infrastructure/whoami", { cache: "no-store" }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
  try { sessionStorage.removeItem("vya:just-onboarded"); } catch { /* */ }
- if (retry && !retry.needsOnboarding) { setIsOwner(retry.admin === true); setStoreSlug(retry.slug || null); setStoreName(retry.storeName || null); setOk(true); return; }
+ if (retry && !retry.needsOnboarding) { setIsOwner(retry.admin === true); setStoreSlug(retry.slug || null); setStoreName(retry.storeName || null); setStoreLogo(retry.logo || null); setOk(true); return; }
  }
  router.replace("/admin/onboarding"); return;
  }
@@ -80,6 +80,7 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  setIsOwner(data?.admin === true);
  setStoreSlug(data?.slug || null);
  setStoreName(data?.storeName || null);
+ setStoreLogo(data?.logo || null);
  setOk(true);
  fetch(withPreview("/api/store/market/mode")).then((m) => (m.ok ? m.json() : null)).then((m) => setMarketMode(Boolean(m?.enabled))).catch(() => setMarketMode(false));
  readFeatureSwitches();
@@ -96,6 +97,8 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  // Her shop's name, for the header. "Infrastructure" is VYA's word for its own owner workspace and
  // means nothing to a seller looking at her own shop. She reported it as simply wrong.
  const [storeName, setStoreName] = useState<string | null>(null);
+ // HER MARK, not VYA's. whoami already carries the logo she uploaded for her storefront.
+ const [storeLogo, setStoreLogo] = useState<string | null>(null);
  const [currentStore, setCurrentStore] = useState<string | null>(null);
  const [storeMenu, setStoreMenu] = useState(false);
  useEffect(() => {
@@ -259,11 +262,28 @@ export default function InfrastructureLayout({ children }: { children: React.Rea
  {/* h-dvh, not h-screen: 100vh on iOS runs under the browser toolbar, which hid Sign out at the bottom. */}
  <button onClick={() => setNavOpen(false)} aria-label="Close menu" className="absolute right-1 top-2 grid h-11 w-11 place-items-center text-stone-400 hover:text-stone-600 lg:hidden"><X size={18} /></button>
  <div className="flex items-center gap-2.5 px-3 pb-5">
- <span className="grid h-8 w-8 place-items-center rounded-lg bg-stone-900">
- {/* VYA mark: the maroon asset flipped to white for the dark badge. */}
- {/* eslint-disable-next-line @next/next/no-img-element */}
- <img src="/via-logo-mark.png" alt="VYA" className="h-[18px] w-[18px] object-contain" style={{ filter: "brightness(0) invert(1)" }} />
- </span>
+ {/* THE SHOP'S MARK, NOT VYA'S.
+     This is her workspace, and the badge in the corner of it was VYA's logo: the one piece of
+     chrome on the page that belonged to the platform rather than the shop. She uploads a logo for
+     her storefront already, so it is the same asset, just used where she actually looks at it.
+     VYA's own mark stays for the owner workspace, which genuinely is VYA's. */}
+ {storeLogo && !marketMode ? (
+  <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-lg border border-stone-200 bg-white">
+   {/* eslint-disable-next-line @next/next/no-img-element -- her own uploaded asset */}
+   <img src={storeLogo} alt={storeName || "Your shop"} className="h-full w-full object-contain" />
+  </span>
+ ) : storeName && !marketMode ? (
+  // A shop with no logo yet gets its initial rather than the platform's mark.
+  <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--accent-soft)] text-[14px] font-semibold text-[var(--accent-ink)]">
+   {storeName.trim().charAt(0).toUpperCase()}
+  </span>
+ ) : (
+  <span className="grid h-8 w-8 place-items-center rounded-lg bg-stone-900">
+   {/* VYA mark: the maroon asset flipped to white for the dark badge. */}
+   {/* eslint-disable-next-line @next/next/no-img-element */}
+   <img src="/via-logo-mark.png" alt="VYA" className="h-[18px] w-[18px] object-contain" style={{ filter: "brightness(0) invert(1)" }} />
+  </span>
+ )}
  <div className="leading-tight">
  <p className="truncate text-[13px] font-semibold tracking-tight text-stone-900">{marketMode ? "Market Mode" : storeName || "Infrastructure"}</p>
  <p className="flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.14em] text-stone-400">

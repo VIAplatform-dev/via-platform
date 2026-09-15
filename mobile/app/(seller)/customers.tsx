@@ -173,7 +173,7 @@ export default function CustomersScreen() {
                 {isOpen ? (
                   <View style={{ paddingBottom: spacing.lg, paddingLeft: 36 + spacing.md }}>
                     <Text style={{ fontSize: 12, color: colors.textDim }}>{c.email}</Text>
-                    <Text style={{ fontFamily: fonts.serif, fontSize: 15, color: colors.text, marginTop: spacing.md }}>Note</Text>
+                    <Text style={{ fontFamily: fonts.medium, fontSize: 15, color: colors.text, marginTop: spacing.md }}>Note</Text>
                     <TextInput
                       value={note ?? c.notes ?? ""}
                       onChangeText={setNote}
@@ -183,7 +183,7 @@ export default function CustomersScreen() {
                       placeholderTextColor={colors.textDim}
                       style={{ fontSize: 14, color: colors.text, lineHeight: 20, minHeight: 60, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }}
                     />
-                    <Text style={{ fontFamily: fonts.serif, fontSize: 15, color: colors.text, marginTop: spacing.md }}>Tags</Text>
+                    <Text style={{ fontFamily: fonts.medium, fontSize: 15, color: colors.text, marginTop: spacing.md }}>Tags</Text>
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm, alignItems: "center" }}>
                       {(c.tags ?? []).map((t) => (
                         <Pressable key={t} onPress={() => save.mutate({ email: c.email, tags: withoutTag(c.tags, t) })} style={{ flexDirection: "row", gap: 6, paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2, borderRadius: 999, backgroundColor: colors.chip }}>

@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
+import { colors, spacing, fonts, radius, eyebrow } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { filterItems } from "../../lib/seller/inventory";
 import { storefrontAddress, describeReach, describeServeMode, shopLine, NO_ADDRESS, type DomainState, type StorefrontState } from "../../lib/seller/storefront";
@@ -138,7 +138,7 @@ export default function StoreScreen() {
         <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl }}>
           {/* What is wrong, in our words, and what it is not: nothing she can fix, and nothing
               wrong with her shop. */}
-          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg }}>
+          <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.lg }}>
             <Text style={{ fontSize: 15, color: colors.text, lineHeight: 21 }}>
               {address ? reached.line : NO_ADDRESS}
             </Text>
@@ -182,7 +182,7 @@ function Window({ items, followers, loading }: { items: Item[]; followers?: numb
   if (loading) return null;
   return (
     <View style={{ marginTop: spacing.xl }}>
-      <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>
+      <Text style={{ ...eyebrow }}>
         IN THE WINDOW
       </Text>
       <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.xs }}>

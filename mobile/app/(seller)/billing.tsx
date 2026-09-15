@@ -3,7 +3,7 @@ import { Linking, Pressable, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
+import { colors, spacing, fonts, radius, eyebrow } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Button, Notice, ChoiceRow, Loading } from "../../components/seller/Form";
 import { stripeNative, stripeAvailable, STRIPE_UNAVAILABLE } from "../../lib/seller/stripe-native";
@@ -288,7 +288,7 @@ function BillingBody({
           comes here from a locked shipping option, not from wanting to change plan. */}
       {data.configured && !payDisabled ? (
         <>
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>CARD ON FILE</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl }}>CARD ON FILE</Text>
           <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: spacing.xs, lineHeight: 19 }}>
             {data.hasCard
               ? "Your plan bills to this, and so does any postage you cover for a buyer. Nothing comes out of your payout."
@@ -307,7 +307,7 @@ function BillingBody({
       {/* ── Choosing a plan: only when there isn't one ─────────────────────────────────── */}
       {!subscribed && data.configured && !payDisabled && tiers.length ? (
         <>
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>CHOOSE A PLAN</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl }}>CHOOSE A PLAN</Text>
           <ChoiceRow
             label="Billed"
             options={[{ key: "month" as const, label: "Monthly" }, { key: "year" as const, label: "Yearly" }]}
@@ -319,7 +319,7 @@ function BillingBody({
               key={t.id}
               disabled={busy !== null}
               onPress={() => void subscribe(t.id)}
-              style={{ marginTop: spacing.lg, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg, opacity: busy && busy !== t.id ? 0.5 : 1 }}
+              style={{ marginTop: spacing.lg, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.lg, opacity: busy && busy !== t.id ? 0.5 : 1 }}
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ flex: 1, fontFamily: fonts.serif, fontSize: 20, color: colors.text }}>{t.name}</Text>
@@ -343,7 +343,7 @@ function BillingBody({
       {/* ── Managing the one she has ───────────────────────────────────────────────────── */}
       {subscribed ? (
         <>
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>MANAGE</Text>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl }}>MANAGE</Text>
 
           {tiers.filter((t) => t.id !== c.tier).map((t) => (
             <Button

@@ -1,8 +1,10 @@
 import { ScrollView, Text, View, RefreshControl, Pressable } from "react-native";
+import { GestureDetector } from "react-native-gesture-handler";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors, spacing, fonts } from "../../lib/portal-theme";
+import { useEdgeBack } from "./EdgeBack";
 
 // The frame every seller screen sits in.
 //
@@ -28,7 +30,12 @@ export function SellerScreen({
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  // Drag in from the left edge to go back, on every screen built in this frame. A tab navigator
+  // has no back gesture of its own, so without this the only way out of Shipping or Domain or
+  // Payouts is the chevron. See components/seller/EdgeBack.tsx.
+  const edgeBack = useEdgeBack(Boolean(back));
   return (
+    <GestureDetector gesture={edgeBack}>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{
@@ -74,6 +81,7 @@ export function SellerScreen({
       )}
       {children}
     </ScrollView>
+    </GestureDetector>
   );
 }
 

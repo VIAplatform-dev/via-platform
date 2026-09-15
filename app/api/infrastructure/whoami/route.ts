@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 import { isAdminRequest, resolveStoreSlug } from "@/app/lib/storeAuth";
 import { getStoreProfile } from "@/app/lib/store-profile-db";
 import { auth } from "@/app/lib/auth";
@@ -7,6 +8,13 @@ import { addStoreUser } from "@/app/lib/store-users-db";
 import { isAdminEmail } from "@/app/lib/admin-emails";
 
 export const dynamic = "force-dynamic";
+
+/** The logo a seller set on her storefront, or "" when she hasn't set one. */
+async function storeLogoFor(slug: string): Promise<string> {
+ return getStorefrontBySlug(slug)
+  .then((sf) => (typeof sf?.theme?.logo === "string" ? sf.theme.logo : "") || "")
+  .catch(() => "");
+}
 
 // Gate for the /infrastructure/admin workspace. Outcomes so the layout can route:
 //  - owner/break-glass admin (ADMIN_PASSWORD)  → { admin: true, slug: "via-admin" }
@@ -49,7 +57,11 @@ export async function GET(request: NextRequest) {
  // shop's) that is the first thing you need when something is missing from a screen.
  if (slug && slug !== "via-admin") {
   const storeName = await getStoreProfile(slug).then((p) => p.displayName).catch(() => slug);
-  return NextResponse.json({ admin: false, slug, staff, email: session.user.email, storeName });
+  // HER MARK, for the workspace's own corner. The sidebar drew VYA's logo on a page that is
+  // entirely her shop; she has already uploaded one for her storefront, so it is the same asset.
+  /* allow-swallow: a shop with no storefront row yet simply has no logo */
+  const logo = await storeLogoFor(slug);
+  return NextResponse.json({ admin: false, slug, staff, email: session.user.email, storeName, logo });
  }
 
  // SECOND PLACE TO LOOK, before declaring she has no shop.
@@ -72,7 +84,7 @@ export async function GET(request: NextRequest) {
   // gate read her as an ordinary seller with a shop and bounced her to Home. The exact symptom
   // reported. Every path that can describe a signed-in person has to describe them the same way.
   const repairedName = await getStoreProfile(account.slug).then((p) => p.displayName).catch(() => account.slug);
-  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff, email: session.user.email, storeName: repairedName });
+  return NextResponse.json({ admin: false, slug: account.slug, repaired: true, staff, email: session.user.email, storeName: repairedName, logo: await storeLogoFor(account.slug) });
  }
 
  // Authenticated but genuinely attached to nothing → the signup wizard.

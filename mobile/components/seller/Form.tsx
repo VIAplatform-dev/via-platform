@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { ActivityIndicator, Pressable, Switch, Text, TextInput, View } from "react-native";
-import { colors, spacing, button, radius, fonts } from "../../lib/portal-theme";
+import { colors, spacing, button, radius, pill, fonts } from "../../lib/portal-theme";
 
 // The pieces every settings screen is built from.
 //
@@ -22,13 +22,25 @@ import { colors, spacing, button, radius, fonts } from "../../lib/portal-theme";
  * does anything: the label is a fixed-width column, and tapping it, which is where the eye goes,
  * because it is the word naming the thing you want to change. Misses the input entirely. On a
  * phone that reads as a field you are not allowed to edit.
+ *
+ * THE LABEL SITS ABOVE THE BOX, and the box has an edge.
+ *
+ * It used to be a 96pt label column and a bare underlined value: two columns of small type an
+ * eighth of an inch apart, with nothing drawing the boundary between one field and the next. The
+ * report was the right one, "it is a little bit too small and a little bit too close together, it
+ * needs to be clearly in different boxes", and it is the same shape the web form has had all
+ * along: a label, then a bordered input under it.
+ *
+ * The value is 16px. Not 13. This is typed into, one-handed, in a shop, sometimes by someone who
+ * would rather not reach for their glasses, and a field nobody can read is a field filled wrong.
  */
 export function InlineField({
-  label, value, onChangeText, labelWidth = 96, placeholder, keyboardType, autoCapitalize, multiline, trailing,
+  label, value, onChangeText, labelWidth, placeholder, keyboardType, autoCapitalize, multiline, trailing,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
+  /** Ignored. Kept so call sites that still pass it compile; the label sits ABOVE the box now. */
   labelWidth?: number;
   placeholder?: string;
   keyboardType?: "default" | "numeric" | "email-address" | "decimal-pad" | "phone-pad" | "url" | "numbers-and-punctuation";
@@ -38,12 +50,13 @@ export function InlineField({
   trailing?: React.ReactNode;
 }) {
   const box = useRef<TextInput>(null);
+  void labelWidth;
   return (
-    <Pressable
-      onPress={() => box.current?.focus()}
-      style={{ flexDirection: "row", alignItems: multiline ? "flex-start" : "center", borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}
-    >
-      <Text style={{ width: labelWidth, fontSize: 14, color: colors.textMuted, paddingTop: multiline ? spacing.sm : 0 }}>{label}</Text>
+    <Pressable onPress={() => box.current?.focus()} style={{ marginTop: spacing.lg }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: 6 }}>
+        <Text style={{ fontSize: 13.5, color: colors.textMuted, fontWeight: "500" }}>{label}</Text>
+        {trailing}
+      </View>
       <TextInput
         ref={box}
         value={value}
@@ -55,16 +68,19 @@ export function InlineField({
         autoCorrect={autoCapitalize === "none" ? false : undefined}
         multiline={multiline}
         style={{
-          flex: 1,
-          fontSize: 15,
+          backgroundColor: colors.bgCard,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: radius,
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.md,
+          fontSize: 16,
           color: colors.text,
-          fontWeight: multiline ? "400" : "600",
-          paddingVertical: spacing.sm,
-          minHeight: multiline ? 72 : undefined,
+          fontWeight: "400",
+          minHeight: multiline ? 88 : 46,
           textAlignVertical: multiline ? "top" : "center",
         }}
       />
-      {trailing}
     </Pressable>
   );
 }
@@ -90,8 +106,11 @@ export function Field({
     // Pressable for the same reason as InlineField: the label is part of the control, so tapping
     // it has to put the cursor in the box rather than doing nothing.
     <Pressable onPress={() => box.current?.focus()} style={{ marginTop: spacing.lg }}>
-      <Text style={{ fontSize: 12, color: colors.textMuted }}>{label}</Text>
-      <View style={{ flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: colors.border }}>
+      <Text style={{ fontSize: 13.5, color: colors.textMuted, fontWeight: "500", marginBottom: 6 }}>{label}</Text>
+      {/* A BOX WITH AN EDGE, not an underline. An underlined value in a column of underlined
+          values gives the eye nothing to separate one field from the next, and at 12/15px in a
+          shop that is a form filled wrong. Same shape as InlineField and as the web's. */}
+      <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, paddingHorizontal: spacing.md }}>
         <TextInput
           ref={box}
           value={value}
@@ -105,18 +124,18 @@ export function Field({
           editable={editable}
           style={{
             flex: 1,
-            fontSize: 15,
+            fontSize: 16,
             color: editable ? colors.text : colors.textMuted,
-            fontWeight: multiline ? "400" : "600",
-            paddingVertical: spacing.sm,
-            minHeight: multiline ? 96 : undefined,
+            fontWeight: "400",
+            paddingVertical: spacing.md,
+            minHeight: multiline ? 96 : 46,
             // Multiline on Android starts vertically centred, which looks like a bug in a form.
             textAlignVertical: multiline ? "top" : "center",
           }}
         />
-        {suffix ? <Text style={{ fontSize: 13, color: colors.textDim, marginLeft: spacing.sm }}>{suffix}</Text> : null}
+        {suffix ? <Text style={{ fontSize: 14, color: colors.textMuted, marginLeft: spacing.sm }}>{suffix}</Text> : null}
       </View>
-      {hint ? <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>{hint}</Text> : null}
+      {hint ? <Text style={{ fontSize: 13, color: colors.textDim, marginTop: 6, lineHeight: 18 }}>{hint}</Text> : null}
     </Pressable>
   );
 }
@@ -132,12 +151,12 @@ export function ToggleRow({
   disabled?: boolean;
 }) {
   return (
-    <View style={{ paddingVertical: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Text style={{ flex: 1, fontSize: 15, color: colors.text }}>{label}</Text>
-        <Switch value={value} onValueChange={onValueChange} disabled={disabled} trackColor={{ true: colors.accent, false: colors.chip }} />
+    <View style={{ marginTop: spacing.lg, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.md }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+        <Text style={{ flex: 1, fontSize: 15.5, color: colors.text, fontWeight: "500" }}>{label}</Text>
+        <Switch value={value} onValueChange={onValueChange} disabled={disabled} trackColor={{ true: colors.accent, false: colors.border }} />
       </View>
-      {hint ? <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.xs, lineHeight: 17 }}>{hint}</Text> : null}
+      {hint ? <Text style={{ fontSize: 13, color: colors.textDim, marginTop: 6, lineHeight: 18 }}>{hint}</Text> : null}
     </View>
   );
 }
@@ -154,22 +173,22 @@ export function ChoiceRow<T extends string>({
 }) {
   return (
     <View style={{ marginTop: spacing.lg }}>
-      <Text style={{ fontSize: 12, color: colors.textMuted }}>{label}</Text>
-      <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm, flexWrap: "wrap" }}>
+      <Text style={{ fontSize: 13.5, color: colors.textMuted, fontWeight: "500" }}>{label}</Text>
+      <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: 6, flexWrap: "wrap" }}>
         {options.map((o) => {
           const on = o.key === value;
           return (
             <Pressable
               key={o.key}
               onPress={() => onChange(o.key)}
-              style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius, backgroundColor: on ? colors.chipActive : colors.chip, borderWidth: 1, borderColor: on ? colors.chipActive : colors.border }}
+              style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: pill, backgroundColor: on ? colors.chipActive : colors.bgCard, borderWidth: 1, borderColor: on ? colors.chipActive : colors.border }}
             >
-              <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{o.label}</Text>
+              <Text style={{ fontSize: 14, fontWeight: "500", color: on ? colors.chipActiveText : colors.textMuted }}>{o.label}</Text>
             </Pressable>
           );
         })}
       </View>
-      {hint ? <Text style={{ fontSize: 12, color: colors.textDim, marginTop: spacing.sm, lineHeight: 17 }}>{hint}</Text> : null}
+      {hint ? <Text style={{ fontSize: 13, color: colors.textDim, marginTop: 6, lineHeight: 18 }}>{hint}</Text> : null}
     </View>
   );
 }
@@ -221,7 +240,7 @@ export function Button({
 /** Anything the screen needs to say back: a save that failed, a rule that applies, a step still to do. */
 export function Notice({ children, tone = "plain" }: { children: React.ReactNode; tone?: "plain" | "good" }) {
   return (
-    <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginTop: spacing.lg, borderWidth: 1, borderColor: colors.border }}>
+    <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.md, marginTop: spacing.lg }}>
       <Text style={{ fontSize: 13, color: tone === "good" ? colors.positive : colors.text, lineHeight: 18 }}>{children}</Text>
     </View>
   );

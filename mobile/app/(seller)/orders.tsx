@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, radius } from "../../lib/portal-theme";
+import { colors, spacing, radius, pill } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { groupIntoParcels, parcelsToCollect, type Parcel } from "../../lib/seller/parcels";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
@@ -142,7 +142,7 @@ export default function OrdersScreen() {
           const pickup = p.deliveryMethod === "pickup";
           const busy = act.isPending && act.variables?.parcel.key === p.key;
           return (
-            <View key={p.key} style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg, marginBottom: spacing.md }}>
+            <View key={p.key} style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.lg, marginBottom: spacing.md }}>
               <View style={{ flexDirection: "row", gap: spacing.md }}>
                 <View style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: colors.bgAlt }} />
                 <View style={{ flex: 1 }}>
@@ -175,7 +175,7 @@ export default function OrdersScreen() {
                   <Pressable
                     disabled={busy}
                     onPress={() => act.mutate({ parcel: p, action: pickup ? "collected" : "posted" })}
-                    style={{ flex: 1, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.md, alignItems: "center" }}
+                    style={{ flex: 1, backgroundColor: colors.accent, borderRadius: pill, paddingVertical: spacing.md, alignItems: "center" }}
                   >
                     <Text style={{ color: colors.accentText, fontSize: 14, fontWeight: "600" }}>
                       {busy ? "…" : pickup ? "Mark collected" : "Mark as posted"}
@@ -210,7 +210,7 @@ export default function OrdersScreen() {
                 <Pressable
                   disabled={busy}
                   onPress={() => act.mutate({ parcel: p, action: "delivered" })}
-                  style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: radius, paddingVertical: spacing.md, alignItems: "center" }}
+                  style={{ marginTop: spacing.md, backgroundColor: colors.bgAlt, borderRadius: pill, paddingVertical: spacing.md, alignItems: "center" }}
                 >
                   <Text style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>{busy ? "…" : "Mark delivered"}</Text>
                 </Pressable>
@@ -227,7 +227,7 @@ export default function OrdersScreen() {
                     <Pressable
                       disabled={labelBusy !== null}
                       onPress={() => void buyLabel(p, quote.quote.rate.rateId)}
-                      style={{ flex: 1, backgroundColor: colors.accent, borderRadius: radius, paddingVertical: spacing.md, alignItems: "center", opacity: labelBusy ? 0.6 : 1 }}
+                      style={{ flex: 1, backgroundColor: colors.accent, borderRadius: pill, paddingVertical: spacing.md, alignItems: "center", opacity: labelBusy ? 0.6 : 1 }}
                     >
                       <Text style={{ color: colors.accentText, fontSize: 14, fontWeight: "600" }}>
                         {labelBusy === p.key ? "Buying…" : "Buy this label"}

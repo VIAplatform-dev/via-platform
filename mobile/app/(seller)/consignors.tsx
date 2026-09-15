@@ -3,7 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
+import { colors, spacing, fonts, radius, eyebrow } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
@@ -178,7 +178,7 @@ export default function ConsignorsScreen() {
 
           {open === "new" ? (
             <View style={{ marginTop: spacing.md }}>
-              <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted }}>NEW CONSIGNOR</Text>
+              <Text style={{ ...eyebrow }}>NEW CONSIGNOR</Text>
               <FormBody />
             </View>
           ) : (
@@ -191,7 +191,7 @@ export default function ConsignorsScreen() {
               store credit" was true, and the switch that fixes it lived on a screen she was not
               on. Same four the web offers; the last one on cannot be turned off, because a
               consignor owed money needs some way to be settled with. */}
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted, marginTop: spacing.xxl }}>
+          <Text style={{ ...eyebrow, marginTop: spacing.xxl }}>
             HOW YOU PAY THEM
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>

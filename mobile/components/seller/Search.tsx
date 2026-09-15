@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
-import { colors, spacing, radius } from "../../lib/portal-theme";
+import { colors, spacing, radius, pill } from "../../lib/portal-theme";
 import { flattenHits, hitTarget, isPiece, searchPlaceholder, type SearchGroup } from "../../lib/seller/search";
 import { matchDestinations } from "../../lib/seller/destinations";
 import { imageUrl, IMG } from "../../lib/imageUrl";
@@ -39,7 +39,7 @@ export function SearchBox({ autoFocus }: { autoFocus?: boolean }) {
 
   return (
     <View>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.chip, borderRadius: radius, paddingHorizontal: spacing.md, height: 42 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, backgroundColor: colors.chip, borderRadius: pill, paddingHorizontal: spacing.md, height: 42 }}>
         <Feather name="search" size={16} color={colors.textDim} />
         <TextInput
           autoFocus={autoFocus}

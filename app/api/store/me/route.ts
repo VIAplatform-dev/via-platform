@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getStorefrontBySlug } from "@/app/lib/storefront-db";
 import { stores, convertCurrencyToUSD } from "@/app/lib/stores";
 import { resolveStoreSlugAny } from "@/app/lib/storeAuth";
 import { neon } from "@neondatabase/serverless";
@@ -42,6 +43,18 @@ export async function GET(request: NextRequest) {
  // saved. See store-currency.ts.
  const currency = await storeCurrency(storeSlug);
 
+ // HER LOGO, from where she actually set it.
+ //
+ // This route returned `logo: ""` for every real store, so the one asset a seller has definitely
+ // uploaded, the mark on her own storefront, was invisible to everything that asked "who is this
+ // shop": the phone's greeting drew a grey disc, and the workspace sidebar drew VYA's mark in the
+ // corner of her own workspace. It is one read of the storefront theme, which the design editor
+ // has been writing all along (app/api/store/storefront/design).
+ /* allow-swallow: a shop with no storefront row yet simply has no logo */
+ const storeLogo = await getStorefrontBySlug(storeSlug)
+  .then((sf) => (typeof sf?.theme?.logo === "string" ? sf.theme.logo : "") || "")
+  .catch(() => "");
+
  const store = stores.find((s) => s.slug === storeSlug);
  if (!store) {
  // Store is in storeContactEmails but not yet fully onboarded. Return a minimal portal.
@@ -63,7 +76,7 @@ export async function GET(request: NextRequest) {
  location: "",
  currency,
  website: "",
- logo: "",
+ logo: storeLogo,
  logoBg: "#FFFDF8",
  commissionType: "squarespace-manual",
  totalInventoryValue: 0,
@@ -141,7 +154,9 @@ export async function GET(request: NextRequest) {
  location: store.location,
  currency,
  website: store.website,
- logo: store.logo,
+ // What she uploaded wins over the hardcoded partner asset: `stores` was written before
+ // sellers could set their own, and a shop that has set one should see it.
+ logo: storeLogo || store.logo,
  logoBg: store.logoBg,
  commissionType: store.commissionType,
  commissionRates,

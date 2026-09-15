@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPost } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
+import { colors, spacing, fonts, radius, eyebrow } from "../../lib/portal-theme";
 import { formatMoney } from "../../lib/seller/home";
 import { SellerScreen, Chips, Empty } from "../../components/seller/Screen";
 import { Button, Notice } from "../../components/seller/Form";
@@ -151,8 +151,8 @@ export default function ConsignmentScreen() {
         <Empty>Couldn&apos;t load consignment.</Empty>
       ) : (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl, marginTop: spacing.sm }}>
-            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>
+          <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.xl, marginTop: spacing.sm }}>
+            <Text style={{ ...eyebrow }}>
               {tab === "owed" ? "DUE NOW" : "STILL ON HOLD"}
             </Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text, marginTop: spacing.sm }}>

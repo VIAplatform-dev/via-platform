@@ -1,4 +1,4 @@
-import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { Image, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { Redirect, router } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
@@ -38,7 +38,7 @@ import { parcelsToPost, parcelsToPostLabel, type Parcel } from "../../lib/seller
 
 /* ── response shapes, read off the routes rather than guessed ──────────── */
 
-type Me = { storeName: string; currency: string; website: string; storeFollowers?: number };
+type Me = { storeName: string; currency: string; website: string; storeFollowers?: number; logo?: string | null; logoBg?: string | null };
 /** Everything /api/store/home returns. One payload, already shaped for what this screen draws. */
 type HomeData = {
   takings: { revenueCents: number; priorRevenueCents: number };
@@ -75,7 +75,7 @@ function Tile({ children, onPress, style }: { children: React.ReactNode; onPress
   return (
     <Pressable
       onPress={onPress}
-      style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg, ...style }}
+      style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.lg, ...style }}
     >
       {children}
     </Pressable>
@@ -174,7 +174,7 @@ export default function SellerHome() {
       }
     >
       {blocked ? (
-        <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.md, marginBottom: spacing.md }}>
+        <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.md, marginBottom: spacing.md }}>
           <Text style={{ fontSize: 13, color: colors.text }}>
             Signed in, but this account isn&apos;t linked to a store yet.
           </Text>
@@ -183,7 +183,22 @@ export default function SellerHome() {
 
       {/* greeting */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.chip }} />
+        {/* HER SHOP'S MARK, not a grey disc.
+            /api/store/me has returned `logo` all along: it is the one she uploads for her
+            storefront, and this drew an empty circle regardless. A seller opening her own
+            workspace should see her own shop. `logoBg` is the colour the storefront sets behind
+            it, because a mark drawn for a dark header disappears on paper.
+            Falls back to her initial rather than to nothing: an empty circle beside her name reads
+            as a picture that failed to load. */}
+        <View style={{ width: 40, height: 40, borderRadius: pill, backgroundColor: me.data?.logoBg || colors.accentSoft, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          {me.data?.logo ? (
+            <Image source={{ uri: me.data.logo }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
+          ) : (
+            <Text style={{ fontSize: 15, fontWeight: "600", color: colors.accentInk }}>
+              {(me.data?.storeName ?? storeSlug ?? "?").trim().charAt(0).toUpperCase()}
+            </Text>
+          )}
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, color: colors.textMuted }}>{greeting(new Date().getHours())}</Text>
           <Text style={{ fontFamily: fonts.serif, fontSize: 22, color: colors.text }} numberOfLines={1}>
@@ -241,7 +256,7 @@ export default function SellerHome() {
           else void WebBrowser.openBrowserAsync(`${API_BASE_URL}${s.href}`);
         };
         return (
-          <View style={{ marginTop: spacing.lg, backgroundColor: colors.chip, borderRadius: radius, padding: spacing.lg }}>
+          <View style={{ marginTop: spacing.lg, backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.lg }}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Text style={{ flex: 1, fontSize: 15, color: colors.text, fontWeight: "600" }}>Set up your store</Text>
               <Text style={{ fontSize: 12, color: colors.textMuted }}>{sum.done} of {sum.total} done</Text>
@@ -309,7 +324,7 @@ export default function SellerHome() {
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <Feather name="archive" size={18} color={colors.text} />
             {payable.length > 0 ? (
-              <View style={{ marginLeft: "auto", minWidth: 20, height: 20, borderRadius: radius, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 }}>
+              <View style={{ marginLeft: "auto", minWidth: 20, height: 20, borderRadius: pill, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", paddingHorizontal: 5 }}>
                 <Text style={{ color: colors.accentText, fontSize: 11, fontWeight: "700" }}>{payable.length}</Text>
               </View>
             ) : null}
@@ -392,7 +407,7 @@ export default function SellerHome() {
       </Tile>
 
       {/* needs you */}
-      <Text style={{ fontFamily: fonts.serif, fontSize: 17, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.xs }}>
+      <Text style={{ fontFamily: fonts.medium, fontSize: 17, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.xs }}>
         Needs you
       </Text>
       {home.isError ? (

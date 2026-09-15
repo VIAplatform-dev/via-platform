@@ -3,7 +3,7 @@ import { Pressable, Switch, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost, apiPatch, apiDelete } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts } from "../../lib/portal-theme";
+import { colors, spacing, fonts, eyebrow } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Field, ChoiceRow, Button, Notice, Loading } from "../../components/seller/Form";
 import { normalizeCode, describeDiscount, discountValueFromText, type DiscountKind } from "../../lib/seller/discounts";
@@ -124,7 +124,7 @@ export default function DiscountsScreen() {
 
           {open === "new" ? (
             <View style={{ marginTop: spacing.md }}>
-              <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textMuted }}>NEW CODE</Text>
+              <Text style={{ ...eyebrow }}>NEW CODE</Text>
               <FormBody />
             </View>
           ) : (

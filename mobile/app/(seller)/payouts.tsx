@@ -4,7 +4,7 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../lib/portal-theme";
+import { colors, spacing, fonts, radius, eyebrow } from "../../lib/portal-theme";
 import { SellerScreen, Empty } from "../../components/seller/Screen";
 import { Button, Notice, Loading } from "../../components/seller/Form";
 import { useConnect, STRIPE_UNAVAILABLE } from "../../lib/seller/connect";
@@ -63,8 +63,8 @@ export default function PayoutsScreen() {
         <Loading />
       ) : (
         <>
-          <View style={{ backgroundColor: colors.chip, borderRadius: radius, padding: spacing.xl }}>
-            <Text style={{ fontFamily: fonts.label, fontSize: 12, letterSpacing: 2.0, color: colors.textMuted }}>PAYOUTS</Text>
+          <View style={{ backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.border, borderRadius: radius, padding: spacing.xl }}>
+            <Text style={{ ...eyebrow }}>PAYOUTS</Text>
             <Text style={{ fontFamily: fonts.serif, fontSize: 28, color: colors.text, marginTop: spacing.sm }}>
               {p.payoutsEnabled ? "Active" : p.connected ? "Finishing setup" : "Not connected"}
             </Text>

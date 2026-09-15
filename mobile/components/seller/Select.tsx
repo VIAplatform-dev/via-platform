@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors as portalColors, spacing, radius } from "../../lib/portal-theme";
+import { colors as portalColors, spacing, radius, pill } from "../../lib/portal-theme";
 
 // A dropdown: one row that says what is chosen, and a sheet that changes it.
 //
@@ -231,7 +231,7 @@ export function MultiSelectRow({
         footer={
           <Pressable
             onPress={() => { setOpen(false); setDraft(""); }}
-            style={{ backgroundColor: palette.accent, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center" }}
+            style={{ backgroundColor: palette.accent, borderRadius: pill, paddingVertical: spacing.lg, alignItems: "center" }}
           >
             <Text style={{ fontSize: 15, fontWeight: "600", color: palette.accentText }}>Done</Text>
           </Pressable>

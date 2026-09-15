@@ -7,18 +7,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiGet, apiPatch, apiPost, apiPut, apiDelete, ApiError } from "../../../lib/api";
 import { uploadPhoto, draftListing } from "../../../lib/seller/intake";
 import { useAuth } from "../../../lib/auth";
-import { colors, spacing, fonts, radius } from "../../../lib/portal-theme";
+// `pill` is aliased: this screen already has a local `pill`, the status WORD ("SOLD",
+// "RESERVED"). React Native accepts a string for borderRadius (it can be a percentage), so
+// the collision typechecks and renders wrong rather than failing.
+import { colors, spacing, fonts, radius, pill as pillRadius, eyebrow } from "../../../lib/portal-theme";
 import { formatMoney } from "../../../lib/seller/home";
 import { daysListed } from "../../../lib/seller/aging";
 import { describeHold, HOLD_LENGTHS } from "../../../lib/seller/holds";
-import { flawsFromLine, flawsToLine } from "../../../lib/seller/intake-shape";
+import { flawsFromLine, flawsToLine, CONDITION_GRADES } from "../../../lib/seller/intake-shape";
 import { fillBlanks, fillSummary } from "../../../lib/seller/fill";
 import { templateFor, unitFor, measurementsFromForm, measurementsToForm, formatMeasurements, MEASUREMENT_LABELS, type MeasurementKey, type Measurement } from "../../../lib/seller/measurements";
 import { SellerScreen } from "../../../components/seller/Screen";
 import { FIELDS, PARCEL_KEYS, MAX_PHOTOS, type FieldKey } from "../../../lib/seller/listing-fields";
 import { PACKAGING, packagingById, packagingFromDims, packagingSummary, suggestPackaging, weightForPackaging } from "../../../lib/seller/packaging";
 import { TIER_DAYS, tierLabel, starterTiers, formFromTiers, termsProblem, termsPayload, termsSummary, type TermsForm } from "../../../lib/seller/rental-terms";
-import { schedulePresets, parseScheduleInput, describeSchedule } from "../../../lib/seller/schedule";
+import { describeSchedule } from "../../../lib/seller/schedule";
+import { WhenPicker } from "../../../components/seller/WhenPicker";
+import { tomorrowEvening } from "../../../lib/seller/calendar";
 import { InlineField } from "../../../components/seller/Form";
 import { SelectRow, MultiSelectRow } from "../../../components/seller/Select";
 
@@ -71,7 +76,7 @@ function Button({ label, onPress, disabled, primary }: { label: string; onPress?
     <Pressable
       disabled={disabled}
       onPress={onPress}
-      style={{ flex: 1, backgroundColor: primary ? colors.accent : colors.chip, borderRadius: radius, paddingVertical: spacing.lg, alignItems: "center", opacity: disabled ? 0.5 : 1 }}
+      style={{ flex: 1, backgroundColor: primary ? colors.accent : colors.chip, borderRadius: pillRadius, paddingVertical: spacing.lg, alignItems: "center", opacity: disabled ? 0.5 : 1 }}
     >
       <Text style={{ color: primary ? colors.accentText : colors.text, fontSize: 15, fontWeight: "600" }}>{label}</Text>
     </Pressable>
@@ -100,7 +105,6 @@ export default function PieceScreen() {
   // undefined = untouched; null = "clear it"; a Date = this time. Three states, because clearing a
   // schedule and never touching one must not look the same to the route.
   const [when, setWhen] = useState<Date | null | undefined>(undefined);
-  const [whenTyped, setWhenTyped] = useState("");
   const [channels, setChannels] = useState<string[] | null>(null);
   const [consignor, setConsignor] = useState<number | null | undefined>(undefined);
   const [packing, setPacking] = useState<string | null>(null);
@@ -189,10 +193,33 @@ export default function PieceScreen() {
     onSuccess: () => { void refresh(); },
     onError: (e) => fail(e, "Couldn't mark it sold. Try again."),
   });
+  /**
+   * PUBLISH A DRAFT. The piece exists; this is the transition that makes it live.
+   *
+   * The screen had no way to do it. `isDraft` gated the schedule block and one line of copy that
+   * read "it stays a draft until you list it" beside no button that would list it, so a draft
+   * edited on the phone could only be published from a laptop, or by deleting it and listing the
+   * same garment again. The listing flow has used this exact call all along
+   * (POST /api/store/items/{id} with action "publish"), which is the same transition the web
+   * takes, so anything it schedules (cross-listing, publish-at) happens here too.
+   *
+   * SAVE FIRST. Leaving the screen is what saves an edit (see onExit), and publishing does not
+   * leave the screen, so a seller who fixes the price and taps Publish in one breath would
+   * otherwise put the OLD price live. Pending edits go up, then the transition.
+   */
+  const publish = useMutation({
+    mutationFn: async () => {
+      if (dirty) await persist();
+      return apiPost(`/api/store/items/${id}`, { action: "publish" });
+    },
+    onSuccess: () => { clearEdits(); setMode("view"); void refresh(); },
+    onError: (e) => fail(e, "Couldn't publish it. Try again."),
+  });
+
   /** Every edit buffer back to untouched. Called once the server has the changes, and by Discard. */
   const clearEdits = () => {
     setForm({}); setMeasureForm(null); setMeasuring(false); setPhotos(null); setCols(null);
-    setWhen(undefined); setWhenTyped(""); setChannels(null); setConsignor(undefined);
+    setWhen(undefined); setChannels(null); setConsignor(undefined);
     setPacking(null); setRenting(null); setTerms(null); setFilledNote(null);
   };
 
@@ -525,26 +552,52 @@ export default function PieceScreen() {
               </Text>
             )}
           </View>
-          {FIELDS.map((f) => (
-            <InlineField
-              key={f.key}
-              label={f.label}
-              labelWidth={92}
-              value={current(f.key)}
-              onChangeText={(v) => {
-                setForm({ ...form, [f.key]: v });
-                // Typing a weight moves "Ships in" to the box that weight belongs to. She is the
-                // one holding the piece: heavier than the selected box means the box was wrong.
-                if (f.key === "weightOz") {
-                  const oz = Number(v.replace(/[^0-9]/g, ""));
-                  if (Number.isFinite(oz) && oz > 0) setPacking(suggestPackaging(oz));
-                }
-              }}
-              keyboardType={f.numeric ? "decimal-pad" : "default"}
-              multiline={f.multiline}
-              placeholder={f.placeholder}
-            />
-          ))}
+          {/* THE SAME QUESTIONS, IN THE SAME ORDER, AS THE NEW-LISTING FORM.
+              Both screens read FIELDS from lib/seller/listing-fields.ts. They used to keep their own
+              orders and their own controls: this one put Price second and asked for Condition in a
+              free-text box, where a seller could type "quite good" and get a grade the product page
+              cannot render. Listing a piece and editing it an hour later were two different forms
+              about one record. */}
+          {FIELDS.map((f) =>
+            f.control === "grade" ? (
+              <View key={f.key} style={{ borderBottomWidth: 1, borderBottomColor: colors.borderSoft, paddingVertical: spacing.md }}>
+                <Text style={{ fontSize: 12, color: colors.textMuted }}>{f.label}</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
+                  {CONDITION_GRADES.map((g) => {
+                    const on = current(f.key) === g;
+                    return (
+                      <Pressable
+                        key={g}
+                        onPress={() => setForm({ ...form, [f.key]: g })}
+                        style={{ paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: pillRadius, backgroundColor: on ? colors.chipActive : colors.chip }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: "500", color: on ? colors.chipActiveText : colors.textMuted }}>{g}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : (
+              <InlineField
+                key={f.key}
+                label={f.label}
+                labelWidth={92}
+                value={current(f.key)}
+                onChangeText={(v) => {
+                  setForm({ ...form, [f.key]: v });
+                  // Typing a weight moves "Ships in" to the box that weight belongs to. She is the
+                  // one holding the piece: heavier than the selected box means the box was wrong.
+                  if (f.key === "weightOz") {
+                    const oz = Number(v.replace(/[^0-9]/g, ""));
+                    if (Number.isFinite(oz) && oz > 0) setPacking(suggestPackaging(oz));
+                  }
+                }}
+                keyboardType={f.numeric ? "decimal-pad" : "default"}
+                multiline={f.multiline}
+                placeholder={f.placeholder}
+              />
+            ),
+          )}
 
           {/* SHIPS IN: the web's one question instead of the phone's three boxes, and a row
               instead of seven chips. Choosing a preset writes its L/W/H onto the piece, which is
@@ -628,34 +681,20 @@ export default function PieceScreen() {
           {isDraft ? (
             <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
               <Text style={{ fontSize: 14, color: colors.textMuted }}>Goes live</Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }}>
-                <Pressable
-                  onPress={() => { setWhen(null); setWhenTyped(""); }}
-                  style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: !scheduledAt ? colors.chipActive : colors.chip }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: "600", color: !scheduledAt ? colors.chipActiveText : colors.text }}>When I say</Text>
-                </Pressable>
-                {schedulePresets().map((pr) => {
-                  const on = Boolean(scheduledAt && scheduledAt.getTime() === pr.at.getTime());
-                  return (
-                    <Pressable
-                      key={pr.key}
-                      onPress={() => { setWhen(pr.at); setWhenTyped(""); }}
-                      style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: 999, backgroundColor: on ? colors.chipActive : colors.chip }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: on ? colors.chipActiveText : colors.text }}>{pr.label}</Text>
-                    </Pressable>
-                  );
-                })}
+              {/* The same calendar the listing form uses. It was four presets and a box wanting
+                  "2026-09-15 18:00" typed by hand, which is a date format, not a question. */}
+              <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
+                {([["When I say", !scheduledAt], ["Schedule", !!scheduledAt]] as const).map(([label, on]) => (
+                  <Pressable
+                    key={label}
+                    onPress={() => setWhen(label === "When I say" ? null : scheduledAt ?? tomorrowEvening())}
+                    style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: pillRadius, backgroundColor: on ? colors.chipActive : colors.chip }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: "500", color: on ? colors.chipActiveText : colors.textMuted }}>{label}</Text>
+                  </Pressable>
+                ))}
               </View>
-              <TextInput
-                value={whenTyped}
-                onChangeText={(v) => { setWhenTyped(v); const d = parseScheduleInput(v); if (d) setWhen(d); }}
-                placeholder="or 2026-09-15 18:00"
-                placeholderTextColor={colors.textDim}
-                keyboardType="numbers-and-punctuation"
-                style={{ fontSize: 15, color: colors.text, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.xs, marginTop: spacing.sm }}
-              />
+              {scheduledAt ? <WhenPicker value={scheduledAt} onChange={(d) => setWhen(d)} /> : null}
               <Text style={{ fontSize: 12, color: scheduledAt ? colors.positive : colors.textDim, marginTop: spacing.xs }}>
                 {describeSchedule(scheduledAt) ?? "It stays a draft until you list it."}
               </Text>
@@ -673,10 +712,12 @@ export default function PieceScreen() {
           <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: spacing.md }}>
             <SelectRow
               label="Consignor"
-              title="Whose piece is it?"
+              title="Is this on consignment?"
               value={chosenConsignor == null ? "" : String(chosenConsignor)}
               options={[
-                { key: "", label: "Mine", hint: "Bought for the shop" },
+                // "None", not "Mine": the row is labelled Consignor, and a piece she bought outright
+                // has no consignor. "Mine" reads as her BEING one, owed a split of her own sale.
+                { key: "", label: "None", hint: "You bought it outright" },
                 ...(consignors.data?.consignors ?? []).map((c) => ({ key: String(c.id), label: c.name })),
               ]}
               onChange={(key) => setConsignor(key === "" ? null : Number(key))}
@@ -778,7 +819,17 @@ export default function PieceScreen() {
               her to distrust the screen. Discard is the one that changes the outcome, so it says
               what it does rather than "Cancel". */}
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
-            <Button label={save.isPending ? "Saving…" : "Done"} primary disabled={busy || filling} onPress={() => (dirty ? save.mutate() : setMode("view"))} />
+            <Button label={save.isPending ? "Saving…" : "Done"} primary={!isDraft} disabled={busy || filling} onPress={() => (dirty ? save.mutate() : setMode("view"))} />
+            {/* Straight from the form. She has just finished the piece; making her tap Done, read
+                the view, and find Publish is three taps for one intention. */}
+            {isDraft ? (
+              <Button
+                label={publish.isPending ? "Publishing…" : scheduledAt ? "Schedule it" : "Publish"}
+                primary
+                disabled={busy || filling}
+                onPress={() => publish.mutate()}
+              />
+            ) : null}
             {dirty ? (
               <Button label="Discard changes" disabled={busy || filling} onPress={() => { setMode("view"); clearEdits(); setError(null); }} />
             ) : null}
@@ -825,13 +876,25 @@ export default function PieceScreen() {
         </View>
       ) : (
         <>
+          {/* A DRAFT'S FIRST QUESTION IS "PUT IT OUT", so on a draft that is the filled button and
+              Edit steps back. On a live piece there is nothing to publish and Edit leads. */}
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.lg }}>
-            <Button label="Edit" primary disabled={busy} onPress={() => { setError(null); setMode("edit"); }} />
-            <Button
-              label={markSold.isPending ? "Marking…" : sold ? "Sold" : "Mark sold"}
-              disabled={sold || busy}
-              onPress={() => markSold.mutate()}
-            />
+            {isDraft ? (
+              <Button
+                label={publish.isPending ? "Publishing…" : scheduledAt ? "Schedule it" : "Publish"}
+                primary
+                disabled={busy}
+                onPress={() => publish.mutate()}
+              />
+            ) : null}
+            <Button label="Edit" primary={!isDraft} disabled={busy} onPress={() => { setError(null); setMode("edit"); }} />
+            {isDraft ? null : (
+              <Button
+                label={markSold.isPending ? "Marking…" : sold ? "Sold" : "Mark sold"}
+                disabled={sold || busy}
+                onPress={() => markSold.mutate()}
+              />
+            )}
           </View>
           <View style={{ flexDirection: "row", gap: spacing.md, marginTop: spacing.md }}>
             {hold ? (
@@ -850,7 +913,7 @@ export default function PieceScreen() {
       {/* Flaws: the list shoppers see under Condition; Edit changes it as one comma-separated line. */}
       {flaws.length > 0 && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>FLAWS</Text>
+          <Text style={{ ...eyebrow }}>FLAWS</Text>
           {flaws.map((f, i) => (
             <Text key={`${f}-${i}`} style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{"\u2022"} {f}</Text>
           ))}
@@ -859,13 +922,13 @@ export default function PieceScreen() {
       {/* Beyond the grade and the tape measure. Both print on the product page; Edit changes them. */}
       {item.conditionNote && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>CONDITION NOTE</Text>
+          <Text style={{ ...eyebrow }}>CONDITION NOTE</Text>
           <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{item.conditionNote}</Text>
         </View>
       ) : null}
       {storedMeasurementsLine && mode === "view" ? (
         <View style={{ marginTop: spacing.xl }}>
-          <Text style={{ fontFamily: fonts.label, fontSize: 13, letterSpacing: 2.0, color: colors.textDim, fontWeight: "700" }}>MEASUREMENTS</Text>
+          <Text style={{ ...eyebrow }}>MEASUREMENTS</Text>
           <Text style={{ fontSize: 14, color: colors.text, marginTop: spacing.xs }}>{storedMeasurementsLine}</Text>
         </View>
       ) : null}
