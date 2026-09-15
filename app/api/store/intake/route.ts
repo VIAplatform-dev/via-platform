@@ -12,7 +12,7 @@ import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
 import { reverseImageBestOf, matchesToComps, editorialCaptions, verifyMatchesByImage, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
-import { brandConsensus, consensusConfidence, type Consensus } from "@/app/lib/brand-consensus";
+import { brandConsensus, resolveBrandName, type Consensus } from "@/app/lib/brand-consensus";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -230,20 +230,25 @@ export async function POST(request: NextRequest) {
  labelBrand = tagBrand || rnBrand;
  if (labelBrand) draft.brand = { value: labelBrand, confidence: 0.92 }; // printed label = high confidence
  }
- // Lens consensus only when the label didn't already pin the brand, and only when the matches
- // genuinely agreed. `idBrand.brand` is null unless they did, so a minority can no longer override.
- if (draft && idBrand.brand && !has("brand") && !labelBrand) {
+ // Resolve the brand from everything that has an opinion: the map-backed consensus when the
+ // matches genuinely agreed, otherwise a designer the map has never heard of IF the drafter named
+ // him too, otherwise whatever the drafter already had. Two independent sources are what make the
+ // unknown-designer path safe, and it is the path that gets a Todd Oldham dress called Todd Oldham
+ // rather than Chanel or nothing. See brand-consensus.ts.
+ if (draft && !has("brand") && !labelBrand) {
  const cur = draft.brand?.value || "";
  // A DOCUMENTED RUNWAY LOOK OUTRANKS A WEB TALLY. If the model tied this piece to a specific
  // show, the house that put on that show is the brand, and a pile of shopping titles does not
- // get to argue with it. This is what should have saved the Oldham dress even before the
- // thresholds: the runway field said "Todd Oldham S/S 1995" while the brand was set to Chanel.
+ // get to argue with it.
  const runwayHouse = (draft.runway || "").trim();
- const runwaySaysOther = runwayHouse.length > 0
+ const runwaySaysOther = idBrand.brand !== null && runwayHouse.length > 0
   && !runwayHouse.toLowerCase().includes(idBrand.brand.toLowerCase());
- const disagrees = !cur || draft.brand.confidence < 0.7 || !cur.toLowerCase().includes(idBrand.brand.toLowerCase());
- if (disagrees && !runwaySaysOther) {
-  draft.brand = { value: idBrand.brand, confidence: consensusConfidence(idBrand) };
+ const resolved = runwaySaysOther
+  ? { brand: cur || null, confidence: draft.brand?.confidence ?? 0.6, source: "draft" as const }
+  : resolveBrandName({ consensus: idBrand, draftTitle: draft.title, draftRunway: draft.runway, draftBrand: cur });
+ // Never blank a field the drafter filled: a null here means "nothing better to offer".
+ if (resolved.brand && resolved.brand.toLowerCase() !== cur.toLowerCase()) {
+  draft.brand = { value: resolved.brand, confidence: resolved.confidence };
  }
  }
  // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label,

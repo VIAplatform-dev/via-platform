@@ -130,7 +130,6 @@ export default function IntakePage() {
  const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
  const [careTag, setCareTag] = useState<string | null>(null);
  const [reverseImage, setReverseImage] = useState<{ matches: number; brand: string | null; hits: number; sampleTitles: string[] } | null>(null);
- const [specificPiece, setSpecificPiece] = useState<{ model: string; similarity: number; era: string | null; source: string; refPriceCents: number | null } | null>(null);
  const [flaws, setFlaws] = useState<string[]>([]);
  const [newFlaw, setNewFlaw] = useState(""); // the flaw being typed; whatever is left in the box is saved too
  // Structure (owner audit #27/#31): the note beyond the grade, the category's measurement template,
@@ -374,7 +373,6 @@ export default function IntakePage() {
  if (d.ghostUrl) setGhost(d.ghostUrl);
  if (Array.isArray(d.embedding)) setEmbedding(d.embedding);
  setReverseImage(d.reverseImage || null);
- setSpecificPiece(d.specificPiece || null);
  if (dr && Array.isArray(dr.flaws)) setFlaws(dr.flaws);
  if (dr?.parcel) { const est = parcelEstimateFrom(dr.parcel); setAiParcel(est); setPacking(suggestPackaging(est?.weightOz)); }
  setPromptVersion(d.promptVersion || null);
@@ -589,7 +587,7 @@ export default function IntakePage() {
  /** Wipe everything the AI wrote, and anything typed over it, but keep the photos. */
  function clearDetails() {
   setForm(BLANK); setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null);
-  setRunway(null); setCelebrity(null); setSpecificPiece(null); setFlaws([]); setNewFlaw(""); setConditionNote(""); setMeasurements({}); setAiParcel(null); setCareTag(null);
+  setRunway(null); setCelebrity(null); setFlaws([]); setNewFlaw(""); setConditionNote(""); setMeasurements({}); setAiParcel(null); setCareTag(null);
   setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote("");
   setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false);
   setAiDraft({}); setAiPhoto(null); setPromptVersion(null); setEmbedding(null); setReverseImage(null);
@@ -599,7 +597,7 @@ export default function IntakePage() {
  draftIdRef.current = null; setAutoSavedAt(null); // fresh draft for the next item
  setPhase("form"); setPhotos([]); setSelPhoto(0); setRunway(null); setCelebrity(null); setGhost(null); setForm(BLANK);
  setSelectedCols([]); setFlagged([]); setConfirmed({}); setErr(null); setSavedDraft(false);
- setReverseImage(null); setSpecificPiece(null); setFlaws([]); setNewFlaw(""); setConditionNote(""); setMeasurements({}); setAiParcel(null); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setAiPhoto(null); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
+ setReverseImage(null); setFlaws([]); setNewFlaw(""); setConditionNote(""); setMeasurements({}); setAiParcel(null); setPromptVersion(null); setCareTag(null); setMarketPrice(null); setRawMarketCents(null); setAiConfidence(null); setPriceNote(""); setPriceLow(null); setPriceHigh(null); setPriceFlag(null); setLowConf(false); setConsigned(false); setConsign({ consignorId: "", split: "", expiresAt: "", newName: "" }); setAiDraft({}); setAiPhoto(null); setEmbedding(null); setSchedule(""); setScheduledAt(null); setCrossResult([]);
  }
 
  // ── Done ──
@@ -776,15 +774,7 @@ export default function IntakePage() {
  )}
  {/* Specific-piece match (Phase 2): the exact model we recognized from the reference index,
    used to sharpen the title/era and tighten the price comps. Only shown when confident. */}
- {/* NO PRICE ON THIS CHIP. It is only ever set when the exact-recall path found nothing, which
-     makes it a LOOK-ALIKE by definition, and the pipeline says so in as many words: it may inform
-     the ERA and must not supply a model, a material or a price. It was nonetheless printing
-     "refs ~$16013" beside a 1,681 dress, because the look-alike's own listing was a Chanel
-     handbag. A number shown to a seller is a number she prices against, whatever we call it. */}
- {specificPiece && (
- <p className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-[11px] text-stone-600">🎯 Looks like <span className="font-medium text-stone-800">{specificPiece.model}</span> <span className="text-stone-400">· {Math.round(specificPiece.similarity * 100)}% visual match{specificPiece.era ? `, ${specificPiece.era}` : ""} · used for the era, not the price</span></p>
- )}
-
+ 
  <TechButton className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length}>
  <Sparkles size={14} className="mr-1.5 inline" />{busy ? busyMsg : "Fill the rest with AI"}
  </TechButton>

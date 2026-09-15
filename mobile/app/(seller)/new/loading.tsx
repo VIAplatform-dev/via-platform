@@ -50,10 +50,15 @@ export default function LoadingScreen() {
         setFields(fields);
         setDone(1);
 
+        // Everything the desktop sends. Three of these were missing and the phone priced with less
+        // evidence than the web on the same photo. See draftListing for what knowledgeHintCents is.
         const pricing = await priceListing(imageUrls, draft.fields, {
           searchQuery: draft.searchQuery,
           reverseComps: draft.reverseComps,
           reverseTitles: draft.reverseTitles,
+          editorialTitles: draft.editorialTitles,
+          knowledgeHintCents: draft.knowledgeHintCents,
+          draftRanFull: draft.draftRanFull,
         });
         if (!alive) return;
         // priceListing already returns the normalised { priceCents, compsCount }: the raw route

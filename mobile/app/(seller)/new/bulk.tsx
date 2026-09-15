@@ -123,8 +123,11 @@ export default function BulkScreen() {
         setProgress({ done: i, total: rows.length });
         const filled = { brand: r.brand, cost: r.cost };
         const d = await draftListing(r.photos, filled);
+        // The same full set the single-piece flow and the desktop send: a bulk upload must not be
+        // priced on thinner evidence than the same photo added one at a time.
         const p = await priceListing(r.photos, d.fields, {
           searchQuery: d.searchQuery, reverseComps: d.reverseComps, reverseTitles: d.reverseTitles,
+          editorialTitles: d.editorialTitles, knowledgeHintCents: d.knowledgeHintCents, draftRanFull: d.draftRanFull,
         });
         // The drafted fields never carried the cost she typed. It reached the pricer and stopped
         // there. The lot fields put it (or its share of the batch) on the piece itself.

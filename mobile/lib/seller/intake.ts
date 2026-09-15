@@ -50,8 +50,17 @@ export async function uploadPhoto(uri: string): Promise<string> {
  */
 export async function draftListing(imageUrls: string[], typedFields: Record<string, string | undefined>) {
   const r = await apiPost<{
-    draft?: unknown; searchQuery?: string; reverseComps?: unknown[]; reverseTitles?: string[]; editorialTitles?: string[];
+    draft?: { priceHint?: number | null } | null;
+    searchQuery?: string; reverseComps?: unknown[]; reverseTitles?: string[]; editorialTitles?: string[];
+    needDraft?: boolean;
   }>("/api/store/intake", { imageUrls, filled: filledFields(typedFields), draftOnly: true });
+
+  // THE MODEL'S OWN PRICE FOR THE PIECE, carried through to the pricer. It is the last thing
+  // standing when the comparables are useless: price-engine falls back to it rather than to
+  // whatever the comp search dragged in. The desktop has always sent it and the phone never did,
+  // which is why a Todd Oldham dress priced at 1,681 here and 16,013 on the phone. Same photo,
+  // same endpoints, less evidence.
+  const hint = typeof r.draft?.priceHint === "number" && r.draft.priceHint > 0 ? r.draft.priceHint * 100 : null;
 
   return {
     fields: normalizeDraft(r.draft),
@@ -59,6 +68,8 @@ export async function draftListing(imageUrls: string[], typedFields: Record<stri
     reverseComps: r.reverseComps,
     reverseTitles: r.reverseTitles,
     editorialTitles: r.editorialTitles,
+    knowledgeHintCents: hint,
+    draftRanFull: r.needDraft === true,
   };
 }
 

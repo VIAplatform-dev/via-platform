@@ -119,3 +119,16 @@ test("an AI placeholder is not a value", () => {
   assert.equal(hasRealValue(null), false);
   assert.equal(hasRealValue(undefined), false);
 });
+
+test("the phone carries the model's own price through to the pricer", () => {
+  // The Todd Oldham split: 1,681 on the web and 16,013 on the phone, same photo, same endpoints.
+  // The desktop sent knowledgeHintCents and the phone did not, and price-engine falls back to it
+  // when the comparables are useless, which they were (Chanel handbags for a dress).
+  const hint = (priceHint: unknown) =>
+    typeof priceHint === "number" && priceHint > 0 ? priceHint * 100 : null;
+  assert.equal(hint(1681), 168100, "dollars in, cents out: the route multiplies by 100");
+  assert.equal(hint(0), null);
+  assert.equal(hint(null), null);
+  assert.equal(hint(undefined), null);
+  assert.equal(hint("1681"), null, "a string is not a price");
+});

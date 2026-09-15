@@ -126,3 +126,46 @@ export function consensusConfidence(c: Consensus): number {
  const share = c.hits / Math.max(1, c.total);
  return Math.max(0.6, Math.min(0.92, 0.55 + share * 0.5));
 }
+
+
+/**
+ * The brand, after everything that has an opinion has had one.
+ *
+ * WHY THIS EXISTS AND NOT JUST A VETO. Refusing the Chanel minority was only half an answer: it
+ * left the field blank on a piece the system had ALREADY identified. The title said "Todd Oldham
+ * S/S 1995 Black Cutout Mini Dress" and the runway field said "Todd Oldham S/S 1995". Making a
+ * seller retype a name we put on the screen ourselves is not a fix, it is a shrug.
+ *
+ * So a designer the brand map has never heard of can still become the brand, on one condition: TWO
+ * INDEPENDENT SOURCES have to name him. The web titles are one (the repeated name), and the model's
+ * own reading of the photograph is the other (its title, or the show it tied the piece to). That
+ * pairing is what makes this safe. A name from the web titles alone is not enough, because reverse
+ * image results are full of names that are not the designer: the model wearing it, the photographer,
+ * the shop reselling it. "Nadia Auermann" appears all over this dress's results and never made it
+ * into the brand field, because the drafter never wrote it down as a maker.
+ */
+export function resolveBrandName(args: {
+ consensus: Consensus;
+ /** What the drafter wrote from the photograph. */
+ draftTitle?: string | null;
+ draftRunway?: string | null;
+ draftBrand?: string | null;
+}): { brand: string | null; confidence: number; source: "consensus" | "corroborated-name" | "draft" | "none" } {
+ const { consensus: c } = args;
+ if (c.brand) return { brand: c.brand, confidence: consensusConfidence(c), source: "consensus" };
+
+ const name = c.unknownName;
+ if (name) {
+  const first = name.split(" ")[0].toLowerCase();
+  // Named by the drafter too, in the title or in the show it identified. Two sources, one name.
+  const alsoSaidBy = [args.draftTitle, args.draftRunway, args.draftBrand]
+   .some((v) => String(v ?? "").toLowerCase().includes(first));
+  if (alsoSaidBy) {
+   // Not as high as a map-backed consensus: this is a name we read, not a brand we know.
+   return { brand: name, confidence: 0.8, source: "corroborated-name" };
+  }
+ }
+ // Nothing corroborated: keep whatever the drafter already had rather than blanking a filled field.
+ const kept = String(args.draftBrand ?? "").trim();
+ return kept ? { brand: kept, confidence: 0.6, source: "draft" } : { brand: null, confidence: 0, source: "none" };
+}

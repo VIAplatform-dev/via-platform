@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { brandConsensus, repeatedName, consensusConfidence } from "./brand-consensus.ts";
+import { brandConsensus, repeatedName, consensusConfidence, resolveBrandName } from "./brand-consensus.ts";
 
 // A stand-in for the canonical map: it knows the famous houses and, like the real one, has never
 // heard of Todd Oldham. That blindness IS the bug under test.
@@ -116,4 +116,45 @@ test("confidence tracks how much of the web actually agreed", () => {
  const weaker = brandConsensus([...Array(4).fill("Chanel flap bag"), ...Array(6).fill("black flap bag")], infer);
  assert.ok(consensusConfidence(strong) > consensusConfidence(weaker), "half the web beats a third");
  assert.ok(consensusConfidence(strong) <= 0.92, "never certain from titles alone");
+});
+
+test("a designer the map never heard of still becomes the brand when two sources name him", () => {
+ // The point of the whole exercise. Blanking the field on a piece we had already identified in our
+ // own title and runway is a shrug, not a fix.
+ const c = brandConsensus(OLDHAM, infer);
+ const r = resolveBrandName({
+  consensus: c,
+  draftTitle: "Todd Oldham S/S 1995 Black Cutout Mini Dress with Rhinestone O-Ring",
+  draftRunway: "Todd Oldham S/S 1995",
+ });
+ assert.equal(r.brand, "Todd Oldham");
+ assert.equal(r.source, "corroborated-name");
+ assert.ok(r.confidence >= 0.75 && r.confidence < 0.92, "trusted, but not as a brand we know");
+});
+
+test("a name only the web says is never promoted to the brand", () => {
+ // Reverse-image results are full of names that are not the designer: the model wearing it, the
+ // photographer, the shop reselling it. This dress's own results are thick with Nadia Auermann.
+ const titles = [
+  ...Array(8).fill("Nadia Auermann 1994 runway photograph"),
+  ...Array(3).fill("black cutout mini dress"),
+ ];
+ const r = resolveBrandName({ consensus: brandConsensus(titles, infer), draftTitle: "Black cutout mini dress" });
+ assert.equal(r.brand, null, "the drafter never called her a maker, so she is not the brand");
+ assert.equal(r.source, "none");
+});
+
+test("a real map-backed agreement still wins outright", () => {
+ const c = brandConsensus(Array(8).fill("Prada re-nylon shoulder bag"), infer);
+ const r = resolveBrandName({ consensus: c, draftTitle: "Prada nylon bag" });
+ assert.equal(r.brand, "Prada");
+ assert.equal(r.source, "consensus");
+});
+
+test("an uncorroborated result never blanks a brand the drafter already had", () => {
+ // Wiping a filled field is its own bug: she then has to retype what we deleted.
+ const c = brandConsensus(["black dress", "vintage dress", "90s dress"], infer);
+ const r = resolveBrandName({ consensus: c, draftBrand: "Moschino", draftTitle: "Moschino dress" });
+ assert.equal(r.brand, "Moschino");
+ assert.equal(r.source, "draft");
 });
