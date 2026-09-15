@@ -10,8 +10,10 @@ import {
 test("the opening ladder matches the web's, proportions included", () => {
   // A seller who prices a piece on the phone and reopens it on a laptop must not be shown a
   // different set of suggestions for the same piece.
+  // rental-tiers.ts, not RentalPanel.tsx: the ladder moved out of the component so the web could
+  // test it too (a .tsx cannot be loaded by the test runner). The parity check is the same one.
   const web = fs.readFileSync(
-    path.join(process.cwd(), "..", "app", "infrastructure", "admin", "rentals", "RentalPanel.tsx"), "utf8",
+    path.join(process.cwd(), "..", "app", "infrastructure", "admin", "rentals", "rental-tiers.ts"), "utf8",
   );
   const m = web.match(/return \[\{ days: 4, cents: at\((\d+)\) \}, \{ days: 7, cents: at\((\d+)\) \}, \{ days: 28, cents: at\((\d+)\) \}\]/);
   assert.ok(m, "the web's starterTiers no longer has the shape this test reads");
