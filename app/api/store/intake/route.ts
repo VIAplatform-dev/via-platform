@@ -12,6 +12,7 @@ import { embedImage, isEmbeddingConfigured } from "@/app/lib/embeddings";
 import { reverseImageBestOf, matchesToComps, editorialCaptions, verifyMatchesByImage, isCompsConfigured, type VisualMatch } from "@/app/lib/comps";
 import { inferBrandFromTitle } from "@/app/lib/market-data-db";
 import { gate } from "@/app/lib/concurrency";
+import { brandConsensus, consensusConfidence, type Consensus } from "@/app/lib/brand-consensus";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,18 +22,17 @@ export const maxDuration = 60;
 // Anthropic per-minute rate limits. Tunable as the API tier grows.
 const AI_GATE = () => gate("intake-ai", Number(process.env.INTAKE_AI_CONCURRENCY) || 3);
 
-// The reverse-image matches are the same piece found across the web, so their titles
-// carry the real brand. Run each through the canonical brand matcher and take the
-// consensus. Deterministic, so we don't depend on the model choosing to trust them.
-function brandFromMatches(matches: VisualMatch[]): { brand: string | null; hits: number } {
- const tally = new Map<string, number>();
- for (const m of matches) {
- const b = inferBrandFromTitle(m.title);
- if (b) tally.set(b, (tally.get(b) || 0) + 1);
- }
- let brand: string | null = null, hits = 0;
- for (const [b, n] of tally) if (n > hits) { brand = b; hits = n; }
- return { brand, hits };
+// The reverse-image matches are the same piece found across the web, so their titles carry the real
+// brand. Run each through the canonical brand matcher and see whether they actually AGREE.
+//
+// This used to take a bare plurality: whichever brand had the most hits won, so one mention beat
+// zero. It branded a Todd Oldham S/S 1995 runway dress "Chanel" off 5 of 31 matches, because the
+// other 26 said Todd Oldham and the canonical map has never heard of him, so they scored nothing.
+// The wrong brand then drove the comp search and priced a 1,681 dress against 16,013 of Chanel
+// handbags. See brand-consensus.ts for the thresholds and for how a designer the map cannot see is
+// noticed anyway.
+function brandFromMatches(matches: VisualMatch[]): Consensus {
+ return brandConsensus(matches.map((m) => m.title || ""), inferBrandFromTitle);
 }
 
 // titleHasBrand + extractRunway now live in ./intake-pricing (shared with the phase-2 endpoint).
@@ -230,11 +230,21 @@ export async function POST(request: NextRequest) {
  labelBrand = tagBrand || rnBrand;
  if (labelBrand) draft.brand = { value: labelBrand, confidence: 0.92 }; // printed label = high confidence
  }
- // Lens consensus only when the label didn't already pin the brand.
+ // Lens consensus only when the label didn't already pin the brand, and only when the matches
+ // genuinely agreed. `idBrand.brand` is null unless they did, so a minority can no longer override.
  if (draft && idBrand.brand && !has("brand") && !labelBrand) {
  const cur = draft.brand?.value || "";
+ // A DOCUMENTED RUNWAY LOOK OUTRANKS A WEB TALLY. If the model tied this piece to a specific
+ // show, the house that put on that show is the brand, and a pile of shopping titles does not
+ // get to argue with it. This is what should have saved the Oldham dress even before the
+ // thresholds: the runway field said "Todd Oldham S/S 1995" while the brand was set to Chanel.
+ const runwayHouse = (draft.runway || "").trim();
+ const runwaySaysOther = runwayHouse.length > 0
+  && !runwayHouse.toLowerCase().includes(idBrand.brand.toLowerCase());
  const disagrees = !cur || draft.brand.confidence < 0.7 || !cur.toLowerCase().includes(idBrand.brand.toLowerCase());
- if (disagrees) draft.brand = { value: idBrand.brand, confidence: idBrand.hits >= 2 ? 0.85 : 0.6 };
+ if (disagrees && !runwaySaysOther) {
+  draft.brand = { value: idBrand.brand, confidence: consensusConfidence(idBrand) };
+ }
  }
  // A tag showing BOTH a brand name and an RN is a definitive pairing read off one physical label,
  // learn it so a later faded-name/legible-RN tag can still resolve. (Not circular: two OCR'd facts.)

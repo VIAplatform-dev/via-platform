@@ -1,4 +1,5 @@
 import { fetchComps, rankComps, filterModelConflicts, isCompsConfigured, type Comp } from "./comps.ts";
+import { filterKindConflicts, comparablesAreThin } from "./comp-kind.ts";
 import { getCachedComps, saveComps, getVyaComps, newestCompAgeDays } from "./comp-cache-db.ts";
 import { inferCategoryFromTitle } from "./loadStoreProducts.ts";
 import { getInternalPriceBenchmark, type InternalPriceBenchmark } from "./data-layer/price-benchmark-db.ts";
@@ -271,13 +272,24 @@ export async function estimatePrice(opts: {
  // Drop keyword comps that are a DIFFERENT bag model than the query (a "Jumbo Flap" shouldn't be
  // priced off Accordion/Camera/Westminster bags). Keep the unfiltered set if this leaves too few.
  const modelFiltered = filterModelConflicts(ranked, opts.query);
+ // And drop comps that are not even the same KIND of thing. A dress is not priced off handbags at
+ // any house, however alike the photographs looked: a visual search on a runway shot returns what
+ // the model was also wearing, what the brand also sells, and whatever was in the sidebar. This
+ // priced a 1,681 Todd Oldham dress against 16,013 of Chanel bags, shoes and jewellery, and said so
+ // in its own note while doing it. Kept only when enough survives to be a market. See comp-kind.ts.
+ const kindFiltered = filterKindConflicts(modelFiltered, opts.query);
+ const kindOk = !comparablesAreThin(kindFiltered.length, modelFiltered.length);
+ if (kindFiltered.length !== modelFiltered.length) {
+  console.log(`[pricing] ${kindOk ? "dropped" : "would drop (too thin, kept all)"} ${modelFiltered.length - kindFiltered.length}/${modelFiltered.length} different-kind comps`);
+ }
+ const byKind = kindOk ? kindFiltered : modelFiltered;
  // Drop comps from a DIFFERENT TIER of the same house. This is the choke point
  // where every source converges, reverse-image, VYA's own, cached and live, so
  // it has to happen here: filtering only the ones passed in leaves the eBay and
  // Shopping results, which are exactly the ones that priced a Ralph Lauren
  // Collection gown off $50 Lauren Ralph Lauren dresses.
  const line = resolveBrandLine(opts.context?.brand ?? null);
- const tierPool = modelFiltered.length >= 3 ? modelFiltered : ranked;
+ const tierPool = byKind.length >= 3 ? byKind : ranked;
  const sameTier = tierPool.filter((c) => isFairComp(line, c.title || ""));
  if (line && sameTier.length !== tierPool.length) {
   console.log(`[pricing] dropped ${tierPool.length - sameTier.length}/${tierPool.length} cross-tier comps for ${line.label}`);

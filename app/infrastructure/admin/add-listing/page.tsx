@@ -776,8 +776,13 @@ export default function IntakePage() {
  )}
  {/* Specific-piece match (Phase 2): the exact model we recognized from the reference index,
    used to sharpen the title/era and tighten the price comps. Only shown when confident. */}
+ {/* NO PRICE ON THIS CHIP. It is only ever set when the exact-recall path found nothing, which
+     makes it a LOOK-ALIKE by definition, and the pipeline says so in as many words: it may inform
+     the ERA and must not supply a model, a material or a price. It was nonetheless printing
+     "refs ~$16013" beside a 1,681 dress, because the look-alike's own listing was a Chanel
+     handbag. A number shown to a seller is a number she prices against, whatever we call it. */}
  {specificPiece && (
- <p className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-[11px] text-stone-600">🎯 Looks like <span className="font-medium text-stone-800">{specificPiece.model}</span> <span className="text-stone-400">· {Math.round(specificPiece.similarity * 100)}% match{specificPiece.refPriceCents ? ` · refs ~$${Math.round(specificPiece.refPriceCents / 100)}` : ""}</span></p>
+ <p className="mt-3 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1.5 text-[11px] text-stone-600">🎯 Looks like <span className="font-medium text-stone-800">{specificPiece.model}</span> <span className="text-stone-400">· {Math.round(specificPiece.similarity * 100)}% visual match{specificPiece.era ? `, ${specificPiece.era}` : ""} · used for the era, not the price</span></p>
  )}
 
  <TechButton className="mt-4 w-full" variant="secondary" onClick={fillWithAI} disabled={busy || !photos.length}>
